@@ -138,12 +138,23 @@ export function AuthProvider({ children }) {
     if (!userId) return null;
 
     try {
-      const freshProfile = await getUserProfile(userId);
-      if (freshProfile) {
-        setProfile(freshProfile);
-        setCachedProfile(freshProfile);
+      // Bypass cache para obtener datos frescos siempre
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error refreshing profile:', error);
+        return null;
       }
-      return freshProfile;
+
+      if (data) {
+        setProfile(data);
+        setCachedProfile(data);
+      }
+      return data;
     } catch (err) {
       console.warn('Could not refresh profile:', err);
       return null;

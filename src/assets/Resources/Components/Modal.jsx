@@ -60,6 +60,7 @@ export default function Modal({
   const [selectedAccent, setSelectedAccent] = useState(initialAccentColor);
   const [interests, setInterests] = useState(initialInterests);
   const [interestInput, setInterestInput] = useState('');
+  const [hasChanges, setHasChanges] = useState(false);
   const [extracting, setExtracting] = useState(false);
   // Submodal state: null | { type: 'avatar' | 'banner', value: string }
   const [showUrlModal, setShowUrlModal] = useState(null);
@@ -78,6 +79,7 @@ export default function Modal({
     setSocialError('');
     setShowUrlModal(null);
     setUrlInput('');
+    setHasChanges(false);
     // Restore cached colors immediately (no flash)
     const cached = initialBanner ? colorCache[initialBanner.trim()] : null;
     if (cached) {
@@ -86,6 +88,23 @@ export default function Modal({
       setExtractedColors([]);
     }
   }, [initialUsername, initialBanner, initialAvatar, initialBio, initialSocialLinks, initialAccentColor, isOpen]);
+
+  // ── Detectar cambios pendientes ──
+  useEffect(() => {
+    const changed =
+      username !== (initialUsername || '') ||
+      banner !== (initialBanner || '') ||
+      avatar !== (initialAvatar || '') ||
+      bio !== (initialBio || '') ||
+      JSON.stringify(socialLinks) !== JSON.stringify(initialSocialLinks || []) ||
+      selectedAccent !== (initialAccentColor || '') ||
+      JSON.stringify(interests) !== JSON.stringify(initialInterests || []);
+    setHasChanges(changed);
+  }, [
+    username, banner, avatar, bio, socialLinks, selectedAccent, interests,
+    initialUsername, initialBanner, initialAvatar, initialBio,
+    initialSocialLinks, initialAccentColor, initialInterests
+  ]);
 
   // Extract colors when banner URL changes (with cache)
   useEffect(() => {
@@ -211,9 +230,14 @@ export default function Modal({
   const defaultAvatar = 'https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg';
   const previewUsername = username || 'username';
 
+  const confirmClose = () => {
+    if (hasChanges && !window.confirm(t('modal.discard_changes'))) return;
+    onClose();
+  };
+
   const handleOverlayClick = (e) => {
     if (e.target === e.currentTarget) {
-      onClose();
+      confirmClose();
     }
   };
 
@@ -469,7 +493,7 @@ export default function Modal({
           <button className="fc-modal-save" onClick={handleSave} disabled={saving}>
             {saving ? t('modal.saving') : t('modal.save')}
           </button>
-          <button className="fc-modal-cancel" onClick={onClose} disabled={saving}>
+          <button className="fc-modal-cancel" onClick={confirmClose} disabled={saving}>
             {t('modal.cancel')}
           </button>
         </div>

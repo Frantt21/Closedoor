@@ -186,6 +186,7 @@
   "modal.social_example": "例: @user, twitter.com/user, https://github.com/user",
   "modal.interests": "興味",
   "modal.interests_placeholder": "興味を追加...",
+  "modal.discard_changes": "保存していない変更があります。破棄しますか？",
   "modal.saving": "保存中...",
 
   "create_post.title": "投稿を作成",

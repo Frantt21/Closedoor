@@ -63,13 +63,17 @@ function ProfileContent({ path, ownProfile, user, t }) {
       return;
     }
 
-    // No forzar loading si ya tenemos cache (el useState ya lo leyó)
+    // Si hay cache, mostrar inmediatamente (el refresh en background se hace desde profile.jsx)
     const hasCache = isUUID(username)
       ? getCachedProfile(username)
       : getCachedProfileByUsername(username);
-    if (!hasCache) {
-      setLoading(true);
+    if (hasCache) {
+      setViewedProfile(hasCache);
+      setLoading(false);
+      return;
     }
+
+    setLoading(true);
 
     const fetchFn = isUUID(username)
       ? getUserProfile(username)

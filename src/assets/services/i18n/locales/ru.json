@@ -185,6 +185,7 @@
   "modal.social_example": "Пример: @user, twitter.com/user, https://github.com/user",
   "modal.interests": "Интересы",
   "modal.interests_placeholder": "Добавьте интерес...",
+  "modal.discard_changes": "У вас есть несохраненные изменения. Отменить их?",
   "modal.saving": "Сохранение...",
 
   "create_post.title": "Создать пост",

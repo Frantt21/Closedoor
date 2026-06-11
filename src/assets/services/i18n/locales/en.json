@@ -188,6 +188,7 @@
   "modal.social_example": "E.g.: @user, twitter.com/user, https://github.com/user",
   "modal.interests": "Interests",
   "modal.interests_placeholder": "Add an interest...",
+  "modal.discard_changes": "You have unsaved changes. Discard them?",
   "modal.saving": "Saving...",
 
   "create_post.title": "Create post",
