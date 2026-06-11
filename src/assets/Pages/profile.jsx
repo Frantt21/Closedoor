@@ -45,7 +45,6 @@ import { useI18n } from "../services/i18n/useI18n";
 import FollowersModal from "../Resources/Components/FollowersModal";
 import PostCard from "../Resources/Components/PostCard";
 import CreatePostModal from "../Resources/Components/CreatePostModal";
-import ProfileSidebar from "../Resources/Components/ProfileSidebar";
 
 // ── Detectar si un string es UUID ──
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -793,8 +792,6 @@ function Profile() {
       : {};
 
     return (            <div className="profile-page" style={styleVars}>
-            <div className="profile-layout">
-            <div className="profile-main">
             <div className="profile-card">
                 <div className="profile-banner-container">
                     {bannerUrl ? (
@@ -925,17 +922,6 @@ function Profile() {
                     </div>
                 </div>
             </div>
-
-            </div>
-
-            {/* ── Sidebar: intereses y estadísticas ── */}
-            <ProfileSidebar
-              profile={activeProfile}
-              isPrivate={isPrivate}
-              canViewContent={canViewContent}
-              isOwnProfile={isOwnProfile}
-            />
-          </div>
 
             {/* Edit modal (own profile only) */}
             {isOwnProfile && (

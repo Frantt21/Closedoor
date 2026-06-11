@@ -8,8 +8,8 @@
     --banner-height: 220px;
     --accent-color: #ffffff;
     padding: 0;
-    margin: 0 auto;
-    max-width: 800px;
+    margin: 0;
+    max-width: 100%;
     position: relative;
 }
 
@@ -105,7 +105,7 @@
     left: calc(12% + var(--avatar-size) / 2 + 1.5rem);
     top: 50%;
     transform: translateY(-50%);
-    color: var(--color-text, #ffffff);
+    color: #ffffff;
     text-shadow: 0 1px 3px rgba(0,0,0,0.7);
     display: flex;
     flex-direction: column;
@@ -233,7 +233,7 @@
 .profile-stat-value {
     font-weight: 700;
     font-size: 0.9rem;
-    color: var(--color-text, #ffffff);
+    color: #ffffff;
 }
 
 .profile-stat-label {
@@ -317,7 +317,7 @@
     background: rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    color: var(--color-text, #ffffff);
+    color: rgba(255, 255, 255, 0.8);
     border: none;
     border-radius: var(--radius, 10px);
     cursor: pointer;

@@ -24,7 +24,7 @@
 
 /* ── Estado: Seguir (como Editar perfil) ── */
 .follow-btn--follow {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--overlay-bg);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   color: var(--color-text, #ffffff);
@@ -32,16 +32,16 @@
 }
 
 .follow-btn--follow:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--overlay-bg-hover);
 }
 
 .follow-btn--follow:active {
-  background: rgba(255, 255, 255, 0.18);
+  background: var(--overlay-bg-active);
 }
 
 /* ── Estado: Siguiendo ── */
 .follow-btn--following {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--overlay-bg-subtle);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   color: var(--color-text-secondary, #9ca3af);
@@ -60,7 +60,7 @@
 /* ── Estado: Solicitar seguir (perfil privado) ──
      Mismo estilo neutro que el botón de seguir */
 .follow-btn--request {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--overlay-bg);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   color: var(--color-text, #ffffff);
@@ -68,16 +68,16 @@
 }
 
 .follow-btn--request:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--overlay-bg-hover);
 }
 
 .follow-btn--request:active {
-  background: rgba(255, 255, 255, 0.18);
+  background: var(--overlay-bg-active);
 }
 
 /* ── Estado: Solicitud enviada ── */
 .follow-btn--requested {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--overlay-bg-subtle);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   color: var(--color-text-secondary, #9ca3af);

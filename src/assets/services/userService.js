@@ -158,6 +158,25 @@ export async function createUserProfile(userId, email, username) {
  */
 export async function getUserProfile(userId) {
   try {
+    // Intentar cache primero
+    const cached = getCachedProfile(userId);
+    if (cached) {
+      // Fetch en background (no await) para refrescar
+      supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (!error && data) {
+            setCachedProfile(data);
+            return data;
+          }
+        })
+        .catch(() => {});
+      return cached;
+    }
+
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -169,9 +188,54 @@ export async function getUserProfile(userId) {
       throw error;
     }
 
+    if (data) setCachedProfile(data);
     return data;
   } catch (err) {
     console.error('Fetch profile error:', err);
+    throw err;
+  }
+}
+
+export async function getUserProfileByUsername(username) {
+  try {
+    // Intentar cache primero
+    const cached = getCachedProfileByUsername(username);
+    if (cached) {
+      // Fetch en background (no await) para refrescar
+      supabase
+        .from('profiles')
+        .select('*')
+        .eq('username', username.toLowerCase())
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (!error && data) {
+            setCachedProfile(data);
+            setCachedProfileByUsername(username, data);
+            return data;
+          }
+        })
+        .catch(() => {});
+      return cached;
+    }
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('username', username.toLowerCase())
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching profile by username:', error);
+      throw error;
+    }
+
+    if (data) {
+      setCachedProfile(data);
+      setCachedProfileByUsername(username, data);
+    }
+    return data;
+  } catch (err) {
+    console.error('Fetch profile by username error:', err);
     throw err;
   }
 }
@@ -204,31 +268,6 @@ export async function listProfiles(excludeUserId, limit = 50) {
     return data || [];
   } catch (err) {
     console.error('List profiles error:', err);
-    throw err;
-  }
-}
-
-/**
- * Get user profile by username
- * @param {string} username - Username
- * @returns {Promise<object>} - User profile or null
- */
-export async function getUserProfileByUsername(username) {
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('username', username.toLowerCase())
-      .maybeSingle();
-
-    if (error) {
-      console.error('Error fetching profile by username:', error);
-      throw error;
-    }
-
-    return data;
-  } catch (err) {
-    console.error('Fetch profile by username error:', err);
     throw err;
   }
 }

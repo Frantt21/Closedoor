@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useI18n } from '../services/i18n/useI18n';
 import { useAuth } from '../../hooks/useAuth';
 import { updateUserProfile } from '../services/userService';
-import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaCheck } from 'react-icons/fa';
+import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaCheck, FaSun, FaMoon } from 'react-icons/fa';
 import '../Resources/Styles/settings.css';
 
 /* ── SVG Flag Icons ── */
@@ -60,7 +60,7 @@ const LANGUAGES = [
 ];
 
 export default function Settings() {
-  const { locale, setLocale, showAccent, setShowAccent, t } = useI18n();
+  const { locale, setLocale, showAccent, setShowAccent, theme, setTheme, t } = useI18n();
   const { user, profile, profileLoading, refreshProfile } = useAuth();
   const [selectOpen, setSelectOpen] = useState(false);
   const selectRef = useRef(null);
@@ -173,6 +173,36 @@ export default function Settings() {
               disabled={privacyUpdating || profileLoading}
             >
               {t('settings.private_profile')}
+            </button>
+          </div>
+        </div>
+
+        {/* ── Separador ── */}
+        <div className="settings-divider" />
+
+        {/* ── Tema ── */}
+        <div className="settings-section">
+          <div className="settings-section-header">
+            <span className="settings-section-icon">{theme === 'light' ? <FaSun /> : <FaMoon />}</span>
+            <div>
+              <h2 className="settings-section-title">{t('settings.theme')}</h2>
+              <p className="settings-section-desc">{t('settings.theme_desc')}</p>
+            </div>
+          </div>
+          <div className="settings-segmented">
+            <button
+              type="button"
+              className={`settings-segmented-btn ${theme === 'dark' ? 'settings-segmented-btn--active' : ''}`}
+              onClick={() => setTheme('dark')}
+            >
+              <FaMoon style={{ marginRight: 6 }} />{t('settings.theme_dark')}
+            </button>
+            <button
+              type="button"
+              className={`settings-segmented-btn ${theme === 'light' ? 'settings-segmented-btn--active' : ''}`}
+              onClick={() => setTheme('light')}
+            >
+              <FaSun style={{ marginRight: 6 }} />{t('settings.theme_light')}
             </button>
           </div>
         </div>

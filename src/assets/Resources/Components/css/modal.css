@@ -69,16 +69,16 @@
 }
 
 .fc-modal-input:hover {
-    border-color: #444;
+    border-color: var(--color-text-muted, #6b7280);
 }
 
 .fc-modal-input:focus {
     border-color: var(--color-text, #ffffff);
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
+    box-shadow: 0 0 0 2px var(--overlay-bg);
 }
 
 .fc-modal-input:focus::placeholder {
-    color: #555;
+    color: var(--color-text-muted, #6b7280);
 }
 
 /* ---- Preview Card grande ---- */
@@ -174,7 +174,7 @@
 .fc-preview-card-name {
     font-size: 0.85rem;
     font-weight: 700;
-    color: var(--color-text, #ffffff);
+    color: #ffffff;
     text-shadow: 0 1px 3px rgba(0,0,0,0.7);
 }
 
@@ -190,8 +190,8 @@
     border-radius: 50%;
     background: rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(4px);
-    border: 1.5px solid rgba(255, 255, 255, 0.2);
-    color: rgba(255, 255, 255, 0.85);
+    border: 1.5px solid var(--overlay-border);
+    color: rgba(255, 255, 255, 0.8);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -203,7 +203,7 @@
 
 .fc-preview-banner-edit:hover {
     background: rgba(0, 0, 0, 0.75);
-    border-color: rgba(255, 255, 255, 0.4);
+    border-color: var(--overlay-border-strong);
 }
 
 .fc-preview-avatar-edit {
@@ -214,7 +214,7 @@
     border-radius: 50%;
     background: none;
     border: none;
-    color: rgba(255, 255, 255, 0.7);
+    color: rgba(255, 255, 255, 0.8);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -231,7 +231,7 @@
 }
 
 .fc-preview-avatar-edit:hover {
-    color: rgba(255, 255, 255, 1);
+    color: var(--overlay-text);
 }
 
 textarea.fc-modal-input {
@@ -294,8 +294,8 @@ textarea.fc-modal-input {
   font-size: 0.8rem;
   font-weight: 500;
   color: var(--color-text-secondary, #9ca3af);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--overlay-bg-subtle);
+  border: 1px solid var(--overlay-bg);
   border-radius: var(--radius-full, 9999px);
   white-space: nowrap;
 }
@@ -480,7 +480,7 @@ textarea.fc-modal-input {
 .fc-modal-cancel:hover:not(:disabled) {
     background: var(--color-surface-hover, #252525);
     color: var(--color-text, #ffffff);
-    border-color: #444;
+    border-color: var(--color-text-muted, #6b7280);
 }
 
 .fc-modal-save:disabled,
@@ -522,7 +522,7 @@ textarea.fc-modal-input {
 }
 
 .fc-modal::-webkit-scrollbar-thumb:hover {
-    background: #444;
+    background: var(--color-text-muted, #6b7280);
 }
 
 /* ── Accent Color Picker ── */
@@ -551,17 +551,17 @@ textarea.fc-modal-input {
 
 .fc-modal-color-swatch:hover {
     transform: scale(1.15);
-    box-shadow: 0 0 12px rgba(255, 255, 255, 0.15);
+    box-shadow: 0 0 12px var(--overlay-bg);
 }
 
 .fc-modal-color-swatch--selected {
     border-color: #ffffff;
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 0 2px var(--overlay-border-strong);
     transform: scale(1.1);
 }
 
 .fc-modal-color-swatch svg {
-    color: rgba(255, 255, 255, 0.9);
+    color: var(--overlay-text);
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
 }
 
@@ -570,7 +570,7 @@ textarea.fc-modal-input {
 .fc-modal-color-swatch[style*="#000"] svg,
 .fc-modal-color-swatch[style*="#111"] svg,
 .fc-modal-color-swatch[style*="#222"] svg {
-    color: rgba(255, 255, 255, 0.9);
+    color: var(--overlay-text);
 }
 
 /* ── URL Submodal ── */

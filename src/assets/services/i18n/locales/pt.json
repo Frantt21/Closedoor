@@ -85,7 +85,7 @@
   "post.minutes_ago": "há {n}min",
   "post.hours_ago": "há {n}h",
   "post.days_ago": "há {n}d",
-  "post.back": "← Voltar",
+  "post.back": "Voltar",
   "post.comments_title": "Comentários",
   "post.comment_placeholder": "Escreva um comentário...",
   "post.comment_post": "Publicar",
@@ -157,6 +157,10 @@
   "settings.profile_config_desc": "Controle a visibilidade do seu perfil.",
   "settings.public_profile": "Público",
   "settings.private_profile": "Privado",
+  "settings.theme": "Tema",
+  "settings.theme_desc": "Selecione o tema do aplicativo.",
+  "settings.theme_dark": "Escuro",
+  "settings.theme_light": "Claro",
 
   "modal.edit_title": "Editar perfil",
   "modal.username_label": "Nome de usuário",
@@ -212,6 +216,9 @@
   "home.no_posts": "Nenhuma publicação no seu feed.",
   "home.no_posts_hint": "Siga usuários para ver suas publicações aqui.",
   "home.no_posts_first": "Nenhum post ainda. Seja o primeiro a publicar!",
+
+  "right_panel.trending": "Tendências",
+  "right_panel.coming_soon": "Em breve você verá tendências e recomendações aqui.",
 
   "followers.title": "Seguidores",
   "following.title": "Seguindo",

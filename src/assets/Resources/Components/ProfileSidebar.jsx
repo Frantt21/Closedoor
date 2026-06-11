@@ -4,15 +4,55 @@ import { useI18n } from '../../services/i18n/useI18n';
 import { supabase } from '../../services/supabaseclient';
 import './css/profileSidebar.css';
 
+// ── Stats cache ──
+const STATS_CACHE_PREFIX = 'fc_stats_';
+const STATS_CACHE_TTL = 1000 * 60 * 5; // 5 minutos
+
+function getCachedStats(profileId) {
+  try {
+    const raw = localStorage.getItem(STATS_CACHE_PREFIX + profileId);
+    if (!raw) return null;
+    const payload = JSON.parse(raw);
+    if (!payload?.ts) return null;
+    if (Date.now() - payload.ts > STATS_CACHE_TTL) {
+      localStorage.removeItem(STATS_CACHE_PREFIX + profileId);
+      return null;
+    }
+    return payload.stats;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedStats(profileId, stats) {
+  try {
+    const payload = { ts: Date.now(), stats };
+    localStorage.setItem(STATS_CACHE_PREFIX + profileId, JSON.stringify(payload));
+  } catch {
+    /* ignore */
+  }
+}
+
 export default function ProfileSidebar({ profile, isPrivate, canViewContent, isOwnProfile }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState(() => {
+    if (!profile?.id) return null;
+    if (!canViewContent && !isOwnProfile) return null;
+    return getCachedStats(profile.id);
+  });
   const interests = profile?.interests || [];
   const visibleInterests = expanded ? interests : interests.slice(0, 20);
   const hasMore = interests.length > 20;
 
-  // ── Fetch aggregated stats ──
+  // ── Reset stats cuando cambia el perfil (navegación entre perfiles) ──
+  useEffect(() => {
+    if (profile?.id) {
+      setStats(getCachedStats(profile.id));
+    }
+  }, [profile?.id]);
+
+  // ── Fetch aggregated stats (cache-first, background-refresh) ──
   useEffect(() => {
     if (!profile?.id) return;
 
@@ -38,6 +78,7 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, isO
             { likes: 0, comments: 0, reposts: 0 }
           );
           setStats(total);
+          setCachedStats(profile.id, total);
         }
       } catch (err) {
         console.warn('Error fetching profile stats:', err);
@@ -45,6 +86,30 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, isO
     };
 
     fetchStats();
+
+    // ── Realtime: refrescar stats cuando se actualiza un post (like/comment/repost) ──
+    const channel = supabase
+      .channel(`profile-stats-${profile.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'posts', filter: `user_id=eq.${profile.id}` },
+        () => fetchStats()
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'posts', filter: `user_id=eq.${profile.id}` },
+        () => fetchStats()
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'posts', filter: `user_id=eq.${profile.id}` },
+        () => fetchStats()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [profile?.id, canViewContent, isOwnProfile]);
 
   if (!profile) return null;

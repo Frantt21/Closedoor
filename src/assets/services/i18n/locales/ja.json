@@ -85,7 +85,7 @@
   "post.minutes_ago": "{n}分前",
   "post.hours_ago": "{n}時間前",
   "post.days_ago": "{n}日前",
-  "post.back": "← 戻る",
+  "post.back": "戻る",
   "post.comments_title": "コメント",
   "post.comment_placeholder": "コメントを書く...",
   "post.comment_post": "投稿",
@@ -157,6 +157,10 @@
   "settings.profile_config_desc": "プロフィールの公開設定を管理します。",
   "settings.public_profile": "公開",
   "settings.private_profile": "非公開",
+  "settings.theme": "テーマ",
+  "settings.theme_desc": "アプリケーションのテーマを選択します。",
+  "settings.theme_dark": "ダーク",
+  "settings.theme_light": "ライト",
 
   "modal.edit_title": "プロフィール編集",
   "modal.username_label": "ユーザー名",
@@ -212,6 +216,9 @@
   "home.no_posts": "フィードに投稿はありません。",
   "home.no_posts_hint": "ユーザーをフォローして投稿を表示しましょう。",
   "home.no_posts_first": "投稿はまだありません。最初の投稿をしよう！",
+
+  "right_panel.trending": "トレンド",
+  "right_panel.coming_soon": "近日中にトレンドとおすすめをここで表示します。",
 
   "followers.title": "フォロワー",
   "following.title": "フォロー中",

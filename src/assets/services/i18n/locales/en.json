@@ -85,7 +85,7 @@
   "post.minutes_ago": "{n}m ago",
   "post.hours_ago": "{n}h ago",
   "post.days_ago": "{n}d ago",
-  "post.back": "← Back",
+  "post.back": "Back",
   "post.comments_title": "Comments",
   "post.comment_placeholder": "Write a comment...",
   "post.comment_post": "Post",
@@ -159,6 +159,10 @@
   "settings.profile_config_desc": "Control your profile visibility.",
   "settings.public_profile": "Public",
   "settings.private_profile": "Private",
+  "settings.theme": "Theme",
+  "settings.theme_desc": "Select the application theme.",
+  "settings.theme_dark": "Dark",
+  "settings.theme_light": "Light",
 
   "modal.edit_title": "Edit profile",
   "modal.username_label": "Username",
@@ -214,6 +218,9 @@
   "home.no_posts": "No posts in your feed.",
   "home.no_posts_hint": "Follow users to see their posts here.",
   "home.no_posts_first": "No posts yet. Be the first to post!",
+
+  "right_panel.trending": "Trending",
+  "right_panel.coming_soon": "Soon you'll see trends and recommendations here.",
 
   "followers.title": "Followers",
   "following.title": "Following",

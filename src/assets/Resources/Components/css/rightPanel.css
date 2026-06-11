@@ -1,0 +1,70 @@
+/* ==========================================
+   Right Panel — widget flotante global
+   ========================================== */
+
+.right-panel {
+  width: 260px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-self: flex-start;
+}
+
+/* ── Card base ── */
+
+.right-panel-card {
+  background: var(--color-surface, #1a1a1a);
+  border: 1px solid var(--color-border, #2a2a2a);
+  border-radius: var(--radius, 10px);
+  padding: 16px;
+}
+
+.right-panel-card-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-text, #ffffff);
+  margin: 0 0 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.right-panel-card-icon {
+  font-size: 0.85rem;
+  color: #f97316;
+}
+
+.right-panel-placeholder {
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #6b7280);
+  font-style: italic;
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ── Skeleton ── */
+
+.right-panel-skeleton-title {
+  height: 16px;
+  width: 60%;
+  margin-bottom: 12px;
+  border-radius: 4px;
+}
+
+.right-panel-skeleton-pill {
+  height: 24px;
+  width: 80%;
+  margin-bottom: 6px;
+  border-radius: 999px;
+}
+
+/* ── Responsive: ocultar en pantallas pequeñas ── */
+
+@media (max-width: 1100px) {
+  .right-panel {
+    display: none;
+  }
+}

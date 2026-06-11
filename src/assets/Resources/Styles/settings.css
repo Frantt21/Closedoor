@@ -5,7 +5,7 @@
 .settings-page {
   max-width: 600px;
   margin: 0 auto;
-  padding: 40px 20px;
+  padding: 0 20px 40px;
 }
 
 .settings-title {
@@ -75,8 +75,8 @@
   width: 100%;
   padding: 8px 12px;
   border-radius: var(--radius, 10px);
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--overlay-bg);
+  border: 1px solid var(--overlay-border);
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
   font-family: inherit;
@@ -86,8 +86,8 @@
 }
 
 .settings-select-trigger:hover {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.25);
+  background: var(--overlay-bg-hover);
+  border-color: var(--overlay-border-hover);
 }
 
 .settings-select-label {
@@ -111,7 +111,7 @@
   left: 0;
   right: 0;
   background: var(--color-surface, #1a1a1a);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--overlay-border);
   border-radius: var(--radius, 10px);
   overflow: hidden;
   z-index: 100;
@@ -135,11 +135,11 @@
 }
 
 .settings-select-option:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--overlay-bg);
 }
 
 .settings-select-option--active {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--overlay-bg-hover);
   font-weight: 600;
 }
 
@@ -159,7 +159,7 @@
 
 .settings-segmented {
   display: flex;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--overlay-bg);
   border-radius: var(--radius, 10px);
   padding: 3px;
   flex-shrink: 0;
@@ -211,13 +211,13 @@
   width: 44px;
   height: 24px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--overlay-bg);
   transition: background 0.2s ease;
   position: relative;
 }
 
 .settings-toggle input:checked + .settings-toggle-track {
-  background: rgba(255, 255, 255, 0.6);
+  background: var(--overlay-strong);
 }
 
 .settings-toggle-thumb {

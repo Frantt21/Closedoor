@@ -3,6 +3,7 @@ import es from './locales/es.json';
 
 const LOCALE_KEY = 'fc_locale';
 const ACCENT_KEY = 'fc_show_accent';
+const THEME_KEY = 'fc_theme';
 
 const locales = { es };
 
@@ -24,18 +25,29 @@ function getSavedShowAccent() {
   }
 }
 
+function getSavedTheme() {
+  try {
+    return localStorage.getItem(THEME_KEY) || 'dark';
+  } catch {
+    return 'dark';
+  }
+}
+
 export const I18nContext = createContext({
   locale: 'es',
   t: (key, params) => key,
   setLocale: () => {},
   showAccent: true,
   setShowAccent: () => {},
+  theme: 'dark',
+  setTheme: () => {},
 });
 
 export function I18nProvider({ children }) {
   const [locale, setLocaleState] = useState(getSavedLocale);
   const [translations, setTranslations] = useState(() => locales[getSavedLocale()] || es);
   const [showAccent, setShowAccentState] = useState(getSavedShowAccent);
+  const [theme, setThemeState] = useState(getSavedTheme);
 
   // Cargar el archivo de locale asíncrono
   useEffect(() => {
@@ -68,6 +80,18 @@ export function I18nProvider({ children }) {
     } catch {}
   }, []);
 
+  const setTheme = useCallback((newTheme) => {
+    setThemeState(newTheme);
+    try {
+      localStorage.setItem(THEME_KEY, newTheme);
+    } catch {}
+  }, []);
+
+  // Aplicar tema al html element
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+
   const t = useCallback((key, params = {}) => {
     if (!translations) return key;
     let text = translations[key];
@@ -80,7 +104,7 @@ export function I18nProvider({ children }) {
   }, [translations]);
 
   return (
-    <I18nContext.Provider value={{ locale, t, setLocale, showAccent, setShowAccent }}>
+    <I18nContext.Provider value={{ locale, t, setLocale, showAccent, setShowAccent, theme, setTheme }}>
       {children}
     </I18nContext.Provider>
   );

@@ -15,7 +15,7 @@
 }
 
 .post-card:hover {
-    background: #1e1e1e;
+    background: var(--color-surface-hover, #252525);
 }
 
 .post-card--deleting {
@@ -88,7 +88,7 @@
 }
 
 .post-card-avatar-link:hover .post-card-avatar {
-    border-color: #555;
+    border-color: var(--color-text-muted, #6b7280);
 }
 
 /* ---- Content area ---- */
@@ -196,18 +196,18 @@
     border-radius: var(--radius, 10px);
     transition: background 0.2s ease, color 0.2s ease;
     user-select: none;
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--overlay-bg-subtle);
     color: var(--color-text-secondary, #9ca3af);
     border: none;
 }
 
 .post-card-action:hover {
-    background: rgba(255, 255, 255, 0.14);
+    background: var(--overlay-bg-hover);
     color: var(--color-text, #ffffff);
 }
 
 .post-card-action:active {
-    background: rgba(255, 255, 255, 0.18);
+    background: var(--overlay-bg-active);
 }
 
 /* Like activo: usa el color de acento */
@@ -271,7 +271,7 @@
 }
 
 .post-card-menu-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: var(--overlay-bg);
     color: var(--color-text, #ffffff);
 }
 
@@ -306,7 +306,7 @@
 }
 
 .post-card-menu-dropdown button:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--overlay-bg-subtle);
 }
 
 .post-card-menu-dropdown button svg {

@@ -3,7 +3,6 @@
    ========================================== */
 
 .posts-section {
-    margin-top: 20px;
     max-width: 800px;
     margin-left: auto;
     margin-right: auto;
@@ -247,7 +246,7 @@
 }
 
 .comment-form-input:focus {
-    border-color: #555;
+    border-color: var(--color-text-muted, #6b7280);
 }
 
 .comment-form-actions {
@@ -302,7 +301,7 @@
 }
 
 .comment-card-avatar:hover {
-    border-color: #555;
+    border-color: var(--color-text-muted, #6b7280);
 }
 
 .comment-card-content {
@@ -372,7 +371,7 @@
 }
 
 .comment-card-btn:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--overlay-bg-subtle);
     color: var(--color-text, #ffffff);
 }
 

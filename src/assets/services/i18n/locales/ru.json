@@ -85,7 +85,7 @@
   "post.minutes_ago": "{n} мин назад",
   "post.hours_ago": "{n} ч назад",
   "post.days_ago": "{n} д назад",
-  "post.back": "← Назад",
+  "post.back": "Назад",
   "post.comments_title": "Комментарии",
   "post.comment_placeholder": "Напишите комментарий...",
   "post.comment_post": "Опубликовать",
@@ -156,6 +156,10 @@
   "settings.profile_config_desc": "Управляйте видимостью профиля.",
   "settings.public_profile": "Публичный",
   "settings.private_profile": "Приватный",
+  "settings.theme": "Тема",
+  "settings.theme_desc": "Выберите тему приложения.",
+  "settings.theme_dark": "Тёмная",
+  "settings.theme_light": "Светлая",
 
   "modal.edit_title": "Редактировать профиль",
   "modal.username_label": "Имя пользователя",
@@ -211,6 +215,9 @@
   "home.no_posts": "В вашей ленте нет постов.",
   "home.no_posts_hint": "Подпишитесь на пользователей, чтобы видеть их посты.",
   "home.no_posts_first": "Постов пока нет. Будьте первым!",
+
+  "right_panel.trending": "Тренды",
+  "right_panel.coming_soon": "Скоро здесь появятся тренды и рекомендации.",
 
   "followers.title": "Подписчики",
   "following.title": "Подписки",
