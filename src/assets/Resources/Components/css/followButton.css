@@ -1,0 +1,95 @@
+/* ==========================================
+   Follow Button Styles
+   Mismo estilo que el botón "Editar perfil"
+   ========================================== */
+
+.follow-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius, 10px);
+  font-family: inherit;
+  user-select: none;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.follow-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Estado: Seguir (como Editar perfil) ── */
+.follow-btn--follow {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--color-text, #ffffff);
+  border: none;
+}
+
+.follow-btn--follow:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.follow-btn--follow:active {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* ── Estado: Siguiendo ── */
+.follow-btn--following {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--color-text-secondary, #9ca3af);
+  border: none;
+}
+
+.follow-btn--following:hover {
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+}
+
+.follow-btn--following:active {
+  background: rgba(239, 68, 68, 0.14);
+}
+
+/* ── Estado: Solicitar seguir (perfil privado) ──
+     Mismo estilo neutro que el botón de seguir */
+.follow-btn--request {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--color-text, #ffffff);
+  border: none;
+}
+
+.follow-btn--request:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.follow-btn--request:active {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* ── Estado: Solicitud enviada ── */
+.follow-btn--requested {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--color-text-secondary, #9ca3af);
+  border: 1px solid var(--color-border, #2a2a2a);
+}
+
+.follow-btn--requested:hover {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.follow-btn--requested:active {
+  background: rgba(239, 68, 68, 0.14);
+}

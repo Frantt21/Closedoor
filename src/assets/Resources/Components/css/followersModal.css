@@ -1,0 +1,145 @@
+/* ==========================================
+   Followers Modal Styles
+   ========================================== */
+
+.followers-modal {
+    max-width: 420px;
+    max-height: 480px;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+}
+
+.followers-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px 12px;
+    border-bottom: 1px solid var(--color-border, #2a2a2a);
+    flex-shrink: 0;
+}
+
+.followers-modal-header .fc-modal-title {
+    margin: 0;
+}
+
+.followers-modal-close {
+    background: none;
+    border: none;
+    color: var(--color-text-secondary, #9ca3af);
+    font-size: 1.4rem;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--radius-sm, 6px);
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.followers-modal-close:hover {
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+}
+
+.followers-modal-loading,
+.followers-modal-empty {
+    padding: 40px 24px;
+    text-align: center;
+    color: var(--color-text-muted, #6b7280);
+    font-size: 0.9rem;
+}
+
+/* ---- List ---- */
+.followers-modal-list {
+    overflow-y: auto;
+    padding: 8px 0;
+    flex: 1;
+}
+
+.followers-modal-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.followers-modal-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.followers-modal-list::-webkit-scrollbar-thumb {
+    background: var(--color-border, #2a2a2a);
+    border-radius: 3px;
+}
+
+/* ---- Item ---- */
+.followers-modal-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 24px;
+    text-decoration: none;
+    color: inherit;
+    transition: background 0.15s ease;
+}
+
+.followers-modal-item:hover {
+    background: var(--color-surface-hover, #252525);
+}
+
+.followers-modal-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--color-bg, #000000);
+}
+
+.followers-modal-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.followers-modal-username {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--color-text, #ffffff);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.followers-modal-roles {
+    font-size: 0.75rem;
+    color: var(--color-text-muted, #6b7280);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.followers-modal-action {
+    flex-shrink: 0;
+}
+
+.followers-modal-action .follow-btn {
+    padding: 6px 14px;
+    min-width: auto;
+    font-size: 0.8rem;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 480px) {
+    .followers-modal {
+        max-height: 85vh;
+    }
+
+    .followers-modal-header {
+        padding: 16px 16px 10px;
+    }
+
+    .followers-modal-item {
+        padding: 10px 16px;
+    }
+}

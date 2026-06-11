@@ -1,0 +1,474 @@
+/* ==========================================
+   PostCard Styles
+   Tema: negro / blanco / gris oscuro
+   Botones de acción con estilo tipo "Editar perfil"
+   ========================================== */
+
+.post-card {
+    background: var(--color-surface, #1a1a1a);
+    border-radius: var(--radius, 10px);
+    padding: 16px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    margin-bottom: 12px;
+    position: relative;
+}
+
+.post-card:hover {
+    background: #1e1e1e;
+}
+
+.post-card--deleting {
+    opacity: 0.4;
+    pointer-events: none;
+}
+
+.post-card--compact {
+    padding: 12px;
+    margin-bottom: 8px;
+}
+
+/* ---- Repost banner ---- */
+
+.post-card-repost-banner {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: var(--color-text-muted, #6b7280);
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+}
+
+.post-card-repost-icon {
+    font-size: 0.7rem;
+    color: #4ade80;
+}
+
+/* ---- Pin badge ---- */
+
+.post-card-pin {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: var(--color-text-muted, #6b7280);
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--color-border, #2a2a2a);
+}
+
+.post-card-pin svg {
+    font-size: 0.7rem;
+}
+
+/* ---- Body layout ---- */
+
+.post-card-body {
+    display: flex;
+    gap: 12px;
+}
+
+/* ---- Avatar ---- */
+
+.post-card-avatar-link {
+    flex-shrink: 0;
+    display: block;
+    max-height: 50px;
+}
+
+.post-card-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+    border: 2px solid var(--color-border, #2a2a2a);
+    transition: border-color 0.2s ease;
+}
+
+.post-card-avatar-link:hover .post-card-avatar {
+    border-color: #555;
+}
+
+/* ---- Content area ---- */
+
+.post-card-content {
+    flex: 1;
+    min-width: 0;
+}
+
+/* ---- Header ---- */
+
+.post-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.post-card-author {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    text-decoration: none;
+    transition: opacity 0.2s ease;
+}
+
+.post-card-author:hover {
+    opacity: 0.85;
+}
+
+.post-card-username {
+    font-weight: 600;
+    font-size: 1rem;
+    color: var(--color-text, #ffffff);
+}
+
+.post-card-time {
+    font-size: 0.75rem;
+    color: var(--color-text-muted, #6b7280);
+    white-space: nowrap;
+}
+
+/* ---- Text ---- */
+
+.post-card-text {
+    font-size: 0.92rem;
+    line-height: 1.55;
+    color: var(--color-text, #ffffff);
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+    margin: 0 0 10px 0;
+}
+
+/* ---- Media ---- */
+
+.post-card-media {
+    border-radius: var(--radius-sm, 6px);
+    overflow: hidden;
+    margin-bottom: 10px;
+    border: 1px solid var(--color-border, #2a2a2a);
+    background: #000;
+}
+
+.post-card-image {
+    width: 100%;
+    max-height: 400px;
+    object-fit: contain;
+    display: block;
+    background: #000;
+}
+
+.post-card-video {
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    border: none;
+    display: block;
+}
+
+/* ==========================================
+   Acciones: Like, Comentar, Repost
+   Estilo tipo "Editar perfil" — con
+   background, border, hover con transición
+   ========================================== */
+
+.post-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.post-card-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 14px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    border-radius: var(--radius, 10px);
+    transition: background 0.2s ease, color 0.2s ease;
+    user-select: none;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--color-text-secondary, #9ca3af);
+    border: none;
+}
+
+.post-card-action:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: var(--color-text, #ffffff);
+}
+
+.post-card-action:active {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+/* Like activo: usa el color de acento */
+.post-card-action--liked {
+    background: color-mix(in srgb, var(--accent-color, #f472b6) 8%, transparent);
+    color: var(--accent-color, #f472b6);
+}
+
+.post-card-action--liked:hover {
+    background: color-mix(in srgb, var(--accent-color, #f472b6) 15%, transparent);
+    color: var(--accent-color, #f472b6);
+}
+
+/* Repost activo: verde */
+.post-card-action--reposted {
+    background: rgba(74, 222, 128, 0.08);
+    color: #4ade80;
+}
+
+.post-card-action--reposted:hover {
+    background: rgba(74, 222, 128, 0.15);
+    color: #4ade80;
+}
+
+.post-card-action-icon {
+    display: flex;
+    align-items: center;
+    font-size: 0.9rem;
+    line-height: 1;
+}
+
+.post-card-action-icon svg {
+    display: block;
+}
+
+.post-card-action-count {
+    font-weight: 500;
+    min-width: 12px;
+    text-align: center;
+}
+
+/* ---- Menu (three dots) ---- */
+
+.post-card-menu-wrapper {
+    position: relative;
+    flex-shrink: 0;
+}
+
+.post-card-menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted, #6b7280);
+    font-size: 0.85rem;
+    padding: 4px 8px;
+    border-radius: var(--radius, 6px);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.post-card-menu-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--color-text, #ffffff);
+}
+
+.post-card-menu-dropdown {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: var(--color-surface, #1a1a1a);
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius, 8px);
+    overflow: hidden;
+    z-index: 10;
+    min-width: 170px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    animation: fcFadeIn 0.15s ease;
+}
+
+.post-card-menu-dropdown button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 14px;
+    text-align: left;
+    background: transparent;
+    border: none;
+    color: var(--color-text, #ffffff);
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.1s ease;
+    font-family: inherit;
+}
+
+.post-card-menu-dropdown button:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.post-card-menu-dropdown button svg {
+    font-size: 0.8rem;
+    opacity: 0.6;
+}
+
+.post-card-menu-danger {
+    color: #fca5a5 !important;
+}
+
+.post-card-menu-danger:hover {
+    background: rgba(255, 80, 80, 0.12) !important;
+}
+
+/* ── @Mention links ── */
+.post-card-mention {
+    color: #60a5fa;
+    font-weight: 600;
+    text-decoration: none;
+    transition: opacity 0.15s ease;
+}
+
+.post-card-mention:hover {
+    opacity: 0.8;
+    text-decoration: underline;
+}
+
+/* ── Image grid (multiple images) ── */
+.post-card-image-grid {
+    display: grid;
+    gap: 3px;
+    border-radius: var(--radius-sm, 6px);
+    overflow: hidden;
+    margin-bottom: 10px;
+    border: 1px solid var(--color-border, #2a2a2a);
+    background: #000;
+}
+
+.post-card-image-grid--1 {
+    grid-template-columns: 1fr;
+}
+
+.post-card-image-grid--2 {
+    grid-template-columns: 1fr 1fr;
+}
+
+.post-card-image-grid--3 {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+}
+
+.post-card-image-grid--3 .post-card-image-grid-item:first-child {
+    grid-column: 1 / -1;
+}
+
+.post-card-image-grid--4 {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+}
+
+.post-card-image-grid-item {
+    overflow: hidden;
+    aspect-ratio: 16 / 10;
+    background: #000;
+}
+
+.post-card-image-grid-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.25s ease;
+    cursor: zoom-in;
+}
+
+.post-card-image-grid-item img:hover {
+    transform: scale(1.03);
+}
+
+/* ── Lightbox ── */
+.post-card-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(0, 0, 0, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    animation: fcFadeIn 0.2s ease;
+    cursor: zoom-out;
+}
+
+.post-card-lightbox-content {
+    position: relative;
+    max-width: 95vw;
+    max-height: 95vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: default;
+}
+
+.post-card-lightbox-content img {
+    max-width: 100%;
+    max-height: calc(95vh - 60px);
+    object-fit: contain;
+    border-radius: var(--radius-sm, 6px);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+    display: block;
+    animation: fcSlideUp 0.25s ease;
+}
+
+.post-card-lightbox-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+    align-items: center;
+}
+
+.post-card-lightbox-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 1rem;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+}
+
+.post-card-lightbox-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+    transform: scale(1.1);
+}
+
+.post-card-lightbox-btn:active {
+    transform: scale(0.95);
+}
+
+.post-card-lightbox-close {
+    font-size: 1.2rem;
+    font-weight: 300;
+}
+
+/* ── Saved (bookmark) action ── */
+.post-card-action--saved {
+    background: rgba(250, 204, 21, 0.08);
+    color: #facc15;
+}
+
+.post-card-action--saved:hover {
+    background: rgba(250, 204, 21, 0.15);
+    color: #facc15;
+}

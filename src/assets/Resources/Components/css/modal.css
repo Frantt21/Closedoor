@@ -1,0 +1,733 @@
+/* ==========================================
+   Modal Styles
+   Tema: negro / blanco / gris oscuro
+   ========================================== */
+
+.fc-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 16px;
+    box-sizing: border-box;
+    animation: fcFadeIn 0.2s ease;
+}
+
+.fc-modal {
+    width: 100%;
+    max-width: 520px;
+    background: var(--color-surface, #1a1a1a);
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius, 10px);
+    padding: 28px;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+    max-height: 90vh;
+    overflow-y: auto;
+    animation: fcSlideUp 0.25s ease;
+}
+
+.fc-modal-title {
+    margin: 0 0 20px 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--color-text, #ffffff);
+    letter-spacing: -0.01em;
+}
+
+.fc-modal-label {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 16px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--color-text-secondary, #9ca3af);
+    gap: 6px;
+}
+
+.fc-modal-input {
+    padding: 12px 14px;
+    border: 1.5px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius, 10px);
+    margin-top: 0;
+    font-size: 1rem;
+    font-family: inherit;
+    color: var(--color-text, #ffffff);
+    background: var(--color-bg, #000000);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    width: 100%;
+    box-sizing: border-box;
+    outline: none;
+}
+
+.fc-modal-input::placeholder {
+    color: var(--color-text-muted, #6b7280);
+}
+
+.fc-modal-input:hover {
+    border-color: #444;
+}
+
+.fc-modal-input:focus {
+    border-color: var(--color-text, #ffffff);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
+}
+
+.fc-modal-input:focus::placeholder {
+    color: #555;
+}
+
+/* ---- Preview Card grande ---- */
+
+.fc-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    gap: 12px;
+}
+
+.fc-modal-header .fc-modal-title {
+    margin: 0;
+}
+
+.fc-preview-card {
+    margin-bottom: 20px;
+    border-radius: var(--radius, 10px);
+    overflow: hidden;
+    border: 1px solid var(--color-border, #2a2a2a);
+}
+
+.fc-preview-card--large .fc-preview-card-banner {
+    height: 160px;
+}
+
+.fc-preview-card-banner {
+    position: relative;
+    width: 100%;
+    height: 100px;
+    background: var(--color-surface, #1a1a1a);
+    background-size: cover;
+    background-position: center center;
+}
+
+.fc-preview-card-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.6) 100%);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.fc-preview-card-avatar {
+    position: absolute;
+    left: 14%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 3px solid var(--color-surface, #1a1a1a);
+    z-index: 2;
+    background: var(--color-bg, #000000);
+}
+
+.fc-preview-card-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.fc-preview-card--large .fc-preview-card-avatar {
+    width: 80px;
+    height: 80px;
+    border-width: 3px;
+    left: 16%;
+}
+
+.fc-preview-card--large .fc-preview-card-info {
+    left: calc(16% + 40px + 1.5rem);
+    gap: 10px;
+}
+
+.fc-preview-card--large .fc-preview-card-name {
+    font-size: 1.1rem;
+}
+
+.fc-preview-card-info {
+    position: absolute;
+    left: calc(14% + 28px + 1rem);
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.fc-preview-card-name {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--color-text, #ffffff);
+    text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+}
+
+/* ── Edit icon overlays ── */
+
+.fc-preview-banner-edit {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 10;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(4px);
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.85);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    transition: background 0.2s ease;
+    padding: 0;
+}
+
+.fc-preview-banner-edit:hover {
+    background: rgba(0, 0, 0, 0.75);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+.fc-preview-avatar-edit {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    padding: 0;
+}
+
+.fc-preview-card-avatar:hover .fc-preview-avatar-edit,
+.fc-preview-avatar-edit:focus-visible {
+    opacity: 1;
+}
+
+.fc-preview-avatar-edit:hover {
+    color: rgba(255, 255, 255, 1);
+}
+
+textarea.fc-modal-input {
+    resize: vertical;
+    min-height: 80px;
+    line-height: 1.5;
+}
+
+/* ── Interests Section ── */
+
+.fc-modal-interests-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.fc-modal-interests-input {
+  flex: 1;
+}
+
+.fc-modal-interests-add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius, 10px);
+  background: var(--color-text, #ffffff);
+  color: var(--color-bg, #000000);
+  border: none;
+  font-size: 1.3rem;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.2s ease, transform 0.15s ease;
+}
+
+.fc-modal-interests-add:hover:not(:disabled) {
+  opacity: 0.85;
+  transform: scale(1.05);
+}
+
+.fc-modal-interests-add:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.fc-modal-interests-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.fc-modal-interest-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-text-secondary, #9ca3af);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-full, 9999px);
+  white-space: nowrap;
+}
+
+.fc-modal-interest-pill-remove {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  line-height: 1;
+  color: #fca5a5;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.fc-modal-interest-pill-remove:hover {
+  background: rgba(255, 80, 80, 0.2);
+}
+
+/* ── Social Links Section ── */
+
+.fc-modal-section {
+    margin-bottom: 16px;
+}
+
+.fc-modal-social-input-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.fc-modal-social-input {
+    flex: 1;
+}
+
+.fc-modal-social-add {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--radius, 10px);
+    background: var(--color-text, #ffffff);
+    color: var(--color-bg, #000000);
+    border: none;
+    font-size: 1.3rem;
+    font-weight: 700;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: opacity 0.2s ease, transform 0.15s ease;
+}
+
+.fc-modal-social-add:hover:not(:disabled) {
+    opacity: 0.85;
+    transform: scale(1.05);
+}
+
+.fc-modal-social-add:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.fc-modal-social-error {
+    color: #fca5a5;
+    font-size: 0.8rem;
+    margin: 4px 0 0 0;
+}
+
+.fc-modal-social-hint {
+    color: var(--color-text-muted, #6b7280);
+    font-size: 0.75rem;
+    margin: 6px 0 0 0;
+}
+
+.fc-modal-social-list {
+    list-style: none;
+    padding: 0;
+    margin: 10px 0 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.fc-modal-social-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--color-bg, #000000);
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius-sm, 6px);
+    font-size: 0.85rem;
+    color: var(--color-text, #ffffff);
+}
+
+.fc-modal-social-icon {
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+}
+
+.fc-modal-social-platform {
+    font-weight: 600;
+    text-transform: capitalize;
+    color: var(--color-text-secondary, #9ca3af);
+    min-width: 70px;
+}
+
+.fc-modal-social-username {
+    flex: 1;
+    color: var(--color-text, #ffffff);
+}
+
+.fc-modal-social-remove {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: transparent;
+    color: #fca5a5;
+    border: 1px solid transparent;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+    flex-shrink: 0;
+}
+
+.fc-modal-social-remove:hover {
+    background: rgba(255, 80, 80, 0.15);
+    border-color: rgba(255, 80, 80, 0.3);
+}
+
+.fc-modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 24px;
+    flex-wrap: wrap;
+}
+
+.fc-modal-save {
+    background: var(--color-text, #ffffff);
+    color: var(--color-bg, #000000);
+    border: none;
+    padding: 10px 20px;
+    border-radius: var(--radius, 10px);
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    min-width: 100px;
+    transition: opacity 0.2s ease, transform 0.15s ease;
+}
+
+.fc-modal-save:hover:not(:disabled) {
+    opacity: 0.85;
+    transform: translateY(-1px);
+}
+
+.fc-modal-save:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.fc-modal-cancel {
+    background: transparent;
+    color: var(--color-text-secondary, #9ca3af);
+    border: 1px solid var(--color-border, #2a2a2a);
+    padding: 10px 20px;
+    border-radius: var(--radius, 10px);
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 500;
+    min-width: 100px;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.fc-modal-cancel:hover:not(:disabled) {
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+    border-color: #444;
+}
+
+.fc-modal-save:disabled,
+.fc-modal-cancel:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* Animaciones */
+@keyframes fcFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes fcSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(16px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Scroll personalizado dentro del modal */
+.fc-modal::-webkit-scrollbar {
+    width: 6px;
+}
+
+.fc-modal::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.fc-modal::-webkit-scrollbar-thumb {
+    background: var(--color-border, #2a2a2a);
+    border-radius: 3px;
+}
+
+.fc-modal::-webkit-scrollbar-thumb:hover {
+    background: #444;
+}
+
+/* ── Accent Color Picker ── */
+
+.fc-modal-color-picker {
+    display: flex;
+    gap: 10px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+
+.fc-modal-color-swatch {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 2.5px solid transparent;
+    background: var(--swatch-color);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    padding: 0;
+    outline: none;
+}
+
+.fc-modal-color-swatch:hover {
+    transform: scale(1.15);
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.15);
+}
+
+.fc-modal-color-swatch--selected {
+    border-color: #ffffff;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+}
+
+.fc-modal-color-swatch svg {
+    color: rgba(255, 255, 255, 0.9);
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+
+/* Dark swatch: ensure checkmark stays visible */
+.fc-modal-color-swatch[style*="rgb(0, 0, 0)"] svg,
+.fc-modal-color-swatch[style*="#000"] svg,
+.fc-modal-color-swatch[style*="#111"] svg,
+.fc-modal-color-swatch[style*="#222"] svg {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* ── URL Submodal ── */
+
+.fc-modal-sub-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1100;
+    padding: 16px;
+    animation: fcFadeIn 0.15s ease;
+}
+
+.fc-modal-sub {
+    width: 100%;
+    max-width: 400px;
+    background: var(--color-surface, #1a1a1a);
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius, 10px);
+    padding: 24px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+    animation: fcSlideUp 0.2s ease;
+}
+
+.fc-modal-sub-title {
+    margin: 0 0 16px 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-text, #ffffff);
+}
+
+.fc-modal-sub-input {
+    margin-bottom: 16px;
+}
+
+.fc-modal-sub-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+.fc-modal-sub-save {
+    background: var(--color-text, #ffffff);
+    color: var(--color-bg, #000000);
+    border: none;
+    padding: 10px 20px;
+    border-radius: var(--radius, 10px);
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: opacity 0.2s ease;
+}
+
+.fc-modal-sub-save:hover:not(:disabled) {
+    opacity: 0.85;
+}
+
+.fc-modal-sub-save:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.fc-modal-sub-cancel {
+    background: transparent;
+    color: var(--color-text-secondary, #9ca3af);
+    border: 1px solid var(--color-border, #2a2a2a);
+    padding: 10px 20px;
+    border-radius: var(--radius, 10px);
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.fc-modal-sub-cancel:hover {
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+}
+
+/* ==========================================
+   Responsive: móviles pequeños
+   ========================================== */
+@media (max-width: 480px) {
+    .fc-modal-overlay {
+        padding: 12px;
+        align-items: flex-start;
+        padding-top: 40px;
+    }
+
+    .fc-modal {
+        padding: 20px;
+        max-height: 85vh;
+    }
+
+    .fc-modal-title {
+        font-size: 1rem;
+        margin-bottom: 16px;
+    }
+
+    .fc-modal-label {
+        margin-bottom: 14px;
+        font-size: 0.85rem;
+    }
+
+    .fc-modal-input {
+        padding: 11px 12px;
+        font-size: 1rem;
+    }
+
+    .fc-preview-card--large .fc-preview-card-banner {
+        height: 120px;
+    }
+
+    .fc-preview-card--large .fc-preview-card-avatar {
+        width: 64px;
+        height: 64px;
+    }
+
+    .fc-preview-card--large .fc-preview-card-info {
+        left: calc(16% + 32px + 0.75rem);
+    }
+
+    .fc-preview-card--large .fc-preview-card-name {
+        font-size: 0.95rem;
+    }
+
+    .fc-modal-actions {
+        flex-direction: column-reverse;
+        gap: 8px;
+    }
+
+    .fc-modal-save,
+    .fc-modal-cancel {
+        width: 100%;
+        padding: 12px;
+        min-width: auto;
+    }
+}
+
+/* ==========================================
+   Responsive: tablets
+   ========================================== */
+@media (min-width: 481px) and (max-width: 768px) {
+    .fc-modal-overlay {
+        padding: 20px;
+    }
+
+    .fc-modal {
+        padding: 24px;
+    }
+
+    .fc-modal-actions {
+        justify-content: flex-end;
+    }
+}

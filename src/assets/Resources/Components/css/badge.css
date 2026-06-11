@@ -1,0 +1,76 @@
+/* ==========================================
+   Badge / Role Badge Styles
+   All badges use the same neutral style as admin
+   with --accent-color tinted background
+   ========================================== */
+
+.role-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 10px;
+    border-radius: var(--radius-full, 9999px);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    line-height: 1.5;
+    border: 1px solid;
+    position: relative;
+    user-select: none;
+    flex-shrink: 0;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    color: #e0e0e0;
+    box-shadow: 0 0 12px color-mix(in srgb, var(--accent-color, #ffffff) 6%, transparent);
+    transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* ── All badges share the same accent-tinted style ── */
+.role-badge--admin,
+.role-badge--dev,
+.role-badge--mod,
+.role-badge--partner {
+    background: linear-gradient(135deg,
+        color-mix(in srgb, var(--accent-color, #ffffff) 14%, transparent) 0%,
+        color-mix(in srgb, var(--accent-color, #ffffff) 5%, transparent) 100%
+    );
+    border-color: color-mix(in srgb, var(--accent-color, #ffffff) 18%, transparent);
+}
+
+.role-badge--admin::before {
+    content: "★";
+    font-size: 0.6rem;
+    line-height: 1;
+    opacity: 0.7;
+    display: inline-flex;
+    align-items: center;
+}
+
+.role-badge--dev::before {
+    content: "☁";
+    font-size: 0.6rem;
+    line-height: 1;
+    opacity: 0.7;
+    display: inline-flex;
+    align-items: center;
+}
+
+.role-badge--mod::before {
+    content: "🛡";
+    font-size: 0.6rem;
+    line-height: 1;
+    opacity: 0.7;
+    display: inline-flex;
+    align-items: center;
+}
+
+.role-badge--partner::before {
+    content: "◆";
+    font-size: 0.6rem;
+    line-height: 1;
+    opacity: 0.7;
+    display: inline-flex;
+    align-items: center;
+}

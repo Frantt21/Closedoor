@@ -1,0 +1,100 @@
+/* ==========================================
+   Home Page Styles
+   ========================================== */
+
+/* ── Hero section (not authenticated) ── */
+.home-hero {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 40px 20px;
+    text-align: center;
+}
+
+.home-hero-title {
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--color-text, #ffffff);
+    margin-bottom: 12px;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+}
+
+.home-hero-subtitle {
+    font-size: 1.05rem;
+    line-height: 1.6;
+    color: var(--color-text-secondary, #9ca3af);
+    max-width: 540px;
+    margin: 0 auto 8px;
+}
+
+.home-hero-actions {
+    margin-top: 32px;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.home-hero-btn {
+    padding: 12px 28px;
+    border: none;
+    border-radius: var(--radius, 10px);
+    font-size: 0.95rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: opacity 0.2s ease, transform 0.15s ease;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.home-hero-btn--primary {
+    background: var(--color-text, #ffffff);
+    color: var(--color-bg, #000000);
+}
+
+.home-hero-btn--primary:hover {
+    opacity: 0.85;
+    transform: translateY(-1px);
+}
+
+.home-hero-btn--secondary {
+    background: transparent;
+    color: var(--color-text, #ffffff);
+    border: 1.5px solid var(--color-border, #2a2a2a);
+}
+
+.home-hero-btn--secondary:hover {
+    background: var(--color-surface-hover, #252525);
+    border-color: #444;
+    transform: translateY(-1px);
+}
+
+/* ── Posts section (authenticated) ── */
+/* Tab styles in post.css */
+
+/* Responsive */
+@media (max-width: 480px) {
+    .home-hero {
+        padding: 32px 16px;
+    }
+
+    .home-hero-title {
+        font-size: 1.8rem;
+    }
+
+    .home-hero-subtitle {
+        font-size: 0.95rem;
+    }
+
+    .home-hero-actions {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .home-hero-btn {
+        width: 100%;
+        max-width: 280px;
+        text-align: center;
+    }
+}

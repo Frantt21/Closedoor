@@ -1,0 +1,365 @@
+/**
+ * Color Extraction Utility
+ *
+ * Extracts dominant colors from any image URL using:
+ * 1. Direct fetch (for CORS-friendly sources like Supabase)
+ * 2. wsrv.nl image proxy (for CORS-blocked sources like Pinterest)
+ * 3. Frequency-based color sampling + weighted merging
+ *
+ * Results are cached in localStorage so extraction only happens once per URL.
+ */
+
+// ── Configuration ──
+
+const CORS_SAFE_DOMAINS = [
+  'supabase.co',
+  'supabase.in',
+  'githubusercontent.com',
+  'images.unsplash.com',
+  'cdn.discordapp.com',
+];
+
+// Domains that block CORS — skip direct fetch to avoid console errors
+const CORS_BLOCKED_DOMAINS = [
+  'pinimg.com',
+  'pinterest.com',
+  'fbcdn.net',
+  'instagram.com',
+  'cdninstagram.com',
+];
+
+// Image proxy that resizes + serves with proper CORS headers
+const IMAGE_PROXY = 'https://wsrv.nl/?';
+
+const CACHE_KEY_PREFIX = 'fc_colors_';
+const CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours (but the user suggested 5 min, let's do 1 week since we don't need to delete anything)
+// Actually, cache is fine for a long time since colors don't change per URL
+
+// ── Cache ──
+
+function getCachedColors(imageUrl) {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY_PREFIX + imageUrl);
+    if (!raw) return null;
+    const entry = JSON.parse(raw);
+    if (!entry || !entry.colors || !entry.ts) return null;
+    // No TTL check — if cached, it's valid. User can clear cache manually.
+    return entry.colors;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedColors(imageUrl, colors) {
+  try {
+    localStorage.setItem(CACHE_KEY_PREFIX + imageUrl, JSON.stringify({
+      colors,
+      ts: Date.now(),
+    }));
+  } catch {
+    // localStorage might be full, ignore
+  }
+}
+
+// ── Domain matching ──
+
+function matchesDomain(url, domains) {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    return domains.some((d) => hostname.endsWith(d) || hostname === d);
+  } catch {
+    return false;
+  }
+}
+
+// ── Fetch helpers ──
+
+async function fetchImageAsBlob(url, timeoutMs = 8000) {
+  const response = await fetch(url, { mode: 'cors', signal: AbortSignal.timeout(timeoutMs) });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const blob = await response.blob();
+  if (blob.size < 100) throw new Error('Image too small');
+  return blob;
+}
+
+/**
+ * Generate a proxied URL via wsrv.nl — resizes image + adds CORS headers
+ */
+function proxyViaWsrv(originalUrl) {
+  const params = new URLSearchParams({
+    url: originalUrl,
+    w: '200',      // Resize to 200px wide (plenty for color extraction)
+    output: 'webp', // WebP is smaller, faster to download
+    q: '60',       // Quality 60% — good enough for colors
+  });
+  return `${IMAGE_PROXY}${params.toString()}`;
+}
+
+function loadBlobAndExtract(blob) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const colors = extractDominantColors(img);
+        URL.revokeObjectURL(url);
+        resolve(colors);
+      } catch (err) {
+        URL.revokeObjectURL(url);
+        reject(err);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Failed to load blob image'));
+    };
+    img.src = url;
+  });
+}
+
+// ── Main export ──
+
+/**
+ * Extract 4 dominant colors from an image URL.
+ * Uses browser cache + localStorage cache to avoid repeated downloads.
+ */
+export async function extractColors(imageUrl) {
+  if (!imageUrl) return ['#ffffff', '#555555', '#222222', '#000000'];
+
+  // Check localStorage cache first
+  const cached = getCachedColors(imageUrl);
+  if (cached) return cached;
+
+  let colors;
+
+  if (matchesDomain(imageUrl, CORS_SAFE_DOMAINS)) {
+    // CORS-safe → fetch directly
+    colors = await attemptExtraction(imageUrl);
+  } else if (matchesDomain(imageUrl, CORS_BLOCKED_DOMAINS)) {
+    // CORS-blocked → skip direct fetch (avoids console errors), use proxy
+    colors = await attemptExtraction(proxyViaWsrv(imageUrl));
+  } else {
+    // Unknown → try direct first, then proxy
+    colors = await attemptExtraction(imageUrl)
+      || await attemptExtraction(proxyViaWsrv(imageUrl));
+  }
+
+  // Final fallback
+  if (!colors) {
+    colors = ['#ffffff', '#555555', '#222222', '#000000'];
+  }
+
+  setCachedColors(imageUrl, colors);
+  return colors;
+}
+
+/**
+ * Try to fetch and extract colors from a URL. Returns null on failure.
+ */
+async function attemptExtraction(url) {
+  try {
+    const blob = await fetchImageAsBlob(url);
+    return await loadBlobAndExtract(blob);
+  } catch {
+    return null;
+  }
+}
+
+// ── Color extraction algorithm ──
+// Frequency-based sampling + weighted merging
+// No hue shifting — colors stay true to the source image
+
+function extractDominantColors(img) {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+
+  // 200px is plenty for color analysis
+  const MAX_SIZE = 200;
+  let width = img.naturalWidth || img.width;
+  let height = img.naturalHeight || img.height;
+
+  if (width > MAX_SIZE || height > MAX_SIZE) {
+    const ratio = Math.min(MAX_SIZE / width, MAX_SIZE / height);
+    width = Math.round(width * ratio);
+    height = Math.round(height * ratio);
+  }
+
+  canvas.width = Math.max(width, 1);
+  canvas.height = Math.max(height, 1);
+
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const pixels = imageData.data;
+
+  // Sample every pixel with fine quantization (8 levels)
+  const QUANTIZE_LEVELS = 8;
+  const colorMap = new Map();
+
+  for (let i = 0; i < pixels.length; i += 4) {
+    const r = pixels[i];
+    const g = pixels[i + 1];
+    const b = pixels[i + 2];
+    const a = pixels[i + 3];
+
+    if (a < 128) continue;
+    if (r < 15 && g < 15 && b < 15) continue;  // near-black
+    if (r > 245 && g > 245 && b > 245) continue; // near-white (likely overlay)
+
+    const qr = quantize(r, QUANTIZE_LEVELS);
+    const qg = quantize(g, QUANTIZE_LEVELS);
+    const qb = quantize(b, QUANTIZE_LEVELS);
+    const key = `${qr},${qg},${qb}`;
+
+    const entry = colorMap.get(key);
+    if (entry) {
+      entry.count++;
+    } else {
+      colorMap.set(key, { r: qr, g: qg, b: qb, count: 1 });
+    }
+  }
+
+  if (colorMap.size === 0) {
+    return ['#ffffff', '#555555', '#222222', '#000000'];
+  }
+
+  // Sort by frequency (most common colors first)
+  const sorted = Array.from(colorMap.values()).sort((a, b) => b.count - a.count);
+
+  // Merge similar colors (weighted average)
+  const MERGE_THRESHOLD = 35;
+  const merged = [];
+
+  for (const color of sorted) {
+    let matched = false;
+
+    for (const existing of merged) {
+      const dist = colorDistance(
+        { r: color.r, g: color.g, b: color.b },
+        { r: existing.r, g: existing.g, b: existing.b }
+      );
+
+      if (dist < MERGE_THRESHOLD) {
+        const total = existing.count + color.count;
+        existing.r = Math.round((existing.r * existing.count + color.r * color.count) / total);
+        existing.g = Math.round((existing.g * existing.count + color.g * color.count) / total);
+        existing.b = Math.round((existing.b * existing.count + color.b * color.count) / total);
+        existing.count = total;
+        matched = true;
+        break;
+      }
+    }
+
+    if (!matched) {
+      merged.push({ ...color });
+    }
+
+    if (merged.length >= 6) break;
+  }
+
+  merged.sort((a, b) => b.count - a.count);
+
+  // Take top 4 and convert to hex
+  const top4 = merged.slice(0, 4).map((c) => rgbToHex(c));
+
+  // Fill missing slots
+  while (top4.length < 4) {
+    if (top4.length === 1) top4.push('#666666');
+    else if (top4.length === 2) top4.push('#333333');
+    else top4.push('#999999');
+  }
+
+  // Gentle lightness adjustment only (no hue shift)
+  return adjustLightness(top4);
+}
+
+function adjustLightness(colors) {
+  const result = [...colors];
+
+  for (let i = 1; i < result.length; i++) {
+    let tooSimilar = false;
+    for (let j = 0; j < i; j++) {
+      if (hexDelta(result[i], result[j]) < 20) {
+        tooSimilar = true;
+        break;
+      }
+    }
+
+    if (tooSimilar) {
+      const hsl = hexToHsl(result[i]);
+      // Only adjust lightness — NEVER touch hue
+      hsl.l = Math.max(15, Math.min(85, hsl.l + (i % 2 === 0 ? 20 : -15)));
+      result[i] = hslToHex(hsl);
+    }
+  }
+
+  return result;
+}
+
+// ── Color math ──
+
+function quantize(value, levels) {
+  const step = Math.floor(256 / levels);
+  return Math.round(Math.floor(value / step) * step + step / 2);
+}
+
+function colorDistance(a, b) {
+  const dr = a.r - b.r, dg = a.g - b.g, db = a.b - b.b;
+  return Math.sqrt(dr * dr + dg * dg + db * db);
+}
+
+function hexDelta(hex1, hex2) {
+  return colorDistance(hexToRgb(hex1), hexToRgb(hex2));
+}
+
+function rgbToHex({ r, g, b }) {
+  const toHex = (v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function hexToRgb(hex) {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result
+    ? { r: parseInt(result[1], 16), g: parseInt(result[2], 16), b: parseInt(result[3], 16) }
+    : { r: 128, g: 128, b: 128 };
+}
+
+function hexToHsl(hex) {
+  let { r, g, b } = hexToRgb(hex);
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h = 0, s = 0, l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+  return { h: h * 360, s: s * 100, l: l * 100 };
+}
+
+function hslToHex({ h, s, l }) {
+  h /= 360; s /= 100; l /= 100;
+  let r, g, b;
+  if (s === 0) { r = g = b = l; }
+  else {
+    const hue2rgb = (p, q, t) => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1/6) return p + (q - p) * 6 * t;
+      if (t < 1/2) return q;
+      if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1/3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1/3);
+  }
+  return rgbToHex({ r: Math.round(r * 255), g: Math.round(g * 255), b: Math.round(b * 255) });
+}

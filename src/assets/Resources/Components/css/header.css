@@ -1,0 +1,233 @@
+/* ==========================================
+   Sidebar / Header Styles
+   Tema: negro / blanco / gris oscuro
+   ========================================== */
+
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 210px;
+    height: 100vh;
+    z-index: 1000;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    border-right: 1px solid var(--color-border, #2a2a2a);
+    background: var(--color-bg, #000000);
+    color: var(--color-text-secondary, #9ca3af);
+    overflow-y: auto;
+    transition: width 0.3s ease, padding 0.3s ease;
+}
+
+/* ---- Estado colapsado ---- */
+.sidebar--collapsed {
+    width: 76px;
+}
+
+/* Texto animado: transición en estado BASE para funcionar en ambos sentidos */
+/* margin-left reemplaza a gap en sidebar-link para que se anime */
+.sidebar-link span:not(.sidebar-icon):not(.sidebar-notif-badge),
+.minicard_profile .user_nick,
+.sidebar-footer-label {
+    overflow: hidden;
+    white-space: nowrap;
+    max-width: 220px;
+    margin-left: 12px;
+    transition: opacity 0.2s ease, visibility 0.3s ease, max-width 0.3s ease, margin-left 0.3s ease;
+}
+
+.sidebar--collapsed .sidebar-link span:not(.sidebar-icon):not(.sidebar-notif-badge),
+.sidebar--collapsed .minicard_profile .user_nick,
+.sidebar--collapsed .sidebar-footer-label {
+    opacity: 0;
+    visibility: hidden;
+    max-width: 0;
+    min-width: 0;
+    margin-left: 0;
+    flex-shrink: 1;
+}
+
+/* La sidebar-link mantiene padding constante en ambos estados */
+.sidebar--collapsed .sidebar-link {
+    padding: 10px 12px;
+    justify-content: flex-start;
+}
+
+/* ---- Footer (toggle + logout) ---- */
+.sidebar-footer {
+    margin-top: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-top: 20px;
+    border-top: 1px solid var(--color-border, #2a2a2a);
+}
+
+.sidebar-footer .sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 10px 12px;
+    color: var(--color-text-secondary, #9ca3af);
+    border-radius: var(--radius, 10px);
+    text-decoration: none;
+    transition: background 0.2s ease, color 0.2s ease;
+    font-size: 0.95rem;
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+}
+
+.sidebar-footer .sidebar-link:hover {
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+}
+
+/* ---- Brand ---- */
+.sidebar-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--color-border, #2a2a2a);
+    transition: align-items 0.3s ease;
+}
+
+.sidebar--collapsed .sidebar-brand {
+    align-items: flex-start;
+    padding-bottom: 10px;
+}
+
+.minicard_profile {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    width: 100%;
+}
+
+.user_pfp {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    object-fit: cover;
+}
+
+.user_nick {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--color-text, #ffffff);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.user_nick p {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.brand-label {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--color-text, #ffffff);
+}
+
+.brand-subtitle {
+    display: block;
+    margin-top: 4px;
+    color: var(--color-text-secondary, #9ca3af);
+    font-size: 0.88rem;
+}
+
+/* ---- Navigation ---- */
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 10px 12px;
+    color: var(--color-text-secondary, #9ca3af);
+    border-radius: var(--radius, 10px);
+    text-decoration: none;
+    transition: background 0.2s ease, color 0.2s ease;
+    font-size: 0.95rem;
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+    position: relative;
+}
+
+.sidebar-link:hover {
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+}
+
+.sidebar-link.active {
+    background: color-mix(in srgb, var(--accent-color, #ffffff) 6%, transparent);
+    color: var(--color-text, #ffffff);
+}
+
+.sidebar-icon {
+    display: grid;
+    place-items: center;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+}
+
+/* Notification badge — posicionado respecto al sidebar-link, fuera del grid */
+.sidebar-notif-badge {
+    position: absolute;
+    top: 4px;
+    left: 24px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 0.65rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 980px) {
+    .sidebar {
+        position: relative;
+        width: 100% !important;
+        height: auto;
+        border-right: none;
+        padding: 16px;
+    }
+
+    .sidebar--collapsed {
+        width: 100% !important;
+    }
+
+    .sidebar-footer {
+        margin-top: 0;
+        border-top: none;
+        padding-top: 0;
+    }
+}

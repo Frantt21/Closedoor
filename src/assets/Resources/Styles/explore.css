@@ -1,0 +1,161 @@
+/* ==========================================
+   Explore Page Styles
+   Tema: negro / blanco / gris oscuro
+   ========================================== */
+
+.explore-page {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0;
+}
+
+.explore-title {
+    font-size: 1.6rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+    color: var(--color-text, #ffffff);
+}
+
+.explore-subtitle {
+    font-size: 0.9rem;
+    color: var(--color-text-secondary, #9ca3af);
+    margin-bottom: 28px;
+}
+
+.explore-loading {
+    text-align: center;
+    padding: 48px 0;
+    color: var(--color-text-muted, #6b7280);
+    font-size: 0.95rem;
+}
+
+.explore-empty {
+    text-align: center;
+    padding: 64px 0;
+    color: var(--color-text-secondary, #9ca3af);
+}
+
+/* ---- Grid ---- */
+.explore-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+}
+
+/* ---- Card ---- */
+.explore-card {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius, 10px);
+    overflow: hidden;
+    background: var(--color-surface, #1a1a1a);
+    text-decoration: none;
+    color: inherit;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.explore-card:hover {
+    transform: translateY(-2px);
+    border-color: #444;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* Banner */
+.explore-card-banner {
+    position: relative;
+    width: 100%;
+    height: 80px;
+    overflow: hidden;
+    background: var(--color-surface, #1a1a1a);
+}
+
+.explore-card-banner-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.explore-card-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 100%);
+    pointer-events: none;
+}
+
+/* Body */
+.explore-card-body {
+    position: relative;
+    padding: 16px;
+    padding-top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.explore-card-avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-top: -28px;
+    border: 3px solid var(--color-surface, #1a1a1a);
+    background: var(--color-bg, #000000);
+    flex-shrink: 0;
+}
+
+.explore-card-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.explore-card-name-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.explore-card-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-text, #ffffff);
+}
+
+.explore-card-private-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-muted, #6b7280);
+    font-size: 0.75rem;
+    opacity: 0.6;
+}
+
+.explore-card-followers {
+    font-size: 0.8rem;
+    color: var(--color-text-muted, #6b7280);
+}
+
+.explore-card-bio {
+    font-size: 0.82rem;
+    color: var(--color-text-secondary, #9ca3af);
+    line-height: 1.5;
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.explore-card-action {
+    margin-top: 4px;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 640px) {
+    .explore-grid {
+        grid-template-columns: 1fr;
+    }
+}

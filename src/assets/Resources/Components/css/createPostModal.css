@@ -1,0 +1,262 @@
+/* ==========================================
+   CreatePostModal Styles
+   ========================================== */
+
+.create-post-modal {
+    max-width: 520px;
+}
+
+/* ── User info ── */
+.create-post-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--color-border, #2a2a2a);
+}
+
+.create-post-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.create-post-username {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--color-text, #ffffff);
+}
+
+.create-post-textarea {
+    min-height: 100px;
+    resize: vertical;
+    line-height: 1.5;
+}
+
+.create-post-charcount {
+    display: block;
+    text-align: right;
+    font-size: 0.75rem;
+    color: var(--color-text-muted, #6b7280);
+    margin-top: 4px;
+}
+
+.create-post-error {
+    color: #fca5a5;
+    font-size: 0.85rem;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    background: rgba(255, 80, 80, 0.1);
+    border-radius: var(--radius-sm, 6px);
+    border: 1px solid rgba(255, 80, 80, 0.2);
+}
+
+/* ── Image tools bar ── */
+.create-post-image-tools {
+    margin-bottom: 12px;
+}
+
+.create-post-image-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius, 10px);
+    background: transparent;
+    color: var(--color-text-secondary, #9ca3af);
+    font-size: 0.85rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.create-post-image-btn:hover {
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+    border-color: #444;
+}
+
+.create-post-image-btn--active {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--color-text, #ffffff);
+    border-color: var(--color-text, #ffffff);
+}
+
+.create-post-image-count {
+    background: var(--color-text, #ffffff);
+    color: var(--color-bg, #000000);
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 999px;
+    line-height: 1.4;
+}
+
+/* ── Image URL section ── */
+.create-post-image-section {
+    margin-bottom: 16px;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius, 10px);
+}
+
+.create-post-image-section-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-text-secondary, #9ca3af);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.create-post-image-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.create-post-image-input {
+    flex: 1;
+    padding: 10px 12px !important;
+    font-size: 0.9rem !important;
+}
+
+.create-post-image-remove {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius-sm, 6px);
+    background: transparent;
+    color: var(--color-text-muted, #6b7280);
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.create-post-image-remove:hover {
+    background: rgba(255, 80, 80, 0.15);
+    color: #fca5a5;
+    border-color: rgba(255, 80, 80, 0.3);
+}
+
+.create-post-image-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px dashed var(--color-border, #2a2a2a);
+    border-radius: var(--radius-sm, 6px);
+    background: transparent;
+    color: var(--color-text-muted, #6b7280);
+    font-size: 0.8rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.create-post-image-add:hover {
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+    border-color: #444;
+}
+
+.create-post-image-mini {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-sm, 6px);
+    overflow: hidden;
+    border: 1px solid var(--color-border, #2a2a2a);
+    background: #000;
+}
+
+.create-post-image-mini img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* ── @mention autocomplete dropdown ── */
+.create-post-textarea-wrapper {
+    position: relative;
+}
+
+.create-post-mention-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 20;
+    background: var(--color-surface, #1a1a1a);
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius, 10px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    max-height: 240px;
+    overflow-y: auto;
+    padding: 6px;
+    margin-top: 2px;
+}
+
+.create-post-mention-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    border: none;
+    border-radius: var(--radius-sm, 6px);
+    background: transparent;
+    color: var(--color-text, #ffffff);
+    font-size: 0.85rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.12s ease;
+    text-align: left;
+}
+
+.create-post-mention-item:hover,
+.create-post-mention-item--active {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.create-post-mention-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.create-post-mention-username {
+    font-weight: 500;
+}
+
+.create-post-preview {
+    margin-bottom: 16px;
+    border-radius: var(--radius-sm, 6px);
+    overflow: hidden;
+    border: 1px solid var(--color-border, #2a2a2a);
+    background: #000;
+    max-height: 200px;
+}
+
+.create-post-preview img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    max-height: 200px;
+}

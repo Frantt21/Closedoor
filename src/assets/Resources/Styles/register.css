@@ -1,0 +1,162 @@
+/* ==========================================
+   Register Page Styles
+   Tema: negro / blanco / gris oscuro
+   Consistente con login.css, modal.css
+   ========================================== */
+
+.auth-page {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0;
+}
+
+.auth-card {
+    background: var(--color-surface, #1a1a1a);
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius, 10px);
+    padding: 40px 36px;
+    max-width: 420px;
+    margin: 0 auto;
+    animation: fcSlideUp 0.3s ease;
+}
+
+.auth-title {
+    text-align: center;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--color-text, #ffffff);
+    margin-bottom: 6px;
+    letter-spacing: -0.01em;
+}
+
+.auth-subtitle {
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--color-text-secondary, #9ca3af);
+    margin-bottom: 28px;
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.auth-input {
+    padding: 12px 14px;
+    border: 1.5px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius, 10px);
+    font-size: 0.95rem;
+    font-family: inherit;
+    color: var(--color-text, #ffffff);
+    background: var(--color-bg, #000000);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    width: 100%;
+    box-sizing: border-box;
+    outline: none;
+}
+
+.auth-input::placeholder {
+    color: var(--color-text-muted, #6b7280);
+}
+
+.auth-input:hover {
+    border-color: #444;
+}
+
+.auth-input:focus {
+    border-color: var(--color-text, #ffffff);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08);
+}
+
+.auth-submit {
+    padding: 12px 20px;
+    border: none;
+    border-radius: var(--radius, 10px);
+    background: var(--color-text, #ffffff);
+    color: var(--color-bg, #000000);
+    font-size: 0.95rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: opacity 0.2s ease, transform 0.15s ease;
+    margin-top: 4px;
+}
+
+.auth-submit:hover:not(:disabled) {
+    opacity: 0.85;
+    transform: translateY(-1px);
+}
+
+.auth-submit:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.auth-submit:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.auth-error {
+    color: #fca5a5;
+    font-size: 0.85rem;
+    padding: 10px 14px;
+    background: rgba(255, 80, 80, 0.1);
+    border-radius: var(--radius-sm, 6px);
+    border: 1px solid rgba(255, 80, 80, 0.2);
+    text-align: center;
+    margin-bottom: 4px;
+}
+
+.auth-footer {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 0.88rem;
+    color: var(--color-text-secondary, #9ca3af);
+}
+
+.auth-link {
+    color: var(--color-text, #ffffff);
+    font-weight: 600;
+    text-decoration: none;
+    transition: opacity 0.2s ease;
+}
+
+.auth-link:hover {
+    opacity: 0.75;
+    text-decoration: underline;
+}
+
+/* Animación consistente con modal */
+@keyframes fcSlideUp {
+    from {
+        opacity: 0;
+        transform: translateY(16px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .auth-card {
+        padding: 28px 20px;
+        margin: 0 12px;
+    }
+
+    .auth-title {
+        font-size: 1.15rem;
+    }
+
+    .auth-input {
+        padding: 11px 12px;
+        font-size: 1rem;
+    }
+
+    .auth-submit {
+        padding: 13px;
+    }
+}
