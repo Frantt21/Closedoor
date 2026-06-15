@@ -1,7 +1,6 @@
 /* ==========================================
    Badge / Role Badge Styles
-   All badges use the same neutral style as admin
-   with --accent-color tinted background
+   Mismo estilo glass/blur que el botón de follow
    ========================================== */
 
 .role-badge {
@@ -16,27 +15,29 @@
     text-transform: uppercase;
     white-space: nowrap;
     line-height: 1.5;
-    border: 1px solid;
     position: relative;
     user-select: none;
     flex-shrink: 0;
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    color: #e0e0e0;
-    box-shadow: 0 0 12px color-mix(in srgb, var(--accent-color, #ffffff) 6%, transparent);
-    transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: none;
+    transition: background 0.2s ease;
 }
 
-/* ── All badges share the same accent-tinted style ── */
+/* ── All badges use the same neutral glass style ── */
 .role-badge--admin,
 .role-badge--dev,
 .role-badge--mod,
 .role-badge--partner {
-    background: linear-gradient(135deg,
-        color-mix(in srgb, var(--accent-color, #ffffff) 14%, transparent) 0%,
-        color-mix(in srgb, var(--accent-color, #ffffff) 5%, transparent) 100%
-    );
-    border-color: color-mix(in srgb, var(--accent-color, #ffffff) 18%, transparent);
+    background: var(--overlay-bg);
+    color: var(--color-text-secondary, #9ca3af);
+}
+
+.role-badge--admin:hover,
+.role-badge--dev:hover,
+.role-badge--mod:hover,
+.role-badge--partner:hover {
+    background: var(--overlay-bg-hover);
 }
 
 .role-badge--admin::before {

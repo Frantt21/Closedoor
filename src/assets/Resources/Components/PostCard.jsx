@@ -26,6 +26,8 @@ export default function PostCard({
   onUpdate,
   onDelete,
   onSaveToggle,
+  onLikeToggle,
+  onRepostToggle,
   compact = false,
   repostInfo = null,
 }) {
@@ -39,7 +41,8 @@ export default function PostCard({
   const [saved, setSaved] = useState(initialSaved);
   const [showMenu, setShowMenu] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [lightboxUrl, setLightboxUrl] = useState(null);
+  const [galleryUrls, setGalleryUrls] = useState(null);
+  const [galleryIndex, setGalleryIndex] = useState(0);
   const menuRef = useRef(null);
 
   // Sincronizar estado liked/reposted cuando el padre refetchea (navegación)
@@ -86,6 +89,7 @@ export default function PostCard({
     e.stopPropagation();
     if (!user) return;
     try {
+      const nowLiked = !liked;
       if (liked) {
         await unlikePost(post.id, user.id);
         setLiked(false);
@@ -95,6 +99,7 @@ export default function PostCard({
         setLiked(true);
         setLikesCount((c) => c + 1);
       }
+      if (onLikeToggle) onLikeToggle(post.id, nowLiked);
     } catch (err) {
       console.error('Like error:', err);
     }
@@ -104,6 +109,7 @@ export default function PostCard({
     e.stopPropagation();
     if (!user) return;
     try {
+      const nowReposted = !reposted;
       if (reposted) {
         await unrepostPost(post.id, user.id);
         setReposted(false);
@@ -113,6 +119,7 @@ export default function PostCard({
         setReposted(true);
         setRepostsCount((c) => c + 1);
       }
+      if (onRepostToggle) onRepostToggle(post.id, nowReposted);
     } catch (err) {
       console.error('Repost error:', err);
     }
@@ -169,13 +176,17 @@ export default function PostCard({
     }
   };
 
-  // Cerrar lightbox con Escape
+  // Cerrar galería con Escape y navegar con flechas
   useEffect(() => {
-    if (!lightboxUrl) return;
-    const handleKey = (e) => { if (e.key === 'Escape') setLightboxUrl(null); };
+    if (!galleryUrls) return;
+    const handleKey = (e) => {
+      if (e.key === 'Escape') { setGalleryUrls(null); return; }
+      if (e.key === 'ArrowLeft') goGalleryPrev();
+      if (e.key === 'ArrowRight') goGalleryNext();
+    };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [lightboxUrl]);
+  }, [galleryUrls, galleryIndex]);
 
   const handleCardClick = () => {
     navigate(`/post/${post.id}`);
@@ -203,9 +214,43 @@ export default function PostCard({
     return null;
   };
 
-  const openLightbox = (e, url) => {
+  // ── Obtener todas las URLs de imagen del post ──
+  const getGalleryUrls = () => {
+    const urls = (post.image_urls || (post.image_url ? [post.image_url] : []))
+      .filter((url) => {
+        if (!url) return false;
+        const VID_RE = /\.(mp4|webm|ogg|mov|avi|mkv)(\?.*)?$/i;
+        return !VID_RE.test(url);
+      });
+    // También incluir inline media si existe y no hay image_urls/image_url
+    if (urls.length === 0 && inlineMedia && inlineMedia.type === 'image') {
+      urls.push(inlineMedia.url);
+    }
+    // Incluir legacy video_url que es imagen
+    if (urls.length === 0 && post.video_url && !isVideo(post.video_url)) {
+      urls.push(post.video_url);
+    }
+    return urls;
+  };
+
+  const openGallery = (e, index) => {
     e.stopPropagation();
-    setLightboxUrl(url);
+    const urls = getGalleryUrls();
+    if (urls.length === 0) return;
+    setGalleryUrls(urls);
+    setGalleryIndex(Math.min(index, urls.length - 1));
+  };
+
+  const goGalleryPrev = () => {
+    setGalleryIndex((prev) => (prev > 0 ? prev - 1 : galleryUrls.length - 1));
+  };
+
+  const goGalleryNext = () => {
+    setGalleryIndex((prev) => (prev < galleryUrls.length - 1 ? prev + 1 : 0));
+  };
+
+  const closeGallery = () => {
+    setGalleryUrls(null);
   };
 
   // Detectar media incrustado en el texto (para posts sin image_url/video_url separados)
@@ -297,10 +342,10 @@ export default function PostCard({
           </div>
 
           {/* Text content with @mention highlighting */}
-          <p className="post-card-text">{renderContent(post.content, getSkipUrls(post), post.mentions)}</p>
+          <p className="post-card-text">{renderContent(post.content, getSkipUrls(post), post.mentions, t)}</p>
 
           {/* Multiple images from post.image_urls (grid) */}
-          {renderImageGrid(post, openLightbox, t)}
+          {renderImageGrid(post, openGallery, t)}
 
           {/* Video from post.video_url */}
           {post.video_url && isVideo(post.video_url) && (
@@ -331,7 +376,7 @@ export default function PostCard({
                 src={post.image_url}
                 alt={t('post.media_alt', { n: 1 })}
                 className="post-card-image"
-                onClick={(e) => openLightbox(e, post.image_url)}
+                onClick={(e) => openGallery(e, 0)}
                 onError={(e) => { e.target.style.display = 'none'; }}
               />
             </div>
@@ -344,7 +389,7 @@ export default function PostCard({
                 src={post.video_url}
                 alt={t('post.media_alt', { n: 1 })}
                 className="post-card-image"
-                onClick={(e) => openLightbox(e, post.video_url)}
+                onClick={(e) => openGallery(e, 0)}
                 onError={(e) => { e.target.style.display = 'none'; }}
               />
             </div>
@@ -358,7 +403,7 @@ export default function PostCard({
                   src={inlineMedia.url}
                   alt={t('post.media_alt', { n: 1 })}
                   className="post-card-image"
-                  onClick={(e) => openLightbox(e, inlineMedia.url)}
+                  onClick={(e) => openGallery(e, 0)}
                   onError={(e) => { e.target.style.display = 'none'; }}
                 />
               ) : (
@@ -409,14 +454,38 @@ export default function PostCard({
         </div>
       </div>
 
-      {/* ── Lightbox ── */}
-      {lightboxUrl && (
-        <div className="post-card-lightbox" onClick={() => setLightboxUrl(null)}>
+      {/* ── Galería de imágenes ── */}
+      {galleryUrls && (
+        <div className="post-card-lightbox" onClick={(e) => { e.stopPropagation(); closeGallery(); }}>
+          {/* Prev button */}
+          {galleryUrls.length > 1 && (
+            <button
+              className="post-card-gallery-nav post-card-gallery-nav--prev"
+              onClick={(e) => { e.stopPropagation(); goGalleryPrev(); }}
+              aria-label="Previous"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+          )}
+
           <div className="post-card-lightbox-content" onClick={(e) => e.stopPropagation()}>
-            <img src={lightboxUrl} alt={t('post.full_media')} />
+            <img
+              src={galleryUrls[galleryIndex]}
+              alt={t('post.full_media')}
+              className="post-card-gallery-image"
+              key={galleryIndex}
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
             <div className="post-card-lightbox-actions">
+              {galleryUrls.length > 1 && (
+                <span className="post-card-gallery-counter">
+                  {galleryIndex + 1} / {galleryUrls.length}
+                </span>
+              )}
               <a
-                href={lightboxUrl}
+                href={galleryUrls[galleryIndex]}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="post-card-lightbox-btn"
@@ -430,7 +499,7 @@ export default function PostCard({
                 </svg>
               </a>
               <a
-                href={lightboxUrl}
+                href={galleryUrls[galleryIndex]}
                 download
                 className="post-card-lightbox-btn"
                 title={t('post.download')}
@@ -444,7 +513,7 @@ export default function PostCard({
               </a>
               <button
                 className="post-card-lightbox-btn post-card-lightbox-close"
-                onClick={() => setLightboxUrl(null)}
+                onClick={closeGallery}
                 title={t('post.close')}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -454,6 +523,19 @@ export default function PostCard({
               </button>
             </div>
           </div>
+
+          {/* Next button */}
+          {galleryUrls.length > 1 && (
+            <button
+              className="post-card-gallery-nav post-card-gallery-nav--next"
+              onClick={(e) => { e.stopPropagation(); goGalleryNext(); }}
+              aria-label="Next"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          )}
         </div>
       )}
     </article>
@@ -461,7 +543,7 @@ export default function PostCard({
 }
 
 // ── Render @mentions as clickable links and URLs as clickable links ──
-function renderContent(text, skipUrls = [], mentions = {}) {
+function renderContent(text, skipUrls = [], mentions = {}, t = () => {}) {
   if (!text) return null;
   const skipSet = new Set(skipUrls);
   // Match both @mentions and URLs
@@ -503,7 +585,12 @@ function renderContent(text, skipUrls = [], mentions = {}) {
           target="_blank"
           rel="noopener noreferrer"
           className="post-card-link"
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!window.confirm(t('post.external_link_warning'))) {
+              e.preventDefault();
+            }
+          }}
         >
           {part}
         </a>
@@ -552,7 +639,7 @@ function renderImageGrid(post, onImageClick, t) {
           <img
             src={url}
             alt={t('post.media_alt', { n: i + 1 })}
-            onClick={(e) => handleClick(e, url)}
+            onClick={(e) => handleClick(e, i)}
             onError={(e) => { e.target.style.display = 'none'; }}
           />
         </div>

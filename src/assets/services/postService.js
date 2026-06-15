@@ -389,7 +389,7 @@ export async function getRepostedPostIds(postIds, userId) {
 
 // ── COMMENTS ──
 
-export async function createComment({ postId, userId, content, parentId = null }) {
+export async function createComment({ postId, userId, content, parentId = null, imageUrl = null, videoUrl = null }) {
   const { data, error } = await supabase
     .from('comments')
     .insert({
@@ -397,6 +397,8 @@ export async function createComment({ postId, userId, content, parentId = null }
       post_id: postId,
       content,
       parent_id: parentId,
+      image_url: imageUrl,
+      video_url: videoUrl,
     })
     .select('*, profiles!comments_user_id_fkey (id, username, avatar_url, roles)')
     .single();

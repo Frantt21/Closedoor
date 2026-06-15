@@ -68,6 +68,7 @@
   "profile.stats_reposts": "Reposts",
   "profile.private_posts_hint": "As publicações e seguidores deste usuário não estão visíveis.",
   "profile.stats_private_label": "Estatísticas privadas",
+  "profile.follows_you": "Segue você",
   "profile.checking_access": "Verificando acesso...",
 
   "post.like": "Curtir",
@@ -104,7 +105,9 @@
   "post.hide_replies": "Ocultar respostas",
   "post.replies_count": "{n} respostas",
   "post.sending": "Enviando...",
+  "post.external_link_warning": "Este link levará você a um site externo. Abri-lo?",
   "post.reply_placeholder": "Escreva uma resposta para @{user}...",
+  "post.replies_depth_limit": "Resposta muito profunda. Crie um novo comentário.",
 
   "follow.follow": "Seguir",
   "follow.following": "Seguindo",
@@ -166,6 +169,10 @@
   "settings.theme_desc": "Selecione o tema do aplicativo.",
   "settings.theme_dark": "Escuro",
   "settings.theme_light": "Claro",
+  "settings.category_system": "Sistema",
+  "settings.category_system_desc": "Idioma, tema e cores de acento",
+  "settings.category_privacy": "Privacidade",
+  "settings.category_privacy_desc": "Visibilidade do perfil e estatísticas",
 
   "modal.edit_title": "Editar perfil",
   "modal.username_label": "Nome de usuário",
@@ -208,11 +215,17 @@
   "create_post.empty_error": "O post não pode estar vazio",
   "create_post.auth_error": "Você precisa fazer login para publicar",
   "create_post.save_error": "Erro ao salvar o post",
-  "create_post.show_images": "Adicionar imagens",
-  "create_post.hide_images": "Ocultar imagens",
+  "create_post.show_media": "Adicionar mídia",
+  "create_post.hide_media": "Ocultar mídia",
   "create_post.image_urls_title": "URLs das imagens",
   "create_post.add_another_image": "Adicionar outra imagem ({n}/4)",
   "create_post.image_count": "{n}/4",
+  "create_post.media_limit_warning": "Você atingiu o limite de 4 imagens na seção de mídia.",
+
+  "post.comment_image_url": "URL da imagem",
+  "post.comment_video_url": "URL do vídeo",
+  "post.comment_add_media": "Adicionar mídia ao comentário",
+  "post.comment_media_added": "Mídia adicionada",
 
   "home.title": "Início",
   "home.hero_title": "Bem-vindo à melhor comunidade de posts",

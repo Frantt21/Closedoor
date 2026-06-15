@@ -199,6 +199,26 @@
     opacity: 0.6;
 }
 
+/* ── "Follows you" mini badge ── */
+
+.profile-follows-you-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    font-weight: 600;
+    color: var(--color-text-secondary, #9ca3af);
+    background: var(--overlay-bg);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    border: none;
+    border-radius: var(--radius-full, 9999px);
+    padding: 1px 7px;
+    white-space: nowrap;
+    line-height: 1.4;
+    cursor: default;
+}
+
 /* Private profile posts section */
 
 .posts-section--private {

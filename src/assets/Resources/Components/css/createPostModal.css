@@ -260,3 +260,15 @@
     display: block;
     max-height: 200px;
 }
+
+.create-post-preview--warning {
+    background: rgba(250, 204, 21, 0.06);
+    border-color: rgba(250, 204, 21, 0.2);
+    color: #facc15;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 14px;
+    font-size: 0.82rem;
+    max-height: none;
+}

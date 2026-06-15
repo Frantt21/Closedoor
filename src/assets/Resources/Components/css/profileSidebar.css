@@ -131,6 +131,10 @@
   font-size: 0.8rem;
 }
 
+.profile-sidebar-stat-icon--posts {
+  color: #a78bfa;
+}
+
 .profile-sidebar-stat-icon--likes {
   color: #f472b6;
 }

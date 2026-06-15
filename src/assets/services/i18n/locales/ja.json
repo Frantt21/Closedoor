@@ -68,6 +68,7 @@
   "profile.stats_reposts": "リポスト",
   "profile.private_posts_hint": "このユーザーの投稿とフォロワーは表示されません。",
   "profile.stats_private_label": "非公開の統計",
+  "profile.follows_you": "フォローされています",
   "profile.checking_access": "アクセス確認中...",
 
   "post.like": "いいね",
@@ -104,7 +105,9 @@
   "post.hide_replies": "返信を隠す",
   "post.replies_count": "{n}件の返信",
   "post.sending": "送信中...",
+  "post.external_link_warning": "このリンクは外部サイトに移動します。開きますか？",
   "post.reply_placeholder": "@{user}に返信を書く...",
+  "post.replies_depth_limit": "返信が深すぎます。代わりに新しいコメントを作成してください。",
 
   "follow.follow": "フォロー",
   "follow.following": "フォロー中",
@@ -166,6 +169,10 @@
   "settings.theme_desc": "アプリケーションのテーマを選択します。",
   "settings.theme_dark": "ダーク",
   "settings.theme_light": "ライト",
+  "settings.category_system": "システム",
+  "settings.category_system_desc": "言語、テーマ、アクセントカラー",
+  "settings.category_privacy": "プライバシー",
+  "settings.category_privacy_desc": "プロフィールと統計の表示設定",
 
   "modal.edit_title": "プロフィール編集",
   "modal.username_label": "ユーザー名",
@@ -208,11 +215,17 @@
   "create_post.empty_error": "投稿を空にできません",
   "create_post.auth_error": "投稿するにはログインが必要です",
   "create_post.save_error": "投稿の保存中にエラーが発生しました",
-  "create_post.show_images": "画像を追加",
-  "create_post.hide_images": "画像を隠す",
+  "create_post.show_media": "メディアを追加",
+  "create_post.hide_media": "メディアを隠す",
   "create_post.image_urls_title": "画像URL",
   "create_post.add_another_image": "画像を追加 ({n}/4)",
   "create_post.image_count": "{n}/4",
+  "create_post.media_limit_warning": "メディアセクションの画像上限（4枚）に達しました。",
+
+  "post.comment_image_url": "画像URL",
+  "post.comment_video_url": "動画URL",
+  "post.comment_add_media": "コメントにメディアを追加",
+  "post.comment_media_added": "メディアが追加されました",
 
   "home.title": "ホーム",
   "home.hero_title": "最高の投稿コミュニティへようこそ",

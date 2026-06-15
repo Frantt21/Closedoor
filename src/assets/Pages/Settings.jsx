@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useI18n } from '../services/i18n/useI18n';
 import { useAuth } from '../../hooks/useAuth';
 import { updateUserProfile } from '../services/userService';
-import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaCheck, FaSun, FaMoon } from 'react-icons/fa';
+import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog } from 'react-icons/fa';
 import '../Resources/Styles/settings.css';
 
 /* ── SVG Flag Icons ── */
@@ -29,7 +29,7 @@ const FlagEn = () => (
 
 const FlagRu = () => (
   <svg viewBox="0 0 24 18" width="22" height="16" className="settings-flag">
-    <rect width="24" height="6" fill="#fff" />
+    <rect width="24" height="18" fill="#fff" />
     <rect y="6" width="24" height="6" fill="#0039a6" />
     <rect y="12" width="24" height="6" fill="#d52b1e" />
   </svg>
@@ -59,6 +59,13 @@ const LANGUAGES = [
   { value: 'pt', Flag: FlagPt },
 ];
 
+const CATEGORIES = [
+  { id: 'system', icon: FaCog, titleKey: 'settings.category_system', descKey: 'settings.category_system_desc' },
+  { id: 'privacy', icon: FaEyeSlash, titleKey: 'settings.category_privacy', descKey: 'settings.category_privacy_desc' },
+];
+
+/* ── Main Settings Component ── */
+
 export default function Settings() {
   const { locale, setLocale, showAccent, setShowAccent, theme, setTheme, t } = useI18n();
   const { user, profile, profileLoading, refreshProfile } = useAuth();
@@ -66,6 +73,7 @@ export default function Settings() {
   const selectRef = useRef(null);
   const [privacyUpdating, setPrivacyUpdating] = useState(false);
   const [statsPrivacyUpdating, setStatsPrivacyUpdating] = useState(false);
+  const [activeCategory, setActiveCategory] = useState('system');
 
   const isPrivate = profile?.is_private ?? false;
   const statsPrivate = profile?.stats_private ?? false;
@@ -115,168 +123,194 @@ export default function Settings() {
     <div className="settings-page">
       <h1 className="settings-title">{t('settings.title')}</h1>
 
-      <div className="settings-card">
-        {/* ── Idioma ── */}
-        <div className="settings-section">
-          <div className="settings-section-header">
-            <span className="settings-section-icon"><FaGlobe /></span>
-            <div>
-              <h2 className="settings-section-title">{t('settings.language')}</h2>
-              <p className="settings-section-desc">{t('settings.language_desc')}</p>
-            </div>
-          </div>
-
-          <div className="settings-select-wrapper" ref={selectRef}>
+      <div className="settings-card settings-card--split">
+        {/* ── Left Panel: Category Navigation ── */}
+        <nav className="settings-nav">
+          {CATEGORIES.map(({ id, icon: Icon, titleKey, descKey }) => (
             <button
+              key={id}
               type="button"
-              className="settings-select-trigger"
-              onClick={() => setSelectOpen((s) => !s)}
+              className={`settings-nav-btn ${activeCategory === id ? 'settings-nav-btn--active' : ''}`}
+              onClick={() => {
+                setSelectOpen(false);
+                setActiveCategory(id);
+              }}
             >
-              <CurrentFlag />
-              <span className="settings-select-label">{t(`settings.${locale}`)}</span>
-              <FaChevronDown className={`settings-select-arrow ${selectOpen ? 'settings-select-arrow--open' : ''}`} />
-            </button>
-
-            {selectOpen && (
-              <div className="settings-select-dropdown">
-                {LANGUAGES.map(({ value, Flag }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    className={`settings-select-option ${value === locale ? 'settings-select-option--active' : ''}`}
-                    onClick={() => {
-                      setLocale(value);
-                      setSelectOpen(false);
-                    }}
-                  >
-                    <Flag />
-                    <span>{t(`settings.${value}`)}</span>
-                    {value === locale && <FaCheck className="settings-select-check" />}
-                  </button>
-                ))}
+              <span className="settings-nav-icon"><Icon /></span>
+              <div className="settings-nav-info">
+                <span className="settings-nav-title">{t(titleKey)}</span>
+                <span className="settings-nav-desc">{t(descKey)}</span>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* ── Separador ── */}
-        <div className="settings-divider" />
-
-        {/* ── Configuración de perfil ── */}
-        <div className="settings-section">
-          <div className="settings-section-header">
-            <span className="settings-section-icon"><FaLock /></span>
-            <div>
-              <h2 className="settings-section-title">{t('settings.profile_config')}</h2>
-              <p className="settings-section-desc">{t('settings.profile_config_desc')}</p>
-            </div>
-          </div>
-
-          <div className="settings-segmented">
-            <button
-              type="button"
-              className={`settings-segmented-btn ${!isPrivate ? 'settings-segmented-btn--active' : ''}`}
-              onClick={() => handlePrivacyChange(false)}
-              disabled={privacyUpdating || profileLoading}
-            >
-              {t('settings.public_profile')}
             </button>
-            <button
-              type="button"
-              className={`settings-segmented-btn ${isPrivate ? 'settings-segmented-btn--active' : ''}`}
-              onClick={() => handlePrivacyChange(true)}
-              disabled={privacyUpdating || profileLoading}
-            >
-              {t('settings.private_profile')}
-            </button>
-          </div>
-        </div>
+          ))}
+        </nav>
 
-        {/* ── Separador ── */}
-        <div className="settings-divider" />
+        {/* ── Right Panel: Active Category Content ── */}
+        <div className="settings-panel">
+          {activeCategory === 'system' && (
+            <>
+              {/* Idioma */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaGlobe /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.language')}</h2>
+                    <p className="settings-section-desc">{t('settings.language_desc')}</p>
+                  </div>
+                </div>
 
-        {/* ── Privacidad de estadísticas ── */}
-        <div className="settings-section">
-          <div className="settings-section-header">
-            <span className="settings-section-icon"><FaLock /></span>
-            <div>
-              <h2 className="settings-section-title">{t('settings.stats_privacy')}</h2>
-              <p className="settings-section-desc">{t('settings.stats_privacy_desc')}</p>
-            </div>
-          </div>
+                <div className="settings-select-wrapper" ref={selectRef}>
+                  <button
+                    type="button"
+                    className="settings-select-trigger"
+                    onClick={() => setSelectOpen((s) => !s)}
+                  >
+                    <CurrentFlag />
+                    <span className="settings-select-label">{t(`settings.${locale}`)}</span>
+                    <FaChevronDown className={`settings-select-arrow ${selectOpen ? 'settings-select-arrow--open' : ''}`} />
+                  </button>
 
-          <div className="settings-segmented">
-            <button
-              type="button"
-              className={`settings-segmented-btn ${!statsPrivate ? 'settings-segmented-btn--active' : ''}`}
-              onClick={() => handleStatsPrivacyChange(false)}
-              disabled={statsPrivacyUpdating || profileLoading}
-            >
-              {t('settings.stats_public')}
-            </button>
-            <button
-              type="button"
-              className={`settings-segmented-btn ${statsPrivate ? 'settings-segmented-btn--active' : ''}`}
-              onClick={() => handleStatsPrivacyChange(true)}
-              disabled={statsPrivacyUpdating || profileLoading}
-            >
-              {t('settings.stats_private')}
-            </button>
-          </div>
-        </div>
+                  {selectOpen && (
+                    <div className="settings-select-dropdown">
+                      {LANGUAGES.map(({ value, Flag }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          className={`settings-select-option ${value === locale ? 'settings-select-option--active' : ''}`}
+                          onClick={() => {
+                            setLocale(value);
+                            setSelectOpen(false);
+                          }}
+                        >
+                          <Flag />
+                          <span>{t(`settings.${value}`)}</span>
+                          {value === locale && <FaCheck className="settings-select-check" />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
 
-        {/* ── Separador ── */}
-        <div className="settings-divider" />
+              <div className="settings-row-divider" />
 
-        {/* ── Tema ── */}
-        <div className="settings-section">
-          <div className="settings-section-header">
-            <span className="settings-section-icon">{theme === 'light' ? <FaSun /> : <FaMoon />}</span>
-            <div>
-              <h2 className="settings-section-title">{t('settings.theme')}</h2>
-              <p className="settings-section-desc">{t('settings.theme_desc')}</p>
-            </div>
-          </div>
-          <div className="settings-segmented">
-            <button
-              type="button"
-              className={`settings-segmented-btn ${theme === 'dark' ? 'settings-segmented-btn--active' : ''}`}
-              onClick={() => setTheme('dark')}
-            >
-              <FaMoon style={{ marginRight: 6 }} />{t('settings.theme_dark')}
-            </button>
-            <button
-              type="button"
-              className={`settings-segmented-btn ${theme === 'light' ? 'settings-segmented-btn--active' : ''}`}
-              onClick={() => setTheme('light')}
-            >
-              <FaSun style={{ marginRight: 6 }} />{t('settings.theme_light')}
-            </button>
-          </div>
-        </div>
+              {/* Tema */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon">{theme === 'light' ? <FaSun /> : <FaMoon />}</span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.theme')}</h2>
+                    <p className="settings-section-desc">{t('settings.theme_desc')}</p>
+                  </div>
+                </div>
+                <div className="settings-segmented">
+                  <button
+                    type="button"
+                    className={`settings-segmented-btn ${theme === 'dark' ? 'settings-segmented-btn--active' : ''}`}
+                    onClick={() => setTheme('dark')}
+                  >
+                    <FaMoon style={{ marginRight: 6 }} />{t('settings.theme_dark')}
+                  </button>
+                  <button
+                    type="button"
+                    className={`settings-segmented-btn ${theme === 'light' ? 'settings-segmented-btn--active' : ''}`}
+                    onClick={() => setTheme('light')}
+                  >
+                    <FaSun style={{ marginRight: 6 }} />{t('settings.theme_light')}
+                  </button>
+                </div>
+              </div>
 
-        {/* ── Separador ── */}
-        <div className="settings-divider" />
+              <div className="settings-row-divider" />
 
-        {/* ── Colores de acento ── */}
-        <div className="settings-section">
-          <div className="settings-section-header">
-            <span className="settings-section-icon"><FaPalette /></span>
-            <div>
-              <h2 className="settings-section-title">{t('settings.show_accent')}</h2>
-              <p className="settings-section-desc">{t('settings.show_accent_desc')}</p>
-            </div>
-          </div>
-          <label className="settings-toggle">
-            <input
-              type="checkbox"
-              checked={showAccent}
-              onChange={(e) => setShowAccent(e.target.checked)}
-            />
-            <span className="settings-toggle-track">
-              <span className="settings-toggle-thumb" />
-            </span>
-          </label>
+              {/* Colores de acento */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaPalette /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.show_accent')}</h2>
+                    <p className="settings-section-desc">{t('settings.show_accent_desc')}</p>
+                  </div>
+                </div>
+                <label className="settings-toggle">
+                  <input
+                    type="checkbox"
+                    checked={showAccent}
+                    onChange={(e) => setShowAccent(e.target.checked)}
+                  />
+                  <span className="settings-toggle-track">
+                    <span className="settings-toggle-thumb" />
+                  </span>
+                </label>
+              </div>
+            </>
+          )}
+
+          {activeCategory === 'privacy' && (
+            <>
+              {/* Configuración de perfil */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaLock /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.profile_config')}</h2>
+                    <p className="settings-section-desc">{t('settings.profile_config_desc')}</p>
+                  </div>
+                </div>
+
+                <div className="settings-segmented">
+                  <button
+                    type="button"
+                    className={`settings-segmented-btn ${!isPrivate ? 'settings-segmented-btn--active' : ''}`}
+                    onClick={() => handlePrivacyChange(false)}
+                    disabled={privacyUpdating || profileLoading}
+                  >
+                    {t('settings.public_profile')}
+                  </button>
+                  <button
+                    type="button"
+                    className={`settings-segmented-btn ${isPrivate ? 'settings-segmented-btn--active' : ''}`}
+                    onClick={() => handlePrivacyChange(true)}
+                    disabled={privacyUpdating || profileLoading}
+                  >
+                    {t('settings.private_profile')}
+                  </button>
+                </div>
+              </div>
+
+              <div className="settings-row-divider" />
+
+              {/* Privacidad de estadísticas */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaEyeSlash /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.stats_privacy')}</h2>
+                    <p className="settings-section-desc">{t('settings.stats_privacy_desc')}</p>
+                  </div>
+                </div>
+
+                <div className="settings-segmented">
+                  <button
+                    type="button"
+                    className={`settings-segmented-btn ${!statsPrivate ? 'settings-segmented-btn--active' : ''}`}
+                    onClick={() => handleStatsPrivacyChange(false)}
+                    disabled={statsPrivacyUpdating || profileLoading}
+                  >
+                    {t('settings.stats_public')}
+                  </button>
+                  <button
+                    type="button"
+                    className={`settings-segmented-btn ${statsPrivate ? 'settings-segmented-btn--active' : ''}`}
+                    onClick={() => handleStatsPrivacyChange(true)}
+                    disabled={statsPrivacyUpdating || profileLoading}
+                  >
+                    {t('settings.stats_private')}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

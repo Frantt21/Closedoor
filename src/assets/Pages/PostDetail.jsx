@@ -18,7 +18,7 @@ import {
   getCachedComments,
   setCachedComments,
 } from '../services/postService';
-import { FaHeart, FaRegHeart, FaReply, FaTrash, FaRegComment, FaRegSadTear, FaArrowLeft } from 'react-icons/fa';
+import { FaHeart, FaRegHeart, FaReply, FaTrash, FaRegComment, FaRegSadTear, FaArrowLeft, FaImage } from 'react-icons/fa';
 import PostCard from '../Resources/Components/PostCard';
 import '../Resources/Styles/post.css';
 
@@ -49,7 +49,27 @@ export default function PostDetail() {
 
   const [commentInput, setCommentInput] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
-  const [replyTo, setReplyTo] = useState(null); // { id, username }
+  const [commentMediaUrl, setCommentMediaUrl] = useState('');
+  const [commentShowMedia, setCommentShowMedia] = useState(false);
+  const [replyTo, setReplyTo] = useState(null); // { id, username } — para form inline
+  // Estado del form inline (reply)
+  const [replyContent, setReplyContent] = useState('');
+  const [replyMediaUrl, setReplyMediaUrl] = useState('');
+  const [replyShowMedia, setReplyShowMedia] = useState(false);
+  const [submittingReply, setSubmittingReply] = useState(false);
+
+  // ── Gallery de imágenes en comentarios ──
+  const [commentGalleryUrls, setCommentGalleryUrls] = useState(null);
+  const [commentGalleryIndex, setCommentGalleryIndex] = useState(0);
+
+  const openCommentGallery = (e, urls, index) => {
+    e.stopPropagation();
+    setCommentGalleryUrls(urls);
+    setCommentGalleryIndex(index);
+  };
+  const closeCommentGallery = () => setCommentGalleryUrls(null);
+  const goCommentGalleryPrev = () => setCommentGalleryIndex((prev) => (prev > 0 ? prev - 1 : commentGalleryUrls.length - 1));
+  const goCommentGalleryNext = () => setCommentGalleryIndex((prev) => (prev < commentGalleryUrls.length - 1 ? prev + 1 : 0));
 
   const [liked, setLiked] = useState(false);
   const [reposted, setReposted] = useState(false);
@@ -132,6 +152,18 @@ export default function PostDetail() {
     isReposted(postId, user.id).then(setReposted).catch(() => {});
   }, [user?.id, postId]);
 
+  // ── Keyboard nav for comment gallery ──
+  useEffect(() => {
+    if (!commentGalleryUrls) return;
+    const handleKey = (e) => {
+      if (e.key === 'Escape') { closeCommentGallery(); return; }
+      if (e.key === 'ArrowLeft') goCommentGalleryPrev();
+      if (e.key === 'ArrowRight') goCommentGalleryNext();
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [commentGalleryUrls, commentGalleryIndex]);
+
   // Realtime: listen for new comments + updates on post/comments
   useEffect(() => {
     if (!postId) return;
@@ -209,23 +241,91 @@ export default function PostDetail() {
     const trimmed = commentInput.trim();
     if (!trimmed || !user?.id || !postId) return;
 
+    const trimmedMedia = commentMediaUrl.trim();
+    const isImage = IMG_RE.test(trimmedMedia);
+    const isVideo = VID_RE.test(trimmedMedia);
+    const imageUrl = isImage ? trimmedMedia : null;
+    const videoUrl = isVideo ? trimmedMedia : null;
+
     setSubmittingComment(true);
     try {
       const newComment = await createComment({
         postId,
         userId: user.id,
         content: trimmed,
-        parentId: replyTo?.id || null,
+        parentId: null,
+        imageUrl,
+        videoUrl,
       });
       setComments((prev) => [...prev, newComment]);
       setCommentInput('');
-      setReplyTo(null);
+      setCommentMediaUrl('');
+      setCommentShowMedia(false);
     } catch (err) {
       console.error('Error creating comment:', err);
     } finally {
       setSubmittingComment(false);
     }
   };
+
+  // ── Handle inline reply submission ──
+  const handleSubmitReply = async () => {
+    if (!replyTo) return;
+    const trimmed = replyContent.trim();
+    if (!trimmed || !user?.id || !postId) return;
+
+    const trimmedMedia = replyMediaUrl.trim();
+    const isImage = IMG_RE.test(trimmedMedia);
+    const isVideo = VID_RE.test(trimmedMedia);
+    const imageUrl = isImage ? trimmedMedia : null;
+    const videoUrl = isVideo ? trimmedMedia : null;
+
+    setSubmittingReply(true);
+    try {
+      const newComment = await createComment({
+        postId,
+        userId: user.id,
+        content: trimmed,
+        parentId: replyTo.id,
+        imageUrl,
+        videoUrl,
+      });
+      setComments((prev) => [...prev, newComment]);
+      // Expandir al padre para que la nueva reply sea visible
+      setExpandedReplies((prev) => ({ ...prev, [replyTo.id]: true }));
+      cancelReply();
+    } catch (err) {
+      console.error('Error creating reply:', err);
+    } finally {
+      setSubmittingReply(false);
+    }
+  };
+
+  // ── Start replying to a comment ──
+  const startReply = (comment, isNested = false) => {
+    const prepend = isNested ? `@${comment.profiles?.username} ` : '';
+    setReplyTo({
+      id: comment.id,
+      username: comment.profiles?.username,
+    });
+    setReplyContent(prepend);
+    setReplyMediaUrl('');
+    setReplyShowMedia(false);
+    setTimeout(() => {
+      const el = document.getElementById(`reply-form-${comment.id}`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 50);
+  };
+
+  const cancelReply = () => {
+    setReplyTo(null);
+    setReplyContent('');
+    setReplyMediaUrl('');
+    setReplyShowMedia(false);
+  };
+
+  const IMG_RE = /\.(jpe?g|png|gif|webp|bmp|svg)(\?.*)?$/i;
+  const VID_RE = /\.(mp4|webm|ogg)(\?.*)?$/i;
 
   const handleDeleteComment = async (commentId) => {
     if (!window.confirm(t('post.delete_comment_confirm'))) return;
@@ -265,16 +365,217 @@ export default function PostDetail() {
   const topLevelComments = comments.filter((c) => !c.parent_id);
   const getReplies = (parentId) => comments.filter((c) => c.parent_id === parentId);
 
-  // ── Render a single comment (used for top-level and replies) ──
-  const renderComment = (comment, isReply = false) => {
-    const likesCount = comments.filter((c) => c.parent_id === comment.id).length;
-    // We don't track comment likes count from DB here, just the UI toggle
-    const isLikedComment = commentLikes[comment.id] || false;
-    const replies = getReplies(comment.id);
-    const showReplies = expandedReplies[comment.id];
+
+
+  // ── Render content with @mentions and URL highlighting ──
+  const renderCommentContent = (text) => {
+    if (!text) return null;
+    const parts = [];
+    const regex = /(?<![\w@])(@[a-zA-Z0-9_]+)|(https?:\/\/[^\s<]+)/gi;
+    let lastIndex = 0, match;
+    while ((match = regex.exec(text)) !== null) {
+      if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
+      parts.push(match[0]);
+      lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+    return parts.map((part, i) => {
+      if (part.startsWith('@')) {
+        return (
+          <span
+            key={i}
+            className="comment-card-mention"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/profile/${part.slice(1)}`);
+            }}
+          >
+            {part}
+          </span>
+        );
+      }
+      if (part.startsWith('http://') || part.startsWith('https://')) {
+        return (
+          <a
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="comment-card-link"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!window.confirm(t('post.external_link_warning'))) e.preventDefault();
+            }}
+          >
+            {part}
+          </a>
+        );
+      }
+      return part;
+    });
+  };
+
+  // ── Render a single reply card ──
+  // depth=1: direct reply (indented), CAN be replied to, shows children toggle
+  // depth>=2: nested reply, NO Reply button, NO children (terminal)
+  const renderReplyCard = (reply, depth = 1) => {
+    const isLikedComment = commentLikes[reply.id] || false;
+    const isReplying = replyTo?.id === reply.id;
+    const childReplies = getReplies(reply.id);
+    const hasChildren = childReplies.length > 0;
+    const childrenExpanded = expandedReplies[reply.id];
+    const isDirectReply = depth === 1;
 
     return (
-      <div key={comment.id} className={`comment-card ${isReply ? 'comment-card--reply' : ''}`}>
+      <div key={reply.id} className="comment-card comment-card--reply">
+        <a
+          href={`/profile/${reply.profiles?.username}`}
+          onClick={(e) => { e.preventDefault(); navigate(`/profile/${reply.profiles?.username}`); }}
+        >
+          <img
+            className="comment-card-avatar"
+            src={reply.profiles?.avatar_url || DEFAULT_AVATAR}
+            alt={reply.profiles?.username || 'user'}
+          />
+        </a>
+        <div className="comment-card-content">
+          <div className="comment-card-header">
+            <a
+              className="comment-card-username"
+              href={`/profile/${reply.profiles?.username}`}
+              onClick={(e) => { e.preventDefault(); navigate(`/profile/${reply.profiles?.username}`); }}
+            >
+              {reply.profiles?.username || 'unknown'}
+            </a>
+            <span className="comment-card-time">{getTimeAgo(t, locale, reply.created_at)}</span>
+          </div>
+          <p className="comment-card-text">{renderCommentContent(reply.content)}</p>
+
+          {/* ── Media (clickable for gallery) ── */}
+          {reply.image_url && (
+            <div className="comment-card-media">
+              <img
+                src={reply.image_url}
+                alt={t('post.media_alt', { n: 1 })}
+                className="comment-card-image"
+                onClick={(e) => openCommentGallery(e, [reply.image_url], 0)}
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+            </div>
+          )}
+          {reply.video_url && (
+            <div className="comment-card-media">
+              {reply.video_url.match(/\.(mp4|webm|ogg)(\?.*)?$/i) ? (
+                <video src={reply.video_url} controls className="comment-card-video" />
+              ) : (
+                <img
+                  src={reply.video_url}
+                  alt={t('post.media_alt', { n: 1 })}
+                  className="comment-card-image"
+                  onClick={(e) => openCommentGallery(e, [reply.video_url], 0)}
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+              )}
+            </div>
+          )}
+
+          <div className="comment-card-actions-row">
+            <button
+              className={`comment-card-btn ${isLikedComment ? 'comment-card-btn--liked' : ''}`}
+              onClick={() => handleLikeComment(reply.id)}
+            >
+              {isLikedComment ? <FaHeart /> : <FaRegHeart />}
+              {reply.comment_likes_count > 0 && <span className="comment-card-btn-count">{reply.comment_likes_count}</span>}
+            </button>
+
+            {/* Only direct replies (depth=1) can be replied to */}
+            {isDirectReply && (
+              <button className="comment-card-btn" onClick={() => startReply(reply, true)}>
+                <FaReply /> {t('post.reply')}
+              </button>
+            )}
+
+            {isDirectReply && hasChildren && (
+              <button
+                className="comment-card-btn"
+                onClick={() => setExpandedReplies((prev) => ({ ...prev, [reply.id]: !childrenExpanded }))}
+              >
+                {childrenExpanded ? t('post.hide_replies') : t('post.replies_count', { n: childReplies.length })}
+              </button>
+            )}
+            {(user?.id === reply.user_id) && (
+              <button className="comment-card-btn comment-card-btn--danger" onClick={() => handleDeleteComment(reply.id)}>
+                <FaTrash />
+              </button>
+            )}
+          </div>
+
+          {/* ── Inline reply form (only for direct replies) ── */}
+          {isDirectReply && isReplying && (
+            <div className="comment-card-reply-form" id={`reply-form-${reply.id}`}>
+              <div className="comment-card-reply-info">
+                {t('post.reply_to', { user: `@${replyTo?.username}` })}
+                <button className="comment-form-cancel-reply" onClick={cancelReply}>{t('post.cancel_reply')}</button>
+              </div>
+              <textarea
+                className="comment-form-input"
+                value={replyContent}
+                onChange={(e) => setReplyContent(e.target.value)}
+                placeholder={t('post.reply_placeholder', { user: replyTo?.username })}
+                rows={2}
+                maxLength={1000}
+              />
+              <div className="comment-form-media-row">
+                <button
+                  type="button"
+                  className={`comment-form-media-btn ${replyShowMedia ? 'comment-form-media-btn--active' : ''}`}
+                  onClick={() => setReplyShowMedia((s) => !s)}
+                  title={t('post.comment_add_media')}
+                >
+                  <FaImage />
+                  {replyMediaUrl && (
+                    <span className="comment-form-media-badge">{t('post.comment_media_added')}</span>
+                  )}
+                </button>
+              </div>
+              {replyShowMedia && (
+                <div className="comment-form-media-inputs">
+                  <input className="comment-form-media-input" type="url" value={replyMediaUrl} onChange={(e) => setReplyMediaUrl(e.target.value)} placeholder={t('post.comment_media_url')} />
+                  {replyMediaUrl && IMG_RE.test(replyMediaUrl) && (
+                    <div className="comment-card-preview"><img src={replyMediaUrl} alt="Preview" onError={(e) => { e.target.style.display = 'none'; }} /></div>
+                  )}
+                  {replyMediaUrl && VID_RE.test(replyMediaUrl) && (
+                    <div className="comment-card-preview"><video src={replyMediaUrl} controls /></div>
+                  )}
+                </div>
+              )}
+              <div className="comment-form-actions">
+                <button className="comment-form-submit" onClick={handleSubmitReply} disabled={submittingReply || !replyContent.trim()}>
+                  {submittingReply ? t('post.sending') : t('post.comment_post')}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Nested replies (only direct replies can have children) ── */}
+          {isDirectReply && hasChildren && childrenExpanded && (
+            <div className="comment-card-replies">
+              {childReplies.map((child) => renderReplyCard(child, 2))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // ── Render a single comment (top-level) ──
+  const renderComment = (comment) => {
+    const isLikedComment = commentLikes[comment.id] || false;
+    const directReplies = getReplies(comment.id);
+    const isReplying = replyTo?.id === comment.id;
+
+    return (
+      <div key={comment.id} className="comment-card">
         <a
           href={`/profile/${comment.profiles?.username}`}
           onClick={(e) => { e.preventDefault(); navigate(`/profile/${comment.profiles?.username}`); }}
@@ -296,7 +597,35 @@ export default function PostDetail() {
             </a>
             <span className="comment-card-time">{getTimeAgo(t, locale, comment.created_at)}</span>
           </div>
-          <p className="comment-card-text">{comment.content}</p>
+          <p className="comment-card-text">{renderCommentContent(comment.content)}</p>
+
+          {/* ── Media en comentario (clickable, gallery) ── */}
+          {comment.image_url && (
+            <div className="comment-card-media">
+              <img
+                src={comment.image_url}
+                alt={t('post.media_alt', { n: 1 })}
+                className="comment-card-image"
+                onClick={(e) => openCommentGallery(e, [comment.image_url], 0)}
+                onError={(e) => { e.target.style.display = 'none'; }}
+              />
+            </div>
+          )}
+          {comment.video_url && (
+            <div className="comment-card-media">
+              {comment.video_url.match(/\.(mp4|webm|ogg)(\?.*)?$/i) ? (
+                <video src={comment.video_url} controls className="comment-card-video" />
+              ) : (
+                <img
+                  src={comment.video_url}
+                  alt={t('post.media_alt', { n: 1 })}
+                  className="comment-card-image"
+                  onClick={(e) => openCommentGallery(e, [comment.video_url], 0)}
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+              )}
+            </div>
+          )}
 
           <div className="comment-card-actions-row">
             {/* Like button */}
@@ -310,25 +639,26 @@ export default function PostDetail() {
               )}
             </button>
 
-            {/* Reply button (only on top-level) */}
-            {!isReply && (
-              <button
-                className="comment-card-btn"
-                onClick={() => setReplyTo({ id: comment.id, username: comment.profiles?.username })}
-              >
-                <FaReply /> {t('post.reply')}
-              </button>
-            )}
+            {/* Reply button */}
+            <button
+              className="comment-card-btn"
+              onClick={() => startReply(comment, false)}
+            >
+              <FaReply /> {t('post.reply')}
+            </button>
 
             {/* Show replies count */}
-            {!isReply && replies.length > 0 && (
-              <button
-                className="comment-card-btn"
-                onClick={() => setExpandedReplies((prev) => ({ ...prev, [comment.id]: !showReplies }))}
-              >
-                {showReplies ? t('post.hide_replies') : t('post.replies_count', { n: replies.length })}
-              </button>
-            )}
+            {directReplies.length > 0 && (() => {
+              const showReplies = expandedReplies[comment.id];
+              return (
+                <button
+                  className="comment-card-btn"
+                  onClick={() => setExpandedReplies((prev) => ({ ...prev, [comment.id]: !showReplies }))}
+                >
+                  {showReplies ? t('post.hide_replies') : t('post.replies_count', { n: directReplies.length })}
+                </button>
+              );
+            })()}
 
             {/* Delete (owner only) */}
             {(user?.id === comment.user_id) && (
@@ -341,12 +671,66 @@ export default function PostDetail() {
             )}
           </div>
 
-          {/* Replies */}
-          {!isReply && showReplies && replies.length > 0 && (
-            <div className="comment-card-replies">
-              {replies.map((reply) => renderComment(reply, true))}
+          {/* ── Inline reply form ── */}
+          {isReplying && (
+            <div className="comment-card-reply-form" id={`reply-form-${comment.id}`}>
+              <div className="comment-card-reply-info">
+                {t('post.reply_to', { user: `@${replyTo?.username}` })}
+                <button className="comment-form-cancel-reply" onClick={cancelReply}>{t('post.cancel_reply')}</button>
+              </div>              <textarea
+                className="comment-form-input"
+                value={replyContent}
+                onChange={(e) => setReplyContent(e.target.value)}
+                placeholder={t('post.reply_placeholder', { user: replyTo?.username })}
+                rows={2}
+                maxLength={1000}
+              />
+              <div className="comment-form-media-row">
+                <button
+                  type="button"
+                  className={`comment-form-media-btn ${replyShowMedia ? 'comment-form-media-btn--active' : ''}`}
+                  onClick={() => setReplyShowMedia((s) => !s)}
+                  title={t('post.comment_add_media')}
+                >
+                  <FaImage />
+                  {replyMediaUrl && (
+                    <span className="comment-form-media-badge">{t('post.comment_media_added')}</span>
+                  )}
+                </button>
+              </div>
+              {replyShowMedia && (
+                <div className="comment-form-media-inputs">
+                  <input className="comment-form-media-input" type="url" value={replyMediaUrl} onChange={(e) => setReplyMediaUrl(e.target.value)} placeholder={t('post.comment_media_url')} />
+                  {replyMediaUrl && IMG_RE.test(replyMediaUrl) && (
+                    <div className="comment-card-preview"><img src={replyMediaUrl} alt="Preview" onError={(e) => { e.target.style.display = 'none'; }} /></div>
+                  )}
+                  {replyMediaUrl && VID_RE.test(replyMediaUrl) && (
+                    <div className="comment-card-preview"><video src={replyMediaUrl} controls /></div>
+                  )}
+                </div>
+              )}
+              <div className="comment-form-actions">
+                <button
+                  className="comment-form-submit"
+                  onClick={handleSubmitReply}
+                  disabled={submittingReply || !replyContent.trim()}
+                >
+                  {submittingReply ? t('post.sending') : t('post.comment_post')}
+                </button>
+              </div>
             </div>
           )}
+
+          {/* ── Replies (indented once) ── */}
+          {(() => {
+            const showReplies = expandedReplies[comment.id];
+            if (!showReplies || directReplies.length === 0) return null;
+            return (
+              <div className="comment-card-replies">
+                {directReplies.map((reply) => renderReplyCard(reply))}
+              </div>
+            );
+          })()}
         </div>
       </div>
     );
@@ -398,7 +782,7 @@ export default function PostDetail() {
       <div className="comments-section">
         <h3 className="comments-title">{t('post.comments_title')}{comments.length > 0 && ` (${comments.length})`}</h3>
 
-        {/* Comment form */}
+        {/* Top-level comment form */}
         {user && (
           <div className="comment-form">
             <img
@@ -407,20 +791,48 @@ export default function PostDetail() {
               alt="Your avatar"
             />
             <div className="comment-form-input-wrapper">
-              {replyTo && (
-                <div className="comment-form-reply-info">
-                  {t('post.reply_to', { user: replyTo.username })}
-                  <button className="comment-form-cancel-reply" onClick={() => setReplyTo(null)}>{t('post.cancel_reply')}</button>
-                </div>
-              )}
               <textarea
                 className="comment-form-input"
                 value={commentInput}
                 onChange={(e) => setCommentInput(e.target.value)}
-                placeholder={replyTo ? t('post.reply_placeholder', { user: replyTo.username }) : t('post.comment_placeholder')}
+                placeholder={t('post.comment_placeholder')}
                 rows={2}
                 maxLength={1000}
               />
+              <div className="comment-form-media-row">
+                <button
+                  type="button"
+                  className={`comment-form-media-btn ${commentShowMedia ? 'comment-form-media-btn--active' : ''}`}
+                  onClick={() => setCommentShowMedia((s) => !s)}
+                  title={t('post.comment_add_media')}
+                >
+                  <FaImage />
+                  {commentMediaUrl && (
+                    <span className="comment-form-media-badge">{t('post.comment_media_added')}</span>
+                  )}
+                </button>
+              </div>
+              {commentShowMedia && (
+                <div className="comment-form-media-inputs">
+                  <input
+                    className="comment-form-media-input"
+                    type="url"
+                    value={commentMediaUrl}
+                    onChange={(e) => setCommentMediaUrl(e.target.value)}
+                    placeholder={t('post.comment_media_url')}
+                  />
+                  {commentMediaUrl && IMG_RE.test(commentMediaUrl) && (
+                    <div className="comment-card-preview">
+                      <img src={commentMediaUrl} alt="Preview" onError={(e) => { e.target.style.display = 'none'; }} />
+                    </div>
+                  )}
+                  {commentMediaUrl && VID_RE.test(commentMediaUrl) && (
+                    <div className="comment-card-preview">
+                      <video src={commentMediaUrl} controls />
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="comment-form-actions">
                 <button
                   className="comment-form-submit"
@@ -453,9 +865,92 @@ export default function PostDetail() {
             <p className="posts-empty-text">{t('post.no_comments')}</p>
           </div>
         ) : (
-          topLevelComments.map((comment) => renderComment(comment, false))
+          topLevelComments.map((comment) => renderComment(comment))
         )}
       </div>
+
+      {/* ── Comment gallery lightbox ── */}
+      {commentGalleryUrls && (
+        <div className="post-card-lightbox" onClick={(e) => { e.stopPropagation(); closeCommentGallery(); }}>
+          {commentGalleryUrls.length > 1 && (
+            <button
+              className="post-card-gallery-nav post-card-gallery-nav--prev"
+              onClick={(e) => { e.stopPropagation(); goCommentGalleryPrev(); }}
+              aria-label="Previous"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+          )}
+
+          <div className="post-card-lightbox-content" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={commentGalleryUrls[commentGalleryIndex]}
+              alt={t('post.full_media')}
+              className="post-card-gallery-image"
+              key={commentGalleryIndex}
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+            <div className="post-card-lightbox-actions">
+              {commentGalleryUrls.length > 1 && (
+                <span className="post-card-gallery-counter">
+                  {commentGalleryIndex + 1} / {commentGalleryUrls.length}
+                </span>
+              )}
+              <a
+                href={commentGalleryUrls[commentGalleryIndex]}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="post-card-lightbox-btn"
+                title={t('post.open_new_tab')}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                  <polyline points="15 3 21 3 21 9" />
+                  <line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+              </a>
+              <a
+                href={commentGalleryUrls[commentGalleryIndex]}
+                download
+                className="post-card-lightbox-btn"
+                title={t('post.download')}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              </a>
+              <button
+                className="post-card-lightbox-btn post-card-lightbox-close"
+                onClick={closeCommentGallery}
+                title={t('post.close')}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {commentGalleryUrls.length > 1 && (
+            <button
+              className="post-card-gallery-nav post-card-gallery-nav--next"
+              onClick={(e) => { e.stopPropagation(); goCommentGalleryNext(); }}
+              aria-label="Next"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

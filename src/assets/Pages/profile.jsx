@@ -101,7 +101,6 @@ function Profile() {
 
     const activeProfile = isOwnProfile ? ownProfile : viewedProfile;
     const isPrivate = activeProfile?.is_private === true;
-    const statsPrivate = activeProfile?.stats_private === true;
 
     // ── Obtener userId incluso cuando activeProfile aún no cargó ──
     const resolveUserId = () => {
@@ -123,8 +122,15 @@ function Profile() {
         }
         return null;
     });
+    const [isFollowedBy, setIsFollowedBy] = useState(() => {
+        // Si el perfil visitado sigue al usuario actual
+        const targetId = activeProfile?.id || resolveUserId();
+        if (user?.id && targetId && !isOwnProfile) {
+            return getCachedFollowStatus(targetId, user.id) ?? null;
+        }
+        return null;
+    });
     const canViewContent = isOwnProfile || !isPrivate || isFollower === true;
-    const canViewStats = isOwnProfile || !statsPrivate || isFollower === true;
 
     const [followCounts, setFollowCounts] = useState(() => {
         const targetId = activeProfile?.id || resolveUserId();
@@ -253,6 +259,30 @@ function Profile() {
             .catch((err) => {
                 console.warn('Error checking follower status:', err);
                 setIsFollower(false);
+            });
+    }, [user?.id, activeProfile?.id, isOwnProfile]);
+
+    // ── Check if this profile follows the current user ("Te sigue") ──
+    useEffect(() => {
+        if (!user?.id || !activeProfile?.id || isOwnProfile) {
+            setIsFollowedBy(null);
+            return;
+        }
+
+        const cached = getCachedFollowStatus(activeProfile.id, user.id);
+        if (cached !== null) {
+            setIsFollowedBy(cached);
+            return;
+        }
+
+        isFollowing(activeProfile.id, user.id)
+            .then((status) => {
+                setIsFollowedBy(status);
+                setCachedFollowStatus(activeProfile.id, user.id, status);
+            })
+            .catch((err) => {
+                console.warn('Error checking if profile follows you:', err);
+                setIsFollowedBy(false);
             });
     }, [user?.id, activeProfile?.id, isOwnProfile]);
 
@@ -556,6 +586,77 @@ function Profile() {
         loadSaved();
     }, [user?.id]);
 
+    // ── Refetch liked/reposted IDs al cambiar a Saved tab ──
+    useEffect(() => {
+        if (tab !== 'saved' || !user?.id) return;
+        const postIds = savedPosts.map((p) => p.id);
+        if (postIds.length === 0) return;
+        (async () => {
+            try {
+                const [likedIds, repostedIds] = await Promise.all([
+                    getLikedPostIds(postIds, user.id),
+                    getRepostedPostIds(postIds, user.id),
+                ]);
+                setSavedLikedIds(likedIds);
+                setSavedRepostedIds(repostedIds);
+                setCachedFeed(`saved_posts_${user.id}`, savedPosts, likedIds, repostedIds, []);
+            } catch (err) {
+                console.warn('Error refreshing saved liked/reposted status:', err);
+            }
+        })();
+    }, [tab, user?.id]);
+
+    // ── Handlers for like/repost sync ──
+    const handleLikeToggle = (postId, nowLiked) => {
+      setLikedPostIds((prev) =>
+        nowLiked ? [...prev, postId] : prev.filter((id) => id !== postId)
+      );
+      setSavedLikedIds((prev) =>
+        nowLiked ? [...prev, postId] : prev.filter((id) => id !== postId)
+      );
+      // Sincronizar likes_count en ambos arrays
+      const delta = nowLiked ? 1 : -1;
+      setProfilePosts((prev) =>
+        prev.map((p) =>
+          p.id === postId
+            ? { ...p, likes_count: Math.max((p.likes_count || 0) + delta, 0) }
+            : p
+        )
+      );
+      setSavedPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId
+            ? { ...p, likes_count: Math.max((p.likes_count || 0) + delta, 0) }
+            : p
+        )
+      );
+    };
+
+    const handleRepostToggle = (postId, nowReposted) => {
+      setRepostedPostIds((prev) =>
+        nowReposted ? [...prev, postId] : prev.filter((id) => id !== postId)
+      );
+      setSavedRepostedIds((prev) =>
+        nowReposted ? [...prev, postId] : prev.filter((id) => id !== postId)
+      );
+      // Sincronizar reposts_count en ambos arrays
+      const delta = nowReposted ? 1 : -1;
+      setProfilePosts((prev) =>
+        prev.map((p) =>
+          p.id === postId
+            ? { ...p, reposts_count: Math.max((p.reposts_count || 0) + delta, 0) }
+            : p
+        )
+      );
+      setSavedPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId
+            ? { ...p, reposts_count: Math.max((p.reposts_count || 0) + delta, 0) }
+            : p
+        )
+      );
+    };
+
     // ── Handlers for post actions ──
     const handlePostCreated = async () => {
         const userId = activeProfile?.id;
@@ -605,14 +706,32 @@ function Profile() {
         setSavedPostIds((prev) =>
             nowSaved ? [...prev, postId] : prev.filter((id) => id !== postId)
         );
-        // Refrescar la lista de guardados en background
+        // Refrescar la lista de guardados en background, incluyendo liked/reposted IDs
         if (user?.id && nowSaved) {
-            getSavedPosts(user.id)
-                .then((items) => setSavedPosts(items))
-                .catch((err) => console.warn('Error refreshing saved posts:', err));
+            (async () => {
+                try {
+                    const items = await getSavedPosts(user.id);
+                    setSavedPosts(items);
+                    if (items.length > 0) {
+                        const postIds = items.map((p) => p.id);
+                        const [likedIds, repostedIds] = await Promise.all([
+                            getLikedPostIds(postIds, user.id),
+                            getRepostedPostIds(postIds, user.id),
+                        ]);
+                        setSavedLikedIds(likedIds);
+                        setSavedRepostedIds(repostedIds);
+                        setCachedFeed(`saved_posts_${user.id}`, items, likedIds, repostedIds, []);
+                    }
+                } catch (err) {
+                    console.warn('Error refreshing saved posts:', err);
+                }
+            })();
         } else if (user?.id && !nowSaved) {
             // Quitar de savedPosts sin refetch
             setSavedPosts((prev) => prev.filter((p) => p.id !== postId));
+            // También remover el postId de savedLikedIds/savedRepostedIds
+            setSavedLikedIds((prev) => prev.filter((id) => id !== postId));
+            setSavedRepostedIds((prev) => prev.filter((id) => id !== postId));
         }
     };
 
@@ -826,7 +945,7 @@ function Profile() {
                         </p>
 
                         <div className="profile-stats">
-                            {canViewStats ? (
+                            {canViewContent ? (
                               <>
                                 <button
                                   type="button"
@@ -852,11 +971,14 @@ function Profile() {
                                   )}
                                   <span className="profile-stat-label">{t('profile.following')}</span>
                                 </button>
+                                {!isOwnProfile && isFollowedBy === true && (
+                                  <span className="profile-follows-you-badge">{t('profile.follows_you')}</span>
+                                )}
                               </>
                             ) : (
                               <span className="profile-stat profile-stat--private">
                                 <FaLock className="profile-stat-lock" />
-                                <span className="profile-stat-label">{t('profile.stats_private_label')}</span>
+                                <span className="profile-stat-label">{t('profile.private_profile')}</span>
                               </span>
                             )}
                         </div>
@@ -1029,6 +1151,8 @@ function Profile() {
                                 onUpdate={handlePostUpdate}
                                 onDelete={handlePostDelete}
                                 onSaveToggle={handleSaveToggle}
+                                onLikeToggle={handleLikeToggle}
+                                onRepostToggle={handleRepostToggle}
                                 repostInfo={post._repostInfo ? { ...post._repostInfo, repostedBy: activeProfile?.username } : null}
                             />
                         ))
@@ -1067,6 +1191,8 @@ function Profile() {
                                 onUpdate={handlePostUpdate}
                                 onDelete={handlePostDelete}
                                 onSaveToggle={handleSaveToggle}
+                                onLikeToggle={handleLikeToggle}
+                                onRepostToggle={handleRepostToggle}
                             />
                         ))
                 )}

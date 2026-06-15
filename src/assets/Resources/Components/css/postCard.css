@@ -335,6 +335,19 @@
     text-decoration: underline;
 }
 
+/* ── External URL links in post content ── */
+.post-card-link {
+    color: #60a5fa;
+    text-decoration: none;
+    word-break: break-all;
+    transition: opacity 0.15s ease;
+}
+
+.post-card-link:hover {
+    opacity: 0.8;
+    text-decoration: underline;
+}
+
 /* ── Image grid (multiple images) ── */
 .post-card-image-grid {
     display: grid;
@@ -343,7 +356,7 @@
     overflow: hidden;
     margin-bottom: 10px;
     border: 1px solid var(--color-border, #2a2a2a);
-    background: #000;
+    background: var(--color-surface, #1a1a1a);
 }
 
 .post-card-image-grid--1 {
@@ -387,7 +400,7 @@
     transform: scale(1.03);
 }
 
-/* ── Lightbox ── */
+/* ── Gallery / Lightbox ── */
 .post-card-lightbox {
     position: fixed;
     inset: 0;
@@ -405,7 +418,7 @@
 
 .post-card-lightbox-content {
     position: relative;
-    max-width: 95vw;
+    max-width: 85vw;
     max-height: 95vh;
     display: flex;
     flex-direction: column;
@@ -414,7 +427,7 @@
     cursor: default;
 }
 
-.post-card-lightbox-content img {
+.post-card-gallery-image {
     max-width: 100%;
     max-height: calc(95vh - 60px);
     object-fit: contain;
@@ -460,6 +473,56 @@
 .post-card-lightbox-close {
     font-size: 1.2rem;
     font-weight: 300;
+}
+
+/* ── Gallery navigation arrows ── */
+.post-card-gallery-nav {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.85);
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease;
+    z-index: 10;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+}
+
+.post-card-gallery-nav:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: translateY(-50%) scale(1.1);
+}
+
+.post-card-gallery-nav:active {
+    transform: translateY(-50%) scale(0.95);
+}
+
+.post-card-gallery-nav--prev {
+    left: 24px;
+}
+
+.post-card-gallery-nav--next {
+    right: 24px;
+}
+
+/* ── Gallery counter ── */
+.post-card-gallery-counter {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.08);
+    padding: 6px 14px;
+    border-radius: 9999px;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
 }
 
 /* ── Saved (bookmark) action ── */

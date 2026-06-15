@@ -3,61 +3,148 @@
    ========================================== */
 
 .settings-page {
-  max-width: 600px;
+  max-width: 800px;
   margin: 0 auto;
-  padding: 0 20px 40px;
+  padding: 0;
 }
 
 .settings-title {
-  font-size: 1.3rem;
+  font-size: 1.5rem;
   font-weight: 700;
   color: var(--color-text, #ffffff);
-  margin: 0 0 24px 0;
+  margin: 0 0 20px 0;
 }
+
+/* ── Card ── */
 
 .settings-card {
   background: var(--color-surface, #1a1a1a);
   border-radius: var(--radius, 10px);
-  padding: 24px;
+  overflow: hidden;
 }
 
-.settings-section {
+.settings-card--split {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+/* ── Left Navigation Panel ── */
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px;
+  min-width: 220px;
+  flex-shrink: 0;
+}
+
+.settings-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius, 8px);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  transition: background 0.15s ease;
+}
+
+.settings-nav-btn:hover {
+  background: var(--overlay-bg, rgba(255,255,255,0.04));
+}
+
+.settings-nav-btn--active {
+  background: var(--overlay-bg, rgba(255,255,255,0.08));
+}
+
+.settings-nav-icon {
+  font-size: 1.2rem;
+  color: var(--color-text-muted, #6b7280);
+  flex-shrink: 0;
+}
+
+.settings-nav-btn--active .settings-nav-icon {
+  color: var(--color-text, #ffffff);
+}
+
+.settings-nav-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-nav-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text, #ffffff);
+  display: block;
+  line-height: 1.3;
+}
+
+.settings-nav-desc {
+  font-size: 0.72rem;
+  color: var(--color-text-muted, #6b7280);
+  display: block;
+  margin-top: 1px;
+}
+
+/* ── Right Content Panel ── */
+
+.settings-panel {
+  flex: 1;
+  padding: 20px 24px;
+  border-left: 1px solid var(--color-border, #2a2a2a);
+  min-height: 200px;
+}
+
+/* ── Row inside panel ── */
+
+.settings-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  padding: 12px 0;
 }
 
-.settings-section-header {
+.settings-row-header {
   display: flex;
   align-items: flex-start;
   gap: 12px;
   flex: 1;
+  min-width: 0;
 }
 
 .settings-section-icon {
-  font-size: 1.5rem;
+  font-size: 1.1rem;
   flex-shrink: 0;
-  margin-top: 2px;
+  margin-top: 1px;
+  color: var(--color-text-muted, #6b7280);
 }
 
 .settings-section-title {
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   font-weight: 600;
   color: var(--color-text, #ffffff);
-  margin: 0 0 2px 0;
+  margin: 0 0 1px 0;
 }
 
 .settings-section-desc {
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--color-text-muted, #6b7280);
   margin: 0;
+  line-height: 1.3;
 }
 
-.settings-divider {
+.settings-row-divider {
   height: 1px;
   background: var(--color-border, #2a2a2a);
-  margin: 20px 0;
+  margin: 0;
 }
 
 /* ── Selector de idioma (dropdown) ── */
@@ -65,7 +152,7 @@
 .settings-select-wrapper {
   position: relative;
   flex-shrink: 0;
-  min-width: 180px;
+  min-width: 150px;
 }
 
 .settings-select-trigger {
@@ -73,14 +160,14 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 8px 12px;
+  padding: 7px 12px;
   border-radius: var(--radius, 10px);
   background: var(--overlay-bg);
   border: 1px solid var(--overlay-border);
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
   font-family: inherit;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   color: var(--color-text, #ffffff);
   text-align: left;
 }
@@ -128,7 +215,7 @@
   border: none;
   cursor: pointer;
   font-family: inherit;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   color: var(--color-text, #ffffff);
   text-align: left;
   transition: background 0.12s ease;
@@ -155,7 +242,7 @@
   display: block;
 }
 
-/* ── Segmented control (public/private) ── */
+/* ── Segmented control (public/private, theme) ── */
 
 .settings-segmented {
   display: flex;
@@ -166,13 +253,13 @@
 }
 
 .settings-segmented-btn {
-  padding: 6px 16px;
+  padding: 5px 14px;
   border: none;
   border-radius: 8px;
   background: transparent;
   color: var(--color-text-muted, #6b7280);
   font-family: inherit;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -208,9 +295,9 @@
 
 .settings-toggle-track {
   display: block;
-  width: 44px;
-  height: 24px;
-  border-radius: 12px;
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
   background: var(--overlay-bg);
   transition: background 0.2s ease;
   position: relative;
@@ -224,8 +311,8 @@
   position: absolute;
   top: 3px;
   left: 3px;
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: #ffffff;
   transition: transform 0.2s ease;
@@ -233,5 +320,44 @@
 }
 
 .settings-toggle input:checked + .settings-toggle-track .settings-toggle-thumb {
-  transform: translateX(20px);
+  transform: translateX(18px);
+}
+
+/* ── Responsive: stack vertically on small screens ── */
+
+@media (max-width: 600px) {
+  .settings-page {
+    max-width: 100%;
+    padding: 0 12px 40px;
+  }
+
+  .settings-card--split {
+    flex-direction: column;
+  }
+
+  .settings-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 6px;
+    padding: 10px;
+    min-width: auto;
+  }
+
+  .settings-nav-btn {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    min-width: 100px;
+    padding: 10px;
+  }
+
+  .settings-nav-desc {
+    display: none;
+  }
+
+  .settings-panel {
+    border-left: none;
+    border-top: 1px solid var(--color-border, #2a2a2a);
+    padding: 16px;
+  }
 }

@@ -68,6 +68,7 @@
   "profile.stats_reposts": "Репосты",
   "profile.private_posts_hint": "Посты и подписчики этого пользователя не видны.",
   "profile.stats_private_label": "Статистика скрыта",
+  "profile.follows_you": "Подписан на вас",
   "profile.checking_access": "Проверка доступа...",
 
   "post.like": "Нравится",
@@ -104,7 +105,9 @@
   "post.hide_replies": "Скрыть ответы",
   "post.replies_count": "{n} ответов",
   "post.sending": "Отправка...",
+  "post.external_link_warning": "Эта ссылка ведет на внешний сайт. Открыть?",
   "post.reply_placeholder": "Напишите ответ @{user}...",
+  "post.replies_depth_limit": "Ответ слишком глубокий. Создайте новый комментарий.",
 
   "follow.follow": "Подписаться",
   "follow.following": "Подписка",
@@ -165,6 +168,10 @@
   "settings.theme_desc": "Выберите тему приложения.",
   "settings.theme_dark": "Тёмная",
   "settings.theme_light": "Светлая",
+  "settings.category_system": "Система",
+  "settings.category_system_desc": "Язык, тема и цвета акцента",
+  "settings.category_privacy": "Приватность",
+  "settings.category_privacy_desc": "Видимость профиля и статистики",
 
   "modal.edit_title": "Редактировать профиль",
   "modal.username_label": "Имя пользователя",
@@ -207,11 +214,17 @@
   "create_post.empty_error": "Пост не может быть пустым",
   "create_post.auth_error": "Вы должны войти, чтобы публиковать",
   "create_post.save_error": "Ошибка сохранения поста",
-  "create_post.show_images": "Добавить изображения",
-  "create_post.hide_images": "Скрыть изображения",
+  "create_post.show_media": "Добавить медиа",
+  "create_post.hide_media": "Скрыть медиа",
   "create_post.image_urls_title": "URL изображений",
   "create_post.add_another_image": "Добавить ещё ({n}/4)",
   "create_post.image_count": "{n}/4",
+  "create_post.media_limit_warning": "Вы достигли лимита в 4 изображения в разделе медиа.",
+
+  "post.comment_image_url": "URL изображения",
+  "post.comment_video_url": "URL видео",
+  "post.comment_add_media": "Добавить медиа к комментарию",
+  "post.comment_media_added": "Медиа добавлено",
 
   "home.title": "Главная",
   "home.hero_title": "Добро пожаловать в лучшее сообщество",

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FaLock, FaHeart, FaComment, FaRetweet, FaTags } from 'react-icons/fa';
+import { FaLock, FaHeart, FaComment, FaRetweet, FaTags, FaFeather } from 'react-icons/fa';
 import { useI18n } from '../../services/i18n/useI18n';
 import { supabase } from '../../services/supabaseclient';
 import './css/profileSidebar.css';
@@ -65,17 +65,18 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, can
       try {
         const { data: posts } = await supabase
           .from('posts')
-          .select('likes_count, comments_count, reposts_count')
+          .select('id, likes_count, comments_count, reposts_count')
           .eq('user_id', profile.id);
 
         if (posts) {
           const total = posts.reduce(
             (acc, p) => ({
+              posts: acc.posts + 1,
               likes: acc.likes + (p.likes_count || 0),
               comments: acc.comments + (p.comments_count || 0),
               reposts: acc.reposts + (p.reposts_count || 0),
             }),
-            { likes: 0, comments: 0, reposts: 0 }
+            { posts: 0, likes: 0, comments: 0, reposts: 0 }
           );
           setStats(total);
           setCachedStats(profile.id, total);
@@ -155,36 +156,45 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, can
       </div>
 
       {/* ── Stats ── */}
-      {canViewStats && (
-        <div className="profile-sidebar-card">
-          <h3 className="profile-sidebar-title">{t('profile.stats_title')}</h3>
-          {!stats ? (
-            <div className="profile-sidebar-stats-skeleton">
-              <div className="skeleton profile-sidebar-skeleton-row" />
-              <div className="skeleton profile-sidebar-skeleton-row" />
-              <div className="skeleton profile-sidebar-skeleton-row" />
+      <div className="profile-sidebar-card">
+        <h3 className="profile-sidebar-title">{t('profile.stats_title')}</h3>
+        {!canViewStats ? (
+          <div className="profile-sidebar-private">
+            <FaLock className="profile-sidebar-private-icon" />
+            <span>{t('profile.stats_private_label')}</span>
+          </div>
+        ) : !stats ? (
+          <div className="profile-sidebar-stats-skeleton">
+            <div className="skeleton profile-sidebar-skeleton-row" />
+            <div className="skeleton profile-sidebar-skeleton-row" />
+            <div className="skeleton profile-sidebar-skeleton-row" />
+            <div className="skeleton profile-sidebar-skeleton-row" />
+          </div>
+        ) : (
+          <div className="profile-sidebar-stats">
+            <div className="profile-sidebar-stat">
+              <FaFeather className="profile-sidebar-stat-icon profile-sidebar-stat-icon--posts" />
+              <span className="profile-sidebar-stat-value">{stats.posts}</span>
+              <span className="profile-sidebar-stat-label">{t('profile.posts_tab')}</span>
             </div>
-          ) : (
-            <div className="profile-sidebar-stats">
-              <div className="profile-sidebar-stat">
-                <FaHeart className="profile-sidebar-stat-icon profile-sidebar-stat-icon--likes" />
-                <span className="profile-sidebar-stat-value">{stats.likes}</span>
-                <span className="profile-sidebar-stat-label">{t('profile.stats_likes')}</span>
-              </div>
-              <div className="profile-sidebar-stat">
-                <FaComment className="profile-sidebar-stat-icon profile-sidebar-stat-icon--comments" />
-                <span className="profile-sidebar-stat-value">{stats.comments}</span>
-                <span className="profile-sidebar-stat-label">{t('profile.stats_comments')}</span>
-              </div>
-              <div className="profile-sidebar-stat">
-                <FaRetweet className="profile-sidebar-stat-icon profile-sidebar-stat-icon--reposts" />
-                <span className="profile-sidebar-stat-value">{stats.reposts}</span>
-                <span className="profile-sidebar-stat-label">{t('profile.stats_reposts')}</span>
-              </div>
+            <div className="profile-sidebar-stat">
+              <FaHeart className="profile-sidebar-stat-icon profile-sidebar-stat-icon--likes" />
+              <span className="profile-sidebar-stat-value">{stats.likes}</span>
+              <span className="profile-sidebar-stat-label">{t('profile.stats_likes')}</span>
             </div>
-          )}
-        </div>
-      )}
+            <div className="profile-sidebar-stat">
+              <FaComment className="profile-sidebar-stat-icon profile-sidebar-stat-icon--comments" />
+              <span className="profile-sidebar-stat-value">{stats.comments}</span>
+              <span className="profile-sidebar-stat-label">{t('profile.stats_comments')}</span>
+            </div>
+            <div className="profile-sidebar-stat">
+              <FaRetweet className="profile-sidebar-stat-icon profile-sidebar-stat-icon--reposts" />
+              <span className="profile-sidebar-stat-value">{stats.reposts}</span>
+              <span className="profile-sidebar-stat-label">{t('profile.stats_reposts')}</span>
+            </div>
+          </div>
+        )}
+      </div>
     </aside>
   );
 }

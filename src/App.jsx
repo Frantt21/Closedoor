@@ -1,4 +1,5 @@
-import { Routes, Route, useParams } from 'react-router-dom';
+import { useLayoutEffect } from 'react';
+import { Routes, Route, useParams, useLocation } from 'react-router-dom';
 import Header from './assets/Resources/Components/Header.jsx';
 import FollowCountsWatcher from './assets/Resources/Components/FollowCountsWatcher.jsx';
 import Home from './assets/Pages/Home.jsx';
@@ -17,11 +18,18 @@ function ProfileWrapper() {
   return <Profile key={username || 'own'} />;
 }
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useLayoutEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  return null;
+}
+
 function App() {
   return (
     <I18nProvider>
       <div className="app-layout">
         {/* Components */}
+        <ScrollToTop />
         <Header />
         <FollowCountsWatcher />
 

@@ -55,6 +55,7 @@ export default function CreatePostModal({
   const [previewType, setPreviewType] = useState(null);
   const [imageUrls, setImageUrls] = useState(['']);
   const [showImageSection, setShowImageSection] = useState(false);
+  const [mediaLimitWarning, setMediaLimitWarning] = useState(null);
 
   // ── @ Mention autocomplete ──
   const [followedUsers, setFollowedUsers] = useState([]);
@@ -69,20 +70,36 @@ export default function CreatePostModal({
   const avatarUrl = profile?.avatar_url || DEFAULT_AVATAR;
   const displayName = profile?.username || t('common.username');
 
+  // ── Image URL management (must be before updatePreview) ──
+  const getValidImageUrls = () => {
+    return imageUrls.filter((url) => url.trim() && IMAGE_EXTENSIONS.test(url.trim()));
+  };
+
   // Preview the media found in current content
   const updatePreview = useCallback((text) => {
     const { imageUrl, videoUrl } = detectMediaFromContent(text);
-    if (imageUrl) {
-      setPreviewUrl(imageUrl);
-      setPreviewType('image');
-    } else if (videoUrl) {
-      setPreviewUrl(videoUrl);
-      setPreviewType('video');
+    const validCount = getValidImageUrls().length;
+    if (imageUrl || videoUrl) {
+      if (validCount >= 4) {
+        setMediaLimitWarning(t('create_post.media_limit_warning'));
+        setPreviewUrl(null);
+        setPreviewType(null);
+        return;
+      }
+      setMediaLimitWarning(null);
+      if (imageUrl) {
+        setPreviewUrl(imageUrl);
+        setPreviewType('image');
+      } else if (videoUrl) {
+        setPreviewUrl(videoUrl);
+        setPreviewType('video');
+      }
     } else {
       setPreviewUrl(null);
       setPreviewType(null);
+      setMediaLimitWarning(null);
     }
-  }, []);
+  }, [t, imageUrls]);
 
   // ── Detectar @ y actualizar query de mención ──
   const updateMentionState = useCallback((text, cursorPos) => {
@@ -213,10 +230,6 @@ export default function CreatePostModal({
 
   const removeImageUrlInput = (index) => {
     setImageUrls((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const getValidImageUrls = () => {
-    return imageUrls.filter((url) => url.trim() && IMAGE_EXTENSIONS.test(url.trim()));
   };
 
   const handleSubmit = async () => {
@@ -360,7 +373,7 @@ export default function CreatePostModal({
             onClick={() => setShowImageSection((s) => !s)}
           >
             <FaImage />
-            <span>{showImageSection ? t('create_post.hide_images') : t('create_post.show_images')}</span>
+            <span>{showImageSection ? t('create_post.hide_media') : t('create_post.show_media')}</span>
             {getValidImageUrls().length > 0 && (
               <span className="create-post-image-count">{t('create_post.image_count', { n: getValidImageUrls().length })}</span>
             )}
@@ -413,6 +426,13 @@ export default function CreatePostModal({
                 <FaPlus /> {t('create_post.add_another_image', { n: imageUrls.length })}
               </button>
             )}
+          </div>
+        )}
+
+        {/* ── Aviso de límite de media alcanzado ── */}
+        {mediaLimitWarning && (
+          <div className="create-post-preview create-post-preview--warning">
+            <span>{mediaLimitWarning}</span>
           </div>
         )}
 
