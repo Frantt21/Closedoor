@@ -12,6 +12,7 @@ import {
     setCachedProfileByUsername,
     getCachedProfileByUsername,
     getCachedProfile,
+    trackProfileView,
 } from "../services/userService";
 import {
     getFollowCounts,
@@ -131,6 +132,13 @@ function Profile() {
         return null;
     });
     const canViewContent = isOwnProfile || !isPrivate || isFollower === true;
+
+    // ── Track profile view (once per visitor) ──
+    useEffect(() => {
+        if (activeProfile?.id) {
+            trackProfileView(activeProfile.id, user?.id);
+        }
+    }, [activeProfile?.id, user?.id]);
 
     const [followCounts, setFollowCounts] = useState(() => {
         const targetId = activeProfile?.id || resolveUserId();
@@ -529,7 +537,7 @@ function Profile() {
                     setProfilePosts((prev) => {
                         const mapped = prev.map((p) =>
                             p.id === updated.id
-                                ? { ...p, likes_count: updated.likes_count, reposts_count: updated.reposts_count, comments_count: updated.comments_count, is_pinned: updated.is_pinned, pinned_at: updated.pinned_at }
+                                ? { ...p, likes_count: updated.likes_count, reposts_count: updated.reposts_count, comments_count: updated.comments_count, views_count: updated.views_count, is_pinned: updated.is_pinned, pinned_at: updated.pinned_at }
                                 : p
                         );
                         return [...mapped].sort(sortProfilePosts);

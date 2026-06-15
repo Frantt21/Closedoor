@@ -11,7 +11,7 @@ import {
   savePost,
   unsavePost,
 } from '../../services/postService';
-import { FaHeart, FaRegHeart, FaComment, FaRetweet, FaThumbtack, FaEdit, FaTrash, FaEllipsisV, FaBookmark, FaRegBookmark } from 'react-icons/fa';
+import { FaHeart, FaRegHeart, FaComment, FaRetweet, FaThumbtack, FaEdit, FaTrash, FaEllipsisV, FaBookmark, FaRegBookmark, FaEye } from 'react-icons/fa';
 import Badge from './Badge';
 import { useI18n } from '../../services/i18n/useI18n';
 import './css/postCard.css';
@@ -449,6 +449,11 @@ export default function PostCard({
               title={saved ? t('post.saved') : t('post.save')}
             >
               <span className="post-card-action-icon">{saved ? <FaBookmark /> : <FaRegBookmark />}</span>
+            </button>
+
+            <button type="button" className="post-card-action post-card-action--view">
+              <span className="post-card-action-icon"><FaEye /></span>
+              <span className="post-card-action-count">{post.views_count || 0}</span>
             </button>
           </div>
         </div>

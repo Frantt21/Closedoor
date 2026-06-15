@@ -525,6 +525,12 @@
     white-space: nowrap;
 }
 
+/* ── View count (mismo estilo que los botones, sin hover) ── */
+.post-card-action--view {
+  pointer-events: none;
+  cursor: default;
+}
+
 /* ── Saved (bookmark) action ── */
 .post-card-action--saved {
     background: rgba(250, 204, 21, 0.08);

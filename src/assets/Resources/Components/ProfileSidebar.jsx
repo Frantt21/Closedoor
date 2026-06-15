@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FaLock, FaHeart, FaComment, FaRetweet, FaTags, FaFeather } from 'react-icons/fa';
+import { FaLock, FaHeart, FaComment, FaRetweet, FaTags, FaFeather, FaBookmark, FaEye, FaUser } from 'react-icons/fa';
 import { useI18n } from '../../services/i18n/useI18n';
 import { supabase } from '../../services/supabaseclient';
 import './css/profileSidebar.css';
@@ -65,7 +65,7 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, can
       try {
         const { data: posts } = await supabase
           .from('posts')
-          .select('id, likes_count, comments_count, reposts_count')
+          .select('id, likes_count, comments_count, reposts_count, views_count')
           .eq('user_id', profile.id);
 
         if (posts) {
@@ -75,11 +75,35 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, can
               likes: acc.likes + (p.likes_count || 0),
               comments: acc.comments + (p.comments_count || 0),
               reposts: acc.reposts + (p.reposts_count || 0),
+              views: acc.views + (p.views_count || 0),
             }),
-            { posts: 0, likes: 0, comments: 0, reposts: 0 }
+            { posts: 0, likes: 0, comments: 0, reposts: 0, views: 0 }
           );
-          setStats(total);
-          setCachedStats(profile.id, total);
+
+          // Contar saves totales en los posts de este perfil
+          const postIds = posts.map(p => p.id);
+          let saves = 0;
+          if (postIds.length > 0) {
+            const { count } = await supabase
+              .from('saved_posts')
+              .select('id', { count: 'exact', head: true })
+              .in('post_id', postIds);
+            saves = count || 0;
+          }
+
+          // Obtener vistas del perfil
+          let profileViews = 0;
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('profile_views_count')
+            .eq('id', profile.id)
+            .single();
+          if (profileData) {
+            profileViews = profileData.profile_views_count || 0;
+          }
+
+          setStats({ ...total, saves, profileViews });
+          setCachedStats(profile.id, { ...total, saves, profileViews });
         }
       } catch (err) {
         console.warn('Error fetching profile stats:', err);
@@ -108,8 +132,24 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, can
       )
       .subscribe();
 
+    // ── Realtime: refrescar stats cuando alguien guarda/desguarda un post ──
+    const savesChannel = supabase
+      .channel(`profile-saves-${profile.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'saved_posts' },
+        () => fetchStats()
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'saved_posts' },
+        () => fetchStats()
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(channel);
+      supabase.removeChannel(savesChannel);
     };
   }, [profile?.id, canViewStats, isOwnProfile]);
 
@@ -191,6 +231,21 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, can
               <FaRetweet className="profile-sidebar-stat-icon profile-sidebar-stat-icon--reposts" />
               <span className="profile-sidebar-stat-value">{stats.reposts}</span>
               <span className="profile-sidebar-stat-label">{t('profile.stats_reposts')}</span>
+            </div>
+            <div className="profile-sidebar-stat">
+              <FaEye className="profile-sidebar-stat-icon profile-sidebar-stat-icon--views" />
+              <span className="profile-sidebar-stat-value">{stats.views}</span>
+              <span className="profile-sidebar-stat-label">{t('profile.stats_views')}</span>
+            </div>
+            <div className="profile-sidebar-stat">
+              <FaUser className="profile-sidebar-stat-icon profile-sidebar-stat-icon--profile-views" />
+              <span className="profile-sidebar-stat-value">{stats.profileViews}</span>
+              <span className="profile-sidebar-stat-label">{t('profile.stats_profile_views')}</span>
+            </div>
+            <div className="profile-sidebar-stat">
+              <FaBookmark className="profile-sidebar-stat-icon profile-sidebar-stat-icon--saves" />
+              <span className="profile-sidebar-stat-value">{stats.saves}</span>
+              <span className="profile-sidebar-stat-label">{t('profile.stats_saved')}</span>
             </div>
           </div>
         )}

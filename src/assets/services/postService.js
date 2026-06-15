@@ -48,8 +48,7 @@ export async function createPost({ userId, content, imageUrl, imageUrls, videoUr
 }
 
 export async function getPosts({ userId, profileUserId, limit = 20, offset = 0 } = {}) {
-  let query = supabase
-    .from('posts')
+  let query = supabase      .from('posts')
     .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles)');
 
   if (profileUserId) {
@@ -162,7 +161,7 @@ export async function getProfileContent(profileUserId, currentUserId) {
         id, created_at, user_id,
         posts!reposts_post_id_fkey (
           id, user_id, content, image_url, image_urls, video_url, is_pinned, pinned_at, mentions,
-          likes_count, comments_count, reposts_count, created_at, updated_at,
+          likes_count, comments_count, reposts_count, views_count, created_at, updated_at,
           profiles!posts_user_id_fkey (id, username, avatar_url, roles)
         )
       `)
@@ -536,6 +535,46 @@ export async function isReposted(postId, userId) {
   return !!data;
 }
 
+// ── VIEWS ──
+
+const VIEWED_POSTS_KEY = 'fc_viewed_';
+
+/**
+ * Track a post view (once per user per post, dedup via localStorage)
+ * Increments views_count on the post if not already viewed
+ */
+export async function trackPostView(postId, userId) {
+  if (!postId) return false;
+  const key = VIEWED_POSTS_KEY + (userId || 'anon');
+  try {
+    const raw = localStorage.getItem(key);
+    const viewed = raw ? JSON.parse(raw) : [];
+    if (viewed.includes(postId)) return false; // Already viewed
+
+    // Increment views_count on the post
+    const { data: post } = await supabase
+      .from('posts')
+      .select('views_count')
+      .eq('id', postId)
+      .single();
+
+    if (post) {
+      await supabase
+        .from('posts')
+        .update({ views_count: (post.views_count || 0) + 1 })
+        .eq('id', postId);
+    }
+
+    // Add to viewed set
+    viewed.push(postId);
+    localStorage.setItem(key, JSON.stringify(viewed));
+    return true;
+  } catch (err) {
+    console.warn('Error tracking view:', err);
+    return false;
+  }
+}
+
 // ── SAVED POSTS ──
 
 export async function savePost(postId, userId) {
@@ -594,8 +633,7 @@ export async function getSavedPosts(userId, { limit = 50, offset = 0 } = {}) {
     .select(`
       id, created_at,
       posts!saved_posts_post_id_fkey (
-        id, user_id, content, image_url, image_urls, video_url, mentions,
-        likes_count, comments_count, reposts_count, created_at, updated_at,
+        id, user_id, content, image_url, image_urls, video_url, mentions,          likes_count, comments_count, reposts_count, views_count, created_at, updated_at,
         profiles!posts_user_id_fkey (id, username, avatar_url, roles)
       )
     `)

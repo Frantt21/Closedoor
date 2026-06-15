@@ -17,6 +17,7 @@ import {
   isCommentLiked,
   getCachedComments,
   setCachedComments,
+  trackPostView,
 } from '../services/postService';
 import { FaHeart, FaRegHeart, FaReply, FaTrash, FaRegComment, FaRegSadTear, FaArrowLeft, FaImage } from 'react-icons/fa';
 import PostCard from '../Resources/Components/PostCard';
@@ -129,11 +130,8 @@ export default function PostDetail() {
       // Guardar en cache
       setCachedComments(postId, data, likes);
 
-      // Expand all top-level comments' replies by default
-      const topLevel = data.filter((c) => !c.parent_id);
-      const expanded = {};
-      topLevel.forEach((c) => { expanded[c.id] = true; });
-      setExpandedReplies(expanded);
+      // All replies start hidden by default
+      setExpandedReplies({});
     } catch (err) {
       console.error('Error loading comments:', err);
     } finally {
@@ -144,6 +142,12 @@ export default function PostDetail() {
   useEffect(() => {
     loadComments();
   }, [loadComments]);
+
+  // Track post view (once per user)
+  useEffect(() => {
+    if (!postId) return;
+    trackPostView(postId, user?.id);
+  }, [postId, user?.id]);
 
   // Check if current user liked/reposted this post
   useEffect(() => {
@@ -211,6 +215,7 @@ export default function PostDetail() {
               likes_count: updated.likes_count,
               reposts_count: updated.reposts_count,
               comments_count: updated.comments_count,
+              views_count: updated.views_count,
             };
             setCachedPost(merged);
             return merged;
@@ -257,6 +262,8 @@ export default function PostDetail() {
         imageUrl,
         videoUrl,
       });
+      // El primer comentario del usuario en este post cuenta como vista
+      trackPostView(postId, user?.id);
       setComments((prev) => [...prev, newComment]);
       setCommentInput('');
       setCommentMediaUrl('');
@@ -425,6 +432,9 @@ export default function PostDetail() {
     const hasChildren = childReplies.length > 0;
     const childrenExpanded = expandedReplies[reply.id];
     const isDirectReply = depth === 1;
+    // Encontrar el autor del comentario padre
+    const parentComment = comments.find((c) => c.id === reply.parent_id);
+    const parentUsername = parentComment?.profiles?.username;
 
     return (
       <div key={reply.id} className="comment-card comment-card--reply">
@@ -448,6 +458,11 @@ export default function PostDetail() {
               {reply.profiles?.username || 'unknown'}
             </a>
             <span className="comment-card-time">{getTimeAgo(t, locale, reply.created_at)}</span>
+            {parentUsername && (
+              <span className="comment-card-replying-to">
+                {t('post.replying_to', { user: `@${parentUsername}` })}
+              </span>
+            )}
           </div>
           <p className="comment-card-text">{renderCommentContent(reply.content)}</p>
 
@@ -780,7 +795,7 @@ export default function PostDetail() {
 
       {/* Comments Section */}
       <div className="comments-section">
-        <h3 className="comments-title">{t('post.comments_title')}{comments.length > 0 && ` (${comments.length})`}</h3>
+        <h3 className="comments-title">{t('post.comments_title')}</h3>
 
         {/* Top-level comment form */}
         {user && (

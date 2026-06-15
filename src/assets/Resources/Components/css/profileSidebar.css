@@ -25,7 +25,6 @@
 
 .profile-sidebar-card {
   background: var(--color-surface, #1a1a1a);
-  border: 1px solid var(--color-border, #2a2a2a);
   border-radius: var(--radius, 10px);
   padding: 16px;
 }
@@ -145,6 +144,18 @@
 
 .profile-sidebar-stat-icon--reposts {
   color: #34d399;
+}
+
+.profile-sidebar-stat-icon--views {
+  color: #22d3ee;
+}
+
+.profile-sidebar-stat-icon--profile-views {
+  color: #818cf8;
+}
+
+.profile-sidebar-stat-icon--saves {
+  color: #f59e0b;
 }
 
 .profile-sidebar-stat-value {

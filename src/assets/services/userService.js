@@ -410,6 +410,44 @@ export async function updateUserProfile(userId, updates) {
   }
 }
 
+// ── Profile views ──
+
+const VIEWED_PROFILE_KEY = 'fc_viewed_profile_';
+
+/**
+ * Track a profile view (once per user per profile, dedup via localStorage)
+ */
+export async function trackProfileView(profileId, userId) {
+  if (!profileId) return false;
+  const key = VIEWED_PROFILE_KEY + (userId || 'anon');
+  try {
+    const raw = localStorage.getItem(key);
+    const viewed = raw ? JSON.parse(raw) : [];
+    if (viewed.includes(profileId)) return false;
+
+    // Increment profile_views_count
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('profile_views_count')
+      .eq('id', profileId)
+      .single();
+
+    if (profile) {
+      await supabase
+        .from('profiles')
+        .update({ profile_views_count: (profile.profile_views_count || 0) + 1 })
+        .eq('id', profileId);
+    }
+
+    viewed.push(profileId);
+    localStorage.setItem(key, JSON.stringify(viewed));
+    return true;
+  } catch (err) {
+    console.warn('Error tracking profile view:', err);
+    return false;
+  }
+}
+
 export async function updateAuthUserMetadata(updates) {
   try {
     const { data, error } = await supabase.auth.updateUser({
