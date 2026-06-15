@@ -114,6 +114,7 @@ function ProfileContent({ path, ownProfile, user, t }) {
   // ── Profile page ──
   const activeProfile = isOwnProfilePage ? ownProfile : viewedProfile;
   const isPrivate = activeProfile?.is_private === true;
+  const statsPrivate = activeProfile?.stats_private === true;
 
   if (loading) {
     return (
@@ -133,6 +134,7 @@ function ProfileContent({ path, ownProfile, user, t }) {
       profile={activeProfile}
       isPrivate={isPrivate}
       canViewContent={isOwnProfilePage || !isPrivate}
+      canViewStats={isOwnProfilePage || !statsPrivate}
       isOwnProfile={isOwnProfilePage}
     />
   );

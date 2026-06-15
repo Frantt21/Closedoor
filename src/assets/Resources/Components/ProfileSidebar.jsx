@@ -33,12 +33,12 @@ function setCachedStats(profileId, stats) {
   }
 }
 
-export default function ProfileSidebar({ profile, isPrivate, canViewContent, isOwnProfile }) {
+export default function ProfileSidebar({ profile, isPrivate, canViewContent, canViewStats, isOwnProfile }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const [stats, setStats] = useState(() => {
     if (!profile?.id) return null;
-    if (!canViewContent && !isOwnProfile) return null;
+    if (!canViewStats && !isOwnProfile) return null;
     return getCachedStats(profile.id);
   });
   const interests = profile?.interests || [];
@@ -57,7 +57,7 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, isO
     if (!profile?.id) return;
 
     const fetchStats = async () => {
-      if (!canViewContent && !isOwnProfile) {
+      if (!canViewStats && !isOwnProfile) {
         setStats(null);
         return;
       }
@@ -110,7 +110,7 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, isO
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [profile?.id, canViewContent, isOwnProfile]);
+  }, [profile?.id, canViewStats, isOwnProfile]);
 
   if (!profile) return null;
 
@@ -155,7 +155,7 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, isO
       </div>
 
       {/* ── Stats ── */}
-      {canViewContent && (
+      {canViewStats && (
         <div className="profile-sidebar-card">
           <h3 className="profile-sidebar-title">{t('profile.stats_title')}</h3>
           {!stats ? (

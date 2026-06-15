@@ -20,7 +20,7 @@
 
 .fc-modal {
     width: 100%;
-    max-width: 520px;
+    max-width: 960px;
     background: var(--color-surface, #1a1a1a);
     border: 1px solid var(--color-border, #2a2a2a);
     border-radius: var(--radius, 10px);
@@ -655,6 +655,140 @@ textarea.fc-modal-input {
     color: var(--color-text, #ffffff);
 }
 
+/* ── Two-column grid layout ── */
+
+.fc-modal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+}
+
+.fc-modal-grid-left {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.fc-modal-grid-right {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-left: 1px solid var(--color-border, #2a2a2a);
+  padding-left: 28px;
+}
+
+/* ── Suggested interests list ── */
+
+.fc-modal-suggested-wrapper {
+  margin-top: 16px;
+  position: relative;
+}
+
+.fc-modal-suggested-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-text-muted, #6b7280);
+  background: transparent;
+  border: 1px solid var(--color-border, #2a2a2a);
+  border-radius: var(--radius, 10px);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  font-family: inherit;
+}
+
+.fc-modal-suggested-toggle:hover {
+  color: var(--color-text-secondary, #9ca3af);
+  background: var(--color-surface-hover, #252525);
+  border-color: var(--color-text-muted, #6b7280);
+}
+
+.fc-modal-suggested-chevron {
+  margin-left: auto;
+  transition: transform 0.25s ease;
+  flex-shrink: 0;
+}
+
+.fc-modal-suggested-chevron--open {
+  transform: rotate(180deg);
+}
+
+/* ── Collapse animation ── */
+
+.fc-modal-suggested-collapse {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease, opacity 0.25s ease, margin 0.3s ease;
+  opacity: 0;
+  margin-top: 0;
+}
+
+.fc-modal-suggested-collapse--open {
+  max-height: 400px;
+  opacity: 1;
+  margin-top: 10px;
+}
+
+.fc-modal-suggested-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 340px;
+  overflow-y: auto;
+  padding-bottom: 12px;
+  /* ── Fade effect at the bottom ── */
+  -webkit-mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 85%, transparent 100%);
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  mask-mode: alpha;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+.fc-modal-suggested-list::-webkit-scrollbar {
+  width: 4px;
+}
+
+.fc-modal-suggested-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.fc-modal-suggested-list::-webkit-scrollbar-thumb {
+  background: var(--color-border, #2a2a2a);
+  border-radius: 3px;
+}
+
+.fc-modal-suggested-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--color-text-secondary, #9ca3af);
+  background: var(--overlay-bg-subtle);
+  border: 1px solid var(--color-border, #2a2a2a);
+  border-radius: var(--radius-full, 9999px);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.fc-modal-suggested-chip:hover {
+  color: var(--color-text, #ffffff);
+  background: var(--color-surface-hover, #252525);
+  border-color: var(--color-text-muted, #6b7280);
+}
+
+.fc-modal-suggested-chip:active {
+  transform: translateY(0);
+}
+
 /* ==========================================
    Responsive: móviles pequeños
    ========================================== */
@@ -702,6 +836,23 @@ textarea.fc-modal-input {
         font-size: 0.95rem;
     }
 
+    .fc-modal-grid {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    .fc-modal-grid-right {
+        border-left: none;
+        padding-left: 0;
+        padding-top: 16px;
+        border-top: 1px solid var(--color-border, #2a2a2a);
+        margin-top: 4px;
+    }
+
+    .fc-modal-suggested-list {
+        max-height: 200px;
+    }
+
     .fc-modal-actions {
         flex-direction: column-reverse;
         gap: 8px;
@@ -725,6 +876,20 @@ textarea.fc-modal-input {
 
     .fc-modal {
         padding: 24px;
+        max-width: 520px;
+    }
+
+    .fc-modal-grid {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    .fc-modal-grid-right {
+        border-left: none;
+        padding-left: 0;
+        padding-top: 20px;
+        border-top: 1px solid var(--color-border, #2a2a2a);
+        margin-top: 8px;
     }
 
     .fc-modal-actions {

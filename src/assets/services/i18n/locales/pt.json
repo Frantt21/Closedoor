@@ -67,6 +67,7 @@
   "profile.stats_comments": "Comentários",
   "profile.stats_reposts": "Reposts",
   "profile.private_posts_hint": "As publicações e seguidores deste usuário não estão visíveis.",
+  "profile.stats_private_label": "Estatísticas privadas",
   "profile.checking_access": "Verificando acesso...",
 
   "post.like": "Curtir",
@@ -157,6 +158,10 @@
   "settings.profile_config_desc": "Controle a visibilidade do seu perfil.",
   "settings.public_profile": "Público",
   "settings.private_profile": "Privado",
+  "settings.stats_privacy": "Privacidade de estatísticas",
+  "settings.stats_privacy_desc": "Controle quem pode ver suas estatísticas (seguidores, curtidas, etc.).",
+  "settings.stats_public": "Visíveis",
+  "settings.stats_private": "Privadas",
   "settings.theme": "Tema",
   "settings.theme_desc": "Selecione o tema do aplicativo.",
   "settings.theme_dark": "Escuro",
@@ -187,6 +192,7 @@
   "modal.interests": "Interesses",
   "modal.interests_placeholder": "Adicione um interesse...",
   "modal.discard_changes": "Você tem alterações não salvas. Descartá-las?",
+  "modal.suggested_interests": "Sugeridos",
   "modal.saving": "Salvando...",
 
   "create_post.title": "Criar publicação",

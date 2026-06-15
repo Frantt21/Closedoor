@@ -67,6 +67,7 @@
   "profile.stats_comments": "コメント",
   "profile.stats_reposts": "リポスト",
   "profile.private_posts_hint": "このユーザーの投稿とフォロワーは表示されません。",
+  "profile.stats_private_label": "非公開の統計",
   "profile.checking_access": "アクセス確認中...",
 
   "post.like": "いいね",
@@ -157,6 +158,10 @@
   "settings.profile_config_desc": "プロフィールの公開設定を管理します。",
   "settings.public_profile": "公開",
   "settings.private_profile": "非公開",
+  "settings.stats_privacy": "統計のプライバシー",
+  "settings.stats_privacy_desc": "統計情報（フォロワー、いいね等）の表示を制御します。",
+  "settings.stats_public": "表示",
+  "settings.stats_private": "非公開",
   "settings.theme": "テーマ",
   "settings.theme_desc": "アプリケーションのテーマを選択します。",
   "settings.theme_dark": "ダーク",
@@ -187,6 +192,7 @@
   "modal.interests": "興味",
   "modal.interests_placeholder": "興味を追加...",
   "modal.discard_changes": "保存していない変更があります。破棄しますか？",
+  "modal.suggested_interests": "おすすめ",
   "modal.saving": "保存中...",
 
   "create_post.title": "投稿を作成",

@@ -65,8 +65,10 @@ export default function Settings() {
   const [selectOpen, setSelectOpen] = useState(false);
   const selectRef = useRef(null);
   const [privacyUpdating, setPrivacyUpdating] = useState(false);
+  const [statsPrivacyUpdating, setStatsPrivacyUpdating] = useState(false);
 
   const isPrivate = profile?.is_private ?? false;
+  const statsPrivate = profile?.stats_private ?? false;
 
   const handlePrivacyChange = async (value) => {
     if (!user?.id || privacyUpdating || value === isPrivate) return;
@@ -78,6 +80,19 @@ export default function Settings() {
       console.error('Error updating privacy:', err);
     } finally {
       setPrivacyUpdating(false);
+    }
+  };
+
+  const handleStatsPrivacyChange = async (value) => {
+    if (!user?.id || statsPrivacyUpdating || value === statsPrivate) return;
+    setStatsPrivacyUpdating(true);
+    try {
+      await updateUserProfile(user.id, { stats_private: value });
+      await refreshProfile(user.id);
+    } catch (err) {
+      console.error('Error updating stats privacy:', err);
+    } finally {
+      setStatsPrivacyUpdating(false);
     }
   };
 
@@ -173,6 +188,39 @@ export default function Settings() {
               disabled={privacyUpdating || profileLoading}
             >
               {t('settings.private_profile')}
+            </button>
+          </div>
+        </div>
+
+        {/* ── Separador ── */}
+        <div className="settings-divider" />
+
+        {/* ── Privacidad de estadísticas ── */}
+        <div className="settings-section">
+          <div className="settings-section-header">
+            <span className="settings-section-icon"><FaLock /></span>
+            <div>
+              <h2 className="settings-section-title">{t('settings.stats_privacy')}</h2>
+              <p className="settings-section-desc">{t('settings.stats_privacy_desc')}</p>
+            </div>
+          </div>
+
+          <div className="settings-segmented">
+            <button
+              type="button"
+              className={`settings-segmented-btn ${!statsPrivate ? 'settings-segmented-btn--active' : ''}`}
+              onClick={() => handleStatsPrivacyChange(false)}
+              disabled={statsPrivacyUpdating || profileLoading}
+            >
+              {t('settings.stats_public')}
+            </button>
+            <button
+              type="button"
+              className={`settings-segmented-btn ${statsPrivate ? 'settings-segmented-btn--active' : ''}`}
+              onClick={() => handleStatsPrivacyChange(true)}
+              disabled={statsPrivacyUpdating || profileLoading}
+            >
+              {t('settings.stats_private')}
             </button>
           </div>
         </div>

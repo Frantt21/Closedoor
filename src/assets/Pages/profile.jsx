@@ -101,6 +101,7 @@ function Profile() {
 
     const activeProfile = isOwnProfile ? ownProfile : viewedProfile;
     const isPrivate = activeProfile?.is_private === true;
+    const statsPrivate = activeProfile?.stats_private === true;
 
     // ── Obtener userId incluso cuando activeProfile aún no cargó ──
     const resolveUserId = () => {
@@ -123,6 +124,7 @@ function Profile() {
         return null;
     });
     const canViewContent = isOwnProfile || !isPrivate || isFollower === true;
+    const canViewStats = isOwnProfile || !statsPrivate || isFollower === true;
 
     const [followCounts, setFollowCounts] = useState(() => {
         const targetId = activeProfile?.id || resolveUserId();
@@ -824,7 +826,7 @@ function Profile() {
                         </p>
 
                         <div className="profile-stats">
-                            {canViewContent ? (
+                            {canViewStats ? (
                               <>
                                 <button
                                   type="button"
@@ -854,7 +856,7 @@ function Profile() {
                             ) : (
                               <span className="profile-stat profile-stat--private">
                                 <FaLock className="profile-stat-lock" />
-                                <span className="profile-stat-label">{t('profile.private_profile')}</span>
+                                <span className="profile-stat-label">{t('profile.stats_private_label')}</span>
                               </span>
                             )}
                         </div>

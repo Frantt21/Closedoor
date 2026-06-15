@@ -67,6 +67,7 @@
   "profile.stats_comments": "Comments",
   "profile.stats_reposts": "Reposts",
   "profile.private_posts_hint": "This user's posts and followers are not visible.",
+  "profile.stats_private_label": "Private stats",
   "profile.checking_access": "Checking access...",
 
   "post.like": "Like",
@@ -159,6 +160,10 @@
   "settings.profile_config_desc": "Control your profile visibility.",
   "settings.public_profile": "Public",
   "settings.private_profile": "Private",
+  "settings.stats_privacy": "Stats Privacy",
+  "settings.stats_privacy_desc": "Control who can see your statistics (followers, likes, etc.).",
+  "settings.stats_public": "Visible",
+  "settings.stats_private": "Private",
   "settings.theme": "Theme",
   "settings.theme_desc": "Select the application theme.",
   "settings.theme_dark": "Dark",
@@ -189,6 +194,7 @@
   "modal.interests": "Interests",
   "modal.interests_placeholder": "Add an interest...",
   "modal.discard_changes": "You have unsaved changes. Discard them?",
+  "modal.suggested_interests": "Suggested",
   "modal.saving": "Saving...",
 
   "create_post.title": "Create post",

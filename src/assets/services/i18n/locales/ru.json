@@ -67,6 +67,7 @@
   "profile.stats_comments": "Комментарии",
   "profile.stats_reposts": "Репосты",
   "profile.private_posts_hint": "Посты и подписчики этого пользователя не видны.",
+  "profile.stats_private_label": "Статистика скрыта",
   "profile.checking_access": "Проверка доступа...",
 
   "post.like": "Нравится",
@@ -156,6 +157,10 @@
   "settings.profile_config_desc": "Управляйте видимостью профиля.",
   "settings.public_profile": "Публичный",
   "settings.private_profile": "Приватный",
+  "settings.stats_privacy": "Приватность статистики",
+  "settings.stats_privacy_desc": "Управляйте видимостью статистики (подписчики, лайки и т.д.).",
+  "settings.stats_public": "Видна",
+  "settings.stats_private": "Скрыта",
   "settings.theme": "Тема",
   "settings.theme_desc": "Выберите тему приложения.",
   "settings.theme_dark": "Тёмная",
@@ -186,6 +191,7 @@
   "modal.interests": "Интересы",
   "modal.interests_placeholder": "Добавьте интерес...",
   "modal.discard_changes": "У вас есть несохраненные изменения. Отменить их?",
+  "modal.suggested_interests": "Рекомендуемые",
   "modal.saving": "Сохранение...",
 
   "create_post.title": "Создать пост",
