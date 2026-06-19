@@ -110,6 +110,7 @@
   "post.replies_count": "{n} replies",
   "post.sending": "Sending...",
   "post.external_link_warning": "This link will take you to an external site. Open it?",
+  "post.repost_private_forbidden": "Cannot repost a private profile's post",
   "post.reply_placeholder": "Write a reply to @{user}...",
   "post.replies_depth_limit": "Reply too deep. Create a new comment instead.",
 

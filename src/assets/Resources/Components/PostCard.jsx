@@ -83,6 +83,8 @@ export default function PostCard({
 
   const isOwner = user?.id === post.user_id;
   const profile = post.profiles;
+  const isPrivateProfile = profile?.is_private === true;
+  const repostDisabled = isPrivateProfile && !isOwner;
   const timeAgo = getTimeAgo(t, locale, post.created_at);
 
   const handleLike = async (e) => {
@@ -436,8 +438,10 @@ export default function PostCard({
             </button>
 
             <button
-              className={`post-card-action ${reposted ? 'post-card-action--reposted' : ''}`}
-              onClick={handleRepost}
+              className={`post-card-action ${reposted ? 'post-card-action--reposted' : ''} ${repostDisabled ? 'post-card-action--disabled' : ''}`}
+              onClick={repostDisabled ? undefined : handleRepost}
+              title={repostDisabled ? t('post.repost_private_forbidden') : ''}
+              disabled={repostDisabled}
             >
               <span className="post-card-action-icon"><FaRetweet /></span>
               <span className="post-card-action-count">{repostsCount}</span>

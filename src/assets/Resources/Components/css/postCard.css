@@ -221,6 +221,18 @@
     color: var(--accent-color, #f472b6);
 }
 
+/* Repost deshabilitado (perfil privado) */
+.post-card-action--disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.post-card-action--disabled:hover {
+  background: transparent;
+  color: inherit;
+}
+
 /* Repost activo: verde */
 .post-card-action--reposted {
     background: rgba(74, 222, 128, 0.08);

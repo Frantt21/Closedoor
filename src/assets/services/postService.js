@@ -49,7 +49,7 @@ export async function createPost({ userId, content, imageUrl, imageUrls, videoUr
 
 export async function getPosts({ userId, profileUserId, limit = 20, offset = 0 } = {}) {
   let query = supabase      .from('posts')
-    .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles)');
+    .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private)');
 
   if (profileUserId) {
     query = query
@@ -76,7 +76,7 @@ export async function getPosts({ userId, profileUserId, limit = 20, offset = 0 }
 export async function getPost(postId) {
   const { data, error } = await supabase
     .from('posts')
-    .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles)')
+    .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private)')
     .eq('id', postId)
     .single();
 
@@ -162,7 +162,7 @@ export async function getProfileContent(profileUserId, currentUserId) {
         posts!reposts_post_id_fkey (
           id, user_id, content, image_url, image_urls, video_url, is_pinned, pinned_at, mentions,
           likes_count, comments_count, reposts_count, views_count, created_at, updated_at,
-          profiles!posts_user_id_fkey (id, username, avatar_url, roles)
+          profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private)
         )
       `)
       .eq('user_id', profileUserId)
@@ -178,6 +178,14 @@ export async function getProfileContent(profileUserId, currentUserId) {
       repostedAt: r.created_at,
     },
   }));
+
+  // Fijar is_private en los posts originales que vienen de reposts
+  // (ya que la join del repost trae profiles del post original)
+  for (const item of repostItems) {
+    if (item.profiles && !('is_private' in item.profiles)) {
+      item.profiles.is_private = item.profiles.is_private ?? false;
+    }
+  }
 
   // Deduplicar por post.id: si el usuario reposteó su propio post, evitar duplicado
   const seenIds = new Set();
@@ -499,6 +507,22 @@ export async function getCommentLikesCount(commentId) {
 // ── REPOSTS ──
 
 export async function repostPost(postId, userId) {
+  // Verificar si el post pertenece a un perfil privado
+  // Si es privado y quien repostea NO es el dueño del post, bloquear
+  const { data: post } = await supabase
+    .from('posts')
+    .select('user_id, profiles!posts_user_id_fkey (is_private)')
+    .eq('id', postId)
+    .single();
+
+  if (post) {
+    const isPrivate = post.profiles?.is_private === true;
+    const isOwner = post.user_id === userId;
+    if (isPrivate && !isOwner) {
+      throw new Error('repost_private_forbidden');
+    }
+  }
+
   const { error } = await supabase
     .from('reposts')
     .insert({ user_id: userId, post_id: postId });
@@ -634,7 +658,7 @@ export async function getSavedPosts(userId, { limit = 50, offset = 0 } = {}) {
       id, created_at,
       posts!saved_posts_post_id_fkey (
         id, user_id, content, image_url, image_urls, video_url, mentions,          likes_count, comments_count, reposts_count, views_count, created_at, updated_at,
-        profiles!posts_user_id_fkey (id, username, avatar_url, roles)
+        profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private)
       )
     `)
     .eq('user_id', userId)
