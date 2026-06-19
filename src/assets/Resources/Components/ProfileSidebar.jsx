@@ -126,44 +126,18 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
 
     fetchStats();
 
-    // ── Realtime: refrescar stats cuando se actualiza un post (like/comment/repost) ──
+    // ── Realtime unificado: refrescar stats al cambiar posts o saves ──
     const channel = supabase
-      .channel(`profile-stats-${profile.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'posts', filter: `user_id=eq.${profile.id}` },
-        () => fetchStats()
-      )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'posts', filter: `user_id=eq.${profile.id}` },
-        () => fetchStats()
-      )
-      .on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'posts', filter: `user_id=eq.${profile.id}` },
-        () => fetchStats()
-      )
-      .subscribe();
-
-    // ── Realtime: refrescar stats cuando alguien guarda/desguarda un post ──
-    const savesChannel = supabase
-      .channel(`profile-saves-${profile.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'saved_posts' },
-        () => fetchStats()
-      )
-      .on(
-        'postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'saved_posts' },
-        () => fetchStats()
-      )
+      .channel(`profile-sidebar-stats-${profile.id}`)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts', filter: `user_id=eq.${profile.id}` }, () => fetchStats())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts', filter: `user_id=eq.${profile.id}` }, () => fetchStats())
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts', filter: `user_id=eq.${profile.id}` }, () => fetchStats())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'saved_posts' }, () => fetchStats())
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'saved_posts' }, () => fetchStats())
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
-      supabase.removeChannel(savesChannel);
     };
   }, [profile?.id, isOwnProfile]);
 

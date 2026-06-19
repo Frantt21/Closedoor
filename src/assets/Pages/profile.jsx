@@ -188,7 +188,7 @@ function Profile() {
         loadProfile();
     }, [profileUsername, isOwnProfile, t]);
 
-    // ── Fetch follow counts + suscripción Realtime para actualización en vivo ──
+    // ── Fetch follow counts inicial (cache-first, refresh en background) ──
     useEffect(() => {
         const userId = activeProfile?.id;
         if (!userId) return;
@@ -213,35 +213,6 @@ function Profile() {
 
         // Fetch inicial en segundo plano
         refreshCounts();
-
-        // Suscripción Realtime: actualiza en vivo cuando hay cambios
-        const channel = supabase
-            .channel(`profile-counts-${userId}`)
-            .on(
-                'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'follows', filter: `following_id=eq.${userId}` },
-                () => refreshCounts()
-            )
-            .on(
-                'postgres_changes',
-                { event: 'DELETE', schema: 'public', table: 'follows', filter: `following_id=eq.${userId}` },
-                () => refreshCounts()
-            )
-            .on(
-                'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'follows', filter: `follower_id=eq.${userId}` },
-                () => refreshCounts()
-            )
-            .on(
-                'postgres_changes',
-                { event: 'DELETE', schema: 'public', table: 'follows', filter: `follower_id=eq.${userId}` },
-                () => refreshCounts()
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
     }, [activeProfile?.id]);
 
     // ── Check if current user follows this profile (solo una vez, cache + Realtime) ──
@@ -293,91 +264,6 @@ function Profile() {
                 setIsFollowedBy(false);
             });
     }, [user?.id, activeProfile?.id, isOwnProfile]);
-
-    // ── Realtime: escuchar cambios en el estado de follow ──
-    useEffect(() => {
-        if (!user?.id || !activeProfile?.id || isOwnProfile) return;
-
-        const channel = supabase
-            .channel(`follow-status-${user.id}-${activeProfile.id}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'follows',
-                    filter: `follower_id=eq.${user.id}`,
-                },
-                async (payload) => {
-                    const affectedId = payload.new?.following_id || payload.old?.following_id;
-                    if (affectedId !== activeProfile.id) return;
-
-                    try {
-                        const { data, error } = await supabase
-                            .from('follows')
-                            .select('follower_id')
-                            .eq('follower_id', user.id)
-                            .eq('following_id', activeProfile.id)
-                            .eq('status', 'accepted')
-                            .maybeSingle();
-
-                        if (!error) {
-                            const isNowFollowing = !!data;
-                            setIsFollower(isNowFollowing);
-                            setCachedFollowStatus(user.id, activeProfile.id, isNowFollowing);
-                        }
-                    } catch (err) {
-                        console.warn('Error in follow status Realtime handler:', err);
-                    }
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [user?.id, activeProfile?.id, isOwnProfile]);
-
-    // ── Realtime: escuchar cambios en el perfil (is_private, avatar, bio, etc.) ──
-    useEffect(() => {
-        const targetId = activeProfile?.id;
-        if (!targetId || isOwnProfile) return;
-
-        const channel = supabase
-            .channel(`profile-updates-${targetId}`)
-            .on(
-                'postgres_changes',
-                {
-                    event: 'UPDATE',
-                    schema: 'public',
-                    table: 'profiles',
-                    filter: `id=eq.${targetId}`,
-                },
-                (payload) => {
-                    const updated = payload.new;
-                    const merged = { ...activeProfile, ...updated };
-
-                    // Actualizar estado y cache con los nuevos datos
-                    setViewedProfile(merged);
-                    setCachedProfile(merged);
-                    if (profileUsername && !isUUID(profileUsername)) {
-                        setCachedProfileByUsername(profileUsername, merged);
-                    }
-
-                    // Si cambió is_private, refrescar cache del feed
-                    const prevIsPrivate = payload.old?.is_private === true;
-                    const newIsPrivate = updated?.is_private === true;
-                    if (prevIsPrivate !== newIsPrivate) {
-                        clearVisibleIdsCache(user?.id);
-                    }
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [activeProfile?.id, profileUsername, user?.id, isOwnProfile]);
 
     // ── Followers modal state ──
     const [followersModal, setFollowersModal] = useState({ open: false, type: "followers" });
@@ -479,14 +365,26 @@ function Profile() {
         loadPosts();
     }, [activeProfile?.id, activeProfile?.username, user?.id, canViewContent]);
 
-    // ── Realtime: listen for new posts on this profile ──
+    // ── Realtime unificado: sigue cambios en follows, perfil y posts ──
     useEffect(() => {
-        const userId = activeProfile?.id;
-        if (!userId || !canViewContent) return;
+        const profileId = activeProfile?.id;
+        if (!profileId || !user?.id || isOwnProfile) return;
 
+        // Refresh follow counts
+        const refreshCounts = () => {
+            getFollowCounts(profileId)
+                .then((counts) => {
+                    setFollowCounts(counts);
+                    setCachedFollowCounts(profileId, counts);
+                })
+                .catch((err) => console.warn("Error refreshing follow counts:", err));
+        };
+
+        // Refresh posts after insert/delete
         const refreshAfterChange = async () => {
+            if (!canViewContent) return;
             try {
-                const items = await getProfileContent(userId, user?.id);
+                const items = await getProfileContent(profileId, user?.id);
                 setProfilePosts(items);
                 let likedIds = [], repostedIds = [], savedIds = [];
                 if (user?.id && items.length > 0) {
@@ -500,56 +398,79 @@ function Profile() {
                     setRepostedPostIds(repostedIds);
                     setSavedPostIds(savedIds);
                 }
-                setCachedFeed(`profile_posts_${userId}`, items, likedIds, repostedIds, savedIds);
+                setCachedFeed(`profile_posts_${profileId}`, items, likedIds, repostedIds, savedIds);
             } catch (err) {
                 console.warn('Error refreshing after change:', err);
             }
         };
 
         const channel = supabase
-            .channel(`profile-posts-${userId}`)
-            .on(
-                'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'posts', filter: `user_id=eq.${userId}` },
-                () => refreshAfterChange()
-            )
-            .on(
-                'postgres_changes',
-                { event: 'DELETE', schema: 'public', table: 'posts', filter: `user_id=eq.${userId}` },
-                () => refreshAfterChange()
-            )
-            .on(
-                'postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'reposts', filter: `user_id=eq.${userId}` },
-                () => refreshAfterChange()
-            )
-            .on(
-                'postgres_changes',
-                { event: 'DELETE', schema: 'public', table: 'reposts', filter: `user_id=eq.${userId}` },
-                () => refreshAfterChange()
-            )
-            .on(
-                'postgres_changes',
-                { event: 'UPDATE', schema: 'public', table: 'posts', filter: `user_id=eq.${userId}` },
-                (payload) => {
-                    // Actualización en vivo de contadores Y pin state
-                    const updated = payload.new;
-                    setProfilePosts((prev) => {
-                        const mapped = prev.map((p) =>
-                            p.id === updated.id
-                                ? { ...p, likes_count: updated.likes_count, reposts_count: updated.reposts_count, comments_count: updated.comments_count, views_count: updated.views_count, is_pinned: updated.is_pinned, pinned_at: updated.pinned_at }
-                                : p
-                        );
-                        return [...mapped].sort(sortProfilePosts);
-                    });
+            .channel(`profile-${profileId}`)
+            // ── Follow counts ──
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'follows', filter: `following_id=eq.${profileId}` }, () => refreshCounts())
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'follows', filter: `following_id=eq.${profileId}` }, () => refreshCounts())
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'follows', filter: `follower_id=eq.${profileId}` }, () => refreshCounts())
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'follows', filter: `follower_id=eq.${profileId}` }, () => refreshCounts())
+            // ── Follow status (current user's follows) ──
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'follows', filter: `follower_id=eq.${user.id}` }, async (payload) => {
+                const affectedId = payload.new?.following_id || payload.old?.following_id;
+                if (affectedId !== profileId) return;
+                try {
+                    const { data, error } = await supabase
+                        .from('follows')
+                        .select('follower_id')
+                        .eq('follower_id', user.id)
+                        .eq('following_id', profileId)
+                        .eq('status', 'accepted')
+                        .maybeSingle();
+                    if (!error) {
+                        const isNowFollowing = !!data;
+                        setIsFollower(isNowFollowing);
+                        setCachedFollowStatus(user.id, profileId, isNowFollowing);
+                        refreshCounts();
+                    }
+                } catch (err) {
+                    console.warn('Error in follow status Realtime handler:', err);
                 }
-            )
+            })
+            // ── Profile updates (is_private, avatar, bio, etc.) ──
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${profileId}` }, (payload) => {
+                const updated = payload.new;
+                const merged = { ...activeProfile, ...updated };
+                setViewedProfile(merged);
+                setCachedProfile(merged);
+                if (profileUsername && !isUUID(profileUsername)) {
+                    setCachedProfileByUsername(profileUsername, merged);
+                }
+                const prevIsPrivate = payload.old?.is_private === true;
+                const newIsPrivate = updated?.is_private === true;
+                if (prevIsPrivate !== newIsPrivate) {
+                    clearVisibleIdsCache(user?.id);
+                }
+            })
+            // ── Posts / Reposts ──
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'posts', filter: `user_id=eq.${profileId}` }, () => canViewContent && refreshAfterChange())
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'posts', filter: `user_id=eq.${profileId}` }, () => canViewContent && refreshAfterChange())
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'reposts', filter: `user_id=eq.${profileId}` }, () => canViewContent && refreshAfterChange())
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'reposts', filter: `user_id=eq.${profileId}` }, () => canViewContent && refreshAfterChange())
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'posts', filter: `user_id=eq.${profileId}` }, (payload) => {
+                if (!canViewContent) return;
+                const updated = payload.new;
+                setProfilePosts((prev) => {
+                    const mapped = prev.map((p) =>
+                        p.id === updated.id
+                            ? { ...p, likes_count: updated.likes_count, reposts_count: updated.reposts_count, comments_count: updated.comments_count, views_count: updated.views_count, is_pinned: updated.is_pinned, pinned_at: updated.pinned_at }
+                            : p
+                    );
+                    return [...mapped].sort(sortProfilePosts);
+                });
+            })
             .subscribe();
 
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [activeProfile?.id, user?.id, canViewContent]);
+    }, [activeProfile?.id, user?.id, isOwnProfile, profileUsername, canViewContent]);
 
     // ── Load saved posts (con cache + background refresh) ──
     useEffect(() => {
