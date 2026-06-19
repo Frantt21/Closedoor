@@ -169,6 +169,10 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
 
   if (!profile) return null;
 
+  // Determinar si todas las stats están intencionalmente ocultas
+  // (statsVisibility es un objeto no-null sin ninguna stat en true)
+  const isStatsHidden = !isOwnProfile && statsVisibility != null && !Object.values(statsVisibility).some(v => v === true);
+
   // Determinar si una estadística es visible
   function isStatVisible(statKey) {
     // Perfil propio: siempre visible
@@ -234,7 +238,12 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
       {/* ── Stats ── */}
       <div className="profile-sidebar-card">
         <h3 className="profile-sidebar-title">{t('profile.stats_title')}</h3>
-        {!stats ? (
+        {isStatsHidden ? (
+          <div className="profile-sidebar-private">
+            <FaLock className="profile-sidebar-private-icon" />
+            <span>{t('profile.stats_private_label')}</span>
+          </div>
+        ) : !stats ? (
           <div className="profile-sidebar-stats-skeleton">
             <div className="skeleton profile-sidebar-skeleton-row" />
             <div className="skeleton profile-sidebar-skeleton-row" />
