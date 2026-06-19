@@ -425,18 +425,22 @@ export async function trackProfileView(profileId, userId) {
     const viewed = raw ? JSON.parse(raw) : [];
     if (viewed.includes(profileId)) return false;
 
-    // Increment profile_views_count
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('profile_views_count')
-      .eq('id', profileId)
-      .single();
-
-    if (profile) {
-      await supabase
+    // Increment profile_views_count (resiliente a columna faltante)
+    try {
+      const { data: profile } = await supabase
         .from('profiles')
-        .update({ profile_views_count: (profile.profile_views_count || 0) + 1 })
-        .eq('id', profileId);
+        .select('profile_views_count')
+        .eq('id', profileId)
+        .single();
+
+      if (profile) {
+        await supabase
+          .from('profiles')
+          .update({ profile_views_count: (profile.profile_views_count || 0) + 1 })
+          .eq('id', profileId);
+      }
+    } catch (e) {
+      console.warn('profile_views_count not available for tracking:', e?.message || e);
     }
 
     viewed.push(profileId);

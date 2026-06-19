@@ -165,6 +165,8 @@
   "settings.stats_privacy_desc": "Управляйте видимостью статистики (подписчики, лайки и т.д.).",
   "settings.stats_public": "Видна",
   "settings.stats_private": "Скрыта",
+  "settings.stats_show_individual": "Показать отдельные статистики",
+  "settings.stats_hide_individual": "Скрыть отдельные статистики",
   "settings.theme": "Тема",
   "settings.theme_desc": "Выберите тему приложения.",
   "settings.theme_dark": "Тёмная",

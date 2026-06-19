@@ -33,12 +33,17 @@ function setCachedStats(profileId, stats) {
   }
 }
 
-export default function ProfileSidebar({ profile, isPrivate, canViewContent, canViewStats, isOwnProfile }) {
+export default function ProfileSidebar({ profile, isPrivate, canViewContent, statsVisibility, isOwnProfile }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const [stats, setStats] = useState(() => {
     if (!profile?.id) return null;
-    if (!canViewStats && !isOwnProfile) return null;
+    // Perfil ajeno: cargar stats solo si hay al menos una visible
+    if (!isOwnProfile) {
+      // null = legacy (stats_private controlaba): cargar siempre
+      const hasAnyVisible = statsVisibility == null || Object.values(statsVisibility).some(v => v === true);
+      if (!hasAnyVisible) return null;
+    }
     return getCachedStats(profile.id);
   });
   const interests = profile?.interests || [];
@@ -57,9 +62,14 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, can
     if (!profile?.id) return;
 
     const fetchStats = async () => {
-      if (!canViewStats && !isOwnProfile) {
-        setStats(null);
-        return;
+      if (!isOwnProfile) {
+        // null = legacy: cargar siempre (stats_private controlaba)
+        // Objeto: cargar solo si al menos una stat es visible
+        const hasAnyVisible = statsVisibility == null || Object.values(statsVisibility).some(v => v === true);
+        if (!hasAnyVisible) {
+          setStats(null);
+          return;
+        }
       }
 
       try {
@@ -91,15 +101,19 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, can
             saves = count || 0;
           }
 
-          // Obtener vistas del perfil
+          // Obtener vistas del perfil (resiliente a columna faltante)
           let profileViews = 0;
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('profile_views_count')
-            .eq('id', profile.id)
-            .single();
-          if (profileData) {
-            profileViews = profileData.profile_views_count || 0;
+          try {
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('profile_views_count')
+              .eq('id', profile.id)
+              .single();
+            if (profileData) {
+              profileViews = profileData.profile_views_count || 0;
+            }
+          } catch (e) {
+            console.warn('profile_views_count not available:', e?.message || e);
           }
 
           setStats({ ...total, saves, profileViews });
@@ -151,9 +165,31 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, can
       supabase.removeChannel(channel);
       supabase.removeChannel(savesChannel);
     };
-  }, [profile?.id, canViewStats, isOwnProfile]);
+  }, [profile?.id, isOwnProfile]);
 
   if (!profile) return null;
+
+  // Determinar si una estadística es visible
+  function isStatVisible(statKey) {
+    // Perfil propio: siempre visible
+    if (isOwnProfile) return true;
+    // statsVisibility = null: legacy (stats_private controlaba), mostrar todas
+    if (statsVisibility == null) return true;
+    // statsVisibility = {}: todas ocultas
+    // statsVisibility = {likes: true}: solo likes visible
+    return statsVisibility[statKey] === true;
+  }
+
+  function renderStat(statKey, Icon, iconClass, value, label) {
+    if (!isStatVisible(statKey)) return null;
+    return (
+      <div className="profile-sidebar-stat" key={statKey}>
+        <Icon className={`profile-sidebar-stat-icon ${iconClass}`} />
+        <span className="profile-sidebar-stat-value">{value}</span>
+        <span className="profile-sidebar-stat-label">{label}</span>
+      </div>
+    );
+  }
 
   return (
     <aside className="profile-sidebar">
@@ -198,12 +234,7 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, can
       {/* ── Stats ── */}
       <div className="profile-sidebar-card">
         <h3 className="profile-sidebar-title">{t('profile.stats_title')}</h3>
-        {!canViewStats ? (
-          <div className="profile-sidebar-private">
-            <FaLock className="profile-sidebar-private-icon" />
-            <span>{t('profile.stats_private_label')}</span>
-          </div>
-        ) : !stats ? (
+        {!stats ? (
           <div className="profile-sidebar-stats-skeleton">
             <div className="skeleton profile-sidebar-skeleton-row" />
             <div className="skeleton profile-sidebar-skeleton-row" />
@@ -212,41 +243,13 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, can
           </div>
         ) : (
           <div className="profile-sidebar-stats">
-            <div className="profile-sidebar-stat">
-              <FaFeather className="profile-sidebar-stat-icon profile-sidebar-stat-icon--posts" />
-              <span className="profile-sidebar-stat-value">{stats.posts}</span>
-              <span className="profile-sidebar-stat-label">{t('profile.posts_tab')}</span>
-            </div>
-            <div className="profile-sidebar-stat">
-              <FaHeart className="profile-sidebar-stat-icon profile-sidebar-stat-icon--likes" />
-              <span className="profile-sidebar-stat-value">{stats.likes}</span>
-              <span className="profile-sidebar-stat-label">{t('profile.stats_likes')}</span>
-            </div>
-            <div className="profile-sidebar-stat">
-              <FaComment className="profile-sidebar-stat-icon profile-sidebar-stat-icon--comments" />
-              <span className="profile-sidebar-stat-value">{stats.comments}</span>
-              <span className="profile-sidebar-stat-label">{t('profile.stats_comments')}</span>
-            </div>
-            <div className="profile-sidebar-stat">
-              <FaRetweet className="profile-sidebar-stat-icon profile-sidebar-stat-icon--reposts" />
-              <span className="profile-sidebar-stat-value">{stats.reposts}</span>
-              <span className="profile-sidebar-stat-label">{t('profile.stats_reposts')}</span>
-            </div>
-            <div className="profile-sidebar-stat">
-              <FaEye className="profile-sidebar-stat-icon profile-sidebar-stat-icon--views" />
-              <span className="profile-sidebar-stat-value">{stats.views}</span>
-              <span className="profile-sidebar-stat-label">{t('profile.stats_views')}</span>
-            </div>
-            <div className="profile-sidebar-stat">
-              <FaUser className="profile-sidebar-stat-icon profile-sidebar-stat-icon--profile-views" />
-              <span className="profile-sidebar-stat-value">{stats.profileViews}</span>
-              <span className="profile-sidebar-stat-label">{t('profile.stats_profile_views')}</span>
-            </div>
-            <div className="profile-sidebar-stat">
-              <FaBookmark className="profile-sidebar-stat-icon profile-sidebar-stat-icon--saves" />
-              <span className="profile-sidebar-stat-value">{stats.saves}</span>
-              <span className="profile-sidebar-stat-label">{t('profile.stats_saved')}</span>
-            </div>
+            {renderStat('posts', FaFeather, 'profile-sidebar-stat-icon--posts', stats.posts, t('profile.posts_tab'))}
+            {renderStat('likes', FaHeart, 'profile-sidebar-stat-icon--likes', stats.likes, t('profile.stats_likes'))}
+            {renderStat('comments', FaComment, 'profile-sidebar-stat-icon--comments', stats.comments, t('profile.stats_comments'))}
+            {renderStat('reposts', FaRetweet, 'profile-sidebar-stat-icon--reposts', stats.reposts, t('profile.stats_reposts'))}
+            {renderStat('views', FaEye, 'profile-sidebar-stat-icon--views', stats.views, t('profile.stats_views'))}
+            {renderStat('profileViews', FaUser, 'profile-sidebar-stat-icon--profile-views', stats.profileViews, t('profile.stats_profile_views'))}
+            {renderStat('saves', FaBookmark, 'profile-sidebar-stat-icon--saves', stats.saves, t('profile.stats_saved'))}
           </div>
         )}
       </div>

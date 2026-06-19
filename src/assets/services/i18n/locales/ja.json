@@ -166,6 +166,8 @@
   "settings.stats_privacy_desc": "統計情報（フォロワー、いいね等）の表示を制御します。",
   "settings.stats_public": "表示",
   "settings.stats_private": "非公開",
+  "settings.stats_show_individual": "個別の統計を表示",
+  "settings.stats_hide_individual": "個別の統計を隠す",
   "settings.theme": "テーマ",
   "settings.theme_desc": "アプリケーションのテーマを選択します。",
   "settings.theme_dark": "ダーク",

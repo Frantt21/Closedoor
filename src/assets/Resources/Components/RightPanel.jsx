@@ -115,6 +115,10 @@ function ProfileContent({ path, ownProfile, user, t }) {
   const activeProfile = isOwnProfilePage ? ownProfile : viewedProfile;
   const isPrivate = activeProfile?.is_private === true;
   const statsPrivate = activeProfile?.stats_private === true;
+  // statsVisibility directo desde el perfil (puede ser null = legacy)
+  // El control individual se maneja en ProfileSidebar, y el toggle general
+  // en Settings sincroniza stats_visibility automáticamente.
+  const resolvedStatsVisibility = activeProfile?.stats_visibility ?? null;
 
   if (loading) {
     return (
@@ -134,7 +138,7 @@ function ProfileContent({ path, ownProfile, user, t }) {
       profile={activeProfile}
       isPrivate={isPrivate}
       canViewContent={isOwnProfilePage || !isPrivate}
-      canViewStats={isOwnProfilePage || !statsPrivate}
+      statsVisibility={resolvedStatsVisibility}
       isOwnProfile={isOwnProfilePage}
     />
   );

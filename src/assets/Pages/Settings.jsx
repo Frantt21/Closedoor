@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useI18n } from '../services/i18n/useI18n';
 import { useAuth } from '../../hooks/useAuth';
 import { updateUserProfile } from '../services/userService';
-import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog } from 'react-icons/fa';
+import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaComment, FaRetweet, FaEye, FaUser, FaBookmark } from 'react-icons/fa';
 import '../Resources/Styles/settings.css';
 
 /* ── SVG Flag Icons ── */
@@ -74,9 +74,12 @@ export default function Settings() {
   const [privacyUpdating, setPrivacyUpdating] = useState(false);
   const [statsPrivacyUpdating, setStatsPrivacyUpdating] = useState(false);
   const [activeCategory, setActiveCategory] = useState('system');
+  const [statsExpanded, setStatsExpanded] = useState(false);
 
   const isPrivate = profile?.is_private ?? false;
   const statsPrivate = profile?.stats_private ?? false;
+  // No usar || {} para poder distinguir null (legacy) de {} (explicitamente vacío)
+  const statsVisibility = profile?.stats_visibility;
 
   const handlePrivacyChange = async (value) => {
     if (!user?.id || privacyUpdating || value === isPrivate) return;
@@ -95,12 +98,41 @@ export default function Settings() {
     if (!user?.id || statsPrivacyUpdating || value === statsPrivate) return;
     setStatsPrivacyUpdating(true);
     try {
-      await updateUserProfile(user.id, { stats_private: value });
+      // El toggle general sincroniza todas las stats individuales:
+      // Public (false) → todas visibles, Private (true) → todas ocultas
+      const allStats = { posts: true, likes: true, comments: true, reposts: true, views: true, profileViews: true, saves: true };
+      const newVisibility = value ? {} : allStats; // {} = todas ocultas, allStats = todas visibles
+      await updateUserProfile(user.id, {
+        stats_private: value,
+        stats_visibility: newVisibility,
+      });
       await refreshProfile(user.id);
     } catch (err) {
       console.error('Error updating stats privacy:', err);
     } finally {
       setStatsPrivacyUpdating(false);
+    }
+  };
+
+  // ── Stats individuales: iconos y keys ──
+  const STAT_ITEMS = [
+    { key: 'posts', icon: FaFeather, labelKey: 'profile.posts_tab' },
+    { key: 'likes', icon: FaHeart, labelKey: 'profile.stats_likes' },
+    { key: 'comments', icon: FaComment, labelKey: 'profile.stats_comments' },
+    { key: 'reposts', icon: FaRetweet, labelKey: 'profile.stats_reposts' },
+    { key: 'views', icon: FaEye, labelKey: 'profile.stats_views' },
+    { key: 'profileViews', icon: FaUser, labelKey: 'profile.stats_profile_views' },
+    { key: 'saves', icon: FaBookmark, labelKey: 'profile.stats_saved' },
+  ];
+
+  const handleStatVisibilityChange = async (statKey, visible) => {
+    if (!user?.id) return;
+    const newVisibility = { ...(profile?.stats_visibility || {}), [statKey]: visible };
+    try {
+      await updateUserProfile(user.id, { stats_visibility: newVisibility });
+      await refreshProfile(user.id);
+    } catch (err) {
+      console.error('Error updating stat visibility:', err);
     }
   };
 
@@ -308,6 +340,47 @@ export default function Settings() {
                     {t('settings.stats_private')}
                   </button>
                 </div>
+
+                {/* ── Expandir stats individuales ── */}
+                <button
+                  type="button"
+                  className="settings-stats-expand-btn"
+                  onClick={() => setStatsExpanded((s) => !s)}
+                >
+                  <span className={`settings-stats-expand-arrow ${statsExpanded ? 'settings-stats-expand-arrow--open' : ''}`}>
+                    <FaChevronRight />
+                  </span>
+                  <span>{statsExpanded ? t('settings.stats_hide_individual') : t('settings.stats_show_individual')}</span>
+                </button>
+
+                {statsExpanded && (
+                  <div className="settings-stats-list">
+                    {STAT_ITEMS.map(({ key, icon: Icon, labelKey }) => {
+                      // null = legacy: mostrar según statsPrivate
+                      // {} = todas ocultas (seteado por toggle general Privado)
+                      // {likes: true} = solo likes visibles
+                      const isVisible = statsVisibility == null ? !statsPrivate : statsVisibility[key] === true;
+                      return (
+                        <label key={key} className="settings-stat-toggle">
+                          <span className="settings-stat-toggle-label">
+                            <Icon className="settings-stat-toggle-icon" />
+                            {t(labelKey)}
+                          </span>
+                          <span className="settings-toggle">
+                            <input
+                              type="checkbox"
+                              checked={isVisible}
+                              onChange={() => handleStatVisibilityChange(key, !isVisible)}
+                            />
+                            <span className="settings-toggle-track">
+                              <span className="settings-toggle-thumb" />
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </>
           )}

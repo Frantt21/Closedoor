@@ -172,6 +172,8 @@
   "settings.stats_privacy_desc": "Control who can see your statistics (followers, likes, etc.).",
   "settings.stats_public": "Visible",
   "settings.stats_private": "Private",
+  "settings.stats_show_individual": "Show individual stats",
+  "settings.stats_hide_individual": "Hide individual stats",
   "settings.theme": "Theme",
   "settings.theme_desc": "Select the application theme.",
   "settings.theme_dark": "Dark",

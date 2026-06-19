@@ -166,6 +166,8 @@
   "settings.stats_privacy_desc": "Controle quem pode ver suas estatísticas (seguidores, curtidas, etc.).",
   "settings.stats_public": "Visíveis",
   "settings.stats_private": "Privadas",
+  "settings.stats_show_individual": "Mostrar estatísticas individuais",
+  "settings.stats_hide_individual": "Ocultar estatísticas individuais",
   "settings.theme": "Tema",
   "settings.theme_desc": "Selecione o tema do aplicativo.",
   "settings.theme_dark": "Escuro",
