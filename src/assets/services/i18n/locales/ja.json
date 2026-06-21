@@ -243,6 +243,14 @@
 
   "right_panel.trending": "トレンド",
   "right_panel.coming_soon": "近日中にトレンドとおすすめをここで表示します。",
+  "right_panel.trending_words": "話題の言葉",
+  "right_panel.trending_hashtags": "人気のハッシュタグ",
+
+  "hashtag.not_found": "ハッシュタグが見つかりません",
+  "hashtag.no_posts": "このハッシュタグの投稿はまだありません。",
+  "hashtag.posts_with_tag": "#{tag} の投稿",
+  "hashtag.posts_with_word": "「{word}」を含む投稿",
+  "hashtag.load_error": "ハッシュタグ投稿の読み込み中にエラーが発生しました。",
 
   "followers.title": "フォロワー",
   "following.title": "フォロー中",

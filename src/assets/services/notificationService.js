@@ -1,7 +1,7 @@
 import { supabase } from './supabaseclient';
 
 const NOTIF_CACHE_PREFIX = 'fc_notif_';
-const NOTIF_CACHE_TTL = 1000 * 60 * 2; // 2 min
+const NOTIF_CACHE_TTL = 1000 * 60 * 5; // 5 min
 
 export function setCachedNotifications(userId, notifications) {
   if (!userId) return;

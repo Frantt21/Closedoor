@@ -339,7 +339,7 @@ export default function CreatePostModal({
               onChange={handleContentChange}
               onKeyDown={handleTextareaKeyDown}
               rows={5}
-              placeholder={t('create_post.mention_hint')}
+              placeholder={t('create_post.placeholder')}
               maxLength={2000}
             />
             {/* ── @mention autocomplete dropdown ── */}

@@ -5,6 +5,7 @@ import { detectPlatform, getPlatformIcon, getPlatformName } from '../../services
 import { extractColors } from '../../services/colorExtractor';
 import { useI18n } from '../../services/i18n/useI18n';
 import { FaCamera } from 'react-icons/fa';
+import ImagePositionEditor from './ImagePositionEditor';
 
 // Module-level color cache persists across modal mounts/unmounts
 const colorCache = {};
@@ -41,7 +42,10 @@ export default function Modal({
   initialBio = '',
   initialSocialLinks = [],
   initialAccentColor = '',
+  initialAccentColorSecondary = '',
   initialInterests = [],
+  initialBannerPosition = '50% 50%',
+  initialAvatarPosition = '50% 50%',
   userRoles = ['user'],
 }) {
   const { t } = useI18n();
@@ -80,10 +84,14 @@ export default function Modal({
     return cached || [];
   });
   const [selectedAccent, setSelectedAccent] = useState(initialAccentColor);
+  const [selectedAccentSecondary, setSelectedAccentSecondary] = useState(initialAccentColorSecondary);
   const [interests, setInterests] = useState(initialInterests);
   const [interestInput, setInterestInput] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
   const [extracting, setExtracting] = useState(false);
+  // Image position state
+  const [bannerPosition, setBannerPosition] = useState(initialBannerPosition);
+  const [avatarPosition, setAvatarPosition] = useState(initialAvatarPosition);
   // Submodal state: null | { type: 'avatar' | 'banner', value: string }
   const [showUrlModal, setShowUrlModal] = useState(null);
   const [urlInput, setUrlInput] = useState('');
@@ -96,6 +104,7 @@ export default function Modal({
     setBio(initialBio || '');
     setSocialLinks(Array.isArray(initialSocialLinks) ? initialSocialLinks : []);
     setSelectedAccent(initialAccentColor || '');
+    setSelectedAccentSecondary(initialAccentColorSecondary || '');
     setInterests(Array.isArray(initialInterests) ? initialInterests : []);
     setInterestInput('');
     setNewSocial('');
@@ -104,6 +113,8 @@ export default function Modal({
     setUrlInput('');
     setHasChanges(false);
     setShowSuggested(false);
+    setBannerPosition(initialBannerPosition);
+    setAvatarPosition(initialAvatarPosition);
     // Restore cached colors immediately (no flash)
     const cached = initialBanner ? colorCache[initialBanner.trim()] : null;
     if (cached) {
@@ -111,7 +122,7 @@ export default function Modal({
     } else {
       setExtractedColors([]);
     }
-  }, [initialUsername, initialBanner, initialAvatar, initialBio, initialSocialLinks, initialAccentColor, isOpen]);
+  }, [initialUsername, initialBanner, initialAvatar, initialBio, initialSocialLinks, initialAccentColor, initialBannerPosition, initialAvatarPosition, isOpen]);
 
   // ── Detectar cambios pendientes ──
   useEffect(() => {
@@ -122,12 +133,17 @@ export default function Modal({
       bio !== (initialBio || '') ||
       JSON.stringify(socialLinks) !== JSON.stringify(initialSocialLinks || []) ||
       selectedAccent !== (initialAccentColor || '') ||
-      JSON.stringify(interests) !== JSON.stringify(initialInterests || []);
+      selectedAccentSecondary !== (initialAccentColorSecondary || '') ||
+      JSON.stringify(interests) !== JSON.stringify(initialInterests || []) ||
+      bannerPosition !== initialBannerPosition ||
+      avatarPosition !== initialAvatarPosition;
     setHasChanges(changed);
   }, [
-    username, banner, avatar, bio, socialLinks, selectedAccent, interests,
+    username, banner, avatar, bio, socialLinks,    selectedAccent, selectedAccentSecondary, interests,
+    bannerPosition, avatarPosition,
     initialUsername, initialBanner, initialAvatar, initialBio,
-    initialSocialLinks, initialAccentColor, initialInterests
+    initialSocialLinks,    initialAccentColor, initialAccentColorSecondary, initialInterests,
+    initialBannerPosition, initialAvatarPosition
   ]);
 
   // Extract colors when banner URL changes (with cache)
@@ -180,7 +196,10 @@ export default function Modal({
         bio: bio.trim(),
         social_links: socialLinks,
         accent_color: selectedAccent || null,
+        accent_color_secondary: selectedAccentSecondary || null,
         interests: interests,
+        banner_position: bannerPosition,
+        avatar_position: avatarPosition,
       });
     } finally {
       setSaving(false);
@@ -259,14 +278,7 @@ export default function Modal({
     onClose();
   };
 
-  const handleOverlayClick = (e) => {
-    if (e.target === e.currentTarget) {
-      confirmClose();
-    }
-  };
-
-  return (
-    <div className="fc-modal-overlay" role="dialog" aria-modal="true" onClick={handleOverlayClick}>
+  return (      <div className="fc-modal-overlay" role="dialog" aria-modal="true">
       <div className="fc-modal">
         <div className="fc-modal-header">
           <h3 className="fc-modal-title">{t('modal.edit_title')}</h3>
@@ -280,7 +292,7 @@ export default function Modal({
             <div className="fc-preview-card fc-preview-card--large">
               <div
                 className="fc-preview-card-banner"
-                style={banner ? { backgroundImage: `url(${banner})` } : {}}
+                style={banner ? { backgroundImage: `url(${banner})`, backgroundPosition: bannerPosition } : {}}
               >
                 <div className="fc-preview-card-overlay"></div>
                 {/* Edit banner icon — top right */}
@@ -317,9 +329,9 @@ export default function Modal({
               </div>
             </div>
 
-            {/* ── URL submodal ── */}
+            {/* ── URL submodal con posicionador ── */}
             {showUrlModal && (
-              <div className="fc-modal-sub-overlay" onClick={() => setShowUrlModal(null)}>
+              <div className="fc-modal-sub-overlay">
                 <div className="fc-modal-sub" onClick={(e) => e.stopPropagation()}>
                   <h4 className="fc-modal-sub-title">
                     {showUrlModal === 'avatar' ? t('modal.avatar_url') : t('modal.banner_url')}
@@ -332,6 +344,21 @@ export default function Modal({
                     placeholder={showUrlModal === 'avatar' ? 'https://.../avatar.jpg' : 'https://.../banner.jpg'}
                     autoFocus
                   />
+                  {/* ── Image position editor ── */}
+                  {urlInput.trim() && (
+                    <div style={{ marginTop: 10 }}>
+                      <ImagePositionEditor
+                        key={`pos-editor-${showUrlModal}`}
+                        imageUrl={urlInput.trim()}
+                        initialPosition={showUrlModal === 'avatar' ? avatarPosition : bannerPosition}
+                        aspectRatio={showUrlModal === 'avatar' ? 1 : 40 / 11}
+                        onPositionChange={(pos) => {
+                          if (showUrlModal === 'avatar') setAvatarPosition(pos);
+                          else setBannerPosition(pos);
+                        }}
+                      />
+                    </div>
+                  )}
                   <div className="fc-modal-sub-actions">
                     <button type="button" className="fc-modal-sub-save" onClick={handleUrlModalSave} disabled={!urlInput.trim()}>
                       {t('modal.apply')}
@@ -383,6 +410,44 @@ export default function Modal({
                 ) : (
                   <p className="fc-modal-social-hint">{t('modal.add_banner_hint')}</p>
                 )}
+
+                {/* ── Secondary accent color (manual picker) ── */}
+                <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <label style={{ fontSize: '0.8rem', color: 'var(--color-text-muted, #6b7280)' }}>
+                    {t('modal.accent_color_secondary')}
+                  </label>
+                  <input
+                    type="color"
+                    value={selectedAccentSecondary || '#000000'}
+                    onChange={(e) => setSelectedAccentSecondary(e.target.value)}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      padding: 0,
+                      border: '2px solid var(--color-border, #2a2a2a)',
+                      borderRadius: '50%',
+                      cursor: 'pointer',
+                      background: 'none',
+                      overflow: 'hidden',
+                    }}
+                  />
+                  {selectedAccentSecondary && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAccentSecondary('')}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--color-text-muted, #6b7280)',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        padding: '2px 6px',
+                      }}
+                    >
+                      {t('common.clear')}
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 

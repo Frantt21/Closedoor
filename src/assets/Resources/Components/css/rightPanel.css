@@ -17,9 +17,12 @@
 
 .right-panel-card {
   background: var(--color-surface, #1a1a1a);
-  border: 1px solid var(--color-border, #2a2a2a);
   border-radius: var(--radius, 10px);
   padding: 16px;
+}
+
+.right-panel-card--noborder {
+  border: none;
 }
 
 .right-panel-card-title {
@@ -43,6 +46,92 @@
   font-style: italic;
   margin: 0;
   line-height: 1.5;
+}
+
+/* ── Trending hashtags ── */
+
+.right-panel-trending-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.right-panel-trending-pill {
+  height: 40px;
+  width: 100%;
+}
+
+.right-panel-trending-section {
+  margin-bottom: 8px;
+}
+
+.right-panel-trending-section:last-child {
+  margin-bottom: 0;
+}
+
+.right-panel-trending-subtitle {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text, #ffffff);
+  margin: 0 0 4px 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.right-panel-trending-subicon {
+  font-size: 0.9rem;
+  color: #f97316;
+}
+
+.right-panel-trending-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.right-panel-trending-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm, 6px);
+  text-decoration: none;
+  transition: background 0.15s ease;
+}
+
+.right-panel-trending-item-row {
+  display: flex;
+  align-items: center;
+}
+
+.right-panel-trending-item:hover {
+  background: var(--overlay-bg-subtle);
+}
+
+.right-panel-trending-category {
+  font-size: 0.65rem;
+  font-weight: 400;
+  color: var(--color-text-muted, #6b7280);
+  line-height: 1.2;
+}
+
+.right-panel-trending-rank {
+  font-size: 0.92rem;
+  font-weight: 400;
+  color: var(--color-text-muted, #6b7280);
+  min-width: 28px;
+  flex-shrink: 0;
+}
+
+.right-panel-trending-name {
+  font-size: 0.92rem;
+  font-weight: 400;
+  color: var(--color-text, #ffffff);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Skeleton ── */

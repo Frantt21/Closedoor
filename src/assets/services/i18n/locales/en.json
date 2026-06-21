@@ -188,6 +188,7 @@
   "modal.username_label": "Username",
   "modal.bio_label": "Bio",
   "modal.accent_color": "Accent color",
+  "modal.accent_color_secondary": "Secondary color",
   "modal.social_links": "Social links",
   "modal.social_add": "Add",
   "modal.social_placeholder": "https://...",
@@ -250,6 +251,14 @@
 
   "right_panel.trending": "Trending",
   "right_panel.coming_soon": "Soon you'll see trends and recommendations here.",
+  "right_panel.trending_words": "Trending now",
+  "right_panel.trending_hashtags": "Popular hashtags",
+
+  "hashtag.not_found": "Hashtag not found",
+  "hashtag.no_posts": "No posts with this hashtag yet.",
+  "hashtag.posts_with_tag": "Posts tagged with #{tag}",
+  "hashtag.posts_with_word": "Posts containing \"{word}\"",
+  "hashtag.load_error": "Error loading hashtag posts.",
 
   "followers.title": "Followers",
   "following.title": "Following",
@@ -261,6 +270,7 @@
   "common.error": "Error",
   "common.save": "Save",
   "common.cancel": "Cancel",
+  "common.clear": "Clear",
   "common.delete": "Delete",
   "common.confirm": "Confirm",
   "common.search": "Search",

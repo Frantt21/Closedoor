@@ -44,6 +44,19 @@ export async function createPost({ userId, content, imageUrl, imageUrls, videoUr
     console.error('Error creating post:', error);
     throw error;
   }
+
+  // ── Store hashtags after post is created ──
+  if (content && data?.id) {
+    try {
+      const { resolveHashtags } = await import('./hashtagService');
+      resolveHashtags(data.id, content).catch((err) =>
+        console.warn('Error resolving hashtags:', err)
+      );
+    } catch (e) {
+      console.warn('Error importing hashtagService:', e);
+    }
+  }
+
   return data;
 }
 
@@ -90,12 +103,20 @@ export async function getPost(postId) {
 export async function updatePost(postId, updates) {
   const finalUpdates = { ...updates, updated_at: new Date().toISOString() };
 
-  // Re-resolve mentions if content changed
+  // Re-resolve mentions and hashtags if content changed
   if (updates.content) {
     try {
       finalUpdates.mentions = await resolveMentions(updates.content);
     } catch (e) {
       console.warn('Error resolving mentions on update:', e);
+    }
+    try {
+      const { resolveHashtags } = await import('./hashtagService');
+      resolveHashtags(postId, updates.content).catch((err) =>
+        console.warn('Error re-resolving hashtags:', err)
+      );
+    } catch (e) {
+      console.warn('Error importing hashtagService:', e);
     }
   }
 
@@ -203,7 +224,7 @@ export async function getProfileContent(profileUserId, currentUserId) {
 
 // ── Cache de IDs visibles (para evitar consultas repetidas a follows/profiles) ──
 const VISIBLE_IDS_PREFIX = 'fc_vis_';
-const VISIBLE_IDS_TTL = 1000 * 60 * 2; // 2 minutos
+const VISIBLE_IDS_TTL = 1000 * 60 * 5; // 5 min
 
 function setCachedVisibleIds(userId, ids) {
   if (!ids) return;
@@ -743,7 +764,7 @@ export async function notifyMentions(actorId, postId, content) {
 
 // ── CACHE ──
 const POST_CACHE_PREFIX = 'fc_post_';
-const POST_CACHE_TTL = 1000 * 60 * 2; // 2 min
+const POST_CACHE_TTL = 1000 * 60 * 5; // 5 min
 
 export function setCachedPost(post) {
   if (!post?.id) return;
@@ -774,7 +795,7 @@ export function getCachedPost(postId) {
 
 // ── COMMENTS CACHE ──
 const COMMENTS_CACHE_PREFIX = 'fc_comments_';
-const COMMENTS_CACHE_TTL = 1000 * 60 * 2; // 2 min
+const COMMENTS_CACHE_TTL = 1000 * 60 * 5; // 5 min
 
 export function setCachedComments(postId, comments, commentLikes) {
   if (!postId) return;
@@ -825,7 +846,7 @@ export function sortProfilePosts(a, b) {
 
 // ── FEED CACHE (posts + likedIds + repostedIds) ──
 const FEED_CACHE_PREFIX = 'fc_feed_';
-const FEED_CACHE_TTL = 1000 * 60 * 1; // 1 min
+const FEED_CACHE_TTL = 1000 * 60 * 10; // 10 min
 
 export function setCachedFeed(key, items, likedIds, repostedIds, savedIds) {
   if (!items) return;

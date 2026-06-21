@@ -103,7 +103,8 @@
 }
 
 .fc-preview-card--large .fc-preview-card-banner {
-    height: 160px;
+    aspect-ratio: 40 / 11;
+    height: auto;
 }
 
 .fc-preview-card-banner {
@@ -820,7 +821,7 @@ textarea.fc-modal-input {
     }
 
     .fc-preview-card--large .fc-preview-card-banner {
-        height: 120px;
+        max-height: 160px;
     }
 
     .fc-preview-card--large .fc-preview-card-avatar {

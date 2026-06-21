@@ -1,5 +1,5 @@
 /* ==========================================
-   Skeleton Loader Styles
+   Skeleton Loader Styles — unificados
    ========================================== */
 
 @keyframes skeleton-pulse {
@@ -9,9 +9,10 @@
 }
 
 .skeleton {
-  background: var(--color-text, #ffffff);
+  background: var(--color-text-muted, #6b7280);
   border-radius: var(--radius-sm, 6px);
   animation: skeleton-pulse 1.5s ease-in-out infinite;
+  border: none;
 }
 
 .skeleton--circle {
@@ -36,14 +37,13 @@
 }
 
 .explore-skeleton-card {
-  border: 1px solid var(--color-border, #2a2a2a);
   border-radius: var(--radius, 10px);
   overflow: hidden;
   background: var(--color-surface, #1a1a1a);
 }
 
 .explore-skeleton-banner {
-  height: 80px;
+  aspect-ratio: 40 / 11;
   width: 100%;
   border-radius: 0;
 }
@@ -97,7 +97,6 @@
   background: var(--color-surface, #1a1a1a);
   border-radius: var(--radius, 10px);
   overflow: hidden;
-  border: 1px solid var(--color-border, #2a2a2a);
 }
 
 .notif-skeleton-item {
@@ -108,7 +107,7 @@
 }
 
 .notif-skeleton-item + .notif-skeleton-item {
-  border-top: 1px solid var(--color-border, #2a2a2a);
+  border-top: none;
 }
 
 .notif-skeleton-avatar {

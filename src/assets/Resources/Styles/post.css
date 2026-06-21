@@ -118,7 +118,6 @@
 
 .posts-skeleton-card {
     background: var(--color-surface, #1a1a1a);
-    border: 1px solid var(--color-border, #2a2a2a);
     border-radius: var(--radius, 10px);
     padding: 16px;
     display: flex;
@@ -141,10 +140,9 @@
 
 .posts-skeleton-line {
     height: 12px;
-    border-radius: 4px;
-    background: linear-gradient(90deg, #2a2a2a 25%, #3a3a3a 50%, #2a2a2a 75%);
-    background-size: 200% 100%;
-    animation: skeleton-pulse 1.4s ease-in-out infinite;
+    background: var(--color-text-muted, #6b7280);
+    animation: skeleton-pulse 1.5s ease-in-out infinite;
+    border: none;
 }
 
 .posts-skeleton-line--short {
@@ -161,6 +159,40 @@
     max-width: 800px;
     margin: 0 auto;
     padding: 0;
+}
+
+/* ── Hashtag page header ── */
+.hashtag-header {
+  margin-bottom: 24px;
+}
+
+.hashtag-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0 4px;
+}
+
+.hashtag-title h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-text, #ffffff);
+  margin: 0;
+}
+
+.hashtag-icon {
+  font-size: 1.3rem;
+  color: #f97316;
+}
+
+.hashtag-icon--trend {
+  color: #facc15;
+}
+
+.hashtag-subtitle {
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #6b7280);
+  margin: 0 0 16px;
 }
 
 .post-detail-back {
@@ -470,6 +502,18 @@
 }
 
 .comment-card-link:hover {
+    opacity: 0.8;
+    text-decoration: underline;
+}
+
+.comment-card-hashtag {
+    color: #f97316;
+    font-weight: 600;
+    text-decoration: none;
+    transition: opacity 0.15s ease;
+}
+
+.comment-card-hashtag:hover {
     opacity: 0.8;
     text-decoration: underline;
 }

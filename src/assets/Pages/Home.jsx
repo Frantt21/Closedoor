@@ -41,6 +41,7 @@ function Home() {
         return !getCachedFeed('home_feed');
     });
     const [showCreatePost, setShowCreatePost] = useState(false);
+    const [editingPost, setEditingPost] = useState(null);
 
     // ── Load feed (con cache) ──
     useEffect(() => {
@@ -126,6 +127,11 @@ function Home() {
     };
 
     const handlePostUpdate = (updatedPost) => {
+        if (updatedPost._editing) {
+            setEditingPost(updatedPost);
+            setShowCreatePost(true);
+            return;
+        }
         setPosts((prev) =>
             prev.map((p) => (p.id === updatedPost.id ? { ...p, ...updatedPost } : p))
         );
@@ -205,8 +211,12 @@ function Home() {
 
             <CreatePostModal
                 isOpen={showCreatePost}
-                onClose={() => setShowCreatePost(false)}
+                onClose={() => {
+                    setShowCreatePost(false);
+                    setEditingPost(null);
+                }}
                 onSuccess={handlePostCreated}
+                editPost={editingPost}
                 userId={user?.id}
             />
         </div>

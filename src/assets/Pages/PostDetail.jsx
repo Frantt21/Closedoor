@@ -375,11 +375,11 @@ export default function PostDetail() {
 
 
 
-  // ── Render content with @mentions and URL highlighting ──
+  // ── Render content with @mentions, #hashtags and URL highlighting ──
   const renderCommentContent = (text) => {
     if (!text) return null;
     const parts = [];
-    const regex = /(?<![\w@])(@[a-zA-Z0-9_]+)|(https?:\/\/[^\s<]+)/gi;
+    const regex = /(?<![\w@])(@[a-zA-Z0-9_]+)|(?<![#\w])#([a-zA-Z0-9_\u00C0-\u024F]+)|(https?:\/\/[^\s<]+)/gi;
     let lastIndex = 0, match;
     while ((match = regex.exec(text)) !== null) {
       if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
@@ -400,6 +400,19 @@ export default function PostDetail() {
           >
             {part}
           </span>
+        );
+      }
+      if (part.startsWith('#')) {
+        const tag = part.slice(1);
+        return (
+          <Link
+            key={i}
+            to={`/hashtag/${encodeURIComponent(tag)}`}
+            className="comment-card-hashtag"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {part}
+          </Link>
         );
       }
       if (part.startsWith('http://') || part.startsWith('https://')) {

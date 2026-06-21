@@ -702,6 +702,7 @@ function Profile() {
     const [modalSocialLinks, setModalSocialLinks] = useState([]);
     const [modalAccentColor, setModalAccentColor] = useState('');
     const [modalInterests, setModalInterests] = useState([]);
+    const [modalAccentColorSecondary, setModalAccentColorSecondary] = useState('');
     const [usernameInput, setUsernameInput] = useState("");
     const [avatarInput, setAvatarInput] = useState("");
     const [bannerInput, setBannerInput] = useState("");
@@ -725,6 +726,7 @@ function Profile() {
             setBannerInput(ownProfile?.banner_url || "");
             setModalSocialLinks(ownProfile?.social_links || []);
             setModalAccentColor(ownProfile?.accent_color || '');
+            setModalAccentColorSecondary(ownProfile?.accent_color_secondary || '');
         }
     }, [ownProfile, user, isOwnProfile]);
 
@@ -741,7 +743,7 @@ function Profile() {
     const roles = activeProfile?.roles || ["user"];
 
     // ── Save profile (own profile only) ──
-    const handleSaveProfile = async ({ username, avatar_url, banner_url, bio, social_links, accent_color, interests }) => {
+    const handleSaveProfile = async ({ username, avatar_url, banner_url, bio, social_links, accent_color, accent_color_secondary, interests, banner_position, avatar_position }) => {
         setLocalError(null);
         setMessage(null);
         if (!user?.id) return;
@@ -767,7 +769,10 @@ function Profile() {
                 bio: bio || null,
                 social_links: social_links || [],
                 accent_color: accent_color || null,
+                accent_color_secondary: accent_color_secondary || null,
                 interests: interests || [],
+                banner_position: banner_position || '50% 50%',
+                avatar_position: avatar_position || '50% 50%',
             };
 
             if (normalizedUsername !== ownProfile?.username) {
@@ -850,7 +855,11 @@ function Profile() {
     if (!activeProfile) return null;
 
     const styleVars = (showAccent && activeProfile?.accent_color)
-      ? { '--accent-color': activeProfile.accent_color, '--accent-text-color': getContrastText(activeProfile.accent_color) }
+      ? {
+          '--accent-color': activeProfile.accent_color,
+          '--accent-color-2': activeProfile?.accent_color_secondary || activeProfile.accent_color,
+          '--accent-text-color': getContrastText(activeProfile.accent_color),
+        }
       : {};
 
     return (            <div className="profile-page" style={styleVars}>
@@ -861,6 +870,7 @@ function Profile() {
                             className="profile-banner"
                             src={bannerUrl}
                             alt="Profile Banner"
+                            style={{ objectPosition: activeProfile?.banner_position || '50% 50%' }}
                         />
                     ) : (
                         <div className="profile-banner profile-banner--placeholder">
@@ -876,6 +886,7 @@ function Profile() {
                                 "https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg"
                             }
                             alt="User Avatar"
+                            style={{ objectPosition: activeProfile?.avatar_position || '50% 50%' }}
                         />
                     </div>
 
@@ -961,6 +972,7 @@ function Profile() {
                                         setModalBio(ownProfile?.bio || "");
                                         setModalSocialLinks(ownProfile?.social_links || []);
                                         setModalAccentColor(ownProfile?.accent_color || '');
+                                        setModalAccentColorSecondary(ownProfile?.accent_color_secondary || '');
                                         setModalInterests(ownProfile?.interests || []);
                                         setShowModal(true);
                                     }}
@@ -989,8 +1001,7 @@ function Profile() {
             </div>
 
             {/* Edit modal (own profile only) */}
-            {isOwnProfile && (
-                <Modal
+            {isOwnProfile && (                      <Modal
                     isOpen={showModal}
                     onClose={() => setShowModal(false)}
                     onSave={handleSaveProfile}
@@ -1000,7 +1011,10 @@ function Profile() {
                     initialBio={modalBio}
                     initialSocialLinks={modalSocialLinks}
                     initialAccentColor={modalAccentColor}
+                    initialAccentColorSecondary={modalAccentColorSecondary}
                     initialInterests={modalInterests}
+                    initialBannerPosition={ownProfile?.banner_position || '50% 50%'}
+                    initialAvatarPosition={ownProfile?.avatar_position || '50% 50%'}
                     userRoles={roles}
                 />
             )}

@@ -10,6 +10,7 @@ import Notifications from './assets/Pages/Notifications.jsx';
 import Explore from './assets/Pages/Explore.jsx';
 import PostDetail from './assets/Pages/PostDetail.jsx';
 import Settings from './assets/Pages/Settings.jsx';
+import HashtagPage from './assets/Pages/HashtagPage.jsx';
 import { I18nProvider } from './assets/services/i18n/I18nContext';
 import RightPanel from './assets/Resources/Components/RightPanel';
 
@@ -46,6 +47,7 @@ function App() {
             <Route path="/Explore" element={<Explore />} />
             <Route path="/Settings" element={<Settings />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/hashtag/:tag" element={<HashtagPage />} />
           </Routes>
         </main>
 

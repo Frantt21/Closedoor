@@ -348,7 +348,7 @@ export async function getFollowCounts(userId) {
 
 // ── localStorage cache for explore data (profiles + counts) ──
 const EXPLORE_CACHE_PREFIX = 'fc_explore_';
-const EXPLORE_CACHE_TTL = 1000 * 60 * 2; // 2 minutes
+const EXPLORE_CACHE_TTL = 1000 * 60 * 10; // 10 min
 
 export function setCachedExploreData(userId, data) {
   if (!data) return;

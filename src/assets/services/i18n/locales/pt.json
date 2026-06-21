@@ -243,6 +243,14 @@
 
   "right_panel.trending": "Tendências",
   "right_panel.coming_soon": "Em breve você verá tendências e recomendações aqui.",
+  "right_panel.trending_words": "O que estão falando",
+  "right_panel.trending_hashtags": "Hashtags populares",
+
+  "hashtag.not_found": "Hashtag não encontrada",
+  "hashtag.no_posts": "Ainda não há publicações com esta hashtag.",
+  "hashtag.posts_with_tag": "Publicações marcadas com #{tag}",
+  "hashtag.posts_with_word": "Publicações contendo \"{word}\"",
+  "hashtag.load_error": "Erro ao carregar publicações da hashtag.",
 
   "followers.title": "Seguidores",
   "following.title": "Seguindo",

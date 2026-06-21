@@ -42,7 +42,9 @@
     gap: 16px;
 }
 
-/* ---- Card ---- */
+/* ---- Card ----
+   Por defecto: fondo gris (--color-surface)
+   Con acento: fondo negro (--color-bg) + gradiente */
 .explore-card {
     display: flex;
     flex-direction: column;
@@ -52,6 +54,11 @@
     text-decoration: none;
     color: inherit;
     transition: transform 0.2s ease;
+    position: relative;
+}
+
+.explore-card--accent {
+    background: var(--color-bg, #000000);
 }
 
 .explore-card:hover {
@@ -62,7 +69,7 @@
 .explore-card-banner {
     position: relative;
     width: 100%;
-    height: 80px;
+    aspect-ratio: 40 / 11;
     overflow: hidden;
     background: var(--color-surface, #1a1a1a);
 }
@@ -81,14 +88,26 @@
     pointer-events: none;
 }
 
-/* Body */
+/* Body — fondo completo con gradiente de acento (primario + secundario)
+   Por defecto: solo fondo de superficie (gris)
+   Con acento: gradiente sobre fondo negro */
 .explore-card-body {
     position: relative;
     padding: 16px;
     padding-top: 0;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    flex: 1;
+    background: var(--color-surface, #1a1a1a);
+}
+
+.explore-card--accent .explore-card-body {
+    background:
+        linear-gradient(180deg,
+            color-mix(in srgb, var(--accent-color, transparent) 18%, transparent) 0%,
+            color-mix(in srgb, var(--accent-color-2, var(--accent-color, transparent)) 18%, transparent) 100%
+        ),
+        var(--color-bg, #000000);
 }
 
 .explore-card-avatar {
@@ -97,15 +116,21 @@
     border-radius: 50%;
     object-fit: cover;
     margin-top: -28px;
+    margin-bottom: 8px;
     border: 3px solid var(--color-surface, #1a1a1a);
     background: var(--color-bg, #000000);
     flex-shrink: 0;
+}
+
+.explore-card--accent .explore-card-avatar {
+    border-color: color-mix(in srgb, var(--accent-color, transparent) 40%, transparent);
 }
 
 .explore-card-info {
     display: flex;
     flex-direction: column;
     gap: 2px;
+    flex: 1;
 }
 
 .explore-card-name-row {
@@ -133,6 +158,7 @@
 .explore-card-followers {
     font-size: 0.8rem;
     color: var(--color-text-muted, #6b7280);
+    margin-bottom: 4px;
 }
 
 .explore-card-bio {
@@ -147,7 +173,8 @@
 }
 
 .explore-card-action {
-    margin-top: 4px;
+    margin-top: auto;
+    padding-top: 8px;
 }
 
 /* ---- Responsive ---- */

@@ -242,6 +242,14 @@
 
   "right_panel.trending": "Тренды",
   "right_panel.coming_soon": "Скоро здесь появятся тренды и рекомендации.",
+  "right_panel.trending_words": "О чём говорят",
+  "right_panel.trending_hashtags": "Популярные хэштеги",
+
+  "hashtag.not_found": "Хэштег не найден",
+  "hashtag.no_posts": "Постов с этим хэштегом пока нет.",
+  "hashtag.posts_with_tag": "Посты с хэштегом #{tag}",
+  "hashtag.posts_with_word": "Посты, содержащие \"{word}\"",
+  "hashtag.load_error": "Ошибка загрузки постов хэштега.",
 
   "followers.title": "Подписчики",
   "following.title": "Подписки",

@@ -569,12 +569,12 @@ export default function PostCard({
   );
 }
 
-// ── Render @mentions as clickable links and URLs as clickable links ──
+// ── Render @mentions, #hashtags and URLs as clickable links ──
 function renderContent(text, skipUrls = [], mentions = {}, t = () => {}) {
   if (!text) return null;
   const skipSet = new Set(skipUrls);
-  // Match both @mentions and URLs
-  const combinedRegex = /(?<![\w@])(@[a-zA-Z0-9_]+)|(https?:\/\/[^\s<]+)/gi;
+  // Match @mentions, #hashtags and URLs
+  const combinedRegex = /(?<![\w@])(@[a-zA-Z0-9_]+)|(?<![#\w])#([a-zA-Z0-9_\u00C0-\u024F]+)|(https?:\/\/[^\s<]+)/gi;
   const parts = [];
   let lastIndex = 0, match;
   while ((match = combinedRegex.exec(text)) !== null) {
@@ -598,6 +598,19 @@ function renderContent(text, skipUrls = [], mentions = {}, t = () => {}) {
           key={i}
           to={profileLink}
           className="post-card-mention"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part}
+        </Link>
+      );
+    }
+    if (part.startsWith('#')) {
+      const tag = part.slice(1);
+      return (
+        <Link
+          key={i}
+          to={`/hashtag/${encodeURIComponent(tag)}`}
+          className="post-card-hashtag"
           onClick={(e) => e.stopPropagation()}
         >
           {part}

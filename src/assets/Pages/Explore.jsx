@@ -21,7 +21,7 @@ const DEFAULT_AVATAR =
   "https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg";
 
 function Explore() {
-  const { t } = useI18n();
+  const { t, showAccent } = useI18n();
   const { user, loading: authLoading } = useAuth();
 
   // Lazy initializers: leen cache sincrónicamente durante el 1er render
@@ -189,6 +189,7 @@ function Explore() {
               profile={profile}
               counts={countsMap[profile.id]}
               isOwnProfile={user?.id === profile.id}
+              showAccent={showAccent}
             />
           ))}
         </div>
@@ -197,13 +198,20 @@ function Explore() {
   );
 }
 
-function ExploreCard({ profile, counts, isOwnProfile }) {
+function ExploreCard({ profile, counts, isOwnProfile, showAccent }) {
   const { t } = useI18n();
   const navigate = useNavigate();
   const avatarUrl = profile.avatar_url || DEFAULT_AVATAR;
   const bio = profile.bio || "";
   const followers = counts?.followers ?? 0;
   const roles = profile.roles || ["user"];
+  const hasAccent = showAccent && profile.accent_color;
+  const cardStyle = hasAccent
+    ? {
+        '--accent-color': profile.accent_color,
+        '--accent-color-2': profile.accent_color_secondary || profile.accent_color,
+      }
+    : {};
 
   const handleCardClick = useCallback((e) => {
     // Dont navigate if clicking inside the FollowButton area
@@ -212,13 +220,14 @@ function ExploreCard({ profile, counts, isOwnProfile }) {
   }, [navigate, profile.username]);
 
   return (
-    <div className="explore-card" onClick={handleCardClick}>
+    <div className={`explore-card${hasAccent ? ' explore-card--accent' : ''}`} style={cardStyle} onClick={handleCardClick}>
       <div className="explore-card-banner">
         {profile.banner_url && (
           <SafeImage
             className="explore-card-banner-img"
             src={profile.banner_url}
             alt=""
+            style={{ objectPosition: profile.banner_position || '50% 50%' }}
           />
         )}
         <div className="explore-card-overlay" />
@@ -229,6 +238,7 @@ function ExploreCard({ profile, counts, isOwnProfile }) {
           className="explore-card-avatar"
           src={avatarUrl}
           alt={profile.username}
+          style={{ objectPosition: profile.avatar_position || '50% 50%' }}
           onError={(e) => {
             e.target.src = DEFAULT_AVATAR;
           }}

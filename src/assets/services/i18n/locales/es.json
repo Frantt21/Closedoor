@@ -188,6 +188,7 @@
   "modal.username_label": "Nombre de usuario",
   "modal.bio_label": "Biografía",
   "modal.accent_color": "Color de acento",
+  "modal.accent_color_secondary": "Color secundario",
   "modal.social_links": "Redes sociales",
   "modal.social_add": "Añadir",
   "modal.social_placeholder": "https://...",
@@ -250,6 +251,14 @@
 
   "right_panel.trending": "Tendencias",
   "right_panel.coming_soon": "Pronto podrás ver las tendencias y recomendaciones aquí.",
+  "right_panel.trending_words": "Lo que se habla",
+  "right_panel.trending_hashtags": "Hashtags populares",
+
+  "hashtag.not_found": "Hashtag no encontrado",
+  "hashtag.no_posts": "Aún no hay publicaciones con este hashtag.",
+  "hashtag.posts_with_tag": "Publicaciones etiquetadas con #{tag}",
+  "hashtag.posts_with_word": "Publicaciones que contienen \"{word}\"",
+  "hashtag.load_error": "Error al cargar las publicaciones del hashtag.",
 
   "followers.title": "Seguidores",
   "following.title": "Seguidos",
@@ -261,6 +270,7 @@
   "common.error": "Error",
   "common.save": "Guardar",
   "common.cancel": "Cancelar",
+  "common.clear": "Limpiar",
   "common.delete": "Eliminar",
   "common.confirm": "Confirmar",
   "common.search": "Buscar",

@@ -347,6 +347,19 @@
     text-decoration: underline;
 }
 
+/* ── #Hashtag links ── */
+.post-card-hashtag {
+    color: #f97316;
+    font-weight: 600;
+    text-decoration: none;
+    transition: opacity 0.15s ease;
+}
+
+.post-card-hashtag:hover {
+    opacity: 0.8;
+    text-decoration: underline;
+}
+
 /* ── External URL links in post content ── */
 .post-card-link {
     color: #60a5fa;
