@@ -112,6 +112,7 @@
   "post.external_link_warning": "This link will take you to an external site. Open it?",
   "post.repost_private_forbidden": "Cannot repost a private profile's post",
   "post.reply_placeholder": "Write a reply to @{user}...",
+  "post.image_failed": "Image failed to load",
   "post.replies_depth_limit": "Reply too deep. Create a new comment instead.",
 
   "follow.follow": "Follow",

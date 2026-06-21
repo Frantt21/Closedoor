@@ -276,6 +276,24 @@ export async function listProfiles(excludeUserId, limit = 50) {
 const PROFILE_CACHE_PREFIX = 'fc_profile_';
 const PROFILE_CACHE_TTL = 1000 * 60 * 60; // 1 hour
 
+export function clearCachedProfile(userId) {
+  if (!userId) return;
+  try {
+    localStorage.removeItem(PROFILE_CACHE_PREFIX + userId);
+  } catch (err) {
+    console.warn('Could not clear cached profile:', err);
+  }
+}
+
+export function clearCachedProfileByUsername(username) {
+  if (!username) return;
+  try {
+    localStorage.removeItem(PROFILE_USERNAME_PREFIX + username.toLowerCase());
+  } catch (err) {
+    console.warn('Could not clear cached profile by username:', err);
+  }
+}
+
 export function setCachedProfile(profile, ttlMs = PROFILE_CACHE_TTL) {
   if (!profile || !profile.id) return;
   try {

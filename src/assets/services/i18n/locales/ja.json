@@ -108,6 +108,7 @@
   "post.external_link_warning": "このリンクは外部サイトに移動します。開きますか？",
   "post.repost_private_forbidden": "非公開プロフィールの投稿はリポストできません",
   "post.reply_placeholder": "@{user}に返信を書く...",
+  "post.image_failed": "画像の読み込みに失敗しました",
   "post.replies_depth_limit": "返信が深すぎます。代わりに新しいコメントを作成してください。",
 
   "follow.follow": "フォロー",

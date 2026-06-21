@@ -190,6 +190,7 @@ function Home() {
                     ) : (
                         posts.map((post) => (
                             <PostCard
+                                key={post.id}
                                 post={post}
                                 liked={likedPostIds.includes(post.id)}
                                 reposted={repostedPostIds.includes(post.id)}

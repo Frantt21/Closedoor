@@ -12,12 +12,15 @@ import {
     setCachedProfileByUsername,
     getCachedProfileByUsername,
     getCachedProfile,
+    clearCachedProfile,
+    clearCachedProfileByUsername,
     trackProfileView,
 } from "../services/userService";
 import {
     getFollowCounts,
     setCachedFollowCounts,
     getCachedFollowCounts,
+    clearCachedFollowCounts,
     isFollowing,
     setCachedFollowStatus,
     getCachedFollowStatus,
@@ -446,6 +449,15 @@ function Profile() {
                 const newIsPrivate = updated?.is_private === true;
                 if (prevIsPrivate !== newIsPrivate) {
                     clearVisibleIdsCache(user?.id);
+                    // Si cambió a privado, invalidar cache de follow counts para que no quede stale
+                    if (!prevIsPrivate && newIsPrivate) {
+                        clearCachedFollowCounts(profileId);
+                        clearCachedProfile(profileId);
+                        if (profileUsername && !isUUID(profileUsername)) {
+                            clearCachedProfileByUsername(profileUsername);
+                        }
+                        setFollowCounts(null);
+                    }
                 }
             })
             // ── Posts / Reposts ──

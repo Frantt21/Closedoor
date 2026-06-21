@@ -13,6 +13,7 @@ import {
 } from '../../services/postService';
 import { FaHeart, FaRegHeart, FaComment, FaRetweet, FaThumbtack, FaEdit, FaTrash, FaEllipsisV, FaBookmark, FaRegBookmark, FaEye } from 'react-icons/fa';
 import Badge from './Badge';
+import SafeImage from './SafeImage';
 import { useI18n } from '../../services/i18n/useI18n';
 import './css/postCard.css';
 
@@ -374,12 +375,11 @@ export default function PostCard({
           {/* Legacy: single image from post.image_url */}
           {post.image_url && !post.image_urls?.length && !post.video_url && (
             <div className="post-card-media">
-              <img
+              <SafeImage
                 src={post.image_url}
                 alt={t('post.media_alt', { n: 1 })}
                 className="post-card-image"
                 onClick={(e) => openGallery(e, 0)}
-                onError={(e) => { e.target.style.display = 'none'; }}
               />
             </div>
           )}
@@ -387,12 +387,11 @@ export default function PostCard({
           {/* Legacy: image in post.video_url */}
           {post.video_url && !isVideo(post.video_url) && !post.image_url && (
             <div className="post-card-media">
-              <img
+              <SafeImage
                 src={post.video_url}
                 alt={t('post.media_alt', { n: 1 })}
                 className="post-card-image"
                 onClick={(e) => openGallery(e, 0)}
-                onError={(e) => { e.target.style.display = 'none'; }}
               />
             </div>
           )}
@@ -401,12 +400,11 @@ export default function PostCard({
           {inlineMedia && !post.image_url && !post.image_urls?.length && !post.video_url && (
             <div className="post-card-media">
               {inlineMedia.type === 'image' ? (
-                <img
+                <SafeImage
                   src={inlineMedia.url}
                   alt={t('post.media_alt', { n: 1 })}
                   className="post-card-image"
                   onClick={(e) => openGallery(e, 0)}
-                  onError={(e) => { e.target.style.display = 'none'; }}
                 />
               ) : (
                 <video
@@ -480,12 +478,12 @@ export default function PostCard({
           )}
 
           <div className="post-card-lightbox-content" onClick={(e) => e.stopPropagation()}>
-            <img
+            <SafeImage
               src={galleryUrls[galleryIndex]}
               alt={t('post.full_media')}
               className="post-card-gallery-image"
               key={galleryIndex}
-              onError={(e) => { e.target.style.display = 'none'; }}
+              fallbackText={t('post.image_failed')}
             />
             <div className="post-card-lightbox-actions">
               {galleryUrls.length > 1 && (
@@ -531,6 +529,24 @@ export default function PostCard({
                 </svg>
               </button>
             </div>
+
+            {/* ── Thumbnail strip ── */}
+            {galleryUrls.length > 1 && (
+              <div className="post-card-gallery-thumbnails">
+                {galleryUrls.map((url, i) => (
+                  <button
+                    key={i}
+                    className={`post-card-gallery-thumb ${i === galleryIndex ? 'post-card-gallery-thumb--active' : ''}`}
+                    onClick={(e) => { e.stopPropagation(); setGalleryIndex(i); }}
+                    aria-label={`Go to image ${i + 1}`}
+                  >
+                    <div className="post-card-gallery-thumb-inner">
+                      <SafeImage src={url} alt={`Thumbnail ${i + 1}`} />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Next button */}
@@ -645,11 +661,10 @@ function renderImageGrid(post, onImageClick, t) {
     <div className={gridClass}>
       {urls.slice(0, 4).map((url, i) => (
         <div key={i} className="post-card-image-grid-item">
-          <img
+          <SafeImage
             src={url}
             alt={t('post.media_alt', { n: i + 1 })}
             onClick={(e) => handleClick(e, i)}
-            onError={(e) => { e.target.style.display = 'none'; }}
           />
         </div>
       ))}

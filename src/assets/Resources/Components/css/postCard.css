@@ -441,7 +441,7 @@
 
 .post-card-gallery-image {
     max-width: 100%;
-    max-height: calc(95vh - 60px);
+    max-height: calc(95vh - 160px);
     object-fit: contain;
     border-radius: var(--radius-sm, 6px);
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
@@ -525,6 +525,90 @@
     right: 24px;
 }
 
+/* ── Thumbnail strip ── */
+.post-card-gallery-thumbnails {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 16px;
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 8px 12px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.post-card-gallery-thumbnails::-webkit-scrollbar {
+  height: 4px;
+}
+
+.post-card-gallery-thumbnails::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.post-card-gallery-thumbnails::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+.post-card-gallery-thumb {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  padding: 0;
+  transition: border-color 0.2s ease, transform 0.15s ease, opacity 0.2s ease;
+  opacity: 0.5;
+  /* Contenedor fijo: el contenido no altera las dimensiones del botón */
+  position: relative;
+}
+
+.post-card-gallery-thumb:hover {
+  opacity: 0.8;
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.post-card-gallery-thumb--active {
+  opacity: 1;
+  border-color: #ffffff;
+}
+
+/* Inner wrapper: mantiene dimensiones fijas y aplica el scale sin desbordar */
+.post-card-gallery-thumb-inner {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 4px;
+  transition: transform 0.15s ease;
+}
+
+.post-card-gallery-thumb:hover .post-card-gallery-thumb-inner {
+  transform: scale(1.08);
+}
+
+.post-card-gallery-thumb--active .post-card-gallery-thumb-inner {
+  transform: scale(1.08);
+}
+
+.post-card-gallery-thumb img,
+.post-card-gallery-thumb .safe-image-fallback {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0;
+  min-height: 0;
+}
+
+.post-card-gallery-thumb .safe-image-fallback-icon {
+  font-size: 1rem;
+}
+
 /* ── Gallery counter ── */
 .post-card-gallery-counter {
     font-size: 0.85rem;
@@ -544,6 +628,73 @@
 }
 
 /* ── Saved (bookmark) action ── */
+
+/* ── SafeImage fallback (image load error) ── */
+
+.safe-image-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg, #000);
+  color: var(--color-text-muted, #6b7280);
+  border-radius: inherit;
+  min-height: 80px;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.safe-image-fallback-icon {
+  opacity: 0.35;
+  font-size: 1.6rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+}
+
+.safe-image-fallback-icon svg {
+  display: block;
+}
+
+.safe-image-fallback-text {
+  font-size: 0.75rem;
+  opacity: 0.45;
+  line-height: 1.2;
+  text-align: center;
+  padding: 0 8px;
+}
+
+/* Grid items: the fallback fills the entire grid cell */
+.post-card-image-grid-item .safe-image-fallback {
+  min-height: 0;
+  aspect-ratio: 16 / 10;
+  border-radius: 0;
+}
+
+/* Single image container: fallback inherits border-radius */
+.post-card-media .safe-image-fallback {
+  min-height: 120px;
+}
+
+/* Lightbox fallback */
+.post-card-lightbox-content .safe-image-fallback {
+  width: 400px;
+  height: 300px;
+  border-radius: var(--radius-sm, 6px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.post-card-lightbox-content .safe-image-fallback-icon {
+  font-size: 2.2rem;
+  opacity: 0.5;
+}
+
+.post-card-lightbox-content .safe-image-fallback-text {
+  font-size: 0.85rem;
+  opacity: 0.6;
+}
 .post-card-action--saved {
     background: rgba(250, 204, 21, 0.08);
     color: #facc15;

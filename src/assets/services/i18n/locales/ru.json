@@ -108,6 +108,7 @@
   "post.external_link_warning": "Эта ссылка ведет на внешний сайт. Открыть?",
   "post.repost_private_forbidden": "Нельзя репостить посты из приватного профиля",
   "post.reply_placeholder": "Напишите ответ @{user}...",
+  "post.image_failed": "Ошибка загрузки изображения",
   "post.replies_depth_limit": "Ответ слишком глубокий. Создайте новый комментарий.",
 
   "follow.follow": "Подписаться",

@@ -4,6 +4,7 @@ import { getFollowing } from '../../services/followService';
 import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../services/i18n/useI18n';
 import { FaImage, FaTimes, FaPlus, FaLink } from 'react-icons/fa';
+import SafeImage from './SafeImage';
 import './css/createPostModal.css';
 
 // ── Smart media detection ──
@@ -408,10 +409,10 @@ export default function CreatePostModal({
                 {/* Mini preview */}
                 {url && IMAGE_EXTENSIONS.test(url) && (
                   <div className="create-post-image-mini">
-                    <img
+                    <SafeImage
                       src={url}
                       alt={`Preview ${index + 1}`}
-                      onError={(e) => { e.target.style.display = 'none'; }}
+                      hideOnError
                     />
                   </div>
                 )}
@@ -439,10 +440,10 @@ export default function CreatePostModal({
         {/* ── Preview de media detectada en texto ── */}
         {previewUrl && previewType === 'image' && getValidImageUrls().length === 0 && (
           <div className="create-post-preview">
-            <img
+            <SafeImage
               src={previewUrl}
               alt="Preview"
-              onError={(e) => { e.target.style.display = 'none'; }}
+              hideOnError
             />
           </div>
         )}

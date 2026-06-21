@@ -11,6 +11,7 @@ import {
   setCachedExploreData,
 } from "../services/followService";
 import FollowButton from "../Resources/Components/FollowButton";
+import SafeImage from "../Resources/Components/SafeImage";
 import Badge from "../Resources/Components/Badge";
 import { FaLock } from 'react-icons/fa';
 import "../Resources/Styles/explore.css";
@@ -214,13 +215,10 @@ function ExploreCard({ profile, counts, isOwnProfile }) {
     <div className="explore-card" onClick={handleCardClick}>
       <div className="explore-card-banner">
         {profile.banner_url && (
-          <img
+          <SafeImage
             className="explore-card-banner-img"
             src={profile.banner_url}
             alt=""
-            onError={(e) => {
-              e.target.style.display = "none";
-            }}
           />
         )}
         <div className="explore-card-overlay" />

@@ -427,6 +427,15 @@ export function setCachedFollowCounts(userId, counts) {
   }
 }
 
+export function clearCachedFollowCounts(userId) {
+  if (!userId) return;
+  try {
+    localStorage.removeItem(COUNTS_CACHE_PREFIX + userId);
+  } catch (err) {
+    console.warn('Could not clear cached follow counts:', err);
+  }
+}
+
 export function getCachedFollowCounts(userId) {
   if (!userId) return null;
   try {

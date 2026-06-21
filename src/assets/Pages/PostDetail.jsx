@@ -21,6 +21,7 @@ import {
 } from '../services/postService';
 import { FaHeart, FaRegHeart, FaReply, FaTrash, FaRegComment, FaRegSadTear, FaArrowLeft, FaImage } from 'react-icons/fa';
 import PostCard from '../Resources/Components/PostCard';
+import SafeImage from '../Resources/Components/SafeImage';
 import '../Resources/Styles/post.css';
 
 const DEFAULT_AVATAR = 'https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg';
@@ -469,12 +470,11 @@ export default function PostDetail() {
           {/* ── Media (clickable for gallery) ── */}
           {reply.image_url && (
             <div className="comment-card-media">
-              <img
+              <SafeImage
                 src={reply.image_url}
                 alt={t('post.media_alt', { n: 1 })}
                 className="comment-card-image"
                 onClick={(e) => openCommentGallery(e, [reply.image_url], 0)}
-                onError={(e) => { e.target.style.display = 'none'; }}
               />
             </div>
           )}
@@ -483,12 +483,11 @@ export default function PostDetail() {
               {reply.video_url.match(/\.(mp4|webm|ogg)(\?.*)?$/i) ? (
                 <video src={reply.video_url} controls className="comment-card-video" />
               ) : (
-                <img
+                <SafeImage
                   src={reply.video_url}
                   alt={t('post.media_alt', { n: 1 })}
                   className="comment-card-image"
                   onClick={(e) => openCommentGallery(e, [reply.video_url], 0)}
-                  onError={(e) => { e.target.style.display = 'none'; }}
                 />
               )}
             </div>
@@ -557,7 +556,7 @@ export default function PostDetail() {
                 <div className="comment-form-media-inputs">
                   <input className="comment-form-media-input" type="url" value={replyMediaUrl} onChange={(e) => setReplyMediaUrl(e.target.value)} placeholder={t('post.comment_media_url')} />
                   {replyMediaUrl && IMG_RE.test(replyMediaUrl) && (
-                    <div className="comment-card-preview"><img src={replyMediaUrl} alt="Preview" onError={(e) => { e.target.style.display = 'none'; }} /></div>
+                    <div className="comment-card-preview"><SafeImage src={replyMediaUrl} alt="Preview" hideOnError /></div>
                   )}
                   {replyMediaUrl && VID_RE.test(replyMediaUrl) && (
                     <div className="comment-card-preview"><video src={replyMediaUrl} controls /></div>
@@ -617,12 +616,11 @@ export default function PostDetail() {
           {/* ── Media en comentario (clickable, gallery) ── */}
           {comment.image_url && (
             <div className="comment-card-media">
-              <img
+              <SafeImage
                 src={comment.image_url}
                 alt={t('post.media_alt', { n: 1 })}
                 className="comment-card-image"
                 onClick={(e) => openCommentGallery(e, [comment.image_url], 0)}
-                onError={(e) => { e.target.style.display = 'none'; }}
               />
             </div>
           )}
@@ -631,12 +629,11 @@ export default function PostDetail() {
               {comment.video_url.match(/\.(mp4|webm|ogg)(\?.*)?$/i) ? (
                 <video src={comment.video_url} controls className="comment-card-video" />
               ) : (
-                <img
+                <SafeImage
                   src={comment.video_url}
                   alt={t('post.media_alt', { n: 1 })}
                   className="comment-card-image"
                   onClick={(e) => openCommentGallery(e, [comment.video_url], 0)}
-                  onError={(e) => { e.target.style.display = 'none'; }}
                 />
               )}
             </div>
@@ -717,7 +714,7 @@ export default function PostDetail() {
                 <div className="comment-form-media-inputs">
                   <input className="comment-form-media-input" type="url" value={replyMediaUrl} onChange={(e) => setReplyMediaUrl(e.target.value)} placeholder={t('post.comment_media_url')} />
                   {replyMediaUrl && IMG_RE.test(replyMediaUrl) && (
-                    <div className="comment-card-preview"><img src={replyMediaUrl} alt="Preview" onError={(e) => { e.target.style.display = 'none'; }} /></div>
+                    <div className="comment-card-preview"><SafeImage src={replyMediaUrl} alt="Preview" hideOnError /></div>
                   )}
                   {replyMediaUrl && VID_RE.test(replyMediaUrl) && (
                     <div className="comment-card-preview"><video src={replyMediaUrl} controls /></div>
@@ -838,7 +835,7 @@ export default function PostDetail() {
                   />
                   {commentMediaUrl && IMG_RE.test(commentMediaUrl) && (
                     <div className="comment-card-preview">
-                      <img src={commentMediaUrl} alt="Preview" onError={(e) => { e.target.style.display = 'none'; }} />
+                      <SafeImage src={commentMediaUrl} alt="Preview" hideOnError />
                     </div>
                   )}
                   {commentMediaUrl && VID_RE.test(commentMediaUrl) && (
@@ -900,12 +897,12 @@ export default function PostDetail() {
           )}
 
           <div className="post-card-lightbox-content" onClick={(e) => e.stopPropagation()}>
-            <img
+            <SafeImage
               src={commentGalleryUrls[commentGalleryIndex]}
               alt={t('post.full_media')}
               className="post-card-gallery-image"
               key={commentGalleryIndex}
-              onError={(e) => { e.target.style.display = 'none'; }}
+              fallbackText={t('post.image_failed')}
             />
             <div className="post-card-lightbox-actions">
               {commentGalleryUrls.length > 1 && (
@@ -951,6 +948,24 @@ export default function PostDetail() {
                 </svg>
               </button>
             </div>
+
+            {/* ── Thumbnail strip ── */}
+            {commentGalleryUrls.length > 1 && (
+              <div className="post-card-gallery-thumbnails">
+                {commentGalleryUrls.map((url, i) => (
+                  <button
+                    key={i}
+                    className={`post-card-gallery-thumb ${i === commentGalleryIndex ? 'post-card-gallery-thumb--active' : ''}`}
+                    onClick={(e) => { e.stopPropagation(); setCommentGalleryIndex(i); }}
+                    aria-label={`Go to image ${i + 1}`}
+                  >
+                    <div className="post-card-gallery-thumb-inner">
+                      <SafeImage src={url} alt={`Thumbnail ${i + 1}`} />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {commentGalleryUrls.length > 1 && (

@@ -108,6 +108,7 @@
   "post.external_link_warning": "Este link levará você a um site externo. Abri-lo?",
   "post.repost_private_forbidden": "Não pode repostar publicações de um perfil privado",
   "post.reply_placeholder": "Escreva uma resposta para @{user}...",
+  "post.image_failed": "Falha ao carregar imagem",
   "post.replies_depth_limit": "Resposta muito profunda. Crie um novo comentário.",
 
   "follow.follow": "Seguir",
