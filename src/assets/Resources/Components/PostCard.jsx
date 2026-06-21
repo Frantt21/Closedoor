@@ -478,13 +478,15 @@ export default function PostCard({
           )}
 
           <div className="post-card-lightbox-content" onClick={(e) => e.stopPropagation()}>
-            <SafeImage
-              src={galleryUrls[galleryIndex]}
-              alt={t('post.full_media')}
-              className="post-card-gallery-image"
-              key={galleryIndex}
-              fallbackText={t('post.image_failed')}
-            />
+            <div className="post-card-gallery-image-area">
+              <SafeImage
+                src={galleryUrls[galleryIndex]}
+                alt={t('post.full_media')}
+                className="post-card-gallery-image"
+                key={galleryIndex}
+                fallbackText={t('post.image_failed')}
+              />
+            </div>
             <div className="post-card-lightbox-actions">
               {galleryUrls.length > 1 && (
                 <span className="post-card-gallery-counter">

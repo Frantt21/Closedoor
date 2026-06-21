@@ -897,13 +897,15 @@ export default function PostDetail() {
           )}
 
           <div className="post-card-lightbox-content" onClick={(e) => e.stopPropagation()}>
-            <SafeImage
-              src={commentGalleryUrls[commentGalleryIndex]}
-              alt={t('post.full_media')}
-              className="post-card-gallery-image"
-              key={commentGalleryIndex}
-              fallbackText={t('post.image_failed')}
-            />
+            <div className="post-card-gallery-image-area">
+              <SafeImage
+                src={commentGalleryUrls[commentGalleryIndex]}
+                alt={t('post.full_media')}
+                className="post-card-gallery-image"
+                key={commentGalleryIndex}
+                fallbackText={t('post.image_failed')}
+              />
+            </div>
             <div className="post-card-lightbox-actions">
               {commentGalleryUrls.length > 1 && (
                 <span className="post-card-gallery-counter">

@@ -150,7 +150,8 @@ export default function CreatePostModal({
       }
       setError(null);
     }
-  }, [isOpen, editPost, updatePreview]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, editPost]);
 
   if (!isOpen) return null;
 
