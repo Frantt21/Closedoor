@@ -1015,6 +1015,7 @@ function Profile() {
                     initialInterests={modalInterests}
                     initialBannerPosition={ownProfile?.banner_position || '50% 50%'}
                     initialAvatarPosition={ownProfile?.avatar_position || '50% 50%'}
+                    initialFollowersCount={followCounts?.followers || 0}
                     userRoles={roles}
                 />
             )}

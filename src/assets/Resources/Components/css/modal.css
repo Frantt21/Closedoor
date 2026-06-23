@@ -83,18 +83,6 @@
 
 /* ---- Preview Card grande ---- */
 
-.fc-modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 20px;
-    gap: 12px;
-}
-
-.fc-modal-header .fc-modal-title {
-    margin: 0;
-}
-
 .fc-preview-card {
     margin-bottom: 20px;
     border-radius: var(--radius, 10px);
@@ -559,6 +547,23 @@ textarea.fc-modal-input {
     border-color: #ffffff;
     box-shadow: 0 0 0 2px var(--overlay-border-strong);
     transform: scale(1.1);
+}
+
+/* Custom color picker swatch (inline in the swatch row) */
+.fc-modal-custom-swatch {
+    position: relative;
+    background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);
+    border-color: var(--color-border, #2a2a2a);
+}
+
+.fc-modal-custom-swatch:hover {
+    transform: scale(1.15);
+    box-shadow: 0 0 12px var(--overlay-bg);
+}
+
+.fc-modal-custom-swatch svg {
+    color: #ffffff;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
 }
 
 .fc-modal-color-swatch svg {

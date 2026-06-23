@@ -204,6 +204,7 @@
   "modal.apply": "Apply",
   "modal.extracting_colors": "Extracting colors from banner...",
   "modal.add_banner_hint": "Add a banner to extract accent colors",
+  "modal.accent_color_custom": "Custom",
   "modal.social_detect_error": "Could not detect platform",
   "modal.social_duplicate": "This link was already added",
   "modal.social_example": "E.g.: @user, twitter.com/user, https://github.com/user",
@@ -211,6 +212,7 @@
   "modal.interests_placeholder": "Add an interest...",
   "modal.discard_changes": "You have unsaved changes. Discard them?",
   "modal.suggested_interests": "Suggested",
+  "modal.explore_preview": "Explore card preview",
   "modal.saving": "Saving...",
 
   "create_post.title": "Create post",
@@ -271,6 +273,7 @@
   "common.save": "Save",
   "common.cancel": "Cancel",
   "common.clear": "Clear",
+  "common.reset": "Reset",
   "common.delete": "Delete",
   "common.confirm": "Confirm",
   "common.search": "Search",

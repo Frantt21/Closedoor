@@ -204,6 +204,7 @@
   "modal.apply": "Aplicar",
   "modal.extracting_colors": "Extrayendo colores del banner...",
   "modal.add_banner_hint": "Agrega un banner para extraer colores de acento",
+  "modal.accent_color_custom": "Personalizado",
   "modal.social_detect_error": "No se pudo detectar la plataforma",
   "modal.social_duplicate": "Este enlace ya fue agregado",
   "modal.social_example": "Ej: @usuario, twitter.com/usuario, https://github.com/user",
@@ -211,6 +212,7 @@
   "modal.interests_placeholder": "Agrega un interés...",
   "modal.discard_changes": "Tienes cambios sin guardar. ¿Descartarlos?",
   "modal.suggested_interests": "Sugeridos",
+  "modal.explore_preview": "Vista previa en Explore",
   "modal.saving": "Guardando...",
 
   "create_post.title": "Crear publicación",
@@ -271,6 +273,7 @@
   "common.save": "Guardar",
   "common.cancel": "Cancelar",
   "common.clear": "Limpiar",
+  "common.reset": "Restablecer",
   "common.delete": "Eliminar",
   "common.confirm": "Confirmar",
   "common.search": "Buscar",
