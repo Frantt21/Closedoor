@@ -20,15 +20,18 @@
 
 /* ── Profile page: surface (glassmorphism) effect ── */
 .profile-page .post-card {
-    background: var(--accent-surface-rgba, rgba(255, 255, 255, 0.04));
-    backdrop-filter: var(--accent-surface-blur, blur(20px));
-    -webkit-backdrop-filter: var(--accent-surface-blur, blur(20px));
-    border: var(--accent-surface-border, 1px solid rgba(255, 255, 255, 0.06));
-    color: var(--accent-surface-text-color, var(--color-text, #ffffff));
+    --color-text: var(--accent-surface-text-color, var(--color-text, #ffffff));
+    --color-text-secondary: var(--accent-surface-text-secondary, var(--color-text-secondary, #9ca3af));
+    --color-text-muted: var(--accent-surface-text-muted, var(--color-text-muted, #6b7280));
+    background: var(--accent-surface-rgba, var(--color-surface, #1a1a1a));
+    backdrop-filter: var(--accent-surface-blur, none);
+    -webkit-backdrop-filter: var(--accent-surface-blur, none);
+    border: none;
+    isolation: isolate;
 }
 
 .profile-page .post-card:hover {
-    background: var(--accent-surface-rgba-hover, rgba(255, 255, 255, 0.07));
+    background: var(--accent-surface-rgba-hover, var(--color-surface-hover, #252525));
 }
 
 .post-card--deleting {

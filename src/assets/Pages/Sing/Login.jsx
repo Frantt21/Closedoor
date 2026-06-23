@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../services/i18n/useI18n';
+import usePageTitle from '../../../hooks/usePageTitle';
 import '../../Resources/Styles/login.css';
 
 function Login() {
   const { t } = useI18n();
+  usePageTitle(t('auth.login_title'));
   const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);

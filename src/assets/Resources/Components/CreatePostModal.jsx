@@ -5,40 +5,11 @@ import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../services/i18n/useI18n';
 import { FaImage, FaTimes, FaPlus, FaLink } from 'react-icons/fa';
 import SafeImage from './SafeImage';
+import Avatar from './Avatar';
+import { IMG_RE, VID_RE, YOUTUBE_PATTERN, VIMEO_PATTERN, extractUrls, detectMediaFromContent, getEmbedUrl as getEmbedUrlHelper } from '../../services/helpers';
 import './css/createPostModal.css';
 
-// ── Smart media detection ──
-const IMAGE_EXTENSIONS = /\.(jpe?g|png|gif|webp|bmp|svg)(\?.*)?$/i;
-const VIDEO_EXTENSIONS = /\.(mp4|webm|ogg|mov|avi|mkv)(\?.*)?$/i;
-const YOUTUBE_PATTERN = /(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/;
-const VIMEO_PATTERN = /vimeo\.com\/(\d+)/;
-const URL_PATTERN = /(https?:\/\/[^\s<]+)/gi;
-
-const DEFAULT_AVATAR = 'https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg';
-
-function extractUrls(text) {
-  if (!text) return [];
-  const matches = text.match(URL_PATTERN);
-  return matches || [];
-}
-
-function detectMediaFromContent(text) {
-  const urls = extractUrls(text);
-  let imageUrl = null;
-  let videoUrl = null;
-
-  for (const url of urls) {
-    if (videoUrl && imageUrl) break;
-    if (!videoUrl && (VIDEO_EXTENSIONS.test(url) || YOUTUBE_PATTERN.test(url) || VIMEO_PATTERN.test(url))) {
-      videoUrl = url;
-    }
-    if (!imageUrl && IMAGE_EXTENSIONS.test(url)) {
-      imageUrl = url;
-    }
-  }
-
-  return { imageUrl, videoUrl };
-}
+const IMAGE_EXTENSIONS = IMG_RE;
 
 export default function CreatePostModal({
   isOpen,
@@ -68,7 +39,6 @@ export default function CreatePostModal({
 
   const isEditing = !!editPost;
 
-  const avatarUrl = profile?.avatar_url || DEFAULT_AVATAR;
   const displayName = profile?.username || t('common.username');
 
   // ── Image URL management (must be before updatePreview) ──
@@ -297,16 +267,9 @@ export default function CreatePostModal({
     }
   };
 
-  const isVideoPreview = previewType === 'video' && (VIDEO_EXTENSIONS.test(previewUrl) || YOUTUBE_PATTERN.test(previewUrl) || VIMEO_PATTERN.test(previewUrl));
+  const isVideoPreview = previewType === 'video' && (VID_RE.test(previewUrl) || YOUTUBE_PATTERN.test(previewUrl) || VIMEO_PATTERN.test(previewUrl));
 
-  const getEmbedUrl = (url) => {
-    if (!url) return null;
-    const yt = url.match(YOUTUBE_PATTERN);
-    if (yt) return `https://www.youtube.com/embed/${yt[1]}`;
-    const vm = url.match(VIMEO_PATTERN);
-    if (vm) return `https://player.vimeo.com/video/${vm[1]}`;
-    return null;
-  };
+  const getEmbedUrl = getEmbedUrlHelper;
 
   return (
     <div className="fc-modal-overlay" role="dialog" aria-modal="true" onClick={handleOverlayClick}>
@@ -319,11 +282,10 @@ export default function CreatePostModal({
 
         {/* ── User info ── */}
         <div className="create-post-user">
-          <img
+          <Avatar
             className="create-post-avatar"
-            src={avatarUrl}
+            src={profile?.avatar_url}
             alt={displayName}
-            onError={(e) => { e.target.src = DEFAULT_AVATAR; }}
           />
           <span className="create-post-username">{displayName}</span>
         </div>
@@ -351,13 +313,11 @@ export default function CreatePostModal({
                     type="button"
                     className={`create-post-mention-item ${idx === selectedMentionIdx ? 'create-post-mention-item--active' : ''}`}
                     onMouseDown={(e) => { e.preventDefault(); insertMention(user); }}
-                  >
-                    <img
-                      className="create-post-mention-avatar"
-                      src={user.avatar_url || DEFAULT_AVATAR}
-                      alt={user.username}
-                      onError={(e) => { e.target.src = DEFAULT_AVATAR; }}
-                    />
+                  >                      <Avatar
+                        className="create-post-mention-avatar"
+                        src={user.avatar_url}
+                        alt={user.username}
+                      />
                     <span className="create-post-mention-username">{user.username}</span>
                   </button>
                 ))}

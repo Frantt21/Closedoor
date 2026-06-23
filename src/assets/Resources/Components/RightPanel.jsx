@@ -6,12 +6,9 @@ import { getUserProfile, getUserProfileByUsername, getCachedProfileByUsername, g
 import { getTrendingHashtags, getTrendingWords, getCachedTrendingWords, getCachedTrendingHashtags } from '../../services/hashtagService';
 import { getTrendingCategory } from '../../services/trendingDictionary';
 import ProfileSidebar from './ProfileSidebar';
+import { getContrastText, isUUID } from '../../services/helpers';
 import { FaFire, FaHashtag } from 'react-icons/fa';
 import './css/rightPanel.css';
-
-// ── Detectar si un string es UUID ──
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-function isUUID(str) { return UUID_RE.test(str); }
 
 const PROFILE_ROUTE = '/profile';
 const PROFILE_ROUTE_PREFIX = '/profile/';
@@ -30,29 +27,6 @@ export default function RightPanel() {
       <ProfileContent path={path} ownProfile={ownProfile} user={user} t={t} />
     </aside>
   );
-}
-
-// ── Helper: elegir texto blanco o negro según el brillo del color de fondo ──
-function getContrastText(hex) {
-  if (!hex) return '#000000';
-  let r, g, b;
-  if (hex.startsWith('#')) {
-    const h = hex.slice(1);
-    if (h.length === 3) {
-      r = parseInt(h[0] + h[0], 16);
-      g = parseInt(h[1] + h[1], 16);
-      b = parseInt(h[2] + h[2], 16);
-    } else {
-      r = parseInt(h.slice(0, 2), 16);
-      g = parseInt(h.slice(2, 4), 16);
-      b = parseInt(h.slice(4, 6), 16);
-    }
-  } else {
-    return '#000000';
-  }
-  const srgb = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
-  const luminance = 0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
-  return luminance > 0.179 ? '#000000' : '#ffffff';
 }
 
 // ── Trending widget: dos secciones ──
@@ -220,13 +194,39 @@ function ProfileContent({ path, ownProfile, user, t }) {
 
   const surfColor = activeProfile?.accent_surface_color;
   const surfGlass = activeProfile?.accent_surface_glass === true;
-  const { showAccent } = useI18n();
-  const surfaceStyle = showAccent ? {
+  const { showAccent, accentVisibility } = useI18n();
+  const isOwnProfileRight = isOwnProfilePage;
+
+  // Para perfiles ajenos: usar las preferencias guardadas en la BD del dueño del perfil
+  // Para perfil propio: siempre mostrar (el toggle es para controlar qué ven los demás)
+  const ownerShowAccentProfile = isOwnProfileRight
+    ? true
+    : (activeProfile?.show_accent_profile ?? true);
+  const ownerAccentVisibility = isOwnProfileRight
+    ? accentVisibility
+    : (activeProfile?.accent_visibility ?? 'both');
+
+  const accentVisibleRight = showAccent && ownerShowAccentProfile && (
+    ownerAccentVisibility === 'both' ||
+    (ownerAccentVisibility === 'me' && isOwnProfileRight) ||
+    (ownerAccentVisibility === 'others' && !isOwnProfileRight)
+  );
+  const surfaceStyle = accentVisibleRight ? {
     '--accent-surface-rgba': surfGlass ? 'rgba(255, 255, 255, 0.04)' : (surfColor || 'var(--color-surface, #1a1a1a)'),
     '--accent-surface-rgba-hover': surfGlass ? 'rgba(255, 255, 255, 0.07)' : (surfColor ? `color-mix(in srgb, ${surfColor} 85%, #000)` : 'var(--color-surface-hover, #252525)'),
     '--accent-surface-blur': surfGlass ? 'blur(20px)' : 'none',
     '--accent-surface-border': surfGlass ? '1px solid rgba(255, 255, 255, 0.06)' : 'none',
     '--accent-surface-text-color': !surfGlass && surfColor ? getContrastText(surfColor) : 'var(--color-text, #ffffff)',
+    '--accent-surface-text-secondary': !surfGlass && surfColor ? '#374151' : 'var(--color-text-secondary, #9ca3af)',
+    '--accent-surface-text-muted': !surfGlass && surfColor ? '#6b7280' : 'var(--color-text-muted, #6b7280)',
+  } : {};
+
+  // Derive CSS vars from accent-surface-text-* for the containers
+  const resolvedSurfaceStyle = Object.keys(surfaceStyle).length > 0 ? {
+    ...surfaceStyle,
+    '--color-text': surfaceStyle['--accent-surface-text-color'] || 'var(--color-text, #ffffff)',
+    '--color-text-secondary': surfaceStyle['--accent-surface-text-secondary'] || 'var(--color-text-secondary, #9ca3af)',
+    '--color-text-muted': surfaceStyle['--accent-surface-text-muted'] || 'var(--color-text-muted, #6b7280)',
   } : {};
 
   return (
@@ -236,10 +236,9 @@ function ProfileContent({ path, ownProfile, user, t }) {
         isPrivate={isPrivate}
         canViewContent={isOwnProfilePage || !isPrivate}
         statsVisibility={resolvedStatsVisibility}
-        isOwnProfile={isOwnProfilePage}
-        surfaceStyle={surfaceStyle}
-      />
-      <TrendingHashtags t={t} surfaceStyle={surfaceStyle} />
+        isOwnProfile={isOwnProfilePage}            surfaceStyle={resolvedSurfaceStyle}
+          />
+          <TrendingHashtags t={t} surfaceStyle={resolvedSurfaceStyle} />
     </>
   );
 }

@@ -10,6 +10,7 @@ import {
   getCachedFollowStatus,
 } from '../../services/followService';
 import { useI18n } from '../../services/i18n/useI18n';
+import ConfirmModal from './ConfirmModal';
 import './css/followButton.css';
 
 export default function FollowButton({ targetUserId, isPrivate, onFollowChange }) {
@@ -25,6 +26,7 @@ export default function FollowButton({ targetUserId, isPrivate, onFollowChange }
     return cached === null;
   });
   const [hovering, setHovering] = useState(false);
+  const [confirmUnfollow, setConfirmUnfollow] = useState(false);
 
   // Check follow status AND pending request status
   const checkStatus = useCallback(async () => {
@@ -62,8 +64,8 @@ export default function FollowButton({ targetUserId, isPrivate, onFollowChange }
 
     // Si el perfil es privado y ya lo sigues, advertir antes de dejar de seguir
     if (following && isPrivate) {
-      const confirmed = window.confirm(t('follow.unfollow_private_warning'));
-      if (!confirmed) return;
+      setConfirmUnfollow(true);
+      return;
     }
 
     setLoading(true);
@@ -109,7 +111,36 @@ export default function FollowButton({ targetUserId, isPrivate, onFollowChange }
     buttonClass += ' follow-btn--follow';
   }
 
+  const executeUnfollow = () => {
+    setConfirmUnfollow(false);
+    handleClickWithConfirm();
+  };
+
+  // Wrap handleClick to skip the confirm check when called from executeUnfollow
+  // We already confirmed, so set following to false temporarily
+  const handleClickWithConfirm = async () => {
+    setLoading(true);
+    try {
+      await unfollowUser(user.id, targetUserId);
+      onFollowChange?.('unfollow');
+      await checkStatus();
+    } catch (err) {
+      console.warn('Unfollow error:', err);
+      checkStatus();
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
+    <>
+      {confirmUnfollow && (
+        <ConfirmModal
+          message={t('follow.unfollow_private_warning')}
+          onConfirm={executeUnfollow}
+          onCancel={() => setConfirmUnfollow(false)}
+        />
+      )}
     <button
       type="button"
       className={buttonClass}
@@ -123,5 +154,6 @@ export default function FollowButton({ targetUserId, isPrivate, onFollowChange }
     >
       {loading ? '...' : buttonText}
     </button>
+    </>
   );
 }

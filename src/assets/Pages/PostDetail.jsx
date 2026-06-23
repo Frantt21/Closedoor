@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useI18n } from '../services/i18n/useI18n';
@@ -22,9 +23,12 @@ import {
 import { FaHeart, FaRegHeart, FaReply, FaTrash, FaRegComment, FaRegSadTear, FaArrowLeft, FaImage } from 'react-icons/fa';
 import PostCard from '../Resources/Components/PostCard';
 import SafeImage from '../Resources/Components/SafeImage';
+import Avatar from '../Resources/Components/Avatar';
+import RichText from '../Resources/Components/RichText';
+import ConfirmModal from '../Resources/Components/ConfirmModal';
+import { getTimeAgo, IMG_RE, VID_RE } from '../services/helpers';
+import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/post.css';
-
-const DEFAULT_AVATAR = 'https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg';
 
 export default function PostDetail() {
   const { postId } = useParams();
@@ -35,6 +39,7 @@ export default function PostDetail() {
   const [post, setPost] = useState(null);
   const [postLoading, setPostLoading] = useState(true);
   const [postError, setPostError] = useState(null);
+  usePageTitle(postError ? t('post.not_found') : 'Post');
 
   // ── Comments con cache ──
   const [comments, setComments] = useState(() => {
@@ -53,6 +58,10 @@ export default function PostDetail() {
   const [submittingComment, setSubmittingComment] = useState(false);
   const [commentMediaUrl, setCommentMediaUrl] = useState('');
   const [commentShowMedia, setCommentShowMedia] = useState(false);
+  const [confirmDeleteComment, setConfirmDeleteComment] = useState(null);
+  const [confirmExternalLink, setConfirmExternalLink] = useState(null);
+  const handleCancelDeleteComment = useCallback(() => setConfirmDeleteComment(null), []);
+  const handleCancelExternalLink = useCallback(() => setConfirmExternalLink(null), []);
   const [replyTo, setReplyTo] = useState(null); // { id, username } — para form inline
   // Estado del form inline (reply)
   const [replyContent, setReplyContent] = useState('');
@@ -122,9 +131,12 @@ export default function PostDetail() {
       // Check which comments the user has liked
       let likes = {};
       if (user?.id && data.length > 0) {
-        for (const c of data) {
-          likes[c.id] = await isCommentLiked(c.id, user.id);
-        }
+        const results = await Promise.allSettled(
+          data.map((c) => isCommentLiked(c.id, user.id))
+        );
+        data.forEach((c, i) => {
+          if (results[i].status === 'fulfilled') likes[c.id] = results[i].value;
+        });
         setCommentLikes(likes);
       }
 
@@ -332,11 +344,27 @@ export default function PostDetail() {
     setReplyShowMedia(false);
   };
 
-  const IMG_RE = /\.(jpe?g|png|gif|webp|bmp|svg)(\?.*)?$/i;
-  const VID_RE = /\.(mp4|webm|ogg)(\?.*)?$/i;
 
-  const handleDeleteComment = async (commentId) => {
-    if (!window.confirm(t('post.delete_comment_confirm'))) return;
+
+  const handleDeleteComment = (commentId) => {
+    setConfirmDeleteComment(commentId);
+  };
+
+  const handleExternalLink = (url) => {
+    setConfirmExternalLink(url);
+  };
+
+  const executeExternalLink = () => {
+    if (confirmExternalLink) {
+      window.open(confirmExternalLink, '_blank', 'noopener noreferrer');
+    }
+    setConfirmExternalLink(null);
+  };
+
+  const executeDeleteComment = async () => {
+    const commentId = confirmDeleteComment;
+    setConfirmDeleteComment(null);
+    if (!commentId) return;
     try {
       await deleteComment(commentId);
       setComments((prev) => prev.filter((c) => c.id !== commentId));
@@ -375,66 +403,7 @@ export default function PostDetail() {
 
 
 
-  // ── Render content with @mentions, #hashtags and URL highlighting ──
-  const renderCommentContent = (text) => {
-    if (!text) return null;
-    const parts = [];
-    const regex = /(?<![\w@])(@[a-zA-Z0-9_]+)|(?<![#\w])#([a-zA-Z0-9_\u00C0-\u024F]+)|(https?:\/\/[^\s<]+)/gi;
-    let lastIndex = 0, match;
-    while ((match = regex.exec(text)) !== null) {
-      if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
-      parts.push(match[0]);
-      lastIndex = match.index + match[0].length;
-    }
-    if (lastIndex < text.length) parts.push(text.slice(lastIndex));
-    return parts.map((part, i) => {
-      if (part.startsWith('@')) {
-        return (
-          <span
-            key={i}
-            className="comment-card-mention"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/profile/${part.slice(1)}`);
-            }}
-          >
-            {part}
-          </span>
-        );
-      }
-      if (part.startsWith('#')) {
-        const tag = part.slice(1);
-        return (
-          <Link
-            key={i}
-            to={`/hashtag/${encodeURIComponent(tag)}`}
-            className="comment-card-hashtag"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {part}
-          </Link>
-        );
-      }
-      if (part.startsWith('http://') || part.startsWith('https://')) {
-        return (
-          <a
-            key={i}
-            href={part}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="comment-card-link"
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!window.confirm(t('post.external_link_warning'))) e.preventDefault();
-            }}
-          >
-            {part}
-          </a>
-        );
-      }
-      return part;
-    });
-  };
+  // renderCommentContent is now handled by RichText component
 
   // ── Render a single reply card ──
   // depth=1: direct reply (indented), CAN be replied to, shows children toggle
@@ -456,9 +425,9 @@ export default function PostDetail() {
           href={`/profile/${reply.profiles?.username}`}
           onClick={(e) => { e.preventDefault(); navigate(`/profile/${reply.profiles?.username}`); }}
         >
-          <img
+          <Avatar
             className="comment-card-avatar"
-            src={reply.profiles?.avatar_url || DEFAULT_AVATAR}
+            src={reply.profiles?.avatar_url}
             alt={reply.profiles?.username || 'user'}
           />
         </a>
@@ -478,7 +447,15 @@ export default function PostDetail() {
               </span>
             )}
           </div>
-          <p className="comment-card-text">{renderCommentContent(reply.content)}</p>
+          <p className="comment-card-text">
+            <RichText
+              text={reply.content}
+              linkClass="comment-card-link"
+              mentionClass="comment-card-mention"
+              hashtagClass="comment-card-hashtag"
+              onExternalLink={handleExternalLink}
+            />
+          </p>
 
           {/* ── Media (clickable for gallery) ── */}
           {reply.image_url && (
@@ -607,9 +584,9 @@ export default function PostDetail() {
           href={`/profile/${comment.profiles?.username}`}
           onClick={(e) => { e.preventDefault(); navigate(`/profile/${comment.profiles?.username}`); }}
         >
-          <img
+          <Avatar
             className="comment-card-avatar"
-            src={comment.profiles?.avatar_url || DEFAULT_AVATAR}
+            src={comment.profiles?.avatar_url}
             alt={comment.profiles?.username || 'user'}
           />
         </a>
@@ -624,7 +601,15 @@ export default function PostDetail() {
             </a>
             <span className="comment-card-time">{getTimeAgo(t, locale, comment.created_at)}</span>
           </div>
-          <p className="comment-card-text">{renderCommentContent(comment.content)}</p>
+          <p className="comment-card-text">
+            <RichText
+              text={comment.content}
+              linkClass="comment-card-link"
+              mentionClass="comment-card-mention"
+              hashtagClass="comment-card-hashtag"
+              onExternalLink={handleExternalLink}
+            />
+          </p>
 
           {/* ── Media en comentario (clickable, gallery) ── */}
           {comment.image_url && (
@@ -810,9 +795,9 @@ export default function PostDetail() {
         {/* Top-level comment form */}
         {user && (
           <div className="comment-form">
-            <img
+            <Avatar
               className="comment-form-avatar"
-              src={profile?.avatar_url || DEFAULT_AVATAR}
+              src={profile?.avatar_url}
               alt="Your avatar"
             />
             <div className="comment-form-input-wrapper">
@@ -894,8 +879,25 @@ export default function PostDetail() {
         )}
       </div>
 
-      {/* ── Comment gallery lightbox ── */}
-      {commentGalleryUrls && (
+      {/* ── Comment gallery lightbox ── */}      {/* ── Delete comment confirmation ── */}
+      {confirmDeleteComment && (
+        <ConfirmModal
+          message={t('post.delete_comment_confirm')}
+          onConfirm={executeDeleteComment}
+          onCancel={handleCancelDeleteComment}
+        />
+      )}
+
+      {/* ── External link confirmation ── */}
+      {confirmExternalLink && (
+        <ConfirmModal
+          message={t('post.external_link_warning')}
+          onConfirm={executeExternalLink}
+          onCancel={handleCancelExternalLink}
+        />
+      )}
+
+      {commentGalleryUrls && createPortal(
         <div className="post-card-lightbox" onClick={(e) => { e.stopPropagation(); closeCommentGallery(); }}>
           {commentGalleryUrls.length > 1 && (
             <button
@@ -994,24 +996,10 @@ export default function PostDetail() {
               </svg>
             </button>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
 }
 
-function getTimeAgo(t, locale, dateStr) {
-  if (!dateStr) return '';
-  const now = Date.now();
-  const date = new Date(dateStr).getTime();
-  const diffMs = now - date;
-  const diffSec = Math.floor(diffMs / 1000);
-  if (diffSec < 60) return t('post.just_now');
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return t('post.minutes_ago', { n: diffMin });
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return t('post.hours_ago', { n: diffHr });
-  const diffDay = Math.floor(diffHr / 24);
-  if (diffDay < 7) return t('post.days_ago', { n: diffDay });
-  return new Date(dateStr).toLocaleDateString(locale === 'en' ? 'en-US' : 'es-ES', { day: 'numeric', month: 'short' });
-}

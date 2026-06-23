@@ -172,6 +172,48 @@
     overflow: hidden;
 }
 
+.explore-card-interests {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.explore-card-interest {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--color-text-muted, #6b7280);
+    background: var(--overlay-bg-subtle);
+    border-radius: var(--radius-full, 9999px);
+    white-space: nowrap;
+    line-height: 1.4;
+}
+
+.explore-card-interests-more {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--color-text-muted, #6b7280);
+    background: transparent;
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius-full, 9999px);
+    cursor: pointer;
+    white-space: nowrap;
+    line-height: 1.4;
+    font-family: inherit;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.explore-card-interests-more:hover {
+    color: var(--color-text, #ffffff);
+    border-color: var(--color-text-muted, #6b7280);
+}
+
 .explore-card-action {
     margin-top: auto;
     padding-top: 8px;

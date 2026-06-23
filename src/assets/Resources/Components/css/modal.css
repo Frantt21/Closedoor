@@ -22,7 +22,7 @@
     width: 100%;
     max-width: 960px;
     background: var(--color-surface, #1a1a1a);
-    border: 1px solid var(--color-border, #2a2a2a);
+    border: none;
     border-radius: var(--radius, 10px);
     padding: 28px;
     box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
@@ -32,7 +32,7 @@
 }
 
 .fc-modal-title {
-    margin: 0 0 20px 0;
+    margin: 0;
     font-size: 1.15rem;
     font-weight: 700;
     color: var(--color-text, #ffffff);
@@ -58,7 +58,7 @@
     font-family: inherit;
     color: var(--color-text, #ffffff);
     background: var(--color-bg, #000000);
-    transition: box-shadow 0.2s ease;
+    transition: background 0.2s ease, box-shadow 0.2s ease;
     width: 100%;
     box-sizing: border-box;
     outline: none;
@@ -69,11 +69,11 @@
 }
 
 .fc-modal-input:hover {
-    box-shadow: 0 0 0 1px var(--color-text-muted, #6b7280);
+    box-shadow: 0 0 0 1px var(--overlay-bg);
 }
 
 .fc-modal-input:focus {
-    box-shadow: 0 0 0 1.5px var(--color-text, #ffffff);
+    box-shadow: 0 0 0 2px var(--overlay-bg);
 }
 
 .fc-modal-input:focus::placeholder {
@@ -86,6 +86,7 @@
     margin-bottom: 20px;
     border-radius: var(--radius, 10px);
     overflow: hidden;
+    border: none;
 }
 
 .fc-preview-card--large .fc-preview-card-banner {
@@ -119,9 +120,8 @@
     height: 56px;
     border-radius: 50%;
     overflow: hidden;
-    border: 3px solid var(--color-surface, #1a1a1a);
+    border: 3px solid color-mix(in srgb, var(--accent-color, #ffffff) 40%, transparent);
     z-index: 2;
-    background: var(--color-bg, #000000);
 }
 
 .fc-preview-card-avatar img {
@@ -177,7 +177,7 @@
     border-radius: 50%;
     background: rgba(0, 0, 0, 0.55);
     backdrop-filter: blur(4px);
-    border: 1.5px solid var(--overlay-border);
+    border: none;
     color: rgba(255, 255, 255, 0.8);
     cursor: pointer;
     display: flex;
@@ -190,7 +190,6 @@
 
 .fc-preview-banner-edit:hover {
     background: rgba(0, 0, 0, 0.75);
-    border-color: var(--overlay-border-strong);
 }
 
 .fc-preview-avatar-edit {
@@ -223,19 +222,9 @@
 
 textarea.fc-modal-input {
     resize: vertical;
-    min-height: 56px;
+    min-height: 80px;
     line-height: 1.5;
 }
-
-.fc-modal-char-count {
-    display: block;
-    text-align: right;
-    font-size: 0.75rem;
-    color: var(--color-text-muted, #6b7280);
-    margin-top: 4px;
-}
-
-
 
 /* ── Interests Section ── */
 
@@ -293,7 +282,7 @@ textarea.fc-modal-input {
   color: var(--color-text-secondary, #9ca3af);
   background: var(--overlay-bg-subtle);
   border: none;
-  border-radius: var(--radius, 10px);
+  border-radius: var(--radius-full, 9999px);
   white-space: nowrap;
 }
 
@@ -419,47 +408,26 @@ textarea.fc-modal-input {
     border-radius: 50%;
     background: transparent;
     color: #fca5a5;
-    border: 1px solid transparent;
+    border: none;
     font-size: 1.1rem;
     cursor: pointer;
-    transition: background 0.15s ease, border-color 0.15s ease;
+    transition: background 0.15s ease;
     flex-shrink: 0;
 }
 
 .fc-modal-social-remove:hover {
     background: rgba(255, 80, 80, 0.15);
-    border-color: rgba(255, 80, 80, 0.3);
-}
-
-.fc-modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 24px;
-    gap: 12px;
-}
-
-.fc-modal-header .fc-modal-title {
-    margin: 0;
-}
-
-.fc-modal-header-actions {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-shrink: 0;
 }
 
 .fc-modal-save {
     background: var(--color-text, #ffffff);
     color: var(--color-bg, #000000);
     border: none;
-    padding: 10px 20px;
+    padding: 8px 16px;
     border-radius: var(--radius, 10px);
     cursor: pointer;
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     font-weight: 600;
-    min-width: 100px;
     transition: opacity 0.2s ease, transform 0.15s ease;
 }
 
@@ -472,28 +440,7 @@ textarea.fc-modal-input {
     transform: translateY(0);
 }
 
-.fc-modal-close {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 38px;
-    height: 38px;
-    border-radius: var(--radius, 10px);
-    background: transparent;
-    color: var(--color-text, #ffffff);
-    border: none;
-    cursor: pointer;
-    transition: background 0.2s ease, transform 0.15s ease;
-    flex-shrink: 0;
-}
-
-.fc-modal-close:hover:not(:disabled) {
-    background: var(--color-surface-hover, #252525);
-    transform: scale(1.05);
-}
-
-.fc-modal-save:disabled,
-.fc-modal-close:disabled {
+.fc-modal-save:disabled {
     opacity: 0.4;
     cursor: not-allowed;
     transform: none;
@@ -547,13 +494,13 @@ textarea.fc-modal-input {
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    border: 2.5px solid transparent;
+    border: none;
     background: var(--swatch-color);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
     padding: 0;
     outline: none;
 }
@@ -564,16 +511,14 @@ textarea.fc-modal-input {
 }
 
 .fc-modal-color-swatch--selected {
-    border-color: #ffffff;
-    box-shadow: 0 0 0 2px var(--overlay-border-strong);
-    transform: scale(1.1);
+    outline: 1px solid rgba(255, 255, 255, 0.5);
+    outline-offset: 2px;
 }
 
 /* Custom color picker swatch (inline in the swatch row) */
 .fc-modal-custom-swatch {
     position: relative;
     background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);
-    border-color: var(--color-border, #2a2a2a);
 }
 
 .fc-modal-custom-swatch:hover {
@@ -619,7 +564,7 @@ textarea.fc-modal-input {
     width: 100%;
     max-width: 400px;
     background: var(--color-surface, #1a1a1a);
-    border: 1px solid var(--color-border, #2a2a2a);
+    border: none;
     border-radius: var(--radius, 10px);
     padding: 24px;
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
@@ -667,7 +612,7 @@ textarea.fc-modal-input {
 .fc-modal-sub-cancel {
     background: transparent;
     color: var(--color-text-secondary, #9ca3af);
-    border: 1px solid var(--color-border, #2a2a2a);
+    border: none;
     padding: 10px 20px;
     border-radius: var(--radius, 10px);
     cursor: pointer;
@@ -681,56 +626,179 @@ textarea.fc-modal-input {
     color: var(--color-text, #ffffff);
 }
 
-/* ── Glass mode toggle ── */
+/* ── Header bar ── */
+
+.fc-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.fc-modal-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.fc-modal-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: transparent;
+    border: none;
+    color: var(--color-text-secondary, #9ca3af);
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+    padding: 0;
+    font-size: 1rem;
+}
+
+.fc-modal-close:hover {
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+}
+
+.fc-modal-close:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ── Character count (bio) ── */
+
+.fc-modal-char-count {
+    display: block;
+    text-align: right;
+    font-size: 0.75rem;
+    color: var(--color-text-muted, #6b7280);
+    margin-top: 4px;
+}
+
+/* ── Social link detected preview ── */
+
+.fc-modal-social-detected {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 8px 12px;
+    background: var(--color-bg, #000000);
+    border: none;
+    border-radius: var(--radius, 10px);
+}
+
+.fc-modal-social-detected-icon {
+    display: flex;
+    align-items: center;
+    font-size: 1.1rem;
+    color: var(--accent-color, #ffffff);
+    flex-shrink: 0;
+}
+
+.fc-modal-social-detected-name {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-text-secondary, #9ca3af);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.fc-modal-social-detected-input {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 10px;
+    font-size: 0.85rem;
+    border: none;
+    border-radius: var(--radius, 10px);
+    font-family: inherit;
+    color: var(--color-text, #ffffff);
+    background: var(--color-surface, #1a1a1a);
+    outline: none;
+    box-sizing: border-box;
+    transition: background 0.2s ease;
+}
+
+.fc-modal-social-detected-input:focus {
+    background: var(--color-bg, #000000);
+}
+
+.fc-modal-social-detected-cancel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: transparent;
+    border: none;
+    color: #fca5a5;
+    font-size: 1.1rem;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.15s ease;
+}
+
+.fc-modal-social-detected-cancel:hover {
+    background: rgba(255, 80, 80, 0.15);
+}
+
+/* ── Glass mode toggle (mismo estilo que settings-toggle, pero con acento) ── */
 
 .fc-modal-glass-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 4px;
-  cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    user-select: none;
+    padding: 4px 0;
 }
 
 .fc-modal-glass-toggle-label {
-  font-size: 0.78rem;
-  color: var(--color-text-muted, #6b7280);
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--color-text-secondary, #9ca3af);
+    flex: 1;
 }
 
 .fc-modal-glass-switch {
-  position: relative;
-  width: 40px;
-  height: 22px;
-  border-radius: 99px;
-  background: var(--color-border, #2a2a2a);
-  cursor: pointer;
-  transition: background 0.25s ease;
-  flex-shrink: 0;
-  outline: none;
-}
-
-.fc-modal-glass-switch:focus-visible {
-  box-shadow: 0 0 0 2px var(--color-text, #ffffff);
+    position: relative;
+    width: 40px;
+    height: 22px;
+    border-radius: 11px;
+    background: var(--overlay-bg);
+    transition: background 0.2s ease;
+    flex-shrink: 0;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    outline: none;
 }
 
 .fc-modal-glass-switch--on {
-  background: var(--color-text, #ffffff);
+    background: var(--accent-color, #ffffff);
+}
+
+.fc-modal-glass-switch:focus-visible {
+    outline: 2px solid var(--color-text, #ffffff);
+    outline-offset: 3px;
 }
 
 .fc-modal-glass-switch-knob {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: var(--color-surface, #1a1a1a);
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s ease;
 }
 
 .fc-modal-glass-switch--on .fc-modal-glass-switch-knob {
-  transform: translateX(18px);
-  background: var(--color-bg, #000000);
+    transform: translateX(18px);
 }
 
 /* ── Two-column grid layout ── */
@@ -751,7 +819,6 @@ textarea.fc-modal-input {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  border-left: 1px solid var(--color-border, #2a2a2a);
   padding-left: 28px;
 }
 
@@ -797,20 +864,15 @@ textarea.fc-modal-input {
 /* ── Collapse animation ── */
 
 .fc-modal-suggested-collapse {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 0.35s ease, opacity 0.25s ease, margin-top 0.3s ease;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease, opacity 0.25s ease, margin 0.3s ease;
   opacity: 0;
   margin-top: 0;
 }
 
-.fc-modal-suggested-collapse > * {
-  overflow: hidden;
-  min-height: 0;
-}
-
 .fc-modal-suggested-collapse--open {
-  grid-template-rows: 1fr;
+  max-height: 400px;
   opacity: 1;
   margin-top: 10px;
 }
@@ -855,9 +917,9 @@ textarea.fc-modal-input {
   color: var(--color-text-secondary, #9ca3af);
   background: var(--overlay-bg-subtle);
   border: none;
-  border-radius: var(--radius, 10px);
+  border-radius: var(--radius-full, 9999px);
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: all 0.15s ease;
   white-space: nowrap;
 }
 
@@ -870,9 +932,8 @@ textarea.fc-modal-input {
   transform: translateY(0);
 }
 
-/* ==========================================
-   Responsive: móviles pequeños
-   ========================================== */
+/* ── Responsive: remove obsolete .fc-modal-actions reference (save/cancel moved to header) ── */
+
 @media (max-width: 480px) {
     .fc-modal-overlay {
         padding: 12px;
@@ -923,10 +984,8 @@ textarea.fc-modal-input {
     }
 
     .fc-modal-grid-right {
-        border-left: none;
         padding-left: 0;
         padding-top: 16px;
-        border-top: 1px solid var(--color-border, #2a2a2a);
         margin-top: 4px;
     }
 
@@ -934,25 +993,6 @@ textarea.fc-modal-input {
         max-height: 200px;
     }
 
-    .fc-modal-header {
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-
-    .fc-modal-header .fc-modal-title {
-        font-size: 1rem;
-    }
-
-    .fc-modal-save {
-        width: 100%;
-        padding: 12px;
-        min-width: auto;
-    }
-
-    .fc-modal-header-actions {
-        width: 100%;
-        justify-content: flex-end;
-    }
 }
 
 /* ==========================================
@@ -974,12 +1014,8 @@ textarea.fc-modal-input {
     }
 
     .fc-modal-grid-right {
-        border-left: none;
         padding-left: 0;
         padding-top: 20px;
-        border-top: 1px solid var(--color-border, #2a2a2a);
         margin-top: 8px;
     }
-
-    /* no dedicated header actions needed for tablet */
 }

@@ -9,7 +9,7 @@
   top: 30px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   align-self: flex-start;
 }
 
@@ -21,8 +21,9 @@
   padding: 16px;
   backdrop-filter: var(--accent-surface-blur, none);
   -webkit-backdrop-filter: var(--accent-surface-blur, none);
-  border: var(--accent-surface-border, none);
+  border: none;
   color: var(--accent-surface-text-color, var(--color-text, #ffffff));
+  isolation: isolate;
   transition: background 0.2s ease;
 }
 

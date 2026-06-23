@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { useI18n } from "../services/i18n/useI18n";
+import usePageTitle from "../../hooks/usePageTitle";
 import { supabase } from "../services/supabaseclient";
 import { listProfiles } from "../services/userService";
 import {
@@ -12,16 +13,15 @@ import {
 } from "../services/followService";
 import FollowButton from "../Resources/Components/FollowButton";
 import SafeImage from "../Resources/Components/SafeImage";
+import Avatar from "../Resources/Components/Avatar";
 import Badge from "../Resources/Components/Badge";
 import { FaLock } from 'react-icons/fa';
 import "../Resources/Styles/explore.css";
 import "../Resources/Styles/skeleton.css";
 
-const DEFAULT_AVATAR =
-  "https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg";
-
 function Explore() {
   const { t, showAccent } = useI18n();
+  usePageTitle(t('explore.title'));
   const { user, loading: authLoading } = useAuth();
 
   // Lazy initializers: leen cache sincrónicamente durante el 1er render
@@ -183,15 +183,24 @@ function Explore() {
         </div>
       ) : (
         <div className="explore-grid">
-          {profiles.map((profile) => (
-            <ExploreCard
-              key={profile.id}
-              profile={profile}
-              counts={countsMap[profile.id]}
-              isOwnProfile={user?.id === profile.id}
-              showAccent={showAccent}
-            />
-          ))}
+          {profiles.map((profile) => {
+            const isOwn = user?.id === profile.id;
+            const profAccentVis = profile.accent_visibility ?? 'both';
+            const accentVisible = showAccent && (profile.show_accent_explore ?? true) && (
+              profAccentVis === 'both' ||
+              (profAccentVis === 'me' && isOwn) ||
+              (profAccentVis === 'others' && !isOwn)
+            );
+            return (
+              <ExploreCard
+                key={profile.id}
+                profile={profile}
+                counts={countsMap[profile.id]}
+                isOwnProfile={isOwn}
+                showAccent={accentVisible}
+              />
+            );
+          })}
         </div>
       )}
     </div>
@@ -201,7 +210,6 @@ function Explore() {
 function ExploreCard({ profile, counts, isOwnProfile, showAccent }) {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const avatarUrl = profile.avatar_url || DEFAULT_AVATAR;
   const bio = profile.bio || "";
   const followers = counts?.followers ?? 0;
   const roles = profile.roles || ["user"];
@@ -234,14 +242,11 @@ function ExploreCard({ profile, counts, isOwnProfile, showAccent }) {
       </div>
 
       <div className="explore-card-body">
-        <img
+        <Avatar
           className="explore-card-avatar"
-          src={avatarUrl}
+          src={profile.avatar_url}
           alt={profile.username}
           style={{ objectPosition: profile.avatar_position || '50% 50%' }}
-          onError={(e) => {
-            e.target.src = DEFAULT_AVATAR;
-          }}
         />
 
         <div className="explore-card-info">
@@ -260,6 +265,27 @@ function ExploreCard({ profile, counts, isOwnProfile, showAccent }) {
           </span>
 
           {bio && <p className="explore-card-bio">{bio}</p>}
+
+          {/* ── Interests (max 3, then "see more" → profile) ── */}
+          {profile.interests?.length > 0 && (
+            <div className="explore-card-interests">
+              {profile.interests.slice(0, 3).map((interest, i) => (
+                <span key={i} className="explore-card-interest">{interest}</span>
+              ))}
+              {profile.interests.length > 3 && (
+                <button
+                  type="button"
+                  className="explore-card-interests-more"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/profile/${profile.username}`);
+                  }}
+                >
+                  {t('profile.show_more', { count: profile.interests.length - 3 })}
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {!isOwnProfile && (

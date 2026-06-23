@@ -287,10 +287,27 @@
   position: relative;
   cursor: pointer;
   flex-shrink: 0;
+  width: 40px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: none;
+  outline: none;
 }
 
-.settings-toggle input {
-  display: none;
+.settings-toggle input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.settings-toggle:focus-visible {
+  outline: 2px solid var(--overlay-strong, #ffffff);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 .settings-toggle-track {
@@ -303,6 +320,11 @@
   position: relative;
 }
 
+.settings-toggle--active .settings-toggle-track {
+  background: var(--overlay-strong);
+}
+
+/* Para toggles que aún usan input oculto (per-stat) */
 .settings-toggle input:checked + .settings-toggle-track {
   background: var(--overlay-strong);
 }
@@ -319,6 +341,11 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
+.settings-toggle--active .settings-toggle-track .settings-toggle-thumb {
+  transform: translateX(18px);
+}
+
+/* Para toggles que aún usan input oculto (per-stat) */
 .settings-toggle input:checked + .settings-toggle-track .settings-toggle-thumb {
   transform: translateX(18px);
 }
@@ -402,6 +429,33 @@
 
 .settings-stat-toggle .settings-toggle {
   transform: scale(0.85);
+}
+
+/* ── Accent sub-options list (nested under master toggle) ── */
+
+.settings-accent-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0 4px 24px;
+  animation: settings-fadeIn 0.2s ease;
+}
+
+.settings-accent-list .settings-row {
+  padding: 8px 0;
+}
+
+.settings-accent-list .settings-section-icon {
+  font-size: 0.9rem;
+}
+
+.settings-accent-list .settings-section-title {
+  font-size: 0.8rem;
+}
+
+.settings-accent-list .settings-section-desc {
+  font-size: 0.7rem;
 }
 
 /* ── Responsive: stack vertically on small screens ── */

@@ -13,6 +13,8 @@ import Settings from './assets/Pages/Settings.jsx';
 import HashtagPage from './assets/Pages/HashtagPage.jsx';
 import { I18nProvider } from './assets/services/i18n/I18nContext';
 import RightPanel from './assets/Resources/Components/RightPanel';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 function ProfileWrapper() {
   const { username } = useParams();
@@ -52,6 +54,20 @@ function App() {
         </main>
 
         <RightPanel />
+        <ToastContainer
+          position="top-right"
+          autoClose={3000}
+          hideProgressBar={true}
+          newestOnTop
+          closeOnClick
+          pauseOnFocusLoss={false}
+          draggable={false}
+          pauseOnHover
+          theme="dark"
+          closeButton={false}
+          toastClassName="fc-toast"
+          bodyClassName="fc-toast-body"
+        />
       </div>
     </I18nProvider>
   );

@@ -3,10 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { useI18n } from "../../services/i18n/useI18n";
 import { getFollowers, getFollowing } from "../../services/followService";
 import FollowButton from "./FollowButton";
+import Avatar from "./Avatar";
 import "./css/followersModal.css";
-
-const DEFAULT_AVATAR =
-  "https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg";
 
 function FollowersModalItem({ user, onClose }) {
   const navigate = useNavigate();
@@ -19,11 +17,10 @@ function FollowersModalItem({ user, onClose }) {
 
   return (
     <div className="followers-modal-item" onClick={handleClick}>
-      <img
+      <Avatar
         className="followers-modal-avatar"
-        src={user.avatar_url || DEFAULT_AVATAR}
+        src={user.avatar_url}
         alt={user.username}
-        onError={(e) => { e.target.src = DEFAULT_AVATAR; }}
       />
 
       <div className="followers-modal-info">

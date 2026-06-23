@@ -6,6 +6,7 @@ import { getPostsByHashtag, searchPostsByContent } from '../services/hashtagServ
 import { getLikedPostIds, getRepostedPostIds, clearFeedCache } from '../services/postService';
 import PostCard from '../Resources/Components/PostCard';
 import { FaArrowLeft, FaHashtag, FaRegSadTear, FaFire } from 'react-icons/fa';
+import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/post.css';
 import '../Resources/Styles/skeleton.css';
 
@@ -24,6 +25,7 @@ export default function HashtagPage() {
   const [repostedIds, setRepostedIds] = useState([]);
 
   const decodedTag = tag ? decodeURIComponent(tag) : '';
+  usePageTitle(decodedTag ? `#${decodedTag}` : t('hashtag.not_found'));
   useEffect(() => {
     if (!decodedTag) {
       setError(t('hashtag.not_found'));

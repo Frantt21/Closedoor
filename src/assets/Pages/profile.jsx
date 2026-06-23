@@ -46,41 +46,15 @@ import { getPlatformIcon, getPlatformName } from "../services/socialPlatforms";
 import { FaFeather, FaBookmark, FaLock } from 'react-icons/fa';
 import FollowButton from "../Resources/Components/FollowButton";
 import { useI18n } from "../services/i18n/useI18n";
+import { getContrastText, isUUID } from "../services/helpers";
+import usePageTitle from "../../hooks/usePageTitle";
 import FollowersModal from "../Resources/Components/FollowersModal";
 import PostCard from "../Resources/Components/PostCard";
 import CreatePostModal from "../Resources/Components/CreatePostModal";
-
-// ── Detectar si un string es UUID ──
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-function isUUID(str) { return UUID_RE.test(str); }
-
-// ── Helper: elegir texto blanco o negro según el brillo del color de fondo ──
-function getContrastText(hex) {
-  if (!hex) return '#000000';
-  // Convertir hex a RGB
-  let r, g, b;
-  if (hex.startsWith('#')) {
-    const h = hex.slice(1);
-    if (h.length === 3) {
-      r = parseInt(h[0] + h[0], 16);
-      g = parseInt(h[1] + h[1], 16);
-      b = parseInt(h[2] + h[2], 16);
-    } else {
-      r = parseInt(h.slice(0, 2), 16);
-      g = parseInt(h.slice(2, 4), 16);
-      b = parseInt(h.slice(4, 6), 16);
-    }
-  } else {
-    return '#000000';
-  }
-  // WCAG relative luminance
-  const srgb = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
-  const luminance = 0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
-  return luminance > 0.179 ? '#000000' : '#ffffff';
-}
+import { toast } from 'react-toastify';
 
 function Profile() {
-    const { t, showAccent } = useI18n();
+    const { t, showAccent, accentVisibility } = useI18n();
     const { username: profileUsername } = useParams();
     const navigate = useNavigate();
     const { user, profile: ownProfile, refreshProfile, isAuthenticated } = useAuth();
@@ -104,6 +78,7 @@ function Profile() {
     const [profileError, setProfileError] = useState(null);
 
     const activeProfile = isOwnProfile ? ownProfile : viewedProfile;
+    usePageTitle(activeProfile?.username ? `@${activeProfile.username}` : t('profile.title'));
     const isPrivate = activeProfile?.is_private === true;
 
     // ── Obtener userId incluso cuando activeProfile aún no cargó ──
@@ -708,18 +683,6 @@ function Profile() {
     const [usernameInput, setUsernameInput] = useState("");
     const [avatarInput, setAvatarInput] = useState("");
     const [bannerInput, setBannerInput] = useState("");
-    const [message, setMessage] = useState(null);
-    const [localError, setLocalError] = useState(null);
-
-    // ── Auto-dismiss messages after 5 seconds ──
-    useEffect(() => {
-        if (!message && !localError) return;
-        const timer = setTimeout(() => {
-            setMessage(null);
-            setLocalError(null);
-        }, 5000);
-        return () => clearTimeout(timer);
-    }, [message, localError]);
 
     useEffect(() => {
         if (isOwnProfile) {
@@ -748,13 +711,11 @@ function Profile() {
 
     // ── Save profile (own profile only) ──
     const handleSaveProfile = async ({ username, avatar_url, banner_url, bio, social_links, accent_color, accent_color_secondary, accent_surface_color, accent_surface_glass, interests, banner_position, avatar_position }) => {
-        setLocalError(null);
-        setMessage(null);
         if (!user?.id) return;
 
         const normalizedUsername = (username || "").trim().toLowerCase();
         if (!normalizedUsername || normalizedUsername.length < 3) {
-            setLocalError(t('profile.username_short'));
+            toast.error(t('profile.username_short'));
             return;
         }
 
@@ -762,7 +723,7 @@ function Profile() {
             if (normalizedUsername !== ownProfile?.username) {
                 const available = await isUsernameAvailable(normalizedUsername, user.id);
                 if (!available) {
-                    setLocalError(t('profile.username_taken'));
+                    toast.error(t('profile.username_taken'));
                     return;
                 }
             }
@@ -794,7 +755,7 @@ function Profile() {
                         display_name: normalizedUsername,
                     });
                 } catch (authErr) {
-                    setLocalError(t('profile.username_auth_error'));
+                    toast.error(t('profile.username_auth_error'));
                     console.error(authErr);
                     return;
                 }
@@ -805,7 +766,7 @@ function Profile() {
             setBannerInput(banner_url || null);
 
             await refreshProfile(user.id);
-            setMessage(t('profile.updated'));
+            toast.success(t('profile.updated'));
             setShowModal(false);
 
             // If username changed, navigate to the new profile URL
@@ -817,7 +778,7 @@ function Profile() {
                 navigate(`/profile/${normalizedUsername}`, { replace: true });
             }
         } catch (err) {
-            setLocalError(err.message || t('profile.error_generic'));
+            toast.error(err.message || t('profile.error_generic'));
         }
     };
 
@@ -862,7 +823,22 @@ function Profile() {
 
     const surfColor = activeProfile?.accent_surface_color;
     const surfGlass = activeProfile?.accent_surface_glass === true;
-    const styleVars = showAccent
+
+    // Para perfiles ajenos: usar las preferencias guardadas en la BD del dueño del perfil
+    // Para perfil propio: siempre mostrar (el toggle es para controlar qué ven los demás)
+    const ownerShowAccentProfile = isOwnProfile
+      ? true
+      : (activeProfile?.show_accent_profile ?? true);
+    const ownerAccentVisibility = isOwnProfile
+      ? accentVisibility
+      : (activeProfile?.accent_visibility ?? 'both');
+
+    const accentVisible = showAccent && ownerShowAccentProfile && (
+      ownerAccentVisibility === 'both' ||
+      (ownerAccentVisibility === 'me' && isOwnProfile) ||
+      (ownerAccentVisibility === 'others' && !isOwnProfile)
+    );
+    const styleVars = accentVisible
       ? {
           ...(activeProfile?.accent_color ? {
             '--accent-color': activeProfile.accent_color,
@@ -871,18 +847,25 @@ function Profile() {
           } : {}),
           '--accent-surface-color': surfColor || null,
           '--accent-surface-text-color': !surfGlass && surfColor ? getContrastText(surfColor) : 'var(--color-text, #ffffff)',
+          '--accent-surface-text-secondary': !surfGlass && surfColor ? '#374151' : 'var(--color-text-secondary, #9ca3af)',
+          '--accent-surface-text-muted': !surfGlass && surfColor ? '#6b7280' : 'var(--color-text-muted, #6b7280)',
           ...(surfGlass ? {
             // Glass ON: translucent + blur
             '--accent-surface-rgba': 'rgba(255, 255, 255, 0.04)',
             '--accent-surface-rgba-hover': 'rgba(255, 255, 255, 0.07)',
             '--accent-surface-blur': 'blur(20px)',
             '--accent-surface-border': '1px solid rgba(255, 255, 255, 0.06)',
-          } : {
-            // Glass OFF: solid background
-            '--accent-surface-rgba': surfColor || 'var(--color-surface, #1a1a1a)',
-            '--accent-surface-rgba-hover': surfColor ? `color-mix(in srgb, ${surfColor} 85%, #000)` : 'var(--color-surface-hover, #252525)',
+          } : surfColor ? {
+            // Glass OFF: solid background with custom color
+            '--accent-surface-rgba': surfColor,
+            '--accent-surface-rgba-hover': `color-mix(in srgb, ${surfColor} 85%, #000)`,
             '--accent-surface-blur': 'none',
             '--accent-surface-border': 'none',
+          } : {
+            // No surface customization: use default card styles
+            '--accent-surface-rgba': 'var(--color-surface, #1a1a1a)',
+            '--accent-surface-rgba-hover': 'var(--color-surface-hover, #252525)',
+            '--accent-surface-blur': 'none',
           }),
         }
       : {};
@@ -1046,9 +1029,6 @@ function Profile() {
                     userRoles={roles}
                 />
             )}
-
-            {localError && <p className="profile-error">{localError}</p>}
-            {message && <p className="profile-message">{message}</p>}
 
             {/* Followers/Following modal */}
             {followersModal.open && (

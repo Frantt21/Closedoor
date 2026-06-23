@@ -12,7 +12,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
     gap: 12px;
 }
 
@@ -61,8 +61,10 @@
     padding: 8px 18px;
     border: none;
     border-radius: var(--radius, 10px);
-    background: transparent;
-    color: var(--color-text-secondary, #9ca3af);
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: rgba(255, 255, 255, 0.8);
     font-size: 0.85rem;
     font-weight: 500;
     font-family: inherit;
@@ -71,13 +73,15 @@
 }
 
 .posts-section-tab:hover {
-    background: var(--color-surface-hover, #252525);
-    color: var(--color-text, #ffffff);
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
 }
 
 .posts-section-tab--active {
     background: var(--accent-color, #ffffff);
     color: var(--accent-text-color, #000000);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
 }
 
 .posts-section-tab--active:hover {

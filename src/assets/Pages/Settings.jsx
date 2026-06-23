@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useI18n } from '../services/i18n/useI18n';
+import usePageTitle from '../../hooks/usePageTitle';
 import { useAuth } from '../../hooks/useAuth';
 import { updateUserProfile } from '../services/userService';
 import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaComment, FaRetweet, FaEye, FaUser, FaBookmark } from 'react-icons/fa';
@@ -67,19 +68,37 @@ const CATEGORIES = [
 /* ── Main Settings Component ── */
 
 export default function Settings() {
-  const { locale, setLocale, showAccent, setShowAccent, theme, setTheme, t } = useI18n();
+  const { locale, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, theme, setTheme, t } = useI18n();
+  usePageTitle(t('settings.title'));
   const { user, profile, profileLoading, refreshProfile } = useAuth();
   const [selectOpen, setSelectOpen] = useState(false);
   const selectRef = useRef(null);
   const [privacyUpdating, setPrivacyUpdating] = useState(false);
   const [statsPrivacyUpdating, setStatsPrivacyUpdating] = useState(false);
   const [activeCategory, setActiveCategory] = useState('system');
+  const [accentExpanded, setAccentExpanded] = useState(false);
   const [statsExpanded, setStatsExpanded] = useState(false);
 
   const isPrivate = profile?.is_private ?? false;
   const statsPrivate = profile?.stats_private ?? false;
   // No usar || {} para poder distinguir null (legacy) de {} (explicitamente vacío)
   const statsVisibility = profile?.stats_visibility;
+
+  // ── Sincronizar preferencias de acento con Supabase ──
+  const [accentPrefUpdating, setAccentPrefUpdating] = useState(false);
+
+  const syncAccentPrefs = async (key, value) => {
+    if (!user?.id || accentPrefUpdating) return;
+    setAccentPrefUpdating(true);
+    try {
+      await updateUserProfile(user.id, { [key]: value });
+      await refreshProfile(user.id);
+    } catch (err) {
+      console.error('Error syncing accent prefs:', err);
+    } finally {
+      setAccentPrefUpdating(false);
+    }
+  };
 
   const handlePrivacyChange = async (value) => {
     if (!user?.id || privacyUpdating || value === isPrivate) return;
@@ -255,7 +274,7 @@ export default function Settings() {
 
               <div className="settings-row-divider" />
 
-              {/* Colores de acento */}
+              {/* ── Colores de acento: toggle general + sub-opciones expandibles ── */}
               <div className="settings-row">
                 <div className="settings-row-header">
                   <span className="settings-section-icon"><FaPalette /></span>
@@ -264,17 +283,126 @@ export default function Settings() {
                     <p className="settings-section-desc">{t('settings.show_accent_desc')}</p>
                   </div>
                 </div>
-                <label className="settings-toggle">
-                  <input
-                    type="checkbox"
-                    checked={showAccent}
-                    onChange={(e) => setShowAccent(e.target.checked)}
-                  />
+                <button
+                  type="button"
+                  className={`settings-toggle ${showAccent ? 'settings-toggle--active' : ''}`}
+                  onClick={() => setShowAccent(!showAccent)}
+                  aria-pressed={showAccent}
+                >
                   <span className="settings-toggle-track">
                     <span className="settings-toggle-thumb" />
                   </span>
-                </label>
+                </button>
               </div>
+
+              {/* Expandir sub-opciones */}
+              <button
+                type="button"
+                className="settings-stats-expand-btn"
+                onClick={() => setAccentExpanded((s) => !s)}
+              >
+                <span className={`settings-stats-expand-arrow ${accentExpanded ? 'settings-stats-expand-arrow--open' : ''}`}>
+                  <FaChevronRight />
+                </span>
+                <span>{accentExpanded ? t('settings.accent_hide_details') : t('settings.accent_show_details')}</span>
+              </button>
+
+              {accentExpanded && (
+                <div className="settings-accent-list">
+                  {/* Mostrar en el perfil */}
+                  <div className="settings-row">
+                    <div className="settings-row-header">
+                      <span className="settings-section-icon"><FaPalette /></span>
+                      <div>
+                        <h2 className="settings-section-title">{t('settings.show_accent_profile')}</h2>
+                        <p className="settings-section-desc">{t('settings.show_accent_profile_desc')}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className={`settings-toggle ${showAccentProfile ? 'settings-toggle--active' : ''}`}
+                      onClick={() => {
+                        const next = !showAccentProfile;
+                        setShowAccentProfile(next);
+                        syncAccentPrefs('show_accent_profile', next);
+                      }}
+                      aria-pressed={showAccentProfile}
+                    >
+                      <span className="settings-toggle-track">
+                        <span className="settings-toggle-thumb" />
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Mostrar en Explore */}
+                  <div className="settings-row">
+                    <div className="settings-row-header">
+                      <span className="settings-section-icon"><FaPalette /></span>
+                      <div>
+                        <h2 className="settings-section-title">{t('settings.show_accent_explore')}</h2>
+                        <p className="settings-section-desc">{t('settings.show_accent_explore_desc')}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className={`settings-toggle ${showAccentExplore ? 'settings-toggle--active' : ''}`}
+                      onClick={() => {
+                        const next = !showAccentExplore;
+                        setShowAccentExplore(next);
+                        syncAccentPrefs('show_accent_explore', next);
+                      }}
+                      aria-pressed={showAccentExplore}
+                    >
+                      <span className="settings-toggle-track">
+                        <span className="settings-toggle-thumb" />
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Visibilidad del color acento */}
+                  <div className="settings-row">
+                    <div className="settings-row-header">
+                      <span className="settings-section-icon"><FaPalette /></span>
+                      <div>
+                        <h2 className="settings-section-title">{t('settings.accent_visibility')}</h2>
+                        <p className="settings-section-desc">{t('settings.accent_visibility_desc')}</p>
+                      </div>
+                    </div>
+                    <div className="settings-segmented">
+                      <button
+                        type="button"
+                        className={`settings-segmented-btn ${accentVisibility === 'others' ? 'settings-segmented-btn--active' : ''}`}
+                        onClick={() => {
+                          setAccentVisibility('others');
+                          syncAccentPrefs('accent_visibility', 'others');
+                        }}
+                      >
+                        {t('settings.accent_visibility_others')}
+                      </button>
+                      <button
+                        type="button"
+                        className={`settings-segmented-btn ${accentVisibility === 'both' ? 'settings-segmented-btn--active' : ''}`}
+                        onClick={() => {
+                          setAccentVisibility('both');
+                          syncAccentPrefs('accent_visibility', 'both');
+                        }}
+                      >
+                        {t('settings.accent_visibility_both')}
+                      </button>
+                      <button
+                        type="button"
+                        className={`settings-segmented-btn ${accentVisibility === 'me' ? 'settings-segmented-btn--active' : ''}`}
+                        onClick={() => {
+                          setAccentVisibility('me');
+                          syncAccentPrefs('accent_visibility', 'me');
+                        }}
+                      >
+                        {t('settings.accent_visibility_me')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           )}
 

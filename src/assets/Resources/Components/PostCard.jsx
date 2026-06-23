@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import {
@@ -12,14 +13,17 @@ import {
   unsavePost,
 } from '../../services/postService';
 import { FaHeart, FaRegHeart, FaComment, FaRetweet, FaThumbtack, FaEdit, FaTrash, FaEllipsisV, FaBookmark, FaRegBookmark, FaEye } from 'react-icons/fa';
+import { toast } from 'react-toastify';
 import Badge from './Badge';
 import SafeImage from './SafeImage';
+import Avatar from './Avatar';
+import RichText from './RichText';
 import { useI18n } from '../../services/i18n/useI18n';
+import { DEFAULT_AVATAR, getTimeAgo, getEmbedUrl as getEmbedUrlHelper, isVideoUrl as isVideoUrlHelper, IMG_RE, VID_RE, VID_RE_EXTENDED } from '../../services/helpers';
+import ConfirmModal from './ConfirmModal';
 import './css/postCard.css';
 
-const DEFAULT_AVATAR = 'https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg';
-
-export default function PostCard({
+const PostCard = React.memo(function PostCard({
   post,
   liked: initialLiked = false,
   reposted: initialReposted = false,
@@ -44,6 +48,8 @@ export default function PostCard({
   const [deleting, setDeleting] = useState(false);
   const [galleryUrls, setGalleryUrls] = useState(null);
   const [galleryIndex, setGalleryIndex] = useState(0);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmExternalLink, setConfirmExternalLink] = useState(null);
   const menuRef = useRef(null);
 
   // Sincronizar estado liked/reposted cuando el padre refetchea (navegación)
@@ -86,9 +92,12 @@ export default function PostCard({
   const profile = post.profiles;
   const isPrivateProfile = profile?.is_private === true;
   const repostDisabled = isPrivateProfile && !isOwner;
-  const timeAgo = getTimeAgo(t, locale, post.created_at);
+  const timeAgo = useMemo(() => getTimeAgo(t, locale, post.created_at), [t, locale, post.created_at]);
 
-  const handleLike = async (e) => {
+  const handleCancelDelete = useCallback(() => setConfirmDelete(false), []);
+  const handleCancelExternal = useCallback(() => setConfirmExternalLink(null), []);
+
+  const handleLike = useCallback(async (e) => {
     e.stopPropagation();
     if (!user) return;
     try {
@@ -106,9 +115,9 @@ export default function PostCard({
     } catch (err) {
       console.error('Like error:', err);
     }
-  };
+  }, [user, liked, post.id, onLikeToggle]);
 
-  const handleRepost = async (e) => {
+  const handleRepost = useCallback(async (e) => {
     e.stopPropagation();
     if (!user) return;
     try {
@@ -126,7 +135,7 @@ export default function PostCard({
     } catch (err) {
       console.error('Repost error:', err);
     }
-  };
+  }, [user, reposted, post.id, onRepostToggle]);
 
   const handlePin = async (e) => {
     e.stopPropagation();
@@ -143,23 +152,39 @@ export default function PostCard({
       }
     } catch (err) {
       console.error('Pin error:', err);
-      if (err.message) alert(err.message);
+      if (err.message) toast.error(err.message);
     }
     setShowMenu(false);
   };
 
-  const handleDelete = async (e) => {
+  const handleDelete = useCallback(async (e) => {
     e.stopPropagation();
-    if (!window.confirm(t('post.delete_confirm'))) return;
+    setConfirmDelete(true);
+  }, []);
+
+  const executeDelete = useCallback(async () => {
+    setConfirmDelete(false);
     setDeleting(true);
     try {
       await deletePost(post.id);
+      toast.success(t('post.deleted_success'));
       if (onDelete) onDelete(post.id);
     } catch (err) {
       console.error('Delete error:', err);
       setDeleting(false);
     }
-  };
+  }, [post.id, onDelete, t]);
+
+  const handleExternalLink = useCallback((url) => {
+    setConfirmExternalLink(url);
+  }, []);
+
+  const executeExternalLink = useCallback(() => {
+    if (confirmExternalLink) {
+      window.open(confirmExternalLink, '_blank', 'noopener noreferrer');
+    }
+    setConfirmExternalLink(null);
+  }, [confirmExternalLink]);
 
   const handleSave = async (e) => {
     e.stopPropagation();
@@ -201,29 +226,15 @@ export default function PostCard({
     setShowMenu(false);
   };
 
-  const isVideo = (url) => {
-    if (!url) return false;
-    const videoExts = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv'];
-    const lower = url.toLowerCase();
-    return videoExts.some((ext) => lower.includes(ext)) || lower.includes('youtube.com') || lower.includes('youtu.be') || lower.includes('vimeo.com');
-  };
-
-  const getEmbedUrl = (url) => {
-    if (!url) return null;
-    const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-    if (ytMatch) return `https://www.youtube.com/embed/${ytMatch[1]}`;
-    const vimeoMatch = url.match(/vimeo\.com\/(\d+)/);
-    if (vimeoMatch) return `https://player.vimeo.com/video/${vimeoMatch[1]}`;
-    return null;
-  };
+  const isVideo = isVideoUrlHelper;
+  const getEmbedUrl = getEmbedUrlHelper;
 
   // ── Obtener todas las URLs de imagen del post ──
   const getGalleryUrls = () => {
     const urls = (post.image_urls || (post.image_url ? [post.image_url] : []))
       .filter((url) => {
         if (!url) return false;
-        const VID_RE = /\.(mp4|webm|ogg|mov|avi|mkv)(\?.*)?$/i;
-        return !VID_RE.test(url);
+        return !VID_RE_EXTENDED.test(url);
       });
     // También incluir inline media si existe y no hay image_urls/image_url
     if (urls.length === 0 && inlineMedia && inlineMedia.type === 'image') {
@@ -259,10 +270,7 @@ export default function PostCard({
   // Detectar media incrustado en el texto (para posts sin image_url/video_url separados)
   const detectInlineMedia = (text) => {
     if (post.image_url || post.video_url) return null;
-    const urlPattern = /(https?:\/\/[^\s<]+)/gi;
-    const urls = text?.match(urlPattern) || [];
-    const IMG_RE = /\.(jpe?g|png|gif|webp|bmp|svg)(\?.*)?$/i;
-    const VID_RE = /\.(mp4|webm|ogg)(\?.*)?$/i;
+    const urls = text?.match(/(https?:\/\/[^\s<]+)/gi) || [];
     for (const url of urls) {
       if (IMG_RE.test(url)) return { type: 'image', url };
       if (VID_RE.test(url)) return { type: 'video', url };
@@ -270,7 +278,7 @@ export default function PostCard({
     return null;
   };
 
-  const inlineMedia = detectInlineMedia(post.content);
+  const inlineMedia = useMemo(() => detectInlineMedia(post.content), [post.content, post.image_url, post.video_url]);
 
   return (
     <article
@@ -303,9 +311,9 @@ export default function PostCard({
           className="post-card-avatar-link"
           onClick={(e) => e.stopPropagation()}
         >
-          <img
+          <Avatar
             className="post-card-avatar"
-            src={profile?.avatar_url || DEFAULT_AVATAR}
+            src={profile?.avatar_url}
             alt={profile?.username || 'user'}
           />
         </Link>
@@ -345,7 +353,14 @@ export default function PostCard({
           </div>
 
           {/* Text content with @mention highlighting */}
-          <p className="post-card-text">{renderContent(post.content, getSkipUrls(post), post.mentions, t)}</p>
+          <p className="post-card-text">
+            <RichText
+              text={post.content}
+              skipUrls={getSkipUrls(post)}
+              mentions={post.mentions}
+              onExternalLink={handleExternalLink}
+            />
+          </p>
 
           {/* Multiple images from post.image_urls (grid) */}
           {renderImageGrid(post, openGallery, t)}
@@ -461,8 +476,26 @@ export default function PostCard({
         </div>
       </div>
 
-      {/* ── Galería de imágenes ── */}
-      {galleryUrls && (
+      {/* ── Delete confirmation modal ── */}
+      {confirmDelete && (
+        <ConfirmModal
+          message={t('post.delete_confirm')}
+          onConfirm={executeDelete}
+          onCancel={handleCancelDelete}
+        />
+      )}
+
+      {/* ── External link confirmation ── */}
+      {confirmExternalLink && (
+        <ConfirmModal
+          message={t('post.external_link_warning')}
+          onConfirm={executeExternalLink}
+          onCancel={handleCancelExternal}
+        />
+      )}
+
+      {/* ── Galería de imágenes (portal a body para evitar backdrop-filter issue) ── */}
+      {galleryUrls && createPortal(
         <div className="post-card-lightbox" onClick={(e) => { e.stopPropagation(); closeGallery(); }}>
           {/* Prev button */}
           {galleryUrls.length > 1 && (
@@ -563,91 +596,19 @@ export default function PostCard({
               </svg>
             </button>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </article>
   );
-}
-
-// ── Render @mentions, #hashtags and URLs as clickable links ──
-function renderContent(text, skipUrls = [], mentions = {}, t = () => {}) {
-  if (!text) return null;
-  const skipSet = new Set(skipUrls);
-  // Match @mentions, #hashtags and URLs
-  const combinedRegex = /(?<![\w@])(@[a-zA-Z0-9_]+)|(?<![#\w])#([a-zA-Z0-9_\u00C0-\u024F]+)|(https?:\/\/[^\s<]+)/gi;
-  const parts = [];
-  let lastIndex = 0, match;
-  while ((match = combinedRegex.exec(text)) !== null) {
-    if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index));
-    const matchedText = match[0];
-    // Saltar URLs que son media (imagen/video) — se renderizan aparte como preview
-    if (matchedText.startsWith('@') || !skipSet.has(matchedText)) {
-      parts.push(matchedText);
-    }
-    lastIndex = match.index + matchedText.length;
-  }
-  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
-  return parts.map((part, i) => {
-    if (part.startsWith('@')) {
-      const username = part.slice(1);
-      // Find user_id from mentions mapping by matching stored username
-      const mentionEntry = Object.entries(mentions).find(([, stored]) => stored === username);
-      const profileLink = mentionEntry ? `/profile/${mentionEntry[0]}` : `/profile/${username}`;
-      return (
-        <Link
-          key={i}
-          to={profileLink}
-          className="post-card-mention"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {part}
-        </Link>
-      );
-    }
-    if (part.startsWith('#')) {
-      const tag = part.slice(1);
-      return (
-        <Link
-          key={i}
-          to={`/hashtag/${encodeURIComponent(tag)}`}
-          className="post-card-hashtag"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {part}
-        </Link>
-      );
-    }
-    if (part.startsWith('http://') || part.startsWith('https://')) {
-      return (
-        <a
-          key={i}
-          href={part}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="post-card-link"
-          onClick={(e) => {
-            e.stopPropagation();
-            if (!window.confirm(t('post.external_link_warning'))) {
-              e.preventDefault();
-            }
-          }}
-        >
-          {part}
-        </a>
-      );
-    }
-    return part;
-  });
-}
+});
+export default PostCard;
 
 // Genera URLs a ocultar del texto porque ya se renderizan como media aparte
 function getSkipUrls(post) {
   const text = post?.content;
   if (!text) return [];
-  const urlPattern = /(https?:\/\/[^\s<]+)/gi;
-  const urls = text.match(urlPattern) || [];
-  const IMG_RE = /\.(jpe?g|png|gif|webp|bmp|svg)(\?.*)?$/i;
-  const VID_RE = /\.(mp4|webm|ogg)(\?.*)?$/i;
+  const urls = text.match(/(https?:\/\/[^\s<]+)/gi) || [];
   const result = [];
   for (const url of urls) {
     if (IMG_RE.test(url) || VID_RE.test(url) || (post.video_url && url === post.video_url)) {
@@ -661,10 +622,8 @@ function getSkipUrls(post) {
 function renderImageGrid(post, onImageClick, t) {
   const urls = (post.image_urls || (post.image_url ? [post.image_url] : []))
     .filter((url) => {
-      // Excluir URLs de video — se renderizan aparte (seguridad ante datos duplicados)
       if (!url) return false;
-      const VID_RE = /\.(mp4|webm|ogg|mov|avi|mkv)(\?.*)?$/i;
-      return !VID_RE.test(url);
+      return !VID_RE_EXTENDED.test(url);
     });
   if (!urls.length) return null;
 
@@ -685,20 +644,4 @@ function renderImageGrid(post, onImageClick, t) {
       ))}
     </div>
   );
-}
-
-function getTimeAgo(t, locale, dateStr) {
-  if (!dateStr) return '';
-  const now = Date.now();
-  const date = new Date(dateStr).getTime();
-  const diffMs = now - date;
-  const diffSec = Math.floor(diffMs / 1000);
-  if (diffSec < 60) return t('post.just_now');
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return t('post.minutes_ago', { n: diffMin });
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return t('post.hours_ago', { n: diffHr });
-  const diffDay = Math.floor(diffHr / 24);
-  if (diffDay < 7) return t('post.days_ago', { n: diffDay });
-  return new Date(dateStr).toLocaleDateString(locale === 'en' ? 'en-US' : 'es-ES', { day: 'numeric', month: 'short' });
 }

@@ -5,11 +5,10 @@ import { useAuth } from '../../hooks/useAuth';
 import { useI18n } from '../services/i18n/useI18n';
 import { acceptFollowRequest, rejectFollowRequest } from '../services/followService';
 import { FaUserPlus, FaHeart, FaComment, FaRetweet, FaBullhorn, FaBell, FaCheck, FaTimes } from 'react-icons/fa';
+import Avatar from '../Resources/Components/Avatar';
 import '../Resources/Styles/notifications.css';
+import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/skeleton.css';
-
-const DEFAULT_AVATAR =
-  'https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg';
 
 function getIcon(type) {
   switch (type) {
@@ -91,6 +90,7 @@ function timeAgo(t, locale, dateString) {
 
 export default function Notifications() {
   const { t, locale } = useI18n();
+  usePageTitle(t('notifications.title'));
   const {
     notifications,
     unreadCount,
@@ -279,7 +279,6 @@ function NotificationItem({
   const { t, locale } = useI18n();
   const actor = notification.actor || {};
   const username = actor.username || '';
-  const avatarUrl = actor.avatar_url || DEFAULT_AVATAR;
   const linkTo = getNotificationLink(notification);
   const postRef = notification.post;
 
@@ -329,13 +328,10 @@ function NotificationItem({
           }
         }}
       >
-        <img
+        <Avatar
           className="notification-avatar"
-          src={avatarUrl}
+          src={actor.avatar_url}
           alt={username}
-          onError={(e) => {
-            e.target.src = DEFAULT_AVATAR;
-          }}
         />
 
         <div className="notification-content">

@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import './css/modal.css';
 import '../Styles/explore.css';
 import Badge from './Badge';
+import ConfirmModal from './ConfirmModal';
+import Avatar from './Avatar';
+import { DEFAULT_AVATAR } from '../../services/helpers';
 import { detectPlatform, getPlatformIcon, getPlatformName } from '../../services/socialPlatforms';
 import { extractColors } from '../../services/colorExtractor';
 import { useI18n } from '../../services/i18n/useI18n';
@@ -102,6 +105,7 @@ export default function Modal({
   const [showUrlModal, setShowUrlModal] = useState(null);
   const [urlInput, setUrlInput] = useState('');
   const [showSuggested, setShowSuggested] = useState(false);
+  const [pendingClose, setPendingClose] = useState(false);
 
   useEffect(() => {
     setUsername(initialUsername || '');
@@ -196,7 +200,15 @@ export default function Modal({
   }, [banner]);
 
   const confirmClose = () => {
-    if (hasChanges && !window.confirm(t('modal.discard_changes'))) return;
+    if (hasChanges) {
+      setPendingClose(true);
+    } else {
+      onClose();
+    }
+  };
+
+  const executeClose = () => {
+    setPendingClose(false);
     onClose();
   };
 
@@ -302,7 +314,7 @@ export default function Modal({
   };
 
   const BIO_MAX_LENGTH = 80;
-  const defaultAvatar = 'https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg';
+  const defaultAvatar = DEFAULT_AVATAR;
   const previewUsername = username || 'username';
 
   return (      <div className="fc-modal-overlay" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) confirmClose(); }}>
@@ -328,7 +340,12 @@ export default function Modal({
           {/* ── LEFT COLUMN ── */}
           <div className="fc-modal-grid-left">
             {/* ── Preview Card (grande) ── */}
-            <div className="fc-preview-card fc-preview-card--large">
+            <div className="fc-preview-card fc-preview-card--large"
+              style={{
+                '--accent-color': selectedAccent || 'transparent',
+                '--accent-color-2': selectedAccentSecondary || selectedAccent || 'transparent',
+              }}
+            >
               <div
                 className="fc-preview-card-banner"
                 style={banner ? { backgroundImage: `url(${banner})`, backgroundPosition: bannerPosition } : {}}
@@ -645,6 +662,27 @@ export default function Modal({
                   {bio.trim() && (
                     <p className="explore-card-bio">{bio.trim()}</p>
                   )}
+
+                  {/* ── Interests (max 3, then "see more" → profile) ── */}
+                  {interests?.length > 0 && (
+                    <div className="explore-card-interests">
+                      {interests.slice(0, 3).map((interest, i) => (
+                        <span key={i} className="explore-card-interest">{interest}</span>
+                      ))}
+                      {interests.length > 3 && (
+                        <button
+                          type="button"
+                          className="explore-card-interests-more"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.location.href = `/profile/${username}`;
+                          }}
+                        >
+                          {t('profile.show_more', { count: interests.length - 3 })}
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="explore-card-action">
@@ -822,23 +860,32 @@ export default function Modal({
                 )}
               </div>
               {/* ── Glass mode toggle ── */}
-              <div className="fc-modal-glass-toggle" onClick={() => setUseGlassSurface((prev) => !prev)}>
+              <div className="fc-modal-glass-toggle">
                 <span className="fc-modal-glass-toggle-label">{t('modal.accent_surface_glass')}</span>
-                <div
+                <button
+                  type="button"
                   className={`fc-modal-glass-switch ${useGlassSurface ? 'fc-modal-glass-switch--on' : ''}`}
+                  onClick={() => setUseGlassSurface((prev) => !prev)}
                   role="switch"
                   aria-checked={useGlassSurface}
-                  tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setUseGlassSurface((prev) => !prev); } }}
                 >
                   <div className="fc-modal-glass-switch-knob" />
-                </div>
+                </button>
               </div>
             </div>
           </div>
         </div>
 
       </div>
+
+      {/* ── Discard changes confirmation ── */}
+      {pendingClose && (
+        <ConfirmModal
+          message={t('modal.discard_changes')}
+          onConfirm={executeClose}
+          onCancel={() => setPendingClose(false)}
+        />
+      )}
     </div>
   );
 }

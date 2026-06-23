@@ -5,6 +5,7 @@ import { useI18n } from '../services/i18n/useI18n';
 import '../Resources/Styles/Home.css';
 import '../Resources/Styles/post.css';
 import { useAuth } from '../../hooks/useAuth';
+import usePageTitle from '../../hooks/usePageTitle';
 import { supabase } from '../services/supabaseclient';
 import {
   getFeed,
@@ -19,6 +20,7 @@ import CreatePostModal from '../Resources/Components/CreatePostModal';
 
 function Home() {
     const { t } = useI18n();
+    usePageTitle(t('home.title'));
     const { user, isAuthenticated } = useAuth();
 
     const [posts, setPosts] = useState(() => {

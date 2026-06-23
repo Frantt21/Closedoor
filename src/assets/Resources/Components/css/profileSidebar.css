@@ -18,7 +18,7 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   position: sticky;
   top: 30px;
 }
@@ -34,8 +34,9 @@
   background: var(--accent-surface-rgba, var(--color-surface, #1a1a1a));
   backdrop-filter: var(--accent-surface-blur, none);
   -webkit-backdrop-filter: var(--accent-surface-blur, none);
-  border: var(--accent-surface-border, none);
+  border: none;
   color: var(--accent-surface-text-color, var(--color-text, #ffffff));
+  isolation: isolate;
   transition: background 0.2s ease;
 }
 
@@ -88,19 +89,18 @@
   display: inline-flex;
   align-items: center;
   padding: 4px 10px;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 500;
   color: var(--color-text-secondary, #9ca3af);
   background: var(--overlay-bg-subtle);
-  border: 1px solid var(--overlay-bg);
+  border: none;
   border-radius: var(--radius-full, 9999px);
   white-space: nowrap;
-  transition: background 0.2s ease, border-color 0.2s ease;
+  transition: background 0.2s ease;
 }
 
 .profile-sidebar-interest-pill:hover {
   background: var(--overlay-bg-hover);
-  border-color: var(--overlay-border);
 }
 
 /* ── Expand/collapse button ── */

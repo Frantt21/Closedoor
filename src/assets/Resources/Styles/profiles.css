@@ -29,7 +29,7 @@
 /* ---- Cards ---- */
 
 .profile-card {
-    margin: 0 auto 2rem;
+    margin: 0 auto 12px;
     border-radius: var(--radius, 10px);
     overflow: hidden;
     background: var(--color-surface, #1a1a1a);
