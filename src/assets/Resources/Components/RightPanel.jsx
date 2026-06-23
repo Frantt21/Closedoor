@@ -32,8 +32,31 @@ export default function RightPanel() {
   );
 }
 
+// ── Helper: elegir texto blanco o negro según el brillo del color de fondo ──
+function getContrastText(hex) {
+  if (!hex) return '#000000';
+  let r, g, b;
+  if (hex.startsWith('#')) {
+    const h = hex.slice(1);
+    if (h.length === 3) {
+      r = parseInt(h[0] + h[0], 16);
+      g = parseInt(h[1] + h[1], 16);
+      b = parseInt(h[2] + h[2], 16);
+    } else {
+      r = parseInt(h.slice(0, 2), 16);
+      g = parseInt(h.slice(2, 4), 16);
+      b = parseInt(h.slice(4, 6), 16);
+    }
+  } else {
+    return '#000000';
+  }
+  const srgb = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  const luminance = 0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
+  return luminance > 0.179 ? '#000000' : '#ffffff';
+}
+
 // ── Trending widget: dos secciones ──
-function TrendingHashtags({ t }) {
+function TrendingHashtags({ t, surfaceStyle }) {
   const [words, setWords] = useState(() => getCachedTrendingWords());
   const [hashtags, setHashtags] = useState(() => getCachedTrendingHashtags());
 
@@ -48,7 +71,7 @@ function TrendingHashtags({ t }) {
   const isEmpty = (!words?.length && !hashtags?.length);
 
   return (
-    <div className="right-panel-card right-panel-card--noborder">
+    <div className="right-panel-card right-panel-card--noborder" style={surfaceStyle}>
       {isLoading ? (
         <div className="right-panel-trending-skeleton">
           {[1, 2, 3, 4].map((i) => (
@@ -195,6 +218,17 @@ function ProfileContent({ path, ownProfile, user, t }) {
 
   if (!activeProfile) return null;
 
+  const surfColor = activeProfile?.accent_surface_color;
+  const surfGlass = activeProfile?.accent_surface_glass === true;
+  const { showAccent } = useI18n();
+  const surfaceStyle = showAccent ? {
+    '--accent-surface-rgba': surfGlass ? 'rgba(255, 255, 255, 0.04)' : (surfColor || 'var(--color-surface, #1a1a1a)'),
+    '--accent-surface-rgba-hover': surfGlass ? 'rgba(255, 255, 255, 0.07)' : (surfColor ? `color-mix(in srgb, ${surfColor} 85%, #000)` : 'var(--color-surface-hover, #252525)'),
+    '--accent-surface-blur': surfGlass ? 'blur(20px)' : 'none',
+    '--accent-surface-border': surfGlass ? '1px solid rgba(255, 255, 255, 0.06)' : 'none',
+    '--accent-surface-text-color': !surfGlass && surfColor ? getContrastText(surfColor) : 'var(--color-text, #ffffff)',
+  } : {};
+
   return (
     <>
       <ProfileSidebar
@@ -203,8 +237,9 @@ function ProfileContent({ path, ownProfile, user, t }) {
         canViewContent={isOwnProfilePage || !isPrivate}
         statsVisibility={resolvedStatsVisibility}
         isOwnProfile={isOwnProfilePage}
+        surfaceStyle={surfaceStyle}
       />
-      <TrendingHashtags t={t} />
+      <TrendingHashtags t={t} surfaceStyle={surfaceStyle} />
     </>
   );
 }

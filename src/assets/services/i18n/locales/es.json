@@ -213,6 +213,9 @@
   "modal.discard_changes": "Tienes cambios sin guardar. ¿Descartarlos?",
   "modal.suggested_interests": "Sugeridos",
   "modal.explore_preview": "Vista previa en Explore",
+  "modal.accent_surface": "Color de superficie",
+  "modal.accent_surface_default": "Por defecto",
+  "modal.accent_surface_glass": "Modo glass",
   "modal.saving": "Guardando...",
 
   "create_post.title": "Crear publicación",

@@ -213,6 +213,9 @@
   "modal.discard_changes": "You have unsaved changes. Discard them?",
   "modal.suggested_interests": "Suggested",
   "modal.explore_preview": "Explore card preview",
+  "modal.accent_surface": "Surface color",
+  "modal.accent_surface_default": "Default",
+  "modal.accent_surface_glass": "Glass mode",
   "modal.saving": "Saving...",
 
   "create_post.title": "Create post",

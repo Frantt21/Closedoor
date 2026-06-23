@@ -51,14 +51,14 @@
 
 .fc-modal-input {
     padding: 12px 14px;
-    border: 1.5px solid var(--color-border, #2a2a2a);
+    border: none;
     border-radius: var(--radius, 10px);
     margin-top: 0;
     font-size: 1rem;
     font-family: inherit;
     color: var(--color-text, #ffffff);
     background: var(--color-bg, #000000);
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    transition: box-shadow 0.2s ease;
     width: 100%;
     box-sizing: border-box;
     outline: none;
@@ -69,12 +69,11 @@
 }
 
 .fc-modal-input:hover {
-    border-color: var(--color-text-muted, #6b7280);
+    box-shadow: 0 0 0 1px var(--color-text-muted, #6b7280);
 }
 
 .fc-modal-input:focus {
-    border-color: var(--color-text, #ffffff);
-    box-shadow: 0 0 0 2px var(--overlay-bg);
+    box-shadow: 0 0 0 1.5px var(--color-text, #ffffff);
 }
 
 .fc-modal-input:focus::placeholder {
@@ -87,7 +86,6 @@
     margin-bottom: 20px;
     border-radius: var(--radius, 10px);
     overflow: hidden;
-    border: 1px solid var(--color-border, #2a2a2a);
 }
 
 .fc-preview-card--large .fc-preview-card-banner {
@@ -225,9 +223,19 @@
 
 textarea.fc-modal-input {
     resize: vertical;
-    min-height: 80px;
+    min-height: 56px;
     line-height: 1.5;
 }
+
+.fc-modal-char-count {
+    display: block;
+    text-align: right;
+    font-size: 0.75rem;
+    color: var(--color-text-muted, #6b7280);
+    margin-top: 4px;
+}
+
+
 
 /* ── Interests Section ── */
 
@@ -284,8 +292,8 @@ textarea.fc-modal-input {
   font-weight: 500;
   color: var(--color-text-secondary, #9ca3af);
   background: var(--overlay-bg-subtle);
-  border: 1px solid var(--overlay-bg);
-  border-radius: var(--radius-full, 9999px);
+  border: none;
+  border-radius: var(--radius, 10px);
   white-space: nowrap;
 }
 
@@ -378,8 +386,8 @@ textarea.fc-modal-input {
     gap: 8px;
     padding: 8px 12px;
     background: var(--color-bg, #000000);
-    border: 1px solid var(--color-border, #2a2a2a);
-    border-radius: var(--radius-sm, 6px);
+    border: none;
+    border-radius: var(--radius, 10px);
     font-size: 0.85rem;
     color: var(--color-text, #ffffff);
 }
@@ -423,12 +431,23 @@ textarea.fc-modal-input {
     border-color: rgba(255, 80, 80, 0.3);
 }
 
-.fc-modal-actions {
+.fc-modal-header {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    gap: 12px;
+}
+
+.fc-modal-header .fc-modal-title {
+    margin: 0;
+}
+
+.fc-modal-header-actions {
+    display: flex;
+    align-items: center;
     gap: 10px;
-    justify-content: flex-end;
-    margin-top: 24px;
-    flex-wrap: wrap;
+    flex-shrink: 0;
 }
 
 .fc-modal-save {
@@ -453,27 +472,28 @@ textarea.fc-modal-input {
     transform: translateY(0);
 }
 
-.fc-modal-cancel {
-    background: transparent;
-    color: var(--color-text-secondary, #9ca3af);
-    border: 1px solid var(--color-border, #2a2a2a);
-    padding: 10px 20px;
+.fc-modal-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
     border-radius: var(--radius, 10px);
+    background: transparent;
+    color: var(--color-text, #ffffff);
+    border: none;
     cursor: pointer;
-    font-size: 0.95rem;
-    font-weight: 500;
-    min-width: 100px;
-    transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    transition: background 0.2s ease, transform 0.15s ease;
+    flex-shrink: 0;
 }
 
-.fc-modal-cancel:hover:not(:disabled) {
+.fc-modal-close:hover:not(:disabled) {
     background: var(--color-surface-hover, #252525);
-    color: var(--color-text, #ffffff);
-    border-color: var(--color-text-muted, #6b7280);
+    transform: scale(1.05);
 }
 
 .fc-modal-save:disabled,
-.fc-modal-cancel:disabled {
+.fc-modal-close:disabled {
     opacity: 0.4;
     cursor: not-allowed;
     transform: none;
@@ -661,6 +681,58 @@ textarea.fc-modal-input {
     color: var(--color-text, #ffffff);
 }
 
+/* ── Glass mode toggle ── */
+
+.fc-modal-glass-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+  cursor: pointer;
+}
+
+.fc-modal-glass-toggle-label {
+  font-size: 0.78rem;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.fc-modal-glass-switch {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 99px;
+  background: var(--color-border, #2a2a2a);
+  cursor: pointer;
+  transition: background 0.25s ease;
+  flex-shrink: 0;
+  outline: none;
+}
+
+.fc-modal-glass-switch:focus-visible {
+  box-shadow: 0 0 0 2px var(--color-text, #ffffff);
+}
+
+.fc-modal-glass-switch--on {
+  background: var(--color-text, #ffffff);
+}
+
+.fc-modal-glass-switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-surface, #1a1a1a);
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.fc-modal-glass-switch--on .fc-modal-glass-switch-knob {
+  transform: translateX(18px);
+  background: var(--color-bg, #000000);
+}
+
 /* ── Two-column grid layout ── */
 
 .fc-modal-grid {
@@ -700,17 +772,16 @@ textarea.fc-modal-input {
   font-weight: 500;
   color: var(--color-text-muted, #6b7280);
   background: transparent;
-  border: 1px solid var(--color-border, #2a2a2a);
+  border: none;
   border-radius: var(--radius, 10px);
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease;
   font-family: inherit;
 }
 
 .fc-modal-suggested-toggle:hover {
   color: var(--color-text-secondary, #9ca3af);
   background: var(--color-surface-hover, #252525);
-  border-color: var(--color-text-muted, #6b7280);
 }
 
 .fc-modal-suggested-chevron {
@@ -726,15 +797,20 @@ textarea.fc-modal-input {
 /* ── Collapse animation ── */
 
 .fc-modal-suggested-collapse {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.35s ease, opacity 0.25s ease, margin 0.3s ease;
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.35s ease, opacity 0.25s ease, margin-top 0.3s ease;
   opacity: 0;
   margin-top: 0;
 }
 
+.fc-modal-suggested-collapse > * {
+  overflow: hidden;
+  min-height: 0;
+}
+
 .fc-modal-suggested-collapse--open {
-  max-height: 400px;
+  grid-template-rows: 1fr;
   opacity: 1;
   margin-top: 10px;
 }
@@ -778,17 +854,16 @@ textarea.fc-modal-input {
   font-weight: 500;
   color: var(--color-text-secondary, #9ca3af);
   background: var(--overlay-bg-subtle);
-  border: 1px solid var(--color-border, #2a2a2a);
-  border-radius: var(--radius-full, 9999px);
+  border: none;
+  border-radius: var(--radius, 10px);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease;
   white-space: nowrap;
 }
 
 .fc-modal-suggested-chip:hover {
   color: var(--color-text, #ffffff);
   background: var(--color-surface-hover, #252525);
-  border-color: var(--color-text-muted, #6b7280);
 }
 
 .fc-modal-suggested-chip:active {
@@ -859,16 +934,24 @@ textarea.fc-modal-input {
         max-height: 200px;
     }
 
-    .fc-modal-actions {
-        flex-direction: column-reverse;
-        gap: 8px;
+    .fc-modal-header {
+        flex-wrap: wrap;
+        gap: 10px;
     }
 
-    .fc-modal-save,
-    .fc-modal-cancel {
+    .fc-modal-header .fc-modal-title {
+        font-size: 1rem;
+    }
+
+    .fc-modal-save {
         width: 100%;
         padding: 12px;
         min-width: auto;
+    }
+
+    .fc-modal-header-actions {
+        width: 100%;
+        justify-content: flex-end;
     }
 }
 
@@ -898,7 +981,5 @@ textarea.fc-modal-input {
         margin-top: 8px;
     }
 
-    .fc-modal-actions {
-        justify-content: flex-end;
-    }
+    /* no dedicated header actions needed for tablet */
 }

@@ -250,7 +250,7 @@ export async function listProfiles(excludeUserId, limit = 50) {
   try {
     let query = supabase
       .from('profiles')
-      .select('id, username, avatar_url, banner_url, bio, roles, created_at, is_private, interests, accent_color, accent_color_secondary, banner_position, avatar_position')
+      .select('id, username, avatar_url, banner_url, bio, roles, created_at, is_private, interests, accent_color, accent_color_secondary, accent_surface_color, accent_surface_glass, banner_position, avatar_position')
       .order('created_at', { ascending: false })
       .limit(limit);
 

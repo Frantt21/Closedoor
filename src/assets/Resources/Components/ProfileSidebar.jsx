@@ -33,7 +33,7 @@ function setCachedStats(profileId, stats) {
   }
 }
 
-export default function ProfileSidebar({ profile, isPrivate, canViewContent, statsVisibility, isOwnProfile }) {
+export default function ProfileSidebar({ profile, isPrivate, canViewContent, statsVisibility, isOwnProfile, surfaceStyle }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const [stats, setStats] = useState(() => {
@@ -172,7 +172,7 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
   return (
     <aside className="profile-sidebar">
       {/* ── Interests ── */}
-      <div className="profile-sidebar-card">
+      <div className="profile-sidebar-card" style={surfaceStyle}>
         <h3 className="profile-sidebar-title">
           <FaTags className="profile-sidebar-title-icon" />
           {t('profile.interests')}
@@ -210,7 +210,7 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
       </div>
 
       {/* ── Stats ── */}
-      <div className="profile-sidebar-card">
+      <div className="profile-sidebar-card" style={surfaceStyle}>
         <h3 className="profile-sidebar-title">{t('profile.stats_title')}</h3>
         {isStatsHidden ? (
           <div className="profile-sidebar-private">

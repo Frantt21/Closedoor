@@ -702,7 +702,9 @@ function Profile() {
     const [modalSocialLinks, setModalSocialLinks] = useState([]);
     const [modalAccentColor, setModalAccentColor] = useState('');
     const [modalInterests, setModalInterests] = useState([]);
-    const [modalAccentColorSecondary, setModalAccentColorSecondary] = useState('');
+    const    [modalAccentColorSecondary, setModalAccentColorSecondary] = useState('');
+    const [modalAccentSurface, setModalAccentSurface] = useState('');
+    const [modalAccentSurfaceGlass, setModalAccentSurfaceGlass] = useState(false);
     const [usernameInput, setUsernameInput] = useState("");
     const [avatarInput, setAvatarInput] = useState("");
     const [bannerInput, setBannerInput] = useState("");
@@ -727,6 +729,8 @@ function Profile() {
             setModalSocialLinks(ownProfile?.social_links || []);
             setModalAccentColor(ownProfile?.accent_color || '');
             setModalAccentColorSecondary(ownProfile?.accent_color_secondary || '');
+            setModalAccentSurface(ownProfile?.accent_surface_color || '');
+            setModalAccentSurfaceGlass(ownProfile?.accent_surface_glass === true);
         }
     }, [ownProfile, user, isOwnProfile]);
 
@@ -743,7 +747,7 @@ function Profile() {
     const roles = activeProfile?.roles || ["user"];
 
     // ── Save profile (own profile only) ──
-    const handleSaveProfile = async ({ username, avatar_url, banner_url, bio, social_links, accent_color, accent_color_secondary, interests, banner_position, avatar_position }) => {
+    const handleSaveProfile = async ({ username, avatar_url, banner_url, bio, social_links, accent_color, accent_color_secondary, accent_surface_color, accent_surface_glass, interests, banner_position, avatar_position }) => {
         setLocalError(null);
         setMessage(null);
         if (!user?.id) return;
@@ -770,6 +774,8 @@ function Profile() {
                 social_links: social_links || [],
                 accent_color: accent_color || null,
                 accent_color_secondary: accent_color_secondary || null,
+                accent_surface_color: accent_surface_color || null,
+                accent_surface_glass: accent_surface_glass ?? false,
                 interests: interests || [],
                 banner_position: banner_position || '50% 50%',
                 avatar_position: avatar_position || '50% 50%',
@@ -854,11 +860,30 @@ function Profile() {
 
     if (!activeProfile) return null;
 
-    const styleVars = (showAccent && activeProfile?.accent_color)
+    const surfColor = activeProfile?.accent_surface_color;
+    const surfGlass = activeProfile?.accent_surface_glass === true;
+    const styleVars = showAccent
       ? {
-          '--accent-color': activeProfile.accent_color,
-          '--accent-color-2': activeProfile?.accent_color_secondary || activeProfile.accent_color,
-          '--accent-text-color': getContrastText(activeProfile.accent_color),
+          ...(activeProfile?.accent_color ? {
+            '--accent-color': activeProfile.accent_color,
+            '--accent-color-2': activeProfile?.accent_color_secondary || activeProfile.accent_color,
+            '--accent-text-color': getContrastText(activeProfile.accent_color),
+          } : {}),
+          '--accent-surface-color': surfColor || null,
+          '--accent-surface-text-color': !surfGlass && surfColor ? getContrastText(surfColor) : 'var(--color-text, #ffffff)',
+          ...(surfGlass ? {
+            // Glass ON: translucent + blur
+            '--accent-surface-rgba': 'rgba(255, 255, 255, 0.04)',
+            '--accent-surface-rgba-hover': 'rgba(255, 255, 255, 0.07)',
+            '--accent-surface-blur': 'blur(20px)',
+            '--accent-surface-border': '1px solid rgba(255, 255, 255, 0.06)',
+          } : {
+            // Glass OFF: solid background
+            '--accent-surface-rgba': surfColor || 'var(--color-surface, #1a1a1a)',
+            '--accent-surface-rgba-hover': surfColor ? `color-mix(in srgb, ${surfColor} 85%, #000)` : 'var(--color-surface-hover, #252525)',
+            '--accent-surface-blur': 'none',
+            '--accent-surface-border': 'none',
+          }),
         }
       : {};
 
@@ -1012,6 +1037,8 @@ function Profile() {
                     initialSocialLinks={modalSocialLinks}
                     initialAccentColor={modalAccentColor}
                     initialAccentColorSecondary={modalAccentColorSecondary}
+                    initialAccentSurface={modalAccentSurface}
+                    initialAccentSurfaceGlass={modalAccentSurfaceGlass}
                     initialInterests={modalInterests}
                     initialBannerPosition={ownProfile?.banner_position || '50% 50%'}
                     initialAvatarPosition={ownProfile?.avatar_position || '50% 50%'}

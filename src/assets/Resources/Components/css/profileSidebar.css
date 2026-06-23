@@ -29,6 +29,16 @@
   padding: 16px;
 }
 
+/* ── Glassmorphism effect on profile page ── */
+.profile-sidebar-card {
+  background: var(--accent-surface-rgba, var(--color-surface, #1a1a1a));
+  backdrop-filter: var(--accent-surface-blur, none);
+  -webkit-backdrop-filter: var(--accent-surface-blur, none);
+  border: var(--accent-surface-border, none);
+  color: var(--accent-surface-text-color, var(--color-text, #ffffff));
+  transition: background 0.2s ease;
+}
+
 .profile-sidebar-title {
   font-size: 0.85rem;
   font-weight: 700;
