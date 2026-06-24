@@ -7,6 +7,9 @@ const THEME_KEY = 'fc_theme';
 const ACCENT_PROFILE_KEY = 'fc_accent_profile';
 const ACCENT_EXPLORE_KEY = 'fc_accent_explore';
 const ACCENT_VISIBILITY_KEY = 'fc_accent_visibility';
+const SHOW_INTERESTS_KEY = 'fc_show_interests';
+const SHOW_TRENDING_KEY = 'fc_show_trending';
+const SHOW_PROFILE_STATS_KEY = 'fc_show_profile_stats';
 
 const locales = { es };
 
@@ -62,6 +65,33 @@ function getSavedTheme() {
   }
 }
 
+function getSavedShowInterests() {
+  try {
+    const val = localStorage.getItem(SHOW_INTERESTS_KEY);
+    return val === null ? true : val === 'true';
+  } catch {
+    return true;
+  }
+}
+
+function getSavedShowTrending() {
+  try {
+    const val = localStorage.getItem(SHOW_TRENDING_KEY);
+    return val === null ? true : val === 'true';
+  } catch {
+    return true;
+  }
+}
+
+function getSavedShowProfileStats() {
+  try {
+    const val = localStorage.getItem(SHOW_PROFILE_STATS_KEY);
+    return val === null ? true : val === 'true';
+  } catch {
+    return true;
+  }
+}
+
 export const I18nContext = createContext({
   locale: 'es',
   t: (key, params) => key,
@@ -74,6 +104,12 @@ export const I18nContext = createContext({
   setShowAccentExplore: () => {},
   accentVisibility: 'both',
   setAccentVisibility: () => {},
+  showInterests: true,
+  setShowInterests: () => {},
+  showTrending: true,
+  setShowTrending: () => {},
+  showProfileStats: true,
+  setShowProfileStats: () => {},
   theme: 'dark',
   setTheme: () => {},
 });
@@ -85,6 +121,9 @@ export function I18nProvider({ children }) {
   const [showAccentProfile, setShowAccentProfileState] = useState(getSavedShowAccentProfile);
   const [showAccentExplore, setShowAccentExploreState] = useState(getSavedShowAccentExplore);
   const [accentVisibility, setAccentVisibilityState] = useState(getSavedAccentVisibility);
+  const [showInterests, setShowInterestsState] = useState(getSavedShowInterests);
+  const [showTrending, setShowTrendingState] = useState(getSavedShowTrending);
+  const [showProfileStats, setShowProfileStatsState] = useState(getSavedShowProfileStats);
   const [theme, setThemeState] = useState(getSavedTheme);
 
   // Cargar el archivo de locale asíncrono
@@ -139,6 +178,27 @@ export function I18nProvider({ children }) {
     } catch {}
   }, []);
 
+  const setShowInterests = useCallback((value) => {
+    setShowInterestsState(value);
+    try {
+      localStorage.setItem(SHOW_INTERESTS_KEY, String(value));
+    } catch {}
+  }, []);
+
+  const setShowTrending = useCallback((value) => {
+    setShowTrendingState(value);
+    try {
+      localStorage.setItem(SHOW_TRENDING_KEY, String(value));
+    } catch {}
+  }, []);
+
+  const setShowProfileStats = useCallback((value) => {
+    setShowProfileStatsState(value);
+    try {
+      localStorage.setItem(SHOW_PROFILE_STATS_KEY, String(value));
+    } catch {}
+  }, []);
+
   const setTheme = useCallback((newTheme) => {
     setThemeState(newTheme);
     try {
@@ -163,7 +223,7 @@ export function I18nProvider({ children }) {
   }, [translations]);
 
   return (
-    <I18nContext.Provider value={{ locale, t, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, theme, setTheme }}>
+    <I18nContext.Provider value={{ locale, t, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, theme, setTheme }}>
       {children}
     </I18nContext.Provider>
   );

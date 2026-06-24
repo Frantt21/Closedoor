@@ -33,7 +33,7 @@ function setCachedStats(profileId, stats) {
   }
 }
 
-export default function ProfileSidebar({ profile, isPrivate, canViewContent, statsVisibility, isOwnProfile, surfaceStyle }) {
+export default function ProfileSidebar({ profile, isPrivate, canViewContent, statsVisibility, isOwnProfile, surfaceStyle, showInterests = true, showStats = true }) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const [stats, setStats] = useState(() => {
@@ -141,7 +141,8 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
     };
   }, [profile?.id, isOwnProfile]);
 
-  if (!profile) return null;
+  const bothCardsHidden = !showInterests && !showStats;
+  if (!profile || bothCardsHidden) return null;
 
   // Determinar si todas las stats están intencionalmente ocultas
   // (statsVisibility es un objeto no-null sin ninguna stat en true)
@@ -172,7 +173,8 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
   return (
     <aside className="profile-sidebar">
       {/* ── Interests ── */}
-      <div className="profile-sidebar-card" style={surfaceStyle}>
+      {showInterests && (
+        <div className="profile-sidebar-card" style={surfaceStyle}>
         <h3 className="profile-sidebar-title">
           <FaTags className="profile-sidebar-title-icon" />
           {t('profile.interests')}
@@ -207,10 +209,12 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
             )}
           </>
         )}
-      </div>
+        </div>
+      )}
 
       {/* ── Stats ── */}
-      <div className="profile-sidebar-card" style={surfaceStyle}>
+      {showStats && (
+        <div className="profile-sidebar-card" style={surfaceStyle}>
         <h3 className="profile-sidebar-title">{t('profile.stats_title')}</h3>
         {isStatsHidden ? (
           <div className="profile-sidebar-private">
@@ -236,6 +240,7 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
           </div>
         )}
       </div>
+      )}
     </aside>
   );
 }

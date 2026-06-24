@@ -41,15 +41,6 @@
     transform: translateY(0);
 }
 
-.posts-section-title {
-    font-size: 1.1rem;
-    font-weight: 700;
-    color: var(--color-text, #ffffff);
-    margin: 0;
-}
-
-
-
 /* Empty state */
 
 .posts-section-tabs {
@@ -175,13 +166,6 @@
   align-items: center;
   gap: 10px;
   margin: 12px 0 4px;
-}
-
-.hashtag-title h1 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--color-text, #ffffff);
-  margin: 0;
 }
 
 .hashtag-icon {

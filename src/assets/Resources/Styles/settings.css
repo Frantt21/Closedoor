@@ -8,13 +8,6 @@
   padding: 0;
 }
 
-.settings-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--color-text, #ffffff);
-  margin: 0 0 20px 0;
-}
-
 /* ── Card ── */
 
 .settings-card {

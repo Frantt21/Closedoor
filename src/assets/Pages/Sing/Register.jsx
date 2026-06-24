@@ -47,7 +47,6 @@ function Register() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1 className="auth-title">{t('auth.register_title')}</h1>
         <p className="auth-subtitle">{t('auth.register_subtitle')}</p>
 
         {error && <div className="auth-error">{error}</div>}

@@ -20,15 +20,6 @@
     animation: fcSlideUp 0.3s ease;
 }
 
-.auth-title {
-    text-align: center;
-    font-size: 1.35rem;
-    font-weight: 700;
-    color: var(--color-text, #ffffff);
-    margin-bottom: 6px;
-    letter-spacing: -0.01em;
-}
-
 .auth-subtitle {
     text-align: center;
     font-size: 0.85rem;

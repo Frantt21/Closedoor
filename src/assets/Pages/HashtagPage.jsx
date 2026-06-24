@@ -91,7 +91,6 @@ export default function HashtagPage() {
           ) : (
             <FaHashtag className="hashtag-icon" />
           )}
-          <h1>{decodedTag}</h1>
         </div>
         <p className="hashtag-subtitle">
           {isTextSearch ? t('hashtag.posts_with_word', { word: decodedTag }) : t('hashtag.posts_with_tag', { tag: decodedTag })}

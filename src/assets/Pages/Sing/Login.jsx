@@ -40,7 +40,6 @@ function Login() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1 className="auth-title">{t('auth.login_title')}</h1>
         <p className="auth-subtitle">{t('auth.login_subtitle')}</p>
 
         {error && <div className="auth-error">{error}</div>}

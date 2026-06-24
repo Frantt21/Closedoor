@@ -179,7 +179,6 @@ export default function Notifications() {
   return (
     <div className="notifications-page">
       <div className="notifications-header">
-        <h1 className="notifications-title">{t('notifications.title')}</h1>
         <div className="notifications-header-actions">
           {hasSelection && (
             <span className="notifications-selected-count">

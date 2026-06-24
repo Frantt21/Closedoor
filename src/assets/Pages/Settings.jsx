@@ -3,7 +3,7 @@ import { useI18n } from '../services/i18n/useI18n';
 import usePageTitle from '../../hooks/usePageTitle';
 import { useAuth } from '../../hooks/useAuth';
 import { updateUserProfile } from '../services/userService';
-import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaComment, FaRetweet, FaEye, FaUser, FaBookmark } from 'react-icons/fa';
+import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaFire, FaChartBar } from 'react-icons/fa';
 import '../Resources/Styles/settings.css';
 
 /* ── SVG Flag Icons ── */
@@ -68,7 +68,7 @@ const CATEGORIES = [
 /* ── Main Settings Component ── */
 
 export default function Settings() {
-  const { locale, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, theme, setTheme, t } = useI18n();
+  const { locale, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, theme, setTheme, t } = useI18n();
   usePageTitle(t('settings.title'));
   const { user, profile, profileLoading, refreshProfile } = useAuth();
   const [selectOpen, setSelectOpen] = useState(false);
@@ -84,19 +84,19 @@ export default function Settings() {
   // No usar || {} para poder distinguir null (legacy) de {} (explicitamente vacío)
   const statsVisibility = profile?.stats_visibility;
 
-  // ── Sincronizar preferencias de acento con Supabase ──
-  const [accentPrefUpdating, setAccentPrefUpdating] = useState(false);
+  // ── Sincronizar preferencias con Supabase ──
+  const [savingPref, setSavingPref] = useState(false);
 
-  const syncAccentPrefs = async (key, value) => {
-    if (!user?.id || accentPrefUpdating) return;
-    setAccentPrefUpdating(true);
+  const syncProfilePref = async (key, value) => {
+    if (!user?.id || savingPref) return;
+    setSavingPref(true);
     try {
       await updateUserProfile(user.id, { [key]: value });
       await refreshProfile(user.id);
     } catch (err) {
-      console.error('Error syncing accent prefs:', err);
+      console.error('Error syncing profile pref:', err);
     } finally {
-      setAccentPrefUpdating(false);
+      setSavingPref(false);
     }
   };
 
@@ -172,8 +172,6 @@ export default function Settings() {
 
   return (
     <div className="settings-page">
-      <h1 className="settings-title">{t('settings.title')}</h1>
-
       <div className="settings-card settings-card--split">
         {/* ── Left Panel: Category Navigation ── */}
         <nav className="settings-nav">
@@ -324,7 +322,7 @@ export default function Settings() {
                       onClick={() => {
                         const next = !showAccentProfile;
                         setShowAccentProfile(next);
-                        syncAccentPrefs('show_accent_profile', next);
+                        syncProfilePref('show_accent_profile', next);
                       }}
                       aria-pressed={showAccentProfile}
                     >
@@ -349,7 +347,7 @@ export default function Settings() {
                       onClick={() => {
                         const next = !showAccentExplore;
                         setShowAccentExplore(next);
-                        syncAccentPrefs('show_accent_explore', next);
+                        syncProfilePref('show_accent_explore', next);
                       }}
                       aria-pressed={showAccentExplore}
                     >
@@ -374,7 +372,7 @@ export default function Settings() {
                         className={`settings-segmented-btn ${accentVisibility === 'others' ? 'settings-segmented-btn--active' : ''}`}
                         onClick={() => {
                           setAccentVisibility('others');
-                          syncAccentPrefs('accent_visibility', 'others');
+                          syncProfilePref('accent_visibility', 'others');
                         }}
                       >
                         {t('settings.accent_visibility_others')}
@@ -384,7 +382,7 @@ export default function Settings() {
                         className={`settings-segmented-btn ${accentVisibility === 'both' ? 'settings-segmented-btn--active' : ''}`}
                         onClick={() => {
                           setAccentVisibility('both');
-                          syncAccentPrefs('accent_visibility', 'both');
+                          syncProfilePref('accent_visibility', 'both');
                         }}
                       >
                         {t('settings.accent_visibility_both')}
@@ -394,7 +392,7 @@ export default function Settings() {
                         className={`settings-segmented-btn ${accentVisibility === 'me' ? 'settings-segmented-btn--active' : ''}`}
                         onClick={() => {
                           setAccentVisibility('me');
-                          syncAccentPrefs('accent_visibility', 'me');
+                          syncProfilePref('accent_visibility', 'me');
                         }}
                       >
                         {t('settings.accent_visibility_me')}
@@ -403,6 +401,94 @@ export default function Settings() {
                   </div>
                 </div>
               )}
+
+              <div className="settings-row-divider" />
+
+              {/* ── Perfil: visibilidad de cards ── */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaEye /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.profile_display')}</h2>
+                    <p className="settings-section-desc">{t('settings.profile_display_desc')}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Mostrar intereses */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaTags /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.show_interests')}</h2>
+                    <p className="settings-section-desc">{t('settings.show_interests_desc')}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={`settings-toggle ${showInterests ? 'settings-toggle--active' : ''}`}
+                  onClick={() => {
+                    const next = !showInterests;
+                    setShowInterests(next);
+                    syncProfilePref('show_interests', next);
+                  }}
+                  aria-pressed={showInterests}
+                >
+                  <span className="settings-toggle-track">
+                    <span className="settings-toggle-thumb" />
+                  </span>
+                </button>
+              </div>
+
+              {/* Mostrar estadísticas */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaChartBar /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.show_stats_card')}</h2>
+                    <p className="settings-section-desc">{t('settings.show_stats_card_desc')}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={`settings-toggle ${showProfileStats ? 'settings-toggle--active' : ''}`}
+                  onClick={() => {
+                    const next = !showProfileStats;
+                    setShowProfileStats(next);
+                    syncProfilePref('show_profile_stats', next);
+                  }}
+                  aria-pressed={showProfileStats}
+                >
+                  <span className="settings-toggle-track">
+                    <span className="settings-toggle-thumb" />
+                  </span>
+                </button>
+              </div>
+
+              {/* Mostrar tendencias */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaFire /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.show_trending')}</h2>
+                    <p className="settings-section-desc">{t('settings.show_trending_desc')}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={`settings-toggle ${showTrending ? 'settings-toggle--active' : ''}`}
+                  onClick={() => {
+                    const next = !showTrending;
+                    setShowTrending(next);
+                    syncProfilePref('show_trending', next);
+                  }}
+                  aria-pressed={showTrending}
+                >
+                  <span className="settings-toggle-track">
+                    <span className="settings-toggle-thumb" />
+                  </span>
+                </button>
+              </div>
             </>
           )}
 

@@ -166,8 +166,7 @@ function Home() {
             ) : (
                 <div className="posts-section">
                     <div className="posts-section-header">
-                        <h2 className="posts-section-title">{t('home.feed_title')}</h2>
-                        <button
+                            <button
                             className="posts-section-action"
                             onClick={() => setShowCreatePost(true)}
                         >

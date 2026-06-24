@@ -164,10 +164,12 @@ function ProfileContent({ path, ownProfile, user, t }) {
       .finally(() => setLoading(false));
   }, [path, isOtherProfilePage, isUUID]);
 
+  const { showAccent, accentVisibility, showTrending, showInterests, showProfileStats } = useI18n();
+
   // ── Home page: placeholder de tendencias ──
   // ── Trending hashtags (shown on home page and non-profile pages) ──
   if (isHomePage || (!isOwnProfilePage && !isOtherProfilePage)) {
-    return <TrendingHashtags t={t} />;
+    return showTrending ? <TrendingHashtags t={t} /> : null;
   }
 
   // ── Profile page ──
@@ -194,7 +196,6 @@ function ProfileContent({ path, ownProfile, user, t }) {
 
   const surfColor = activeProfile?.accent_surface_color;
   const surfGlass = activeProfile?.accent_surface_glass === true;
-  const { showAccent, accentVisibility } = useI18n();
   const isOwnProfileRight = isOwnProfilePage;
 
   // Para perfiles ajenos: usar las preferencias guardadas en la BD del dueño del perfil
@@ -205,6 +206,18 @@ function ProfileContent({ path, ownProfile, user, t }) {
   const ownerAccentVisibility = isOwnProfileRight
     ? accentVisibility
     : (activeProfile?.accent_visibility ?? 'both');
+
+  // Preferencias de visibilidad de cards para perfiles ajenos
+  // Se combinan con la preferencia local (AND): ambas deben ser true para mostrar
+  const ownerShowInterests = isOwnProfileRight
+    ? showInterests
+    : (showInterests && (activeProfile?.show_interests ?? true));
+  const ownerShowStats = isOwnProfileRight
+    ? showProfileStats
+    : (showProfileStats && (activeProfile?.show_profile_stats ?? true));
+  const ownerShowTrending = isOwnProfileRight
+    ? showTrending
+    : (showTrending && (activeProfile?.show_trending ?? true));
 
   const accentVisibleRight = showAccent && ownerShowAccentProfile && (
     ownerAccentVisibility === 'both' ||
@@ -236,9 +249,12 @@ function ProfileContent({ path, ownProfile, user, t }) {
         isPrivate={isPrivate}
         canViewContent={isOwnProfilePage || !isPrivate}
         statsVisibility={resolvedStatsVisibility}
-        isOwnProfile={isOwnProfilePage}            surfaceStyle={resolvedSurfaceStyle}
-          />
-          <TrendingHashtags t={t} surfaceStyle={resolvedSurfaceStyle} />
+        isOwnProfile={isOwnProfilePage}
+        showInterests={ownerShowInterests}
+        showStats={ownerShowStats}
+        surfaceStyle={resolvedSurfaceStyle}
+      />
+      {ownerShowTrending && <TrendingHashtags t={t} surfaceStyle={resolvedSurfaceStyle} />}
     </>
   );
 }

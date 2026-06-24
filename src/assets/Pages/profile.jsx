@@ -245,6 +245,8 @@ function Profile() {
 
     // ── Followers modal state ──
     const [followersModal, setFollowersModal] = useState({ open: false, type: "followers" });
+    // ── Social Links modal state ──
+    const [socialLinksModal, setSocialLinksModal] = useState(false);
 
     const openFollowersModal = (type) => {
         if (activeProfile?.id && canViewContent) {
@@ -949,10 +951,10 @@ function Profile() {
                             <p className="profile-bio profile-bio--empty">{t('profile.no_bio')}</p>
                         )}
 
-                        {/* ── Social Links ── */}
+                        {/* ── Social Links (max 3, then "+N" modal) ── */}
                         {activeProfile?.social_links?.length > 0 && (
                             <div className="profile-social-links">
-                                {activeProfile.social_links.map((link, i) => (
+                                {activeProfile.social_links.slice(0, 3).map((link, i) => (
                                     <a
                                         key={i}
                                         href={link.url}
@@ -965,6 +967,19 @@ function Profile() {
                                         <span className="profile-social-icon">{React.createElement(getPlatformIcon(link.platform))}</span>
                                     </a>
                                 ))}
+                                {activeProfile.social_links.length > 3 && (
+                                    <button
+                                        type="button"
+                                        className="profile-social-link profile-social-link--more"
+                                        title={t('profile.show_more', { count: activeProfile.social_links.length - 3 })}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSocialLinksModal(true);
+                                        }}
+                                    >
+                                        <span className="profile-social-icon">+{activeProfile.social_links.length - 3}</span>
+                                    </button>
+                                )}
                             </div>
                         )}
 
@@ -1037,6 +1052,43 @@ function Profile() {
                     type={followersModal.type}
                     onClose={closeFollowersModal}
                 />
+            )}
+
+            {/* Social Links modal */}
+            {socialLinksModal && (
+                <div className="fc-modal-overlay" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) setSocialLinksModal(false); }}>
+                    <div className="fc-modal social-links-modal">
+                        <div className="followers-modal-header">
+                            <h3 className="fc-modal-title">{t('modal.social_links')}</h3>
+                            <button
+                                type="button"
+                                className="followers-modal-close"
+                                onClick={() => setSocialLinksModal(false)}
+                                aria-label={t('common.close')}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <div className="social-links-modal-list">
+                            {activeProfile.social_links.map((link, i) => (
+                                <a
+                                    key={i}
+                                    href={link.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="social-links-modal-item"
+                                    onClick={() => setSocialLinksModal(false)}
+                                >
+                                    <span className="social-links-modal-icon">{React.createElement(getPlatformIcon(link.platform))}</span>
+                                    <div className="social-links-modal-info">
+                                        <span className="social-links-modal-platform">{getPlatformName(link.platform)}</span>
+                                        <span className="social-links-modal-url">{link.url}</span>
+                                    </div>
+                                </a>
+                            ))}
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* ── Posts Section ── */}

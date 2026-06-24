@@ -9,19 +9,6 @@
     padding: 0;
 }
 
-.explore-title {
-    font-size: 1.6rem;
-    font-weight: 700;
-    margin-bottom: 4px;
-    color: var(--color-text, #ffffff);
-}
-
-.explore-subtitle {
-    font-size: 0.9rem;
-    color: var(--color-text-secondary, #9ca3af);
-    margin-bottom: 28px;
-}
-
 .explore-loading {
     text-align: center;
     padding: 48px 0;

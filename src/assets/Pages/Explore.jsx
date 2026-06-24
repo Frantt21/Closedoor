@@ -157,8 +157,6 @@ function Explore() {
 
   return (
     <div className="explore-page">
-      <h1 className="explore-title">{t('explore.title')}</h1>
-      <p className="explore-subtitle">{t('explore.subtitle')}</p>
 
       {loading ? (
         <div className="explore-skeleton-grid">
