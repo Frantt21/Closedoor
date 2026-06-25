@@ -311,5 +311,14 @@
 
   "block.block": "ユーザーをブロック",
   "block.unblock": "ブロックを解除",
-  "block.blocked": "ブロック済み"
+  "block.blocked": "ブロック済み",
+  "block.blocked_user": "@{user}をブロックしました",
+  "block.you_are_blocked_title": "@{user}にブロックされました",
+  "block.you_are_blocked_desc": "このユーザーのプロフィールや投稿を表示できません。",
+  "block.stats_hidden": "ブロックによりコンテンツが非表示です",
+  "block.interests_hidden": "ブロックにより興味が非表示です",
+  "block.no_blocked_users": "ブロックしたユーザーはいません。",
+
+  "settings.blocked_users": "ブロックしたユーザー",
+  "settings.blocked_users_desc": "ブロックしたユーザーを管理"
 }

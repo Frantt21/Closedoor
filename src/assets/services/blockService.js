@@ -50,6 +50,24 @@ export async function unblockUser(blockerId, blockedId) {
 }
 
 /**
+ * Unfollow both ways (used when blocking).
+ * Calls the unfollow_both_ways RPC to bypass RLS and delete follows in both directions.
+ * @param {string} blockerId - User performing the block
+ * @param {string} blockedId - User being blocked
+ */
+export async function unfollowBothWays(blockerId, blockedId) {
+  const { error } = await supabase.rpc('unfollow_both_ways', {
+    blocker_id: blockerId,
+    blocked_id: blockedId,
+  });
+
+  if (error) {
+    console.error('Error unfollowing both ways:', error);
+    throw error;
+  }
+}
+
+/**
  * Check if a user is blocked by the current user
  * @param {string} blockerId - Potential blocker
  * @param {string} blockedId - Potential blocked
@@ -69,6 +87,84 @@ export async function isBlocked(blockerId, blockedId) {
   }
 
   return !!data;
+}
+
+// ── localStorage cache ──
+
+const BLOCK_CACHE_PREFIX = 'fc_block_';
+
+// ── Block change subscription (para que ProfileSidebar se entere de cambios) ──
+let _blockChangeListeners = [];
+
+/**
+ * Subscribe to block status changes
+ * @param {Function} fn - Callback when block status changes
+ * @returns {Function} - Unsubscribe function
+ */
+export function subscribeBlockChanges(fn) {
+  _blockChangeListeners.push(fn);
+  return () => {
+    _blockChangeListeners = _blockChangeListeners.filter(l => l !== fn);
+  };
+}
+
+let _notifying = false;
+
+function notifyBlockChanged() {
+  if (_notifying) return; // Evita recursión infinita si un listener llama a cacheBlockStatus()
+  _notifying = true;
+  try {
+    _blockChangeListeners.forEach(fn => fn());
+  } finally {
+    _notifying = false;
+  }
+}
+
+/**
+ * Cache a block status in localStorage
+ * @param {string} blockerId - User who blocked
+ * @param {string} blockedId - User who was blocked
+ * @param {boolean} isBlocked - Whether the block exists
+ * @param {boolean} [skipNotify=false] - If true, skip notifying subscribers (prevents loops)
+ */
+export function cacheBlockStatus(blockerId, blockedId, isBlocked, skipNotify = false) {
+  try {
+    const key = BLOCK_CACHE_PREFIX + blockerId + '_' + blockedId;
+    localStorage.setItem(key, isBlocked ? '1' : '0');
+    if (!skipNotify) {
+      notifyBlockChanged();
+    }
+  } catch {}
+}
+
+/**
+ * Read cached block status from localStorage
+ * @param {string} blockerId - Potential blocker
+ * @param {string} blockedId - Potential blocked
+ * @returns {boolean|null} - true/false if cached, null if no cache
+ */
+export function getCachedBlockStatus(blockerId, blockedId) {
+  try {
+    const key = BLOCK_CACHE_PREFIX + blockerId + '_' + blockedId;
+    const val = localStorage.getItem(key);
+    if (val === '1') return true;
+    if (val === '0') return false;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Remove cached block status
+ * @param {string} blockerId 
+ * @param {string} blockedId 
+ */
+export function clearCachedBlockStatus(blockerId, blockedId) {
+  try {
+    const key = BLOCK_CACHE_PREFIX + blockerId + '_' + blockedId;
+    localStorage.removeItem(key);
+  } catch {}
 }
 
 /**

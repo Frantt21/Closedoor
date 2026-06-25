@@ -328,5 +328,14 @@
 
   "block.block": "Block user",
   "block.unblock": "Unblock user",
-  "block.blocked": "Blocked"
+  "block.blocked": "Blocked",
+  "block.blocked_user": "You've blocked @{user}",
+  "block.you_are_blocked_title": "@{user} has blocked you",
+  "block.you_are_blocked_desc": "You cannot view this user's profile or posts.",
+  "block.stats_hidden": "Content hidden due to block",
+  "block.interests_hidden": "Interests hidden due to block",
+  "block.no_blocked_users": "You haven't blocked any users yet.",
+
+  "settings.blocked_users": "Blocked users",
+  "settings.blocked_users_desc": "Manage users you have blocked"
 }

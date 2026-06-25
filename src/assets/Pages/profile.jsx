@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { supabase } from "../services/supabaseclient";
@@ -45,7 +45,7 @@ import Badge from "../Resources/Components/Badge";
 import { getPlatformIcon, getPlatformName } from "../services/socialPlatforms";
 import { FaFeather, FaBookmark, FaLock, FaEllipsisV, FaBan } from 'react-icons/fa';
 import FollowButton from "../Resources/Components/FollowButton";
-import { blockUser, unblockUser, isBlocked } from "../services/blockService";
+import { blockUser, unblockUser, isBlocked, cacheBlockStatus, getCachedBlockStatus, unfollowBothWays } from "../services/blockService";
 import { useI18n } from "../services/i18n/useI18n";
 import { getContrastText, isUUID } from "../services/helpers";
 import usePageTitle from "../../hooks/usePageTitle";
@@ -58,7 +58,7 @@ function Profile() {
     const { t, showAccent, accentVisibility } = useI18n();
     const { username: profileUsername } = useParams();
     const navigate = useNavigate();
-    const { user, profile: ownProfile, refreshProfile, isAuthenticated } = useAuth();
+    const { user, profile: ownProfile, refreshProfile, isAuthenticated, loading } = useAuth();
 
     const isOwnProfile = !profileUsername || profileUsername === ownProfile?.username;
 
@@ -129,6 +129,24 @@ function Profile() {
         return targetId ? !getCachedFollowCounts(targetId) : true;
     });
 
+  // ── Block / context menu state ──
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [blockLoading, setBlockLoading] = useState(false);
+  const [dropdownStyle, setDropdownStyle] = useState({});
+  const contextMenuRef = useRef(null);
+  const dropdownRef = useRef(null);
+  // Cache-first approach: useMemo reads localStorage synchronously during render (no flash)
+  // useState holds the DB-confirmed value from async check
+  const [isBlockedByMeDb, setIsBlockedByMeDb] = useState(null);
+
+  const isBlockedByMe = useMemo(() => {
+    if (user?.id && activeProfile?.id && !isOwnProfile) {
+      const cached = getCachedBlockStatus(user.id, activeProfile.id);
+      if (cached !== null) return cached;
+    }
+    return isBlockedByMeDb;
+  }, [user?.id, activeProfile?.id, isOwnProfile, isBlockedByMeDb]);
+
     // ── Fetch other user's profile (refresh en background) ──
     useEffect(() => {
         if (isOwnProfile) {
@@ -197,19 +215,48 @@ function Profile() {
       // ── Check if current user has blocked this profile ──
   useEffect(() => {
     if (!user?.id || !activeProfile?.id || isOwnProfile) {
-      setIsBlockedByMe(false);
+      setIsBlockedByMeDb(false);
       return;
     }
+    // Async DB check; cache-first already handled in useMemo during render
     isBlocked(user.id, activeProfile.id)
-      .then((blocked) => setIsBlockedByMe(blocked))
+      .then((blocked) => {
+        setIsBlockedByMeDb(blocked);
+        cacheBlockStatus(user.id, activeProfile.id, blocked);
+      })
       .catch((err) => console.warn('Error checking block status:', err));
+  }, [user?.id, activeProfile?.id, isOwnProfile]);
+
+  // ── Check if this profile has blocked the current user ──
+  const [isBlockedByThemDb, setIsBlockedByThemDb] = useState(null);
+  const isBlockedByThem = useMemo(() => {
+    if (user?.id && activeProfile?.id && !isOwnProfile) {
+      const cached = getCachedBlockStatus(activeProfile.id, user.id);
+      if (cached !== null) return cached;
+    }
+    return isBlockedByThemDb;
+  }, [user?.id, activeProfile?.id, isOwnProfile, isBlockedByThemDb]);
+
+  useEffect(() => {
+    if (!user?.id || !activeProfile?.id || isOwnProfile) {
+      setIsBlockedByThemDb(false);
+      return;
+    }
+    // Async DB check; cache-first already handled in useMemo during render
+    isBlocked(activeProfile.id, user.id)
+      .then((blocked) => {
+        setIsBlockedByThemDb(blocked);
+        cacheBlockStatus(activeProfile.id, user.id, blocked);
+      })
+      .catch((err) => console.warn('Error checking reverse block:', err));
   }, [user?.id, activeProfile?.id, isOwnProfile]);
 
   // ── Close context menu on outside click ──
   useEffect(() => {
     if (!contextMenuOpen) return;
     const handleClick = (e) => {
-      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)
+          && dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setContextMenuOpen(false);
       }
     };
@@ -271,10 +318,6 @@ function Profile() {
     const [followersModal, setFollowersModal] = useState({ open: false, type: "followers" });
     // ── Social Links modal state ──
     const [socialLinksModal, setSocialLinksModal] = useState(false);
-  const [contextMenuOpen, setContextMenuOpen] = useState(false);
-  const [isBlockedByMe, setIsBlockedByMe] = useState(false);
-  const [blockLoading, setBlockLoading] = useState(false);
-  const contextMenuRef = useRef(null);
 
     const openFollowersModal = (type) => {
         if (activeProfile?.id && canViewContent) {
@@ -440,6 +483,29 @@ function Profile() {
                 } catch (err) {
                     console.warn('Error in follow status Realtime handler:', err);
                 }
+            })
+            // ── Block status (current user blocks/unblocks profile) ──
+            // Con REPLICA IDENTITY FULL, payload.old en DELETE tiene todos los campos
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'blocks', filter: `blocker_id=eq.${user.id}` }, (payload) => {
+                if (payload.new.blocked_id !== profileId) return;
+                setIsBlockedByMeDb(true);
+                cacheBlockStatus(user.id, profileId, true);
+            })
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'blocks', filter: `blocker_id=eq.${user.id}` }, (payload) => {
+                if (payload.old.blocked_id !== profileId) return;
+                setIsBlockedByMeDb(false);
+                cacheBlockStatus(user.id, profileId, false);
+            })
+            // ── Block status (profile blocks/unblocks current user) ──
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'blocks', filter: `blocked_id=eq.${user.id}` }, (payload) => {
+                if (payload.new.blocker_id !== profileId) return;
+                setIsBlockedByThemDb(true);
+                cacheBlockStatus(profileId, user.id, true);
+            })
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'blocks', filter: `blocked_id=eq.${user.id}` }, (payload) => {
+                if (payload.old.blocker_id !== profileId) return;
+                setIsBlockedByThemDb(false);
+                cacheBlockStatus(profileId, user.id, false);
             })
             // ── Profile updates (is_private, avatar, bio, etc.) ──
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${profileId}` }, (payload) => {
@@ -831,7 +897,8 @@ function Profile() {
         );
     }
 
-    if (!isOwnProfile && viewedProfileLoading) {
+    // ── Mostrar skeleton hasta que auth haya resuelto (evita flash de contenido no bloqueado) ──
+    if (!isOwnProfile && (viewedProfileLoading || (loading && activeProfile))) {
         return (
             <div className="profile-page">
                 <div className="profile-card profile-skeleton-card">
@@ -852,6 +919,19 @@ function Profile() {
             </div>
         );
     }
+
+    // ── Si el perfil nos ha bloqueado, mostrar mensaje ──
+  if (!isOwnProfile && isBlockedByThem) {
+    return (
+      <div className="profile-page">
+        <div className="profile-blocked-card">
+          <div className="profile-blocked-icon"><FaBan /></div>
+          <h2 className="profile-blocked-title">{t('block.you_are_blocked_title', { user: activeProfile?.username })}</h2>
+          <p className="profile-blocked-desc">{t('block.you_are_blocked_desc')}</p>
+        </div>
+      </div>
+    );
+  }
 
     if (!activeProfile) return null;
 
@@ -948,6 +1028,15 @@ function Profile() {
                             <Badge roles={roles} />
                         </p>
 
+                        {!isOwnProfile && isBlockedByMe ? (
+                          <div className="profile-stats">
+                            <span className="profile-stat profile-stat--blocked">
+                              <FaBan className="profile-stat-ban" />
+                              <span className="profile-stat-label">{t('block.stats_hidden')}</span>
+                            </span>
+                          </div>
+                        ) : (
+                          <>
                         <div className="profile-stats">
                             {canViewContent ? (
                               <>
@@ -1024,6 +1113,8 @@ function Profile() {
                                 )}
                             </div>
                         )}
+                        </>
+                        )}
 
                         <div className="profile-actions">
                             {isOwnProfile ? (
@@ -1046,6 +1137,17 @@ function Profile() {
                                 </button>
                             ) : (
                                 <>
+                                {isBlockedByMe ? (
+                                  <button
+                                    type="button"
+                                    className="profile-edit-button"
+                                    disabled
+                                    style={{ opacity: 0.7, cursor: 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                                  >
+                                    <FaBan style={{ marginRight: 4 }} />
+                                    {t('block.blocked')}
+                                  </button>
+                                ) : (
                                 <FollowButton
                                     targetUserId={activeProfile.id}
                                     isPrivate={isPrivate}
@@ -1060,46 +1162,26 @@ function Profile() {
                                         }
                                     }}
                                 />
+                                )}
                                 {/* ── 3-dots context menu ── */}
                                 {user && (
                                   <div className="profile-actions-menu" ref={contextMenuRef}>
                                     <button
                                       type="button"
                                       className="profile-actions-menu-btn"
-                                      onClick={(e) => { e.stopPropagation(); setContextMenuOpen((s) => !s); }}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        setDropdownStyle({
+                                          top: rect.bottom + 6,
+                                          right: window.innerWidth - rect.right,
+                                        });
+                                        setContextMenuOpen((s) => !s);
+                                      }}
                                       aria-label="More actions"
                                     >
                                       <FaEllipsisV />
                                     </button>
-                                    {contextMenuOpen && (
-                                      <div className="profile-actions-dropdown" onClick={(e) => e.stopPropagation()}>
-                                        <button
-                                          type="button"
-                                          className="profile-actions-dropdown-btn"
-                                          onClick={async () => {
-                                            setBlockLoading(true);
-                                            try {
-                                              if (isBlockedByMe) {
-                                                await unblockUser(user.id, activeProfile.id);
-                                                setIsBlockedByMe(false);
-                                              } else {
-                                                await blockUser(user.id, activeProfile.id);
-                                                setIsBlockedByMe(true);
-                                              }
-                                              setContextMenuOpen(false);
-                                            } catch (err) {
-                                              console.error('Block/unblock error:', err);
-                                            } finally {
-                                              setBlockLoading(false);
-                                            }
-                                          }}
-                                          disabled={blockLoading}
-                                        >
-                                          <FaBan />
-                                          {isBlockedByMe ? t('block.unblock') : t('block.block')}
-                                        </button>
-                                      </div>
-                                    )}
                                   </div>
                                 )}
                                 </>
@@ -1108,6 +1190,58 @@ function Profile() {
                     </div>
                 </div>
             </div>
+
+            {/* ── Context Menu Dropdown (fuera de .profile-card para evitar overflow clipping) ── */}
+            {contextMenuOpen && (
+              <div className="profile-actions-dropdown" ref={dropdownRef} style={dropdownStyle} onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  className="profile-actions-dropdown-btn"
+                  onClick={async () => {
+                    setBlockLoading(true);
+                    try {
+                      if (isBlockedByMe) {
+                        await unblockUser(user.id, activeProfile.id);
+                        setIsBlockedByMeDb(false);
+                        cacheBlockStatus(user.id, activeProfile.id, false);
+                      } else {
+                        await blockUser(user.id, activeProfile.id);
+                        // Auto-unfollow: ambos sentidos via RPC (bypass RLS)
+                        try {
+                          await unfollowBothWays(user.id, activeProfile.id);
+                          setIsFollower(false);
+                          setCachedFollowStatus(user.id, activeProfile.id, false);
+                          setIsFollowedBy(false);
+                          setCachedFollowStatus(activeProfile.id, user.id, false);
+                        } catch (e) {
+                          console.warn('Could not unfollow both ways on block:', e);
+                        }
+                        // Refrescar follow counts despues de anular seguimiento
+                        try {
+                          const counts = await getFollowCounts(activeProfile.id);
+                          setFollowCounts(counts);
+                          setCachedFollowCounts(activeProfile.id, counts);
+                          setCountsLoading(false);
+                        } catch (e) {
+                          console.warn('Could not refresh follow counts after block:', e);
+                        }
+                        setIsBlockedByMeDb(true);
+                        cacheBlockStatus(user.id, activeProfile.id, true);
+                      }
+                      setContextMenuOpen(false);
+                    } catch (err) {
+                      console.error('Block/unblock error:', err);
+                    } finally {
+                      setBlockLoading(false);
+                    }
+                  }}
+                  disabled={blockLoading}
+                >
+                  <FaBan />
+                  {isBlockedByMe ? t('block.unblock') : t('block.block')}
+                </button>
+              </div>
+            )}
 
             {/* Edit modal (own profile only) */}
             {isOwnProfile && (                      <Modal
@@ -1182,7 +1316,7 @@ function Profile() {
             )}
 
             {/* ── Posts Section ── */}
-            {!canViewContent ? (
+            {!isOwnProfile && isBlockedByMe ? null : !canViewContent ? (
               <div className="posts-section posts-section--private">
                 <div className="posts-empty">
                   <span className="posts-empty-icon"><FaLock /></span>

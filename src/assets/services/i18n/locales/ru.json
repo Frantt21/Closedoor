@@ -311,5 +311,14 @@
 
   "block.block": "Заблокировать",
   "block.unblock": "Разблокировать",
-  "block.blocked": "Заблокирован"
+  "block.blocked": "Заблокирован",
+  "block.blocked_user": "Вы заблокировали @{user}",
+  "block.you_are_blocked_title": "@{user} заблокировал вас",
+  "block.you_are_blocked_desc": "Вы не можете просматривать профиль и публикации этого пользователя.",
+  "block.stats_hidden": "Контент скрыт из-за блокировки",
+  "block.interests_hidden": "Интересы скрыты из-за блокировки",
+  "block.no_blocked_users": "Вы еще никого не заблокировали.",
+
+  "settings.blocked_users": "Заблокированные пользователи",
+  "settings.blocked_users_desc": "Управление заблокированными пользователями"
 }

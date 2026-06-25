@@ -311,5 +311,14 @@
 
   "block.block": "Bloquear usuário",
   "block.unblock": "Desbloquear usuário",
-  "block.blocked": "Bloqueado"
+  "block.blocked": "Bloqueado",
+  "block.blocked_user": "Você bloqueou @{user}",
+  "block.you_are_blocked_title": "@{user} bloqueou você",
+  "block.you_are_blocked_desc": "Você não pode ver o perfil ou as publicações deste usuário.",
+  "block.stats_hidden": "Conteúdo oculto devido ao bloqueio",
+  "block.interests_hidden": "Interesses ocultos devido ao bloqueio",
+  "block.no_blocked_users": "Você não bloqueou nenhum usuário ainda.",
+
+  "settings.blocked_users": "Usuários bloqueados",
+  "settings.blocked_users_desc": "Gerenciar usuários que você bloqueou"
 }

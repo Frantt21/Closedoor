@@ -15,7 +15,8 @@ import FollowButton from "../Resources/Components/FollowButton";
 import SafeImage from "../Resources/Components/SafeImage";
 import Avatar from "../Resources/Components/Avatar";
 import Badge from "../Resources/Components/Badge";
-import { FaLock } from 'react-icons/fa';
+import { FaLock, FaBan } from 'react-icons/fa';
+import { getBlockedUsers, subscribeBlockChanges } from "../services/blockService";
 import "../Resources/Styles/explore.css";
 import "../Resources/Styles/skeleton.css";
 
@@ -40,6 +41,21 @@ function Explore() {
     return !cached;
   });
 
+  // ── Re-filtrar profiles cuando cambia el estado de bloqueo ──
+  useEffect(() => {
+    if (!user?.id) return;
+    const unsub = subscribeBlockChanges(async () => {
+      try {
+        const blocked = await getBlockedUsers(user.id);
+        const blockedIds = new Set(blocked.map(b => b.id));
+        setProfiles((prev) => prev.filter(p => !blockedIds.has(p.id)));
+      } catch (e) {
+        console.warn('Could not re-filter blocked profiles:', e);
+      }
+    });
+    return unsub;
+  }, [user?.id]);
+
   // ── Fetch initial data (profiles + counts + follow statuses) ──
   useEffect(() => {
     if (authLoading) return;
@@ -51,7 +67,18 @@ function Explore() {
       }
 
       try {
-        const data = await listProfiles(user?.id);
+        let data = await listProfiles(user?.id);
+
+        // Filtrar usuarios bloqueados
+        if (user?.id) {
+          try {
+            const blocked = await getBlockedUsers(user.id);
+            const blockedIds = new Set(blocked.map(b => b.id));
+            data = data.filter(p => !blockedIds.has(p.id));
+          } catch (e) {
+            console.warn('Could not filter blocked users:', e);
+          }
+        }
 
         // Fetch follow counts + follow statuses en paralelo
         const [countsResults] = await Promise.all([

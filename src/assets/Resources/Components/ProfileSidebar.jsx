@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { FaLock, FaHeart, FaComment, FaRetweet, FaTags, FaFeather, FaBookmark, FaEye, FaUser } from 'react-icons/fa';
+import { FaLock, FaHeart, FaComment, FaRetweet, FaTags, FaFeather, FaBookmark, FaEye, FaUser, FaBan } from 'react-icons/fa';
 import { useI18n } from '../../services/i18n/useI18n';
 import { supabase } from '../../services/supabaseclient';
+import { useAuth } from '../../../hooks/useAuth';
+import { getCachedBlockStatus, subscribeBlockChanges } from '../../services/blockService';
 import './css/profileSidebar.css';
 
 // ── Stats cache ──
@@ -35,6 +37,20 @@ function setCachedStats(profileId, stats) {
 
 export default function ProfileSidebar({ profile, isPrivate, canViewContent, statsVisibility, isOwnProfile, surfaceStyle, showInterests = true, showStats = true }) {
   const { t } = useI18n();
+  const { user } = useAuth();
+  const isBlockedByMe = user?.id && profile?.id && !isOwnProfile
+    ? getCachedBlockStatus(user.id, profile.id) ?? false
+    : false;
+  const isBlockedByThem = user?.id && profile?.id && !isOwnProfile
+    ? getCachedBlockStatus(profile.id, user.id) ?? false
+    : false;
+  const isBlocked = isBlockedByMe || isBlockedByThem;
+  // ── Forzar re-render cuando cambia el estado de bloqueo (cacheBlockStatus() se llamó en otro componente) ──
+  const [blockRevision, setBlockRevision] = useState(0);
+  useEffect(() => {
+    return subscribeBlockChanges(() => setBlockRevision(v => v + 1));
+  }, []);
+
   const [expanded, setExpanded] = useState(false);
   const [stats, setStats] = useState(() => {
     if (!profile?.id) return null;
@@ -180,7 +196,12 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
           {t('profile.interests')}
         </h3>
 
-        {!canViewContent && !isOwnProfile ? (
+        {isBlocked ? (
+          <div className="profile-sidebar-private">
+            <FaBan className="profile-sidebar-private-icon" />
+            <span>{t('block.interests_hidden')}</span>
+          </div>
+        ) : !canViewContent && !isOwnProfile ? (
           <div className="profile-sidebar-private">
             <FaLock className="profile-sidebar-private-icon" />
             <span>{t('profile.private_interests_hidden')}</span>
@@ -216,7 +237,12 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
       {showStats && (
         <div className="profile-sidebar-card" style={surfaceStyle}>
         <h3 className="profile-sidebar-title">{t('profile.stats_title')}</h3>
-        {isStatsHidden ? (
+        {isBlocked ? (
+          <div className="profile-sidebar-private">
+            <FaBan className="profile-sidebar-private-icon" />
+            <span>{t('block.stats_hidden')}</span>
+          </div>
+        ) : isStatsHidden ? (
           <div className="profile-sidebar-private">
             <FaLock className="profile-sidebar-private-icon" />
             <span>{t('profile.stats_private_label')}</span>
