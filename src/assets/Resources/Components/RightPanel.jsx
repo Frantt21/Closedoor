@@ -166,10 +166,9 @@ function ProfileContent({ path, ownProfile, user, t }) {
 
   const { showAccent, accentVisibility, showTrending, showInterests, showProfileStats } = useI18n();
 
-  // ── Home page: placeholder de tendencias ──
-  // ── Trending hashtags (shown on home page and non-profile pages) ──
+  // ── Home page y otras rutas no-perfil: trending siempre visible ──
   if (isHomePage || (!isOwnProfilePage && !isOtherProfilePage)) {
-    return showTrending ? <TrendingHashtags t={t} /> : null;
+    return <TrendingHashtags t={t} />;
   }
 
   // ── Profile page ──
@@ -207,17 +206,19 @@ function ProfileContent({ path, ownProfile, user, t }) {
     ? accentVisibility
     : (activeProfile?.accent_visibility ?? 'both');
 
-  // Preferencias de visibilidad de cards para perfiles ajenos
-  // Se combinan con la preferencia local (AND): ambas deben ser true para mostrar
+  // Preferencias de visibilidad de cards:
+  // - Perfil propio: usa la preferencia local (lo que el usuario configuró)
+  // - Perfiles ajenos: usa la preferencia del DUEÑO del perfil (de Supabase)
+  //   La preferencia local NO afecta lo que ves en perfiles ajenos
   const ownerShowInterests = isOwnProfileRight
     ? showInterests
-    : (showInterests && (activeProfile?.show_interests ?? true));
+    : (activeProfile?.show_interests ?? true);
   const ownerShowStats = isOwnProfileRight
     ? showProfileStats
-    : (showProfileStats && (activeProfile?.show_profile_stats ?? true));
+    : (activeProfile?.show_profile_stats ?? true);
   const ownerShowTrending = isOwnProfileRight
     ? showTrending
-    : (showTrending && (activeProfile?.show_trending ?? true));
+    : (activeProfile?.show_trending ?? true);
 
   const accentVisibleRight = showAccent && ownerShowAccentProfile && (
     ownerAccentVisibility === 'both' ||
