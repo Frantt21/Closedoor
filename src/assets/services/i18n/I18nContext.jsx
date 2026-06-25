@@ -10,7 +10,8 @@ const ACCENT_VISIBILITY_KEY = 'fc_accent_visibility';
 const SHOW_INTERESTS_KEY = 'fc_show_interests';
 const SHOW_TRENDING_KEY = 'fc_show_trending';
 const SHOW_PROFILE_STATS_KEY = 'fc_show_profile_stats';
-const SHOW_LIVE_NOTIFS_KEY = 'fc_show_live_notifications';
+const SHOW_TOAST_NOTIFS_KEY = 'fc_show_toast_notifications';
+const SHOW_PUSH_NOTIFS_KEY = 'fc_show_push_notifications';
 
 const locales = { es };
 
@@ -93,13 +94,23 @@ function getSavedShowProfileStats() {
   }
 }
 
-function getSavedShowLiveNotifications() {
+function getSavedShowToastNotifications() {
   try {
-    const val = localStorage.getItem(SHOW_LIVE_NOTIFS_KEY);
-    return val === null ? true : val === 'true';
-  } catch {
-    return true;
-  }
+    const val = localStorage.getItem(SHOW_TOAST_NOTIFS_KEY);
+    if (val !== null) return val === 'true';
+    // Migración desde la antigua key fc_show_live_notifications
+    const oldVal = localStorage.getItem('fc_show_live_notifications');
+    const defaultVal = oldVal !== null ? oldVal === 'true' : true;
+    localStorage.setItem(SHOW_TOAST_NOTIFS_KEY, String(defaultVal));
+    return defaultVal;
+  } catch { return true; }
+}
+
+function getSavedShowPushNotifications() {
+  try {
+    const val = localStorage.getItem(SHOW_PUSH_NOTIFS_KEY);
+    return val === null ? false : val === 'true';
+  } catch { return false; }
 }
 
 export const I18nContext = createContext({
@@ -120,8 +131,10 @@ export const I18nContext = createContext({
   setShowTrending: () => {},
   showProfileStats: true,
   setShowProfileStats: () => {},
-  showLiveNotifications: true,
-  setShowLiveNotifications: () => {},
+  showToastNotifications: true,
+  setShowToastNotifications: () => {},
+  showPushNotifications: false,
+  setShowPushNotifications: () => {},
   theme: 'dark',
   setTheme: () => {},
 });
@@ -136,7 +149,8 @@ export function I18nProvider({ children }) {
   const [showInterests, setShowInterestsState] = useState(getSavedShowInterests);
   const [showTrending, setShowTrendingState] = useState(getSavedShowTrending);
   const [showProfileStats, setShowProfileStatsState] = useState(getSavedShowProfileStats);
-  const [showLiveNotifications, setShowLiveNotificationsState] = useState(getSavedShowLiveNotifications);
+  const [showToastNotifications, setShowToastNotificationsState] = useState(getSavedShowToastNotifications);
+  const [showPushNotifications, setShowPushNotificationsState] = useState(getSavedShowPushNotifications);
   const [theme, setThemeState] = useState(getSavedTheme);
 
   // Cargar el archivo de locale asíncrono
@@ -212,10 +226,17 @@ export function I18nProvider({ children }) {
     } catch {}
   }, []);
 
-  const setShowLiveNotifications = useCallback((value) => {
-    setShowLiveNotificationsState(value);
+  const setShowToastNotifications = useCallback((value) => {
+    setShowToastNotificationsState(value);
     try {
-      localStorage.setItem(SHOW_LIVE_NOTIFS_KEY, String(value));
+      localStorage.setItem(SHOW_TOAST_NOTIFS_KEY, String(value));
+    } catch {}
+  }, []);
+
+  const setShowPushNotifications = useCallback((value) => {
+    setShowPushNotificationsState(value);
+    try {
+      localStorage.setItem(SHOW_PUSH_NOTIFS_KEY, String(value));
     } catch {}
   }, []);
 
@@ -243,7 +264,7 @@ export function I18nProvider({ children }) {
   }, [translations]);
 
   return (
-    <I18nContext.Provider value={{ locale, t, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, showLiveNotifications, setShowLiveNotifications, theme, setTheme }}>
+    <I18nContext.Provider      value={{ locale, t, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showPushNotifications, setShowPushNotifications, theme, setTheme }}>
       {children}
     </I18nContext.Provider>
   );

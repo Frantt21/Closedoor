@@ -113,6 +113,7 @@ export default function Modal({
   const [showUrlModal, setShowUrlModal] = useState(null);
   const [urlInput, setUrlInput] = useState('');
   const [showSuggested, setShowSuggested] = useState(false);
+  const [socialLinksExpanded, setSocialLinksExpanded] = useState(false);
   const [showProfileBgSubmodal, setShowProfileBgSubmodal] = useState(null);
   const [profileBgUrlInput, setProfileBgUrlInput] = useState('');
   const [pendingClose, setPendingClose] = useState(false);
@@ -468,37 +469,37 @@ export default function Modal({
               </div>
             )}
 
-            {/* Username input */}
-            <label className="fc-modal-label">
-              {t('modal.username_label')}
-              <input
-                className="fc-modal-input"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="username"
-              />
-            </label>
-
-            {/* Bio */}
-            <label className="fc-modal-label">
-              {t('modal.bio_label')}
-              <textarea
-                className="fc-modal-input"
-                value={bio}
-                onChange={(e) => {
-                  if (e.target.value.length <= BIO_MAX_LENGTH) setBio(e.target.value);
-                }}
-                rows={2}
-                maxLength={BIO_MAX_LENGTH}
-                placeholder={t('modal.bio_label')}
-              />
-              <span className="fc-modal-char-count">
-                {bio.length}/{BIO_MAX_LENGTH}
-              </span>
-            </label>
+            {/* Perfil — Username + Bio */}
+            <div className="fc-modal-card">
+              <label className="fc-modal-label">
+                {t('modal.username_label')}
+                <input
+                  className="fc-modal-input"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="username"
+                />
+              </label>
+              <label className="fc-modal-label">
+                {t('modal.bio_label')}
+                <textarea
+                  className="fc-modal-input"
+                  value={bio}
+                  onChange={(e) => {
+                    if (e.target.value.length <= BIO_MAX_LENGTH) setBio(e.target.value);
+                  }}
+                  rows={2}
+                  maxLength={BIO_MAX_LENGTH}
+                  placeholder={t('modal.bio_label')}
+                />
+                <span className="fc-modal-char-count">
+                  {bio.length}/{BIO_MAX_LENGTH}
+                </span>
+              </label>
+            </div>
 
             {/* ── Interests ── */}
-            <div className="fc-modal-section">
+            <div className="fc-modal-card">
               <label className="fc-modal-label">{t('modal.interests')}</label>
 
               {/* Input + add button */}
@@ -593,7 +594,7 @@ export default function Modal({
             </div>
 
             {/* ── Social Links ── */}
-            <div className="fc-modal-section">
+            <div className="fc-modal-card">
               <label className="fc-modal-label">{t('modal.social_links')}</label>
               <div className="fc-modal-social-input-row">
                 <input
@@ -636,12 +637,34 @@ export default function Modal({
                   </button>
                 </div>
               )}
+              {/* ── Social links list (colapsable) ── */}
               {socialLinks.length > 0 && (
-                <ul className="fc-modal-social-list">
+              <div className="fc-modal-suggested-wrapper">
+                <button
+                  type="button"
+                  className="fc-modal-suggested-toggle"
+                  onClick={() => setSocialLinksExpanded((prev) => !prev)}
+                >
+                  <span>{t('modal.social_links')} ({socialLinks.length})</span>
+                  <svg
+                    className={`fc-modal-suggested-chevron ${socialLinksExpanded ? 'fc-modal-suggested-chevron--open' : ''}`}
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+                <div className={`fc-modal-suggested-collapse ${socialLinksExpanded ? 'fc-modal-suggested-collapse--open' : ''}`}>
+                <div className="fc-modal-social-list">
                   {socialLinks.map((link, i) => (
-                    <li key={i} className="fc-modal-social-item">
+                    <div key={i} className="fc-modal-social-item">
                       <span className="fc-modal-social-icon">{React.createElement(getPlatformIcon(link.platform))}</span>
-                      <span className="fc-modal-social-platform">{link.platform}</span>
                       <span className="fc-modal-social-username">@{link.username}</span>
                       <button
                         type="button"
@@ -651,9 +674,11 @@ export default function Modal({
                       >
                         ×
                       </button>
-                    </li>
+                    </div>
                   ))}
-                </ul>
+                </div>
+                </div>
+              </div>
               )}
               <p className="fc-modal-social-hint">{t('modal.social_example')}</p>
             </div>
@@ -666,7 +691,7 @@ export default function Modal({
               style={{
                 '--accent-color': selectedAccent || 'transparent',
                 '--accent-color-2': selectedAccentSecondary || selectedAccent || 'transparent',
-                marginBottom: 16,
+                marginBottom: 0,
               }}
             >
               <div className="explore-card-banner">
@@ -714,10 +739,7 @@ export default function Modal({
                         <button
                           type="button"
                           className="explore-card-interests-more"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            window.location.href = `/profile/${username}`;
-                          }}
+                          disabled
                         >
                           {t('profile.show_more', { count: interests.length - 3 })}
                         </button>
@@ -734,10 +756,11 @@ export default function Modal({
               </div>
             </div>
 
-            {/* ── Accent Color — swatches + custom picker integrado ── */}
-            <div className="fc-modal-section">
+            {/* ── Accent Color — consolidado (principal, secundario, superficie + glass) ── */}
+            <div className="fc-modal-card">
               <label className="fc-modal-label">{t('modal.accent_color')}</label>
 
+              {/* ── Color principal ── */}
               {banner.trim() && extracting && (
                 <p className="fc-modal-social-hint">{t('modal.extracting_colors')}</p>
               )}
@@ -745,178 +768,180 @@ export default function Modal({
                 <p className="fc-modal-social-hint">{t('modal.add_banner_hint')}</p>
               )}
 
-              <div className="fc-modal-color-picker">
-                {banner.trim() && !extracting && extractedColors.length >= 4 && extractedColors.map((color, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    className={`fc-modal-color-swatch ${selectedAccent === color ? 'fc-modal-color-swatch--selected' : ''}`}
-                    style={{ '--swatch-color': color }}
-                    onClick={() => setSelectedAccent(color)}
-                    title={`${t('modal.accent_color')}: ${color}`}
-                  >
-                    {selectedAccent === color && (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    )}
-                  </button>
-                ))}
+              <div className="fc-modal-color-section">
+                <span className="fc-modal-color-subtitle">Color principal</span>
+                <div className="fc-modal-color-picker">
+                  {banner.trim() && !extracting && extractedColors.length >= 4 && extractedColors.map((color, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className={`fc-modal-color-swatch ${selectedAccent === color ? 'fc-modal-color-swatch--selected' : ''}`}
+                      style={{ '--swatch-color': color }}
+                      onClick={() => setSelectedAccent(color)}
+                      title={`${t('modal.accent_color')}: ${color}`}
+                    >
+                      {selectedAccent === color && (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </button>
+                  ))}
 
-                <div className="fc-modal-color-swatch fc-modal-custom-swatch"
-                  onClick={() => document.getElementById('accent-color-input')?.click()}
-                  title={`${t('modal.accent_color_custom')}: ${selectedAccent || '#000000'}`}
-                >
+                  <div className="fc-modal-color-swatch fc-modal-custom-swatch"
+                    onClick={() => document.getElementById('accent-color-input')?.click()}
+                    title={`${t('modal.accent_color_custom')}: ${selectedAccent || '#000000'}`}
+                  >
+                    <input
+                      id="accent-color-input"
+                      type="color"
+                      value={selectedAccent || '#000000'}
+                      onChange={(e) => setSelectedAccent(e.target.value)}
+                      style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
+                    />
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                    </svg>
+                  </div>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted, #6b7280)', whiteSpace: 'nowrap', alignSelf: 'center' }}>
+                    {t('modal.accent_color_custom')}
+                  </span>
+                </div>
+
+                {selectedAccent && extractedColors.length > 0 && !extractedColors.includes(selectedAccent) && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedAccent(extractedColors[0] || '')}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--color-text-muted, #6b7280)',
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      padding: '2px 0',
+                      marginTop: 4,
+                      textDecoration: 'underline',
+                      textUnderlineOffset: 2,
+                    }}
+                  >
+                    {t('common.reset')}
+                  </button>
+                )}
+              </div>
+
+              {/* ── Color secundario ── */}
+              <div className="fc-modal-color-section">
+                <span className="fc-modal-color-subtitle">{t('modal.accent_color_secondary')}</span>
+                <div className="fc-modal-color-picker">
+                  <div
+                    onClick={() => document.getElementById('accent-secondary-input')?.click()}
+                    className="fc-modal-color-swatch"
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: '50%',
+                      background: selectedAccentSecondary || '#000000',
+                      border: '2px solid var(--color-border, #2a2a2a)',
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                      transition: 'transform 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                    title={`${t('modal.accent_color_secondary')}: ${selectedAccentSecondary || '#000000'}`}
+                  />
                   <input
-                    id="accent-color-input"
+                    id="accent-secondary-input"
                     type="color"
-                    value={selectedAccent || '#000000'}
-                    onChange={(e) => setSelectedAccent(e.target.value)}
+                    value={selectedAccentSecondary || '#000000'}
+                    onChange={(e) => setSelectedAccentSecondary(e.target.value)}
                     style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
                   />
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="3" />
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                  </svg>
+                  {selectedAccentSecondary && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAccentSecondary('')}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--color-text-muted, #6b7280)',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        padding: '2px 6px',
+                      }}
+                    >
+                      {t('common.clear')}
+                    </button>
+                  )}
                 </div>
-                <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted, #6b7280)', whiteSpace: 'nowrap', alignSelf: 'center' }}>
-                  {t('modal.accent_color_custom')}
-                </span>
               </div>
 
-              {selectedAccent && extractedColors.length > 0 && !extractedColors.includes(selectedAccent) && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedAccent(extractedColors[0] || '')}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: 'var(--color-text-muted, #6b7280)',
-                    fontSize: '0.75rem',
-                    cursor: 'pointer',
-                    padding: '2px 0',
-                    marginTop: 4,
-                    textDecoration: 'underline',
-                    textUnderlineOffset: 2,
-                  }}
-                >
-                  {t('common.reset')}
-                </button>
-              )}
-            </div>
-
-            {/* ── Secondary accent color picker ── */}
-            <div className="fc-modal-section">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <label style={{ fontSize: '0.8rem', color: 'var(--color-text-muted, #6b7280)', whiteSpace: 'nowrap' }}>
-                  {t('modal.accent_color_secondary')}
-                </label>
-                <div
-                  onClick={() => document.getElementById('accent-secondary-input')?.click()}
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '50%',
-                    background: selectedAccentSecondary || '#000000',
-                    border: '2px solid var(--color-border, #2a2a2a)',
-                    cursor: 'pointer',
-                    flexShrink: 0,
-                    transition: 'transform 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
-                  onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                  title={`${t('modal.accent_color_secondary')}: ${selectedAccentSecondary || '#000000'}`}
-                />
-                <input
-                  id="accent-secondary-input"
-                  type="color"
-                  value={selectedAccentSecondary || '#000000'}
-                  onChange={(e) => setSelectedAccentSecondary(e.target.value)}
-                  style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
-                />
-                {selectedAccentSecondary && (
+              {/* ── Color de superficie + Glass ── */}
+              <div className="fc-modal-color-section">
+                <span className="fc-modal-color-subtitle">{t('modal.accent_surface')}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                  <div
+                    onClick={() => document.getElementById('accent-surface-input')?.click()}
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: '50%',
+                      background: selectedAccentSurface || 'rgba(28, 28, 30, 0.7)',
+                      border: selectedAccentSurface ? '2px solid var(--color-border, #2a2a2a)' : '2px dashed var(--color-text-muted, #6b7280)',
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                      transition: 'transform 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                    title={`${t('modal.accent_surface')}: ${selectedAccentSurface || t('modal.accent_surface_default')}`}
+                  />
+                  <input
+                    id="accent-surface-input"
+                    type="color"
+                    value={selectedAccentSurface || '#1c1c1e'}
+                    onChange={(e) => setSelectedAccentSurface(e.target.value)}
+                    style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
+                  />
+                  <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted, #6b7280)' }}>
+                    {selectedAccentSurface ? selectedAccentSurface : t('modal.accent_surface_default')}
+                  </span>
+                  {selectedAccentSurface && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAccentSurface('')}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--color-text-muted, #6b7280)',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        padding: '2px 6px',
+                      }}
+                    >
+                      {t('common.clear')}
+                    </button>
+                  )}
+                </div>
+                {/* ── Glass mode toggle ── */}
+                <div className="fc-modal-glass-toggle">
+                  <span className="fc-modal-glass-toggle-label">{t('modal.accent_surface_glass')}</span>
                   <button
                     type="button"
-                    onClick={() => setSelectedAccentSecondary('')}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--color-text-muted, #6b7280)',
-                      fontSize: '0.75rem',
-                      cursor: 'pointer',
-                      padding: '2px 6px',
-                    }}
+                    className={`fc-modal-glass-switch ${useGlassSurface ? 'fc-modal-glass-switch--on' : ''}`}
+                    onClick={() => setUseGlassSurface((prev) => !prev)}
+                    role="switch"
+                    aria-checked={useGlassSurface}
                   >
-                    {t('common.clear')}
+                    <div className="fc-modal-glass-switch-knob" />
                   </button>
-                )}
-              </div>
-            </div>
-
-            {/* ── Surface color picker + Glass mode toggle ── */}
-            <div className="fc-modal-section">
-              <label className="fc-modal-label">{t('modal.accent_surface')}</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                <div
-                  onClick={() => document.getElementById('accent-surface-input')?.click()}
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '50%',
-                    background: selectedAccentSurface || 'rgba(28, 28, 30, 0.7)',
-                    border: selectedAccentSurface ? '2px solid var(--color-border, #2a2a2a)' : '2px dashed var(--color-text-muted, #6b7280)',
-                    cursor: 'pointer',
-                    flexShrink: 0,
-                    transition: 'transform 0.15s ease',
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
-                  onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
-                  title={`${t('modal.accent_surface')}: ${selectedAccentSurface || t('modal.accent_surface_default')}`}
-                />
-                <input
-                  id="accent-surface-input"
-                  type="color"
-                  value={selectedAccentSurface || '#1c1c1e'}
-                  onChange={(e) => setSelectedAccentSurface(e.target.value)}
-                  style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
-                />
-                <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted, #6b7280)' }}>
-                  {selectedAccentSurface ? selectedAccentSurface : t('modal.accent_surface_default')}
-                </span>
-                {selectedAccentSurface && (
-                  <button
-                    type="button"
-                    onClick={() => setSelectedAccentSurface('')}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--color-text-muted, #6b7280)',
-                      fontSize: '0.75rem',
-                      cursor: 'pointer',
-                      padding: '2px 6px',
-                    }}
-                  >
-                    {t('common.clear')}
-                  </button>
-                )}
-              </div>
-              {/* ── Glass mode toggle ── */}
-              <div className="fc-modal-glass-toggle">
-                <span className="fc-modal-glass-toggle-label">{t('modal.accent_surface_glass')}</span>
-                <button
-                  type="button"
-                  className={`fc-modal-glass-switch ${useGlassSurface ? 'fc-modal-glass-switch--on' : ''}`}
-                  onClick={() => setUseGlassSurface((prev) => !prev)}
-                  role="switch"
-                  aria-checked={useGlassSurface}
-                >
-                  <div className="fc-modal-glass-switch-knob" />
-                </button>
+                </div>
               </div>
             </div>
 
             {/* ── Profile Background ── */}
-            <div className="fc-modal-section">
+            <div className="fc-modal-card">
               <label className="fc-modal-label">{t('modal.profile_background')}</label>
 
               <div className="fc-modal-bg-preview-row">

@@ -62,13 +62,15 @@ const LANGUAGES = [
 
 const CATEGORIES = [
   { id: 'system', icon: FaCog, titleKey: 'settings.category_system', descKey: 'settings.category_system_desc' },
+  { id: 'profile', icon: FaUser, titleKey: 'settings.category_profile', descKey: 'settings.category_profile_desc' },
+  { id: 'notifications', icon: FaBell, titleKey: 'settings.category_notifications', descKey: 'settings.category_notifications_desc' },
   { id: 'privacy', icon: FaEyeSlash, titleKey: 'settings.category_privacy', descKey: 'settings.category_privacy_desc' },
 ];
 
 /* ── Main Settings Component ── */
 
 export default function Settings() {
-  const { locale, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, showLiveNotifications, setShowLiveNotifications, theme, setTheme, t } = useI18n();
+  const { locale, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showPushNotifications, setShowPushNotifications, theme, setTheme, t } = useI18n();
   usePageTitle(t('settings.title'));
   const { user, profile, profileLoading, refreshProfile } = useAuth();
   const [selectOpen, setSelectOpen] = useState(false);
@@ -77,6 +79,7 @@ export default function Settings() {
   const [statsPrivacyUpdating, setStatsPrivacyUpdating] = useState(false);
   const [activeCategory, setActiveCategory] = useState('system');
   const [accentExpanded, setAccentExpanded] = useState(false);
+  const [cardsExpanded, setCardsExpanded] = useState(false);
   const [statsExpanded, setStatsExpanded] = useState(false);
 
   const isPrivate = profile?.is_private ?? false;
@@ -280,10 +283,12 @@ export default function Settings() {
                   </button>
                 </div>
               </div>
+            </>
+          )}
 
-              <div className="settings-row-divider" />
-
-              {/* ── Colores de acento: toggle general + sub-opciones expandibles ── */}
+          {activeCategory === 'profile' && (
+            <>
+              {/* ── Colores de acento ── */}
               <div className="settings-row">
                 <div className="settings-row-header">
                   <span className="settings-section-icon"><FaPalette /></span>
@@ -304,7 +309,7 @@ export default function Settings() {
                 </button>
               </div>
 
-              {/* Expandir sub-opciones */}
+              {/* Expandir sub-opciones de acento */}
               <button
                 type="button"
                 className="settings-stats-expand-btn"
@@ -415,7 +420,7 @@ export default function Settings() {
 
               <div className="settings-row-divider" />
 
-              {/* ── Perfil ── */}
+              {/* ── Visibilidad de cards ── */}
               <div className="settings-row">
                 <div className="settings-row-header">
                   <span className="settings-section-icon"><FaEye /></span>
@@ -426,58 +431,101 @@ export default function Settings() {
                 </div>
               </div>
 
-              {/* Mostrar intereses */}
-              <div className="settings-row">
-                <div className="settings-row-header">
-                  <span className="settings-section-icon"><FaTags /></span>
-                  <div>
-                    <h2 className="settings-section-title">{t('settings.show_interests')}</h2>
-                    <p className="settings-section-desc">{t('settings.show_interests_desc')}</p>
+              {/* Expandir sub-opciones de cards */}
+              <button
+                type="button"
+                className="settings-stats-expand-btn"
+                onClick={() => setCardsExpanded((s) => !s)}
+              >
+                <span className={`settings-stats-expand-arrow ${cardsExpanded ? 'settings-stats-expand-arrow--open' : ''}`}>
+                  <FaChevronRight />
+                </span>
+                <span>{cardsExpanded ? t('settings.cards_hide_details') : t('settings.cards_show_details')}</span>
+              </button>
+
+              {cardsExpanded && (
+                <div className="settings-accent-list">
+                  {/* Mostrar intereses */}
+                  <div className="settings-row">
+                    <div className="settings-row-header">
+                      <span className="settings-section-icon"><FaTags /></span>
+                      <div>
+                        <h2 className="settings-section-title">{t('settings.show_interests')}</h2>
+                        <p className="settings-section-desc">{t('settings.show_interests_desc')}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className={`settings-toggle ${showInterests ? 'settings-toggle--active' : ''}`}
+                      onClick={() => {
+                        const next = !showInterests;
+                        setShowInterests(next);
+                        syncProfilePref('show_interests', next);
+                      }}
+                      aria-pressed={showInterests}
+                    >
+                      <span className="settings-toggle-track">
+                        <span className="settings-toggle-thumb" />
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Mostrar estadísticas */}
+                  <div className="settings-row">
+                    <div className="settings-row-header">
+                      <span className="settings-section-icon"><FaChartBar /></span>
+                      <div>
+                        <h2 className="settings-section-title">{t('settings.show_stats_card')}</h2>
+                        <p className="settings-section-desc">{t('settings.show_stats_card_desc')}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className={`settings-toggle ${showProfileStats ? 'settings-toggle--active' : ''}`}
+                      onClick={() => {
+                        const next = !showProfileStats;
+                        setShowProfileStats(next);
+                        syncProfilePref('show_profile_stats', next);
+                      }}
+                      aria-pressed={showProfileStats}
+                    >
+                      <span className="settings-toggle-track">
+                        <span className="settings-toggle-thumb" />
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Mostrar tendencias */}
+                  <div className="settings-row">
+                    <div className="settings-row-header">
+                      <span className="settings-section-icon"><FaFire /></span>
+                      <div>
+                        <h2 className="settings-section-title">{t('settings.show_trending')}</h2>
+                        <p className="settings-section-desc">{t('settings.show_trending_desc')}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className={`settings-toggle ${showTrending ? 'settings-toggle--active' : ''}`}
+                      onClick={() => {
+                        const next = !showTrending;
+                        setShowTrending(next);
+                        syncProfilePref('show_trending', next);
+                      }}
+                      aria-pressed={showTrending}
+                    >
+                      <span className="settings-toggle-track">
+                        <span className="settings-toggle-thumb" />
+                      </span>
+                    </button>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className={`settings-toggle ${showInterests ? 'settings-toggle--active' : ''}`}
-                  onClick={() => {
-                    const next = !showInterests;
-                    setShowInterests(next);
-                    syncProfilePref('show_interests', next);
-                  }}
-                  aria-pressed={showInterests}
-                >
-                  <span className="settings-toggle-track">
-                    <span className="settings-toggle-thumb" />
-                  </span>
-                </button>
-              </div>
+              )}
+            </>
+          )}
 
-              {/* Mostrar estadísticas */}
-              <div className="settings-row">
-                <div className="settings-row-header">
-                  <span className="settings-section-icon"><FaChartBar /></span>
-                  <div>
-                    <h2 className="settings-section-title">{t('settings.show_stats_card')}</h2>
-                    <p className="settings-section-desc">{t('settings.show_stats_card_desc')}</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className={`settings-toggle ${showProfileStats ? 'settings-toggle--active' : ''}`}
-                  onClick={() => {
-                    const next = !showProfileStats;
-                    setShowProfileStats(next);
-                    syncProfilePref('show_profile_stats', next);
-                  }}
-                  aria-pressed={showProfileStats}
-                >
-                  <span className="settings-toggle-track">
-                    <span className="settings-toggle-thumb" />
-                  </span>
-                </button>
-              </div>
-
-              <div className="settings-row-divider" />
-
+          {activeCategory === 'notifications' && (
+            <>
               {/* ── Notificaciones ── */}
               <div className="settings-row">
                 <div className="settings-row-header">
@@ -489,24 +537,20 @@ export default function Settings() {
                 </div>
               </div>
 
-              {/* Mostrar tendencias */}
+              {/* Notificaciones toast */}
               <div className="settings-row">
                 <div className="settings-row-header">
-                  <span className="settings-section-icon"><FaFire /></span>
+                  <span className="settings-section-icon"><FaBell /></span>
                   <div>
-                    <h2 className="settings-section-title">{t('settings.show_trending')}</h2>
-                    <p className="settings-section-desc">{t('settings.show_trending_desc')}</p>
+                    <h2 className="settings-section-title">{t('settings.show_toast_notifications')}</h2>
+                    <p className="settings-section-desc">{t('settings.show_toast_notifications_desc')}</p>
                   </div>
                 </div>
                 <button
                   type="button"
-                  className={`settings-toggle ${showTrending ? 'settings-toggle--active' : ''}`}
-                  onClick={() => {
-                    const next = !showTrending;
-                    setShowTrending(next);
-                    syncProfilePref('show_trending', next);
-                  }}
-                  aria-pressed={showTrending}
+                  className={`settings-toggle ${showToastNotifications ? 'settings-toggle--active' : ''}`}
+                  onClick={() => setShowToastNotifications(!showToastNotifications)}
+                  aria-pressed={showToastNotifications}
                 >
                   <span className="settings-toggle-track">
                     <span className="settings-toggle-thumb" />
@@ -514,20 +558,27 @@ export default function Settings() {
                 </button>
               </div>
 
-              {/* Notificaciones en vivo */}
+              {/* Notificaciones push */}
               <div className="settings-row">
                 <div className="settings-row-header">
                   <span className="settings-section-icon"><FaBell /></span>
                   <div>
-                    <h2 className="settings-section-title">{t('settings.show_live_notifications')}</h2>
-                    <p className="settings-section-desc">{t('settings.show_live_notifications_desc')}</p>
+                    <h2 className="settings-section-title">{t('settings.show_push_notifications')}</h2>
+                    <p className="settings-section-desc">{t('settings.show_push_notifications_desc')}</p>
                   </div>
                 </div>
                 <button
                   type="button"
-                  className={`settings-toggle ${showLiveNotifications ? 'settings-toggle--active' : ''}`}
-                  onClick={() => setShowLiveNotifications(!showLiveNotifications)}
-                  aria-pressed={showLiveNotifications}
+                  className={`settings-toggle ${showPushNotifications ? 'settings-toggle--active' : ''}`}
+                  onClick={() => {
+                    const next = !showPushNotifications;
+                    setShowPushNotifications(next);
+                    // Si se activa push, pedir permiso al navegador
+                    if (next && 'Notification' in window && Notification.permission === 'default') {
+                      Notification.requestPermission();
+                    }
+                  }}
+                  aria-pressed={showPushNotifications}
                 >
                   <span className="settings-toggle-track">
                     <span className="settings-toggle-thumb" />

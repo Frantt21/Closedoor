@@ -100,23 +100,26 @@ async function tryShowOsNotification(message, avatarUrl, link, tag) {
 function showLiveNotification(data) {
   if (!data?.actor) return;
 
-  // Verificar preferencia del usuario (localStorage)
-  try {
-    if (localStorage.getItem('fc_show_live_notifications') === 'false') return;
-  } catch {}
-
   const username = data.actor.username || 'Alguien';
   const message = getNotifMessage(data.type, username);
   const link = getNotifLink(data);
   const avatarUrl = data.actor.avatar_url;
 
-  // ── Tab oculto o sin foco → OS Notification ──
+  // ── Tab oculto o sin foco → OS Notification (si habilitada) ──
   if (document.visibilityState === 'hidden' || !document.hasFocus()) {
-    tryShowOsNotification(message, avatarUrl, link, data.id);
+    try {
+      if (localStorage.getItem('fc_show_push_notifications') === 'true') {
+        tryShowOsNotification(message, avatarUrl, link, data.id);
+      }
+    } catch {}
     return;
   }
 
-  // ── Tab visible → Toast con React Router Link (evita recarga completa) ──
+  // ── Tab visible → Toast (si habilitada) ──
+  try {
+    if (localStorage.getItem('fc_show_toast_notifications') === 'false') return;
+  } catch {}
+
   toast(
     <Link to={link} className="fc-notif-toast" onClick={(e) => e.stopPropagation()}>
       {avatarUrl && (
