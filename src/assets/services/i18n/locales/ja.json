@@ -307,5 +307,9 @@
   "settings.theme_dark": "ダーク",
   "settings.theme_desc": "アプリケーションのテーマを選択します。",
   "settings.theme_light": "ライト",
-  "settings.title": "設定"
+  "settings.title": "設定",
+
+  "block.block": "ユーザーをブロック",
+  "block.unblock": "ブロックを解除",
+  "block.blocked": "ブロック済み"
 }

@@ -324,5 +324,9 @@
 
   "post_modal.edit_avatar": "Cambiar avatar",
   "post_modal.edit_banner": "Cambiar banner",
-  "post_modal.url_placeholder": "Pega la URL de la imagen..."
+  "post_modal.url_placeholder": "Pega la URL de la imagen...",
+
+  "block.block": "Bloquear usuario",
+  "block.unblock": "Desbloquear usuario",
+  "block.blocked": "Bloqueado"
 }

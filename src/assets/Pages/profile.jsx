@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { supabase } from "../services/supabaseclient";
@@ -43,8 +43,9 @@ import "../Resources/Styles/post.css";
 import Modal from "../Resources/Components/Modal";
 import Badge from "../Resources/Components/Badge";
 import { getPlatformIcon, getPlatformName } from "../services/socialPlatforms";
-import { FaFeather, FaBookmark, FaLock } from 'react-icons/fa';
+import { FaFeather, FaBookmark, FaLock, FaEllipsisV, FaBan } from 'react-icons/fa';
 import FollowButton from "../Resources/Components/FollowButton";
+import { blockUser, unblockUser, isBlocked } from "../services/blockService";
 import { useI18n } from "../services/i18n/useI18n";
 import { getContrastText, isUUID } from "../services/helpers";
 import usePageTitle from "../../hooks/usePageTitle";
@@ -193,7 +194,30 @@ function Profile() {
         refreshCounts();
     }, [activeProfile?.id]);
 
-    // ── Check if current user follows this profile (solo una vez, cache + Realtime) ──
+      // ── Check if current user has blocked this profile ──
+  useEffect(() => {
+    if (!user?.id || !activeProfile?.id || isOwnProfile) {
+      setIsBlockedByMe(false);
+      return;
+    }
+    isBlocked(user.id, activeProfile.id)
+      .then((blocked) => setIsBlockedByMe(blocked))
+      .catch((err) => console.warn('Error checking block status:', err));
+  }, [user?.id, activeProfile?.id, isOwnProfile]);
+
+  // ── Close context menu on outside click ──
+  useEffect(() => {
+    if (!contextMenuOpen) return;
+    const handleClick = (e) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
+        setContextMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [contextMenuOpen]);
+
+// ── Check if current user follows this profile (solo una vez, cache + Realtime) ──
     useEffect(() => {
         if (!user?.id || !activeProfile?.id || isOwnProfile) {
             setIsFollower(null);
@@ -247,6 +271,10 @@ function Profile() {
     const [followersModal, setFollowersModal] = useState({ open: false, type: "followers" });
     // ── Social Links modal state ──
     const [socialLinksModal, setSocialLinksModal] = useState(false);
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [isBlockedByMe, setIsBlockedByMe] = useState(false);
+  const [blockLoading, setBlockLoading] = useState(false);
+  const contextMenuRef = useRef(null);
 
     const openFollowersModal = (type) => {
         if (activeProfile?.id && canViewContent) {
@@ -1017,6 +1045,7 @@ function Profile() {
                                     {t('profile.edit')}
                                 </button>
                             ) : (
+                                <>
                                 <FollowButton
                                     targetUserId={activeProfile.id}
                                     isPrivate={isPrivate}
@@ -1031,6 +1060,49 @@ function Profile() {
                                         }
                                     }}
                                 />
+                                {/* ── 3-dots context menu ── */}
+                                {user && (
+                                  <div className="profile-actions-menu" ref={contextMenuRef}>
+                                    <button
+                                      type="button"
+                                      className="profile-actions-menu-btn"
+                                      onClick={(e) => { e.stopPropagation(); setContextMenuOpen((s) => !s); }}
+                                      aria-label="More actions"
+                                    >
+                                      <FaEllipsisV />
+                                    </button>
+                                    {contextMenuOpen && (
+                                      <div className="profile-actions-dropdown" onClick={(e) => e.stopPropagation()}>
+                                        <button
+                                          type="button"
+                                          className="profile-actions-dropdown-btn"
+                                          onClick={async () => {
+                                            setBlockLoading(true);
+                                            try {
+                                              if (isBlockedByMe) {
+                                                await unblockUser(user.id, activeProfile.id);
+                                                setIsBlockedByMe(false);
+                                              } else {
+                                                await blockUser(user.id, activeProfile.id);
+                                                setIsBlockedByMe(true);
+                                              }
+                                              setContextMenuOpen(false);
+                                            } catch (err) {
+                                              console.error('Block/unblock error:', err);
+                                            } finally {
+                                              setBlockLoading(false);
+                                            }
+                                          }}
+                                          disabled={blockLoading}
+                                        >
+                                          <FaBan />
+                                          {isBlockedByMe ? t('block.unblock') : t('block.block')}
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                                </>
                             )}
                         </div>
                     </div>

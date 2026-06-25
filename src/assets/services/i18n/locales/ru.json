@@ -307,5 +307,9 @@
   "settings.theme_dark": "Тёмная",
   "settings.theme_desc": "Выберите тему приложения.",
   "settings.theme_light": "Светлая",
-  "settings.title": "Настройки"
+  "settings.title": "Настройки",
+
+  "block.block": "Заблокировать",
+  "block.unblock": "Разблокировать",
+  "block.blocked": "Заблокирован"
 }

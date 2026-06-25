@@ -307,5 +307,9 @@
   "settings.theme_dark": "Escuro",
   "settings.theme_desc": "Selecione o tema do aplicativo.",
   "settings.theme_light": "Claro",
-  "settings.title": "Configurações"
+  "settings.title": "Configurações",
+
+  "block.block": "Bloquear usuário",
+  "block.unblock": "Desbloquear usuário",
+  "block.blocked": "Bloqueado"
 }
