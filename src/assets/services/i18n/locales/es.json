@@ -236,6 +236,10 @@
   "modal.accent_surface": "Color de superficie",
   "modal.accent_surface_default": "Por defecto",
   "modal.accent_surface_glass": "Modo translúcido",
+  "modal.profile_background": "Fondo del perfil",
+  "modal.profile_bg_edit": "Cambiar fondo",
+  "modal.profile_bg_blur": "Desenfoque",
+  "modal.profile_bg_dim": "Opacidad",
   "modal.saving": "Guardando...",
 
   "create_post.title": "Crear publicación",

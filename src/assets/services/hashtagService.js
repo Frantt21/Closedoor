@@ -79,18 +79,17 @@ export async function resolveHashtags(postId, content) {
 }
 
 /**
- * Get trending hashtags (solo posts de perfiles públicos), con cache localStorage
+ * Get trending hashtags (solo posts de perfiles públicos), con cache localStorage.
+ * El cache se usa para el render inicial (useState) y como fallback si el fetch falla.
  */
 export async function getTrendingHashtags(limit = 10) {
-  // Cache-first
-  const cached = getCache(TRENDING_HASHTAGS_CACHE_KEY);
-  if (cached) {
-    // Refresh en background
-    getTrendingHashtagsFresh(limit).catch(() => {});
-    return cached.slice(0, limit);
+  try {
+    return await getTrendingHashtagsFresh(limit);
+  } catch (err) {
+    console.warn('Error fetching trending hashtags, falling back to cache:', err.message);
+    const cached = getCache(TRENDING_HASHTAGS_CACHE_KEY);
+    return cached ? cached.slice(0, limit) : [];
   }
-
-  return getTrendingHashtagsFresh(limit);
 }
 
 async function getTrendingHashtagsFresh(limit) {
@@ -269,18 +268,17 @@ export function clearTrendingCache() {
 // ── TRENDING WORDS ──
 
 /**
- * Get trending words from recent posts (via RPC), con cache localStorage
+ * Get trending words from recent posts (via RPC), con cache localStorage.
+ * El cache se usa para el render inicial (useState) y como fallback si el fetch falla.
  */
 export async function getTrendingWords(limit = 8) {
-  // Cache-first
-  const cached = getCache(TRENDING_WORDS_CACHE_KEY);
-  if (cached) {
-    // Refresh en background
-    getTrendingWordsFresh(limit).catch(() => {});
-    return cached.slice(0, limit);
+  try {
+    return await getTrendingWordsFresh(limit);
+  } catch (err) {
+    console.warn('Error fetching trending words, falling back to cache:', err.message);
+    const cached = getCache(TRENDING_WORDS_CACHE_KEY);
+    return cached ? cached.slice(0, limit) : [];
   }
-
-  return getTrendingWordsFresh(limit);
 }
 
 async function getTrendingWordsFresh(limit) {

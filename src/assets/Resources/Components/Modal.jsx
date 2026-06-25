@@ -52,6 +52,10 @@ export default function Modal({
   initialAvatarPosition = '50% 50%',
   initialAccentSurface = '',
   initialAccentSurfaceGlass = false,
+  initialProfileBg = '',
+  initialProfileBgPosition = '50% 50%',
+  initialProfileBgBlur = 0,
+  initialProfileBgDim = 50,
   initialFollowersCount = 0,
   userRoles = ['user'],
 }) {
@@ -94,6 +98,10 @@ export default function Modal({
   const [selectedAccentSecondary, setSelectedAccentSecondary] = useState(initialAccentColorSecondary);
   const [selectedAccentSurface, setSelectedAccentSurface] = useState(initialAccentSurface);
   const [useGlassSurface, setUseGlassSurface] = useState(initialAccentSurfaceGlass);
+  const [profileBg, setProfileBg] = useState(initialProfileBg);
+  const [profileBgPosition, setProfileBgPosition] = useState(initialProfileBgPosition);
+  const [profileBgBlur, setProfileBgBlur] = useState(initialProfileBgBlur);
+  const [profileBgDim, setProfileBgDim] = useState(initialProfileBgDim);
   const [interests, setInterests] = useState(initialInterests);
   const [interestInput, setInterestInput] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
@@ -105,6 +113,8 @@ export default function Modal({
   const [showUrlModal, setShowUrlModal] = useState(null);
   const [urlInput, setUrlInput] = useState('');
   const [showSuggested, setShowSuggested] = useState(false);
+  const [showProfileBgSubmodal, setShowProfileBgSubmodal] = useState(null);
+  const [profileBgUrlInput, setProfileBgUrlInput] = useState('');
   const [pendingClose, setPendingClose] = useState(false);
 
   useEffect(() => {
@@ -126,6 +136,10 @@ export default function Modal({
     setHasChanges(false);
     setShowSuggested(false);
     setSelectedAccentSurface(initialAccentSurface || '');
+    setProfileBg(initialProfileBg || '');
+    setProfileBgPosition(initialProfileBgPosition);
+    setProfileBgBlur(initialProfileBgBlur);
+    setProfileBgDim(initialProfileBgDim);
     setBannerPosition(initialBannerPosition);
     setAvatarPosition(initialAvatarPosition);
     // Restore cached colors immediately (no flash)
@@ -149,6 +163,10 @@ export default function Modal({
       selectedAccentSecondary !== (initialAccentColorSecondary || '') ||
       selectedAccentSurface !== (initialAccentSurface || '') ||
       useGlassSurface !== !!initialAccentSurfaceGlass ||
+      profileBg !== (initialProfileBg || '') ||
+      profileBgPosition !== initialProfileBgPosition ||
+      profileBgBlur !== initialProfileBgBlur ||
+      profileBgDim !== initialProfileBgDim ||
       JSON.stringify(interests) !== JSON.stringify(initialInterests || []) ||
       bannerPosition !== initialBannerPosition ||
       avatarPosition !== initialAvatarPosition;
@@ -157,7 +175,7 @@ export default function Modal({
     username, banner, avatar, bio, socialLinks,    selectedAccent, selectedAccentSecondary, interests,
     bannerPosition, avatarPosition,
     initialUsername, initialBanner, initialAvatar, initialBio,
-    initialSocialLinks, initialAccentColor, initialAccentColorSecondary, initialAccentSurface, initialAccentSurfaceGlass, initialInterests,
+    initialSocialLinks, initialAccentColor, initialAccentColorSecondary, initialAccentSurface, initialAccentSurfaceGlass, initialProfileBg, initialProfileBgPosition, initialProfileBgBlur, initialProfileBgDim, initialInterests,
     initialBannerPosition, initialAvatarPosition
   ]);
 
@@ -243,6 +261,10 @@ export default function Modal({
         interests: interests,
         banner_position: bannerPosition,
         avatar_position: avatarPosition,
+        profile_background_url: profileBg.trim() || null,
+        profile_background_position: profileBgPosition,
+        profile_background_blur: profileBgBlur,
+        profile_background_dim: profileBgDim,
       });
     } finally {
       setSaving(false);
@@ -311,6 +333,25 @@ export default function Modal({
   const handleUrlModalKeyDown = (e) => {
     if (e.key === 'Enter') { e.preventDefault(); handleUrlModalSave(); }
     else if (e.key === 'Escape') setShowUrlModal(null);
+  };
+
+  // ── Profile Background submodal ──
+  const handleOpenProfileBgModal = () => {
+    setProfileBgUrlInput(profileBg);
+    setShowProfileBgSubmodal(true);
+  };
+
+  const handleProfileBgModalSave = () => {
+    const url = profileBgUrlInput.trim();
+    setProfileBg(url);
+    if (url && !profileBgPosition) setProfileBgPosition('50% 50%');
+    setShowProfileBgSubmodal(null);
+    setProfileBgUrlInput('');
+  };
+
+  const handleProfileBgUrlKeyDown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); handleProfileBgModalSave(); }
+    else if (e.key === 'Escape') setShowProfileBgSubmodal(null);
   };
 
   const BIO_MAX_LENGTH = 80;
@@ -873,8 +914,111 @@ export default function Modal({
                 </button>
               </div>
             </div>
+
+            {/* ── Profile Background ── */}
+            <div className="fc-modal-section">
+              <label className="fc-modal-label">{t('modal.profile_background')}</label>
+
+              <div className="fc-modal-bg-preview-row">
+                {profileBg.trim() ? (
+                  <div
+                    className="fc-modal-bg-thumb"
+                    style={{ backgroundImage: `url(${profileBg.trim()})`, backgroundPosition: profileBgPosition }}
+                  />
+                ) : (
+                  <div className="fc-modal-bg-thumb fc-modal-bg-thumb--empty">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <polyline points="21 15 16 10 5 21" />
+                    </svg>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="fc-modal-bg-edit-btn"
+                  onClick={handleOpenProfileBgModal}
+                  title={t('modal.profile_bg_edit')}
+                >
+                  <FaCamera />
+                </button>
+              </div>
+
+              {profileBg.trim() && (
+                <>
+                  {/* Blur slider */}
+                  <div className="fc-modal-range-row">
+                    <span className="fc-modal-range-label">{t('modal.profile_bg_blur')}</span>
+                    <div className="fc-modal-range-control">
+                      <input
+                        type="range"
+                        min="0"
+                        max="20"
+                        step="2"
+                        value={profileBgBlur}
+                        onChange={(e) => setProfileBgBlur(Number(e.target.value))}
+                        className="fc-modal-range"
+                      />
+                      <span className="fc-modal-range-value">{profileBgBlur}px</span>
+                    </div>
+                  </div>
+                  {/* Dim slider */}
+                  <div className="fc-modal-range-row">
+                    <span className="fc-modal-range-label">{t('modal.profile_bg_dim')}</span>
+                    <div className="fc-modal-range-control">
+                      <input
+                        type="range"
+                        min="0"
+                        max="80"
+                        step="5"
+                        value={profileBgDim}
+                        onChange={(e) => setProfileBgDim(Number(e.target.value))}
+                        className="fc-modal-range"
+                      />
+                      <span className="fc-modal-range-value">{profileBgDim}%</span>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
+
+        {/* ── Profile Background URL submodal ── */}
+        {showProfileBgSubmodal && (
+          <div className="fc-modal-sub-overlay">
+            <div className="fc-modal-sub" tabIndex={-1} onKeyDown={(e) => { if (e.key === 'Escape') setShowProfileBgSubmodal(null); }} onClick={(e) => e.stopPropagation()}>
+              <h4 className="fc-modal-sub-title">{t('modal.profile_background')}</h4>
+              <input
+                className="fc-modal-input fc-modal-sub-input"
+                value={profileBgUrlInput}
+                onChange={(e) => setProfileBgUrlInput(e.target.value)}
+                onKeyDown={handleProfileBgUrlKeyDown}
+                placeholder="https://.../background.jpg"
+                autoFocus
+              />
+              {profileBgUrlInput.trim() && (
+                <div style={{ marginTop: 10 }}>
+                  <ImagePositionEditor
+                    key={`bg-pos-${showProfileBgSubmodal}`}
+                    imageUrl={profileBgUrlInput.trim()}
+                    initialPosition={profileBgPosition}
+                    aspectRatio={16 / 9}
+                    onPositionChange={(pos) => setProfileBgPosition(pos)}
+                  />
+                </div>
+              )}
+              <div className="fc-modal-sub-actions">
+                <button type="button" className="fc-modal-sub-save" onClick={handleProfileBgModalSave} disabled={!profileBgUrlInput.trim()}>
+                  {t('modal.apply')}
+                </button>
+                <button type="button" className="fc-modal-sub-cancel" onClick={() => { setShowProfileBgSubmodal(null); setProfileBgUrlInput(''); }}>
+                  {t('modal.cancel')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
 

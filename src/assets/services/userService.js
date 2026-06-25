@@ -158,25 +158,10 @@ export async function createUserProfile(userId, email, username) {
  */
 export async function getUserProfile(userId) {
   try {
-    // Intentar cache primero
+    // Leer cache para el render inicial (el useState en profile.jsx lo usa)
     const cached = getCachedProfile(userId);
-    if (cached) {
-      // Fetch en background (no await) para refrescar
-      supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .maybeSingle()
-        .then(({ data, error }) => {
-          if (!error && data) {
-            setCachedProfile(data);
-            return data;
-          }
-        })
-        .catch(() => {});
-      return cached;
-    }
 
+    // Siempre fetch fresh data — aunque haya cache, resolvemos con datos frescos
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -185,6 +170,10 @@ export async function getUserProfile(userId) {
 
     if (error) {
       console.error('Error fetching profile:', error);
+      if (cached) {
+        console.warn('Falling back to cached profile after fetch error');
+        return cached;
+      }
       throw error;
     }
 
@@ -198,26 +187,10 @@ export async function getUserProfile(userId) {
 
 export async function getUserProfileByUsername(username) {
   try {
-    // Intentar cache primero
+    // Leer cache para el render inicial (el useState en profile.jsx lo usa)
     const cached = getCachedProfileByUsername(username);
-    if (cached) {
-      // Fetch en background (no await) para refrescar
-      supabase
-        .from('profiles')
-        .select('*')
-        .eq('username', username.toLowerCase())
-        .maybeSingle()
-        .then(({ data, error }) => {
-          if (!error && data) {
-            setCachedProfile(data);
-            setCachedProfileByUsername(username, data);
-            return data;
-          }
-        })
-        .catch(() => {});
-      return cached;
-    }
 
+    // Siempre fetch fresh data — aunque haya cache, resolvemos con datos frescos
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
@@ -226,6 +199,10 @@ export async function getUserProfileByUsername(username) {
 
     if (error) {
       console.error('Error fetching profile by username:', error);
+      if (cached) {
+        console.warn('Falling back to cached profile after fetch error');
+        return cached;
+      }
       throw error;
     }
 

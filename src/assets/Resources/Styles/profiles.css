@@ -12,15 +12,35 @@
     position: relative;
 }
 
-/* Accent color gradient covering the entire page background
-   Usa los dos colores acento: primario (extraído del banner) y secundario (elegido manualmente) */
+/* ---- Background image + dim overlay ---- */
+
 .profile-page::before {
     content: '';
     position: fixed;
     inset: 0;
+    background-image:
+        /* Dim overlay (semi-transparent black for contrast) */
+        linear-gradient(rgba(0,0,0, var(--profile-bg-dim, 0)), rgba(0,0,0, var(--profile-bg-dim, 0))),
+        /* Background image (when set) */
+        var(--profile-bg-image, none);
+    background-size: auto, cover;
+    background-position: center, var(--profile-bg-position, center);
+    background-repeat: no-repeat;
+    filter: var(--profile-bg-blur, none);
+    -webkit-filter: var(--profile-bg-blur, none);
+    pointer-events: none;
+    z-index: -2;
+}
+
+/* ---- Accent color gradient overlay ---- */
+
+.profile-page::after {
+    content: '';
+    position: fixed;
+    inset: 0;
     background: linear-gradient(180deg,
-        color-mix(in srgb, var(--accent-color) 18%, transparent) 0%,
-        color-mix(in srgb, var(--accent-color-2, var(--accent-color)) 18%, transparent) 100%
+        color-mix(in srgb, var(--accent-color) var(--profile-accent-opacity, 18%), transparent) 0%,
+        color-mix(in srgb, var(--accent-color-2, var(--accent-color)) var(--profile-accent-opacity, 18%), transparent) 100%
     );
     pointer-events: none;
     z-index: -1;

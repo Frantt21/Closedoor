@@ -344,7 +344,7 @@ export async function getFeed({ limit = 20, offset = 0, userId } = {}) {
   }
   const posts = data || [];
 
-  // Si vino de cache, refrescar IDs en background (sin await)
+  // Si vino de cache, refrescar IDs y actualizar cache en background
   if (fromCache && userId) {
     refreshVisibleIds(userId);
   }

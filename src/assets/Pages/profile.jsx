@@ -712,7 +712,7 @@ function Profile() {
     const roles = activeProfile?.roles || ["user"];
 
     // ── Save profile (own profile only) ──
-    const handleSaveProfile = async ({ username, avatar_url, banner_url, bio, social_links, accent_color, accent_color_secondary, accent_surface_color, accent_surface_glass, interests, banner_position, avatar_position }) => {
+    const handleSaveProfile = async ({ username, avatar_url, banner_url, bio, social_links, accent_color, accent_color_secondary, accent_surface_color, accent_surface_glass, interests, banner_position, avatar_position, profile_background_url, profile_background_position, profile_background_blur, profile_background_dim }) => {
         if (!user?.id) return;
 
         const normalizedUsername = (username || "").trim().toLowerCase();
@@ -742,6 +742,10 @@ function Profile() {
                 interests: interests || [],
                 banner_position: banner_position || '50% 50%',
                 avatar_position: avatar_position || '50% 50%',
+                profile_background_url: profile_background_url || null,
+                profile_background_position: profile_background_position || '50% 50%',
+                profile_background_blur: profile_background_blur ?? 0,
+                profile_background_dim: profile_background_dim ?? 50,
             };
 
             if (normalizedUsername !== ownProfile?.username) {
@@ -826,6 +830,13 @@ function Profile() {
     const surfColor = activeProfile?.accent_surface_color;
     const surfGlass = activeProfile?.accent_surface_glass === true;
 
+    // ── Background image ──
+    const bgUrl = activeProfile?.profile_background_url;
+    const bgPosition = activeProfile?.profile_background_position || '50% 50%';
+    const bgBlur = (activeProfile?.profile_background_blur ?? 0);
+    const bgDim = (activeProfile?.profile_background_dim ?? 50) / 100; // 0-1
+    const hasBg = !!bgUrl;
+
     // Para perfiles ajenos: usar las preferencias guardadas en la BD del dueño del perfil
     // Para perfil propio: siempre mostrar (el toggle es para controlar qué ven los demás)
     const ownerShowAccentProfile = isOwnProfile
@@ -852,23 +863,26 @@ function Profile() {
           '--accent-surface-text-secondary': !surfGlass && surfColor ? '#374151' : 'var(--color-text-secondary, #9ca3af)',
           '--accent-surface-text-muted': !surfGlass && surfColor ? '#6b7280' : 'var(--color-text-muted, #6b7280)',
           ...(surfGlass ? {
-            // Glass ON: translucent + blur
             '--accent-surface-rgba': 'rgba(255, 255, 255, 0.04)',
             '--accent-surface-rgba-hover': 'rgba(255, 255, 255, 0.07)',
             '--accent-surface-blur': 'blur(20px)',
             '--accent-surface-border': '1px solid rgba(255, 255, 255, 0.06)',
           } : surfColor ? {
-            // Glass OFF: solid background with custom color
             '--accent-surface-rgba': surfColor,
             '--accent-surface-rgba-hover': `color-mix(in srgb, ${surfColor} 85%, #000)`,
             '--accent-surface-blur': 'none',
             '--accent-surface-border': 'none',
           } : {
-            // No surface customization: use default card styles
             '--accent-surface-rgba': 'var(--color-surface, #1a1a1a)',
             '--accent-surface-rgba-hover': 'var(--color-surface-hover, #252525)',
             '--accent-surface-blur': 'none',
           }),
+          // ── Background image vars ──
+          '--profile-bg-image': hasBg ? `url(${bgUrl})` : 'none',
+          '--profile-bg-position': bgPosition,
+          '--profile-bg-blur': hasBg && bgBlur > 0 ? `blur(${bgBlur}px)` : 'none',
+          '--profile-bg-dim': hasBg ? String(bgDim) : '0',
+          '--profile-accent-opacity': hasBg ? '8%' : '18%',
         }
       : {};
 
@@ -1040,6 +1054,10 @@ function Profile() {
                     initialInterests={modalInterests}
                     initialBannerPosition={ownProfile?.banner_position || '50% 50%'}
                     initialAvatarPosition={ownProfile?.avatar_position || '50% 50%'}
+                    initialProfileBg={ownProfile?.profile_background_url || ''}
+                    initialProfileBgPosition={ownProfile?.profile_background_position || '50% 50%'}
+                    initialProfileBgBlur={ownProfile?.profile_background_blur ?? 0}
+                    initialProfileBgDim={ownProfile?.profile_background_dim ?? 50}
                     initialFollowersCount={followCounts?.followers || 0}
                     userRoles={roles}
                 />

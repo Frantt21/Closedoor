@@ -236,6 +236,10 @@
   "modal.accent_surface": "Surface color",
   "modal.accent_surface_default": "Default",
   "modal.accent_surface_glass": "Translucent mode",
+  "modal.profile_background": "Profile background",
+  "modal.profile_bg_edit": "Change background",
+  "modal.profile_bg_blur": "Blur",
+  "modal.profile_bg_dim": "Dim",
   "modal.saving": "Saving...",
 
   "create_post.title": "Create post",
