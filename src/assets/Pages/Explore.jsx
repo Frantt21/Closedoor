@@ -16,7 +16,7 @@ import SafeImage from "../Resources/Components/SafeImage";
 import Avatar from "../Resources/Components/Avatar";
 import Badge from "../Resources/Components/Badge";
 import { FaLock, FaBan } from 'react-icons/fa';
-import { getBlockedUsers, subscribeBlockChanges } from "../services/blockService";
+import { getBlockedUsers, getUsersWhoBlockedMe, subscribeBlockChanges } from "../services/blockService";
 import "../Resources/Styles/explore.css";
 import "../Resources/Styles/skeleton.css";
 
@@ -43,12 +43,17 @@ function Explore() {
 
   // ── Re-filtrar profiles cuando cambia el estado de bloqueo ──
   useEffect(() => {
-    if (!user?.id) return;
-    const unsub = subscribeBlockChanges(async () => {
+    if (!user?.id) return;        const unsub = subscribeBlockChanges(async () => {
       try {
-        const blocked = await getBlockedUsers(user.id);
-        const blockedIds = new Set(blocked.map(b => b.id));
-        setProfiles((prev) => prev.filter(p => !blockedIds.has(p.id)));
+        const [blocked, blockedMe] = await Promise.all([
+          getBlockedUsers(user.id),
+          getUsersWhoBlockedMe(user.id),
+        ]);
+        const excludedIds = new Set([
+          ...blocked.map(b => b.id),
+          ...blockedMe.map(b => b.id),
+        ]);
+        setProfiles((prev) => prev.filter(p => !excludedIds.has(p.id)));
       } catch (e) {
         console.warn('Could not re-filter blocked profiles:', e);
       }
@@ -69,12 +74,18 @@ function Explore() {
       try {
         let data = await listProfiles(user?.id);
 
-        // Filtrar usuarios bloqueados
+        // Filtrar usuarios bloqueados (ambas direcciones)
         if (user?.id) {
           try {
-            const blocked = await getBlockedUsers(user.id);
-            const blockedIds = new Set(blocked.map(b => b.id));
-            data = data.filter(p => !blockedIds.has(p.id));
+            const [blocked, blockedMe] = await Promise.all([
+              getBlockedUsers(user.id),
+              getUsersWhoBlockedMe(user.id),
+            ]);
+            const excludedIds = new Set([
+              ...blocked.map(b => b.id),
+              ...blockedMe.map(b => b.id),
+            ]);
+            data = data.filter(p => !excludedIds.has(p.id));
           } catch (e) {
             console.warn('Could not filter blocked users:', e);
           }

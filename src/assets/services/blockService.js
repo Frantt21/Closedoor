@@ -198,3 +198,35 @@ export async function getBlockedUsers(userId) {
     blocked_at: item.created_at,
   }));
 }
+
+/**
+ * Get list of users who have blocked the current user
+ * @param {string} userId - User ID
+ * @returns {Promise<Array>} - List of user profiles who blocked me
+ */
+export async function getUsersWhoBlockedMe(userId) {
+  const { data, error } = await supabase
+    .from('blocks')
+    .select(`
+      blocker_id,
+      created_at,
+      profiles!blocks_blocker_id_fkey (
+        id,
+        username,
+        avatar_url,
+        roles
+      )
+    `)
+    .eq('blocked_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching users who blocked me:', error);
+    throw error;
+  }
+
+  return data.map((item) => ({
+    ...item.profiles,
+    blocked_at: item.created_at,
+  }));
+}
