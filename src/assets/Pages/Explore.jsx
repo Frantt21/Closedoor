@@ -16,7 +16,7 @@ import SafeImage from "../Resources/Components/SafeImage";
 import Avatar from "../Resources/Components/Avatar";
 import Badge from "../Resources/Components/Badge";
 import { FaLock, FaBan } from 'react-icons/fa';
-import { getBlockedUsers, getUsersWhoBlockedMe, subscribeBlockChanges } from "../services/blockService";
+import { getBlockedUserIds, getUsersWhoBlockedMeIds, clearBlockedListsCache, subscribeBlockChanges } from "../services/blockService";
 import "../Resources/Styles/explore.css";
 import "../Resources/Styles/skeleton.css";
 
@@ -45,14 +45,13 @@ function Explore() {
   useEffect(() => {
     if (!user?.id) return;        const unsub = subscribeBlockChanges(async () => {
       try {
-        const [blocked, blockedMe] = await Promise.all([
-          getBlockedUsers(user.id),
-          getUsersWhoBlockedMe(user.id),
+        // Limpiar cache para forzar fetch fresco (el cache es para navegacion, no para Realtime)
+        clearBlockedListsCache(user.id);
+        const [blockedIds, blockedMeIds] = await Promise.all([
+          getBlockedUserIds(user.id),
+          getUsersWhoBlockedMeIds(user.id),
         ]);
-        const excludedIds = new Set([
-          ...blocked.map(b => b.id),
-          ...blockedMe.map(b => b.id),
-        ]);
+        const excludedIds = new Set([...blockedIds, ...blockedMeIds]);
         setProfiles((prev) => prev.filter(p => !excludedIds.has(p.id)));
       } catch (e) {
         console.warn('Could not re-filter blocked profiles:', e);
@@ -74,17 +73,14 @@ function Explore() {
       try {
         let data = await listProfiles(user?.id);
 
-        // Filtrar usuarios bloqueados (ambas direcciones)
+        // Filtrar usuarios bloqueados (ambas direcciones, con cache 5min)
         if (user?.id) {
           try {
-            const [blocked, blockedMe] = await Promise.all([
-              getBlockedUsers(user.id),
-              getUsersWhoBlockedMe(user.id),
+            const [blockedIds, blockedMeIds] = await Promise.all([
+              getBlockedUserIds(user.id),
+              getUsersWhoBlockedMeIds(user.id),
             ]);
-            const excludedIds = new Set([
-              ...blocked.map(b => b.id),
-              ...blockedMe.map(b => b.id),
-            ]);
+            const excludedIds = new Set([...blockedIds, ...blockedMeIds]);
             data = data.filter(p => !excludedIds.has(p.id));
           } catch (e) {
             console.warn('Could not filter blocked users:', e);

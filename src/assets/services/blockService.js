@@ -230,3 +230,100 @@ export async function getUsersWhoBlockedMe(userId) {
     blocked_at: item.created_at,
   }));
 }
+
+// ── Cached ID lists con TTL de 5 minutos ──
+
+const BLOCKED_IDS_CACHE_PREFIX = 'fc_blocked_ids_';
+const BLOCKED_ME_IDS_CACHE_PREFIX = 'fc_blocked_me_ids_';
+const BLOCKED_LISTS_TTL = 1000 * 60 * 5; // 5 minutos
+
+function setCachedBlockedIds(userId, ids) {
+  try {
+    const key = BLOCKED_IDS_CACHE_PREFIX + userId;
+    localStorage.setItem(key, JSON.stringify({ ts: Date.now(), ttl: BLOCKED_LISTS_TTL, ids }));
+  } catch {}
+}
+
+function getCachedBlockedIds(userId) {
+  try {
+    const raw = localStorage.getItem(BLOCKED_IDS_CACHE_PREFIX + userId);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    if (Date.now() - p.ts > (p.ttl || BLOCKED_LISTS_TTL)) {
+      localStorage.removeItem(BLOCKED_IDS_CACHE_PREFIX + userId);
+      return null;
+    }
+    return p.ids || null;
+  } catch { return null; }
+}
+
+function setCachedBlockedMeIds(userId, ids) {
+  try {
+    const key = BLOCKED_ME_IDS_CACHE_PREFIX + userId;
+    localStorage.setItem(key, JSON.stringify({ ts: Date.now(), ttl: BLOCKED_LISTS_TTL, ids }));
+  } catch {}
+}
+
+function getCachedBlockedMeIds(userId) {
+  try {
+    const raw = localStorage.getItem(BLOCKED_ME_IDS_CACHE_PREFIX + userId);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    if (Date.now() - p.ts > (p.ttl || BLOCKED_LISTS_TTL)) {
+      localStorage.removeItem(BLOCKED_ME_IDS_CACHE_PREFIX + userId);
+      return null;
+    }
+    return p.ids || null;
+  } catch { return null; }
+}
+
+export function clearBlockedListsCache(userId) {
+  try {
+    localStorage.removeItem(BLOCKED_IDS_CACHE_PREFIX + userId);
+    localStorage.removeItem(BLOCKED_ME_IDS_CACHE_PREFIX + userId);
+  } catch {}
+}
+
+/**
+ * Obtiene IDs de usuarios bloqueados por mí, con cache de 5 min + background refresh.
+ * Retorna inmediatamente el cache si existe, o hace fetch si no.
+ * Siempre refresca en background para mantener datos frescos.
+ * @param {string} userId
+ * @returns {Promise<string[]>}
+ */
+export async function getBlockedUserIds(userId) {
+  // Intentar cache primero
+  const cached = getCachedBlockedIds(userId);
+  if (cached !== null) {
+    // Background refresh: actualiza el cache sin esperar
+    getBlockedUsers(userId)
+      .then(profiles => setCachedBlockedIds(userId, profiles.map(p => p.id)))
+      .catch(() => {});
+    return cached;
+  }
+  // Cache miss: fetch fresh
+  const profiles = await getBlockedUsers(userId);
+  const ids = profiles.map(p => p.id);
+  setCachedBlockedIds(userId, ids);
+  return ids;
+}
+
+/**
+ * Obtiene IDs de usuarios que me bloquearon, con cache de 5 min + background refresh.
+ * @param {string} userId
+ * @returns {Promise<string[]>}
+ */
+export async function getUsersWhoBlockedMeIds(userId) {
+  const cached = getCachedBlockedMeIds(userId);
+  if (cached !== null) {
+    // Background refresh
+    getUsersWhoBlockedMe(userId)
+      .then(profiles => setCachedBlockedMeIds(userId, profiles.map(p => p.id)))
+      .catch(() => {});
+    return cached;
+  }
+  const profiles = await getUsersWhoBlockedMe(userId);
+  const ids = profiles.map(p => p.id);
+  setCachedBlockedMeIds(userId, ids);
+  return ids;
+}

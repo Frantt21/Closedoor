@@ -7,7 +7,7 @@ import '../Resources/Styles/post.css';
 import { useAuth } from '../../hooks/useAuth';
 import usePageTitle from '../../hooks/usePageTitle';
 import { supabase } from '../services/supabaseclient';
-import { getBlockedUsers, getUsersWhoBlockedMe, subscribeBlockChanges } from '../services/blockService';
+import { getBlockedUserIds, getUsersWhoBlockedMeIds, clearBlockedListsCache, subscribeBlockChanges } from '../services/blockService';
 import {
   getFeed,
   getLikedPostIds,
@@ -60,17 +60,14 @@ function Home() {
         const loadFeed = async () => {
             try {
                 let data = await getFeed({ limit: 30, userId: user?.id });
-                // Filtrar posts de usuarios bloqueados (ambas direcciones)
+                // Filtrar posts de usuarios bloqueados (ambas direcciones, con cache 5min)
                 if (user?.id && data.length > 0) {
                     try {
-                        const [blocked, blockedMe] = await Promise.all([
-                            getBlockedUsers(user.id),
-                            getUsersWhoBlockedMe(user.id),
+                        const [blockedIds, blockedMeIds] = await Promise.all([
+                            getBlockedUserIds(user.id),
+                            getUsersWhoBlockedMeIds(user.id),
                         ]);
-                        const excludedIds = new Set([
-                            ...blocked.map(b => b.id),
-                            ...blockedMe.map(b => b.id),
-                        ]);
+                        const excludedIds = new Set([...blockedIds, ...blockedMeIds]);
                         data = data.filter(p => !excludedIds.has(p.user_id));
                     } catch (e) {
                         console.warn('Could not filter blocked posts:', e);
@@ -128,14 +125,13 @@ function Home() {
       if (!user?.id) return;
       const unsub = subscribeBlockChanges(async () => {
         try {
-          const [blocked, blockedMe] = await Promise.all([
-            getBlockedUsers(user.id),
-            getUsersWhoBlockedMe(user.id),
+          // Limpiar cache para forzar fetch fresco (el cache es para navegacion, no para Realtime)
+          clearBlockedListsCache(user.id);
+          const [blockedIds, blockedMeIds] = await Promise.all([
+            getBlockedUserIds(user.id),
+            getUsersWhoBlockedMeIds(user.id),
           ]);
-          const excludedIds = new Set([
-            ...blocked.map(b => b.id),
-            ...blockedMe.map(b => b.id),
-          ]);
+          const excludedIds = new Set([...blockedIds, ...blockedMeIds]);
           setPosts((prev) => prev.filter(p => !excludedIds.has(p.user_id)));
         } catch (e) {
           console.warn('Could not re-filter blocked posts:', e);
