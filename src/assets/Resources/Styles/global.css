@@ -139,3 +139,37 @@ body:has(.sidebar--collapsed) .app-layout {
 .Toastify__toast--error .Toastify__toast-icon {
   color: #f87171 !important;
 }
+
+/* ── Live notification toast (nuevas notificaciones en tiempo real) ── */
+
+.fc-notif-toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  min-width: 200px;
+}
+
+.fc-notif-toast-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--color-surface-hover, #252525);
+}
+
+.fc-notif-toast-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.fc-notif-toast-text {
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--color-text, #ffffff);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

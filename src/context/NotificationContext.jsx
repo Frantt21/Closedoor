@@ -1,4 +1,6 @@
 import React, { createContext, useState, useEffect, useCallback, useRef } from 'react';
+import { Link } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import { supabase } from '../assets/services/supabaseclient';
 import {
   getNotifications,
@@ -11,6 +13,127 @@ import {
   getCachedNotifications,
 } from '../assets/services/notificationService';
 import { useAuth } from '../hooks/useAuth';
+
+// ── Helpers para notificaciones en vivo ──
+
+const NOTIF_MESSAGES = {
+  es: {
+    follow: (name) => `${name} te siguió`,
+    follow_request: (name) => `${name} quiere seguirte`,
+    follow_request_accepted: (name) => `${name} aceptó tu solicitud`,
+    follow_request_rejected: (name) => `${name} rechazó tu solicitud`,
+    like: (name) => `${name} le gustó tu publicación`,
+    comment: (name) => `${name} comentó tu publicación`,
+    repost: (name) => `${name} reposteó tu publicación`,
+    comment_like: (name) => `${name} le gustó tu comentario`,
+    mention: (name) => `${name} te mencionó`,
+    default: (name) => `${name} hizo algo`,
+  },
+  en: {
+    follow: (name) => `${name} followed you`,
+    follow_request: (name) => `${name} wants to follow you`,
+    follow_request_accepted: (name) => `${name} accepted your request`,
+    follow_request_rejected: (name) => `${name} rejected your request`,
+    like: (name) => `${name} liked your post`,
+    comment: (name) => `${name} commented on your post`,
+    repost: (name) => `${name} reposted your post`,
+    comment_like: (name) => `${name} liked your comment`,
+    mention: (name) => `${name} mentioned you`,
+    default: (name) => `${name} did something`,
+  },
+};
+
+function getCurrentLocale() {
+  try {
+    return localStorage.getItem('fc_locale') || 'es';
+  } catch {
+    return 'es';
+  }
+}
+
+function getNotifMessage(type, username) {
+  const locale = getCurrentLocale();
+  const lang = NOTIF_MESSAGES[locale] || NOTIF_MESSAGES.es;
+  const fn = lang[type] || lang.default;
+  return fn(username || (locale === 'en' ? 'Someone' : 'Alguien'));
+}
+
+function getNotifLink(notif) {
+  const username = notif.actor?.username || '';
+  if (['like', 'comment', 'repost', 'comment_like', 'mention'].includes(notif.type) && notif.reference_id) {
+    return `/post/${notif.reference_id}`;
+  }
+  return `/profile/${username}`;
+}
+
+async function tryShowOsNotification(message, avatarUrl, link, tag) {
+  if (!('Notification' in window)) return false;
+
+  // Si nunca se pidió permiso, pedirlo y esperar respuesta
+  if (Notification.permission === 'default') {
+    const result = await Notification.requestPermission();
+    if (result !== 'granted') return false;
+  }
+
+  if (Notification.permission !== 'granted') return false;
+
+  try {
+    const notif = new Notification('FastChange', {
+      body: message,
+      icon: avatarUrl || undefined,
+      badge: '/favicon.ico',
+      tag,
+      silent: false,
+    });
+    notif.onclick = () => {
+      window.focus();
+      window.location.href = link;
+      notif.close();
+    };
+    return true;
+  } catch (err) {
+    console.warn('Error showing OS notification:', err);
+    return false;
+  }
+}
+
+function showLiveNotification(data) {
+  if (!data?.actor) return;
+
+  // Verificar preferencia del usuario (localStorage)
+  try {
+    if (localStorage.getItem('fc_show_live_notifications') === 'false') return;
+  } catch {}
+
+  const username = data.actor.username || 'Alguien';
+  const message = getNotifMessage(data.type, username);
+  const link = getNotifLink(data);
+  const avatarUrl = data.actor.avatar_url;
+
+  // ── Tab oculto o sin foco → OS Notification ──
+  if (document.visibilityState === 'hidden' || !document.hasFocus()) {
+    tryShowOsNotification(message, avatarUrl, link, data.id);
+    return;
+  }
+
+  // ── Tab visible → Toast con React Router Link (evita recarga completa) ──
+  toast(
+    <Link to={link} className="fc-notif-toast" onClick={(e) => e.stopPropagation()}>
+      {avatarUrl && (
+        <img
+          className="fc-notif-toast-avatar"
+          src={avatarUrl}
+          alt=""
+          onError={(e) => { e.target.style.display = 'none'; }}
+        />
+      )}
+      <div className="fc-notif-toast-body">
+        <span className="fc-notif-toast-text">{message}</span>
+      </div>
+    </Link>,
+    { autoClose: 4000 }
+  );
+}
 
 export const NotificationContext = createContext();
 
@@ -102,13 +225,14 @@ export function NotificationProvider({ children }) {
 
           if (!error && data) {
             setNotifications((prev) => {
-              // Evitar duplicados (si ya existe por cache/creación local)
               if (prev.some((n) => n.id === data.id)) return prev;
               const updated = [data, ...prev];
               setCachedNotifications(userId, updated);
               return updated;
             });
             setUnreadCount((prev) => prev + 1);
+            // Mostrar notificación en vivo (toast u OS según visibilidad del tab)
+            showLiveNotification(data);
           }
         }
       )

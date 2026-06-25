@@ -10,6 +10,7 @@ const ACCENT_VISIBILITY_KEY = 'fc_accent_visibility';
 const SHOW_INTERESTS_KEY = 'fc_show_interests';
 const SHOW_TRENDING_KEY = 'fc_show_trending';
 const SHOW_PROFILE_STATS_KEY = 'fc_show_profile_stats';
+const SHOW_LIVE_NOTIFS_KEY = 'fc_show_live_notifications';
 
 const locales = { es };
 
@@ -92,6 +93,15 @@ function getSavedShowProfileStats() {
   }
 }
 
+function getSavedShowLiveNotifications() {
+  try {
+    const val = localStorage.getItem(SHOW_LIVE_NOTIFS_KEY);
+    return val === null ? true : val === 'true';
+  } catch {
+    return true;
+  }
+}
+
 export const I18nContext = createContext({
   locale: 'es',
   t: (key, params) => key,
@@ -110,6 +120,8 @@ export const I18nContext = createContext({
   setShowTrending: () => {},
   showProfileStats: true,
   setShowProfileStats: () => {},
+  showLiveNotifications: true,
+  setShowLiveNotifications: () => {},
   theme: 'dark',
   setTheme: () => {},
 });
@@ -124,6 +136,7 @@ export function I18nProvider({ children }) {
   const [showInterests, setShowInterestsState] = useState(getSavedShowInterests);
   const [showTrending, setShowTrendingState] = useState(getSavedShowTrending);
   const [showProfileStats, setShowProfileStatsState] = useState(getSavedShowProfileStats);
+  const [showLiveNotifications, setShowLiveNotificationsState] = useState(getSavedShowLiveNotifications);
   const [theme, setThemeState] = useState(getSavedTheme);
 
   // Cargar el archivo de locale asíncrono
@@ -199,6 +212,13 @@ export function I18nProvider({ children }) {
     } catch {}
   }, []);
 
+  const setShowLiveNotifications = useCallback((value) => {
+    setShowLiveNotificationsState(value);
+    try {
+      localStorage.setItem(SHOW_LIVE_NOTIFS_KEY, String(value));
+    } catch {}
+  }, []);
+
   const setTheme = useCallback((newTheme) => {
     setThemeState(newTheme);
     try {
@@ -223,7 +243,7 @@ export function I18nProvider({ children }) {
   }, [translations]);
 
   return (
-    <I18nContext.Provider value={{ locale, t, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, theme, setTheme }}>
+    <I18nContext.Provider value={{ locale, t, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, showLiveNotifications, setShowLiveNotifications, theme, setTheme }}>
       {children}
     </I18nContext.Provider>
   );

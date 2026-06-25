@@ -3,7 +3,7 @@ import { useI18n } from '../services/i18n/useI18n';
 import usePageTitle from '../../hooks/usePageTitle';
 import { useAuth } from '../../hooks/useAuth';
 import { updateUserProfile } from '../services/userService';
-import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaFire, FaChartBar } from 'react-icons/fa';
+import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaFire, FaChartBar, FaBell, FaBrush } from 'react-icons/fa';
 import '../Resources/Styles/settings.css';
 
 /* ── SVG Flag Icons ── */
@@ -68,7 +68,7 @@ const CATEGORIES = [
 /* ── Main Settings Component ── */
 
 export default function Settings() {
-  const { locale, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, theme, setTheme, t } = useI18n();
+  const { locale, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, showLiveNotifications, setShowLiveNotifications, theme, setTheme, t } = useI18n();
   usePageTitle(t('settings.title'));
   const { user, profile, profileLoading, refreshProfile } = useAuth();
   const [selectOpen, setSelectOpen] = useState(false);
@@ -198,6 +198,17 @@ export default function Settings() {
         <div className="settings-panel">
           {activeCategory === 'system' && (
             <>
+              {/* ── Apariencia ── */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaBrush /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.appearance')}</h2>
+                    <p className="settings-section-desc">{t('settings.appearance_desc')}</p>
+                  </div>
+                </div>
+              </div>
+
               {/* Idioma */}
               <div className="settings-row">
                 <div className="settings-row-header">
@@ -404,7 +415,7 @@ export default function Settings() {
 
               <div className="settings-row-divider" />
 
-              {/* ── Perfil: visibilidad de cards ── */}
+              {/* ── Perfil ── */}
               <div className="settings-row">
                 <div className="settings-row-header">
                   <span className="settings-section-icon"><FaEye /></span>
@@ -465,6 +476,19 @@ export default function Settings() {
                 </button>
               </div>
 
+              <div className="settings-row-divider" />
+
+              {/* ── Notificaciones ── */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaBell /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.notifications')}</h2>
+                    <p className="settings-section-desc">{t('settings.notifications_desc')}</p>
+                  </div>
+                </div>
+              </div>
+
               {/* Mostrar tendencias */}
               <div className="settings-row">
                 <div className="settings-row-header">
@@ -483,6 +507,27 @@ export default function Settings() {
                     syncProfilePref('show_trending', next);
                   }}
                   aria-pressed={showTrending}
+                >
+                  <span className="settings-toggle-track">
+                    <span className="settings-toggle-thumb" />
+                  </span>
+                </button>
+              </div>
+
+              {/* Notificaciones en vivo */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaBell /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.show_live_notifications')}</h2>
+                    <p className="settings-section-desc">{t('settings.show_live_notifications_desc')}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={`settings-toggle ${showLiveNotifications ? 'settings-toggle--active' : ''}`}
+                  onClick={() => setShowLiveNotifications(!showLiveNotifications)}
+                  aria-pressed={showLiveNotifications}
                 >
                   <span className="settings-toggle-track">
                     <span className="settings-toggle-thumb" />
