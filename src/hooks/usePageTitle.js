@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-const SITE_NAME = 'Dev';
+const SITE_NAME = 'Closedoor';
 
 export default function usePageTitle(title) {
   useEffect(() => {
