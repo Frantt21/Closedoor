@@ -40,7 +40,7 @@
     background: var(--overlay-bg-hover);
 }
 
-.role-badge--admin::before {
+/* .role-badge--admin::before {
     content: "★";
     font-size: 0.6rem;
     line-height: 1;
@@ -74,4 +74,4 @@
     opacity: 0.7;
     display: inline-flex;
     align-items: center;
-}
+} */
