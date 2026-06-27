@@ -203,6 +203,8 @@
   "post.replies_depth_limit": "返信が深すぎます。代わりに新しいコメントを作成してください。",
   "post.encrypted_visible": "🔒 あなただけが見られる非公開コンテンツ",
   "post.encrypted_hidden": "🔒 難読化されたコンテンツ",
+  "post.preview": "プレビュー",
+  "post.encrypted_hidden_placeholder": "非表示のコンテンツ",
   "post.reply": "返信",
   "post.reply_placeholder": "@{user}に返信を書く...",
   "post.reply_to": "{user}に返信",

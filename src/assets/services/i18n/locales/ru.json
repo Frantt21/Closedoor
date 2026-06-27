@@ -203,6 +203,8 @@
   "post.replies_depth_limit": "Ответ слишком глубокий. Создайте новый комментарий.",
   "post.encrypted_visible": "🔒 Приватный контент, видимый вам",
   "post.encrypted_hidden": "🔒 Скрытый контент",
+  "post.preview": "Предпросмотр",
+  "post.encrypted_hidden_placeholder": "Скрытое содержимое",
   "post.reply": "Ответить",
   "post.reply_placeholder": "Напишите ответ @{user}...",
   "post.reply_to": "Ответ {user}",

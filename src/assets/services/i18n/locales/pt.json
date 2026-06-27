@@ -203,6 +203,8 @@
   "post.replies_depth_limit": "Resposta muito profunda. Crie um novo comentário.",
   "post.encrypted_visible": "🔒 Conteúdo privado visível para você",
   "post.encrypted_hidden": "🔒 Conteúdo ofuscado",
+  "post.preview": "Pré-visualização",
+  "post.encrypted_hidden_placeholder": "Conteúdo oculto",
   "post.reply": "Responder",
   "post.reply_placeholder": "Escreva uma resposta para @{user}...",
   "post.reply_to": "Respondendo a {user}",

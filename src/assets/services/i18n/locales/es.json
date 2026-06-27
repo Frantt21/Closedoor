@@ -117,6 +117,8 @@
   "post.replies_depth_limit": "Respuesta demasiado profunda. Crea un nuevo comentario en su lugar.",
   "post.encrypted_visible": "🔒 Contenido privado visible para ti",
   "post.encrypted_hidden": "🔒 Contenido ofuscado",
+  "post.preview": "Vista previa",
+  "post.encrypted_hidden_placeholder": "Contenido oculto",
 
   "follow.follow": "Seguir",
   "follow.following": "Siguiendo",

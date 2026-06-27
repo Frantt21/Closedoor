@@ -115,6 +115,8 @@
   "post.reply_placeholder": "Write a reply to @{user}...",
   "post.image_failed": "Image failed to load",
   "post.replies_depth_limit": "Reply too deep. Create a new comment instead.",
+  "post.preview": "Preview",
+  "post.encrypted_hidden_placeholder": "Hidden content",
 
   "follow.follow": "Follow",
   "follow.following": "Following",
