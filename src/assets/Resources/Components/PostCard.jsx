@@ -22,7 +22,6 @@ import { useI18n } from '../../services/i18n/useI18n';
 import { DEFAULT_AVATAR, getTimeAgo, getEmbedUrl as getEmbedUrlHelper, isVideoUrl as isVideoUrlHelper, IMG_RE, VID_RE, VID_RE_EXTENDED } from '../../services/helpers';
 import {
   decode as encryptDecode,
-  getObfuscatedDisplay,
   decryptForUser,
   getCachedDecryptedContent,
   setCachedDecryptedContent,
@@ -464,7 +463,7 @@ const PostCard = React.memo(function PostCard({
               <span className="post-card-encrypted-loading">{t('common.loading') || 'Descifrando...'}</span>
             ) : showEncryptedLabel ? (
               <span className="post-card-encrypted-text">
-                {getObfuscatedDisplay(post.obfuscated_display || post.content)}
+                <FaLock style={{ marginRight: 4, fontSize: '0.65rem' }} /> {t('post.encrypted_hidden_placeholder') || 'Contenido oculto'}
               </span>
             ) : (
               <RichText
