@@ -20,7 +20,13 @@ import Avatar from './Avatar';
 import RichText from './RichText';
 import { useI18n } from '../../services/i18n/useI18n';
 import { DEFAULT_AVATAR, getTimeAgo, getEmbedUrl as getEmbedUrlHelper, isVideoUrl as isVideoUrlHelper, IMG_RE, VID_RE, VID_RE_EXTENDED } from '../../services/helpers';
-import { decode as encryptDecode, getObfuscatedDisplay, decryptForUser } from '../../services/alphabetEncryption';
+import {
+  decode as encryptDecode,
+  getObfuscatedDisplay,
+  decryptForUser,
+  getCachedDecryptedContent,
+  setCachedDecryptedContent,
+} from '../../services/alphabetEncryption';
 import ConfirmModal from './ConfirmModal';
 import './css/postCard.css';
 
@@ -52,21 +58,44 @@ const PostCard = React.memo(function PostCard({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmExternalLink, setConfirmExternalLink] = useState(null);
   const menuRef = useRef(null);
-  // ── Encrypted post state ──
-  const [decryptedContent, setDecryptedContent] = useState(null);
-  const [decrypting, setDecrypting] = useState(false);
+  const menuBtnRef = useRef(null);
+  const dropdownRef = useRef(null);
+  const [dropdownStyle, setDropdownStyle] = useState(null);
+  // ── Encrypted post state (con caché síncrono en memoria) ──
+  // undefined = no en caché, null = sin acceso, string = contenido descifrado
+  const initialCached = (post?.is_encrypted && user?.id)
+    ? getCachedDecryptedContent(post.id, user.id)
+    : undefined;
+  const [decryptedContent, setDecryptedContent] = useState(
+    initialCached !== undefined ? initialCached : null
+  );
+  const [decrypting, setDecrypting] = useState(
+    initialCached === undefined && post?.is_encrypted === true && !!post?.encrypted_content
+  );
 
   // ── Decrypt post content if user has access ──
   useEffect(() => {
     if (!post.is_encrypted || !post.encrypted_content || !post.allowed_users || !user?.id) {
       setDecryptedContent(null);
+      setDecrypting(false);
       return;
     }
 
     // Nota: el autor también pasa por decryptForUser porque su ID está en allowed_users
     // (se agrega automáticamente en CreatePostModal al crear el post)
 
+    // Verificar caché primero — evita loading en navegación entre posts ya vistos
+    const cached = getCachedDecryptedContent(post.id, user.id);
+    if (cached !== undefined) {
+      setDecryptedContent(cached); // null o string
+      setDecrypting(false);
+      return;
+    }
+
+    // Resetear estado al cambiar de post (evita mostrar contenido descifrado del post anterior)
+    setDecryptedContent(null);
     setDecrypting(true);
+
     decryptForUser(
       post.encrypted_content,
       post.encrypted_iv,
@@ -74,11 +103,8 @@ const PostCard = React.memo(function PostCard({
       post.allowed_users,
       user.id
     ).then((decrypted) => {
-      if (decrypted) {
-        setDecryptedContent(decrypted);
-      } else {
-        setDecryptedContent(null);
-      }
+      setDecryptedContent(decrypted || null);
+      setCachedDecryptedContent(post.id, user.id, decrypted || null);
     }).catch(() => {
       setDecryptedContent(null);
     }).finally(() => {
@@ -110,11 +136,31 @@ const PostCard = React.memo(function PostCard({
     setSaved(initialSaved);
   }, [initialSaved]);
 
-  // Cerrar menú al hacer clic fuera
+  // ── Calcular posición del dropdown y portearlo a body ──
+  useEffect(() => {
+    if (!showMenu) {
+      setDropdownStyle(null);
+      return;
+    }
+    const btn = menuBtnRef.current;
+    if (btn) {
+      const rect = btn.getBoundingClientRect();
+      setDropdownStyle({
+        position: 'fixed',
+        right: `${window.innerWidth - rect.right}px`,
+        top: `${rect.bottom + 4}px`,
+        zIndex: 9999,
+      });
+    }
+  }, [showMenu]);
+
+  // Cerrar menú al hacer clic fuera (incluye el portal)
   useEffect(() => {
     if (!showMenu) return;
     const handleClick = (e) => {
-      if (menuRef.current && !menuRef.current.contains(e.target)) {
+      const clickedButton = menuBtnRef.current?.contains(e.target);
+      const clickedDropdown = dropdownRef.current?.contains(e.target);
+      if (!clickedButton && !clickedDropdown) {
         setShowMenu(false);
       }
     };
@@ -128,14 +174,14 @@ const PostCard = React.memo(function PostCard({
   const repostDisabled = isPrivateProfile && !isOwner;
   const timeAgo = useMemo(() => getTimeAgo(t, locale, post.created_at), [t, locale, post.created_at]);
 
-  // ── Determinar qué contenido mostrar ──
+  // ── Determinar qué contenido mostrar (sin flicker) ──
   const isEncrypted = post.is_encrypted === true;
-  const hasAccess = isOwner || !!decryptedContent;
+  // Mostrar loading mientras se descifra, nunca mostrar post.content (es la cadena numérica)
+  const showEncryptedLoading = isEncrypted && decrypting && !decryptedContent;
+  const showEncryptedLabel = isEncrypted && !decrypting && !decryptedContent;
   const displayContent = isEncrypted
-    ? (hasAccess ? (decryptedContent || post.content) : null)
+    ? decryptedContent  // nunca hacer fallback a post.content
     : post.content;
-  const encryptedLabel = isEncrypted && !hasAccess;
-  const encryptedLoading = isEncrypted && !hasAccess && decrypting;
 
   const handleCancelDelete = useCallback(() => setConfirmDelete(false), []);
   const handleCancelExternal = useCallback(() => setConfirmExternalLink(null), []);
@@ -375,43 +421,48 @@ const PostCard = React.memo(function PostCard({
               <span className="post-card-time">{timeAgo}</span>
             </Link>
 
+            {/* ── Encrypted badge (sutil, en el header) ── */}
+            {isEncrypted && (
+              <span className="post-card-encrypted-badge" title={t('post.encrypted_hidden') || 'Post ofuscado'}>
+                <FaLock />
+              </span>
+            )}
+
             {isOwner && (
-              <div className="post-card-menu-wrapper" ref={menuRef}>
+              <div className="post-card-menu-wrapper">
                 <button
+                  ref={menuBtnRef}
                   className="post-card-menu-btn"
                   onClick={(e) => { e.stopPropagation(); setShowMenu((s) => !s); }}
                   aria-label="Post options"
                 >
                   <FaEllipsisV />
                 </button>
-                {showMenu && (
-                  <div className="post-card-menu-dropdown" onClick={(e) => e.stopPropagation()}>
+                {/* Dropdown ported a body para evitar clipping */}
+                {showMenu && dropdownStyle && createPortal(
+                  <div
+                    ref={dropdownRef}
+                    className="post-card-menu-dropdown"
+                    style={dropdownStyle}
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <button onClick={handleEdit}><FaEdit /> {t('post.edit')}</button>
                     <button onClick={handlePin}><FaThumbtack /> {post.is_pinned ? t('post.unpin') : t('post.pin')}</button>
                     <button className="post-card-menu-danger" onClick={handleDelete}><FaTrash /> {t('post.delete')}</button>
-                  </div>
+                  </div>,
+                  document.body
                 )}
               </div>
             )}
           </div>
 
-          {/* ── Encrypted content badge ── */}
-          {isEncrypted && (
-            <div className="post-card-encrypted-badge">
-              <FaLock className="post-card-encrypted-icon" />
-              <span className="post-card-encrypted-label">
-                {hasAccess
-                  ? t('post.encrypted_visible') || 'Contenido privado visible para ti'
-                  : t('post.encrypted_hidden') || 'Contenido ofuscado'}
-              </span>
-            </div>
-          )}
+          {/* (badge moved inside header above) */}
 
           {/* Text content with @mention highlighting */}
           <p className="post-card-text">
-            {encryptedLoading ? (
+            {showEncryptedLoading ? (
               <span className="post-card-encrypted-loading">{t('common.loading') || 'Descifrando...'}</span>
-            ) : encryptedLabel ? (
+            ) : showEncryptedLabel ? (
               <span className="post-card-encrypted-text">
                 {getObfuscatedDisplay(post.obfuscated_display || post.content)}
               </span>
@@ -539,22 +590,24 @@ const PostCard = React.memo(function PostCard({
         </div>
       </div>
 
-      {/* ── Delete confirmation modal ── */}
-      {confirmDelete && (
+      {/* ── Delete confirmation modal (portado a body) ── */}
+      {confirmDelete && createPortal(
         <ConfirmModal
           message={t('post.delete_confirm')}
           onConfirm={executeDelete}
           onCancel={handleCancelDelete}
-        />
+        />,
+        document.body
       )}
 
-      {/* ── External link confirmation ── */}
-      {confirmExternalLink && (
+      {/* ── External link confirmation (portado a body) ── */}
+      {confirmExternalLink && createPortal(
         <ConfirmModal
           message={t('post.external_link_warning')}
           onConfirm={executeExternalLink}
           onCancel={handleCancelExternal}
-        />
+        />,
+        document.body
       )}
 
       {/* ── Galería de imágenes (portal a body para evitar backdrop-filter issue) ── */}

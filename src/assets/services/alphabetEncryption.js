@@ -11,6 +11,40 @@
  * La clave NO depende del postId, lo que permite encriptar antes de crear el post.
  */
 
+// ── Caché en memoria para contenido descifrado ──
+// Evita mostrar "Descifrando..." cada vez que un PostCard se monta
+const DECRYPTED_CACHE = new Map();
+const CACHE_TTL = 1000 * 60 * 30; // 30 minutos
+
+function getCacheKey(postId, userId) {
+  return `${postId}|${userId}`;
+}
+
+/**
+ * Obtiene contenido descifrado del caché si existe y no ha expirado
+ * @returns {string|null|undefined} - string=contenido, null=sin acceso, undefined=no en caché
+ */
+export function getCachedDecryptedContent(postId, userId) {
+  if (!postId || !userId) return undefined;
+  const key = getCacheKey(postId, userId);
+  const entry = DECRYPTED_CACHE.get(key);
+  if (!entry) return undefined; // undefined = no está en caché
+  if (Date.now() - entry.ts > CACHE_TTL) {
+    DECRYPTED_CACHE.delete(key);
+    return undefined;
+  }
+  return entry.content; // String | null (null = no tiene acceso)
+}
+
+/**
+ * Almacena contenido descifrado en el caché
+ */
+export function setCachedDecryptedContent(postId, userId, content) {
+  if (!postId || !userId) return;
+  const key = getCacheKey(postId, userId);
+  DECRYPTED_CACHE.set(key, { content, ts: Date.now() });
+}
+
 // ── Mapeo letra → código palindrómico ──
 const LETTER_MAP = {
   a: '2112', b: '4114', c: '6116', d: '8118',

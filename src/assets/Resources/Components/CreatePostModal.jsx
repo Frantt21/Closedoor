@@ -1,14 +1,16 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createPost, updatePost, notifyMentions } from '../../services/postService';
 import { getFollowing } from '../../services/followService';
 import { searchProfiles } from '../../services/userService';
 import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../services/i18n/useI18n';
-import { FaImage, FaTimes, FaPlus, FaLink, FaLock, FaUnlock, FaUserPlus, FaCheck, FaSearch } from 'react-icons/fa';
+import { FaImage, FaTimes, FaPlus, FaLink, FaLock, FaUnlock, FaUserPlus, FaCheck, FaSearch, FaRegHeart, FaComment, FaRetweet, FaEye } from 'react-icons/fa';
 import SafeImage from './SafeImage';
 import Avatar from './Avatar';
+import Badge from './Badge';
 import { IMG_RE, VID_RE, YOUTUBE_PATTERN, VIMEO_PATTERN, extractUrls, detectMediaFromContent, getEmbedUrl as getEmbedUrlHelper } from '../../services/helpers';
-import { encode as encryptEncode, encryptForUsers } from '../../services/alphabetEncryption';
+import { encode as encryptEncode, encryptForUsers, decryptForUser, getObfuscatedDisplay } from '../../services/alphabetEncryption';
+import { supabase } from '../../services/supabaseclient';
 import './css/createPostModal.css';
 
 const IMAGE_EXTENSIONS = IMG_RE;
@@ -48,6 +50,16 @@ export default function CreatePostModal({
   const [searchingUsers, setSearchingUsers] = useState(false);
   const [showUserSearch, setShowUserSearch] = useState(false);
   const userSearchTimeoutRef = useRef(null);
+
+  // ── Cerrar con Escape ──
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   const isEditing = !!editPost;
 
@@ -139,7 +151,7 @@ export default function CreatePostModal({
 
   // ── Reset all state when modal opens ──
   useEffect(() => {
-    if (isOpen && userId && !editPost) {
+    if (isOpen && userId) {
       getFollowing(userId)
         .then((users) => setFollowedUsers(users))
         .catch((err) => console.warn('Error fetching followed users:', err));
@@ -147,7 +159,7 @@ export default function CreatePostModal({
       setMentionQuery('');
       setSelectedMentionIdx(0);
     }
-  }, [isOpen, userId, editPost]);
+  }, [isOpen, userId]);
 
   useEffect(() => {
     if (isOpen) {
@@ -157,8 +169,40 @@ export default function CreatePostModal({
         const existingUrls = editPost.image_urls || (editPost.image_url ? [editPost.image_url] : []);
         setImageUrls(existingUrls.length > 0 ? existingUrls : ['']);
         setShowImageSection(existingUrls.length > 0);
-        setIsEncrypted(editPost.is_encrypted || false);
-        // On edit, we don't reset the user list (still protected)
+
+        // ── Encrypted post: descifrar contenido + mantener estado ──
+        const wasEncrypted = editPost.is_encrypted === true;
+        setIsEncrypted(wasEncrypted);
+        if (wasEncrypted && editPost.encrypted_content && userId) {
+          // Descifrar el contenido para mostrarlo al autor
+          decryptForUser(
+            editPost.encrypted_content,
+            editPost.encrypted_iv,
+            editPost.user_id,
+            editPost.allowed_users,
+            userId
+          ).then((decrypted) => {
+            if (decrypted) setContent(decrypted);
+          }).catch(() => {
+            // Si falla el descifrado, mostrar lo que hay
+          });
+
+          // Cargar usuarios permitidos
+          const allowedIds = editPost.allowed_users || [];
+          if (allowedIds.length > 0) {
+            // Filtrar el autor
+            const others = allowedIds.filter(id => id !== userId);
+            if (others.length > 0) {
+              supabase
+                .from('profiles')
+                .select('id, username, avatar_url')
+                .in('id', others)
+                .then(({ data }) => {
+                  if (data) setAllowedUsers(data);
+                });
+            }
+          }
+        }
       } else {
         setContent('');
         setPreviewUrl(null);
@@ -175,6 +219,16 @@ export default function CreatePostModal({
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, editPost]);
+
+  // ── Obfuscated preview (hook — debe ir antes del early return) ──
+  const obfuscatedPreviewText = useMemo(() => {
+    if (!isEncrypted || !content.trim() || isEditing) return null;
+    try {
+      return encryptEncode(content.trim());
+    } catch {
+      return null;
+    }
+  }, [isEncrypted, content, isEditing]);
 
   if (!isOpen) return null;
 
@@ -292,12 +346,33 @@ export default function CreatePostModal({
       }
 
       if (isEditing) {
-        await updatePost(editPost.id, {
+        const updateData = {
           content: trimmed,
           image_url: finalImageUrls[0] || imageUrl,
           image_urls: finalImageUrls.length > 0 ? finalImageUrls : null,
           video_url: videoUrl,
-        });
+        };
+
+        // Re-encriptar si el post estaba ofuscado
+        if (isEncrypted) {
+          const userIds = allowedUsers.map(u => u.id);
+          if (!userIds.includes(userId)) {
+            userIds.push(userId);
+          }
+          const encResult = await encryptForUsers(trimmed, userId, userIds);
+          const encDisplay = encryptEncode(trimmed);
+          const fullAllowedIds = [...new Set([...allowedUsers.map(u => u.id), userId])];
+          updateData.content = encDisplay;
+          updateData.is_encrypted = true;
+          updateData.encrypted_content = encResult.ciphertext;
+          updateData.encrypted_iv = encResult.iv;
+          updateData.allowed_users = fullAllowedIds;
+          updateData.obfuscated_display = encDisplay;
+          encryptedResult = encResult;
+          obfuscatedDisplay = encDisplay;
+        }
+
+        await updatePost(editPost.id, updateData);
       } else {
         if (!userId) {
           setError(t('create_post.auth_error'));
@@ -315,6 +390,11 @@ export default function CreatePostModal({
           encryptedResult = await encryptForUsers(trimmed, userId, userIds);
         }
 
+        // Incluir al autor en allowed_users (necesario para que coincida con la clave de encriptación)
+        const fullAllowedIds = isEncrypted
+          ? [...new Set([...allowedUsers.map(u => u.id), userId])]
+          : null;
+
         newPost = await createPost({
           userId,
           content: isEncrypted ? obfuscatedDisplay : trimmed,
@@ -323,7 +403,7 @@ export default function CreatePostModal({
           videoUrl,
           encryptedContent: encryptedResult?.ciphertext || null,
           encryptedIv: encryptedResult?.iv || null,
-          allowedUsers: isEncrypted ? allowedUsers.map(u => u.id) : null,
+          allowedUsers: fullAllowedIds,
           obfuscatedDisplay: isEncrypted ? obfuscatedDisplay : null,
         });
 
@@ -428,26 +508,31 @@ export default function CreatePostModal({
             )}
           </button>
 
-          {!isEditing && (
-            <button
-              type="button"
-              className={`create-post-toolbar-btn ${isEncrypted ? 'create-post-toolbar-btn--encrypted' : ''}`}
-              onClick={() => {
-                setIsEncrypted(s => !s);
-                if (isEncrypted) {
-                  setAllowedUsers([]);
-                  setShowUserSearch(false);
-                }
-              }}
-              title={isEncrypted ? (t('create_post.encrypted_on') || 'Ofuscado: ON') : (t('create_post.encrypted_off') || 'Ofuscar contenido')}
-            >
-              {isEncrypted ? <FaLock /> : <FaUnlock />}
-            </button>
-          )}
+          <button
+            type="button"
+            className={`create-post-toolbar-btn ${isEncrypted ? 'create-post-toolbar-btn--encrypted' : ''}`}
+            onClick={() => {
+              if (isEditing) return; // No permitir cambiar en edición
+              setIsEncrypted(s => !s);
+              if (isEncrypted) {
+                setAllowedUsers([]);
+                setShowUserSearch(false);
+              }
+            }}
+            title={
+              isEditing
+                ? (t('create_post.encrypted_edit_locked') || 'Post ofuscado — no se puede cambiar')
+                : isEncrypted
+                  ? (t('create_post.encrypted_on') || 'Ofuscado: ON')
+                  : (t('create_post.encrypted_off') || 'Ofuscar contenido')
+            }
+          >
+            {isEncrypted ? <FaLock /> : <FaUnlock />}
+          </button>
         </div>
 
         {/* ── Allowed users selector (solo si ofuscación activa) ── */}
-        {isEncrypted && !isEditing && (
+        {isEncrypted && (
           <div className="create-post-encrypt-section">
             <div className="create-post-encrypt-section-header">
               <FaUserPlus className="create-post-encrypt-section-icon" />
@@ -526,16 +611,16 @@ export default function CreatePostModal({
                     <div className="create-post-encrypt-quick-list">
                       {followedUsers
                         .filter(u => !allowedUsers.some(a => a.id === u.id))
-                        .slice(0, 8)
+                        .slice(0, 6)
                         .map(u => (
                           <button
                             key={u.id}
                             type="button"
                             className="create-post-encrypt-quick-item"
                             onClick={() => addAllowedUser(u)}
-                            title={`@${u.username}`}
                           >
                             <Avatar className="create-post-encrypt-quick-avatar" src={u.avatar_url} alt={u.username} />
+                            <span className="create-post-encrypt-quick-name">@{u.username}</span>
                           </button>
                         ))}
                     </div>
@@ -604,28 +689,94 @@ export default function CreatePostModal({
           </div>
         )}
 
-        {/* ── Preview de media detectada en texto ── */}
-        {previewUrl && previewType === 'image' && getValidImageUrls().length === 0 && (
-          <div className="create-post-preview">
-            <SafeImage
-              src={previewUrl}
-              alt="Preview"
-              hideOnError
-            />
+        {/* ── Live Post Preview ── */}
+        <div className="create-post-live-preview">
+          <div className="create-post-live-preview-header">
+            <span className="create-post-live-preview-label">{t('post.preview') || 'Vista previa'}</span>
           </div>
-        )}
+          <div className="create-post-live-preview-card">
+            <Avatar
+              className="create-post-live-preview-avatar"
+              src={profile?.avatar_url}
+              alt={displayName}
+            />
+            <div className="create-post-live-preview-content">
+              <div className="create-post-live-preview-author">
+                <span className="create-post-live-preview-username">{displayName}</span>
+                <Badge roles={profile?.roles || []} />
+              </div>
+              <p className="create-post-live-preview-text">
+                {content.trim() || <span className="create-post-live-preview-placeholder">{t('create_post.placeholder')}</span>}
+              </p>
+              {/* Preview images from image_urls */}
+              {showImageSection && getValidImageUrls().length > 0 && (
+                <div className={`post-card-image-grid post-card-image-grid--${Math.min(getValidImageUrls().length, 4)}`}>
+                  {getValidImageUrls().slice(0, 4).map((url, i) => (
+                    <div key={i} className="post-card-image-grid-item">
+                      <SafeImage src={url} alt={`Preview ${i + 1}`} />
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* Preview auto-detected media from content */}
+              {previewUrl && previewType === 'image' && getValidImageUrls().length === 0 && (
+                <div className="post-card-media">
+                  <SafeImage src={previewUrl} alt="Preview" hideOnError />
+                </div>
+              )}
+              {previewUrl && isVideoPreview && (
+                <div className="post-card-media">
+                  {getEmbedUrl(previewUrl) ? (
+                    <iframe src={getEmbedUrl(previewUrl)} title="Video preview" allowFullScreen />
+                  ) : (
+                    <video src={previewUrl} controls />
+                  )}
+                </div>
+              )}
+              {/* Visual action buttons (disabled) */}
+              <div className="create-post-live-preview-actions">
+                <span className="create-post-live-preview-action">
+                  <FaRegHeart /> <span className="create-post-live-preview-count">0</span>
+                </span>
+                <span className="create-post-live-preview-action">
+                  <FaComment /> <span className="create-post-live-preview-count">0</span>
+                </span>
+                <span className="create-post-live-preview-action">
+                  <FaRetweet /> <span className="create-post-live-preview-count">0</span>
+                </span>
+                <span className="create-post-live-preview-action">
+                  <FaEye /> <span className="create-post-live-preview-count">0</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
 
-        {previewUrl && isVideoPreview && (
-          <div className="create-post-preview create-post-preview--video">
-            {getEmbedUrl(previewUrl) ? (
-              <iframe
-                src={getEmbedUrl(previewUrl)}
-                title="Video preview"
-                allowFullScreen
+        {/* ── Obfuscated preview: cómo lo ven los no autorizados ── */}
+        {obfuscatedPreviewText && !isEditing && (
+          <div className="create-post-obfuscated-preview">
+            <div className="create-post-obfuscated-preview-header">
+              <FaLock className="create-post-obfuscated-preview-icon" />
+              <span className="create-post-obfuscated-preview-label">
+                {t('create_post.obfuscated_preview_label') || 'Cómo lo ven los demás usuarios:'}
+              </span>
+            </div>
+            <div className="create-post-obfuscated-preview-card">
+              <Avatar
+                className="create-post-live-preview-avatar"
+                src={profile?.avatar_url}
+                alt={displayName}
               />
-            ) : (
-              <video src={previewUrl} controls />
-            )}
+              <div className="create-post-live-preview-content">
+                <div className="create-post-live-preview-author">
+                  <span className="create-post-live-preview-username">{displayName}</span>
+                  <Badge roles={profile?.roles || []} />
+                </div>
+                <p className="create-post-obfuscated-preview-text">
+                  {getObfuscatedDisplay(obfuscatedPreviewText)}
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
@@ -635,6 +786,7 @@ export default function CreatePostModal({
             onClick={handleSubmit}
             disabled={saving || (!content.trim() && getValidImageUrls().length === 0)}
           >
+            {isEncrypted && <FaLock className="fc-modal-save-lock" />}
             {saving ? t('create_post.saving') : isEditing ? t('create_post.save_changes') : t('create_post.post')}
           </button>
           <button className="fc-modal-cancel" onClick={onClose} disabled={saving}>

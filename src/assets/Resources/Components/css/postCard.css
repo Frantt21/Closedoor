@@ -4,28 +4,20 @@
    Botones de acción con estilo tipo "Editar perfil"
    ========================================== */
 
-/* ── Encrypted post badge ── */
+/* ── Encrypted post badge (sutil) ── */
 .post-card-encrypted-badge {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 6px;
-    margin-bottom: 8px;
-    padding: 6px 10px;
-    background: rgba(250, 204, 21, 0.06);
-    border: 1px solid rgba(250, 204, 21, 0.12);
-    border-radius: var(--radius-sm, 6px);
-    font-size: 0.75rem;
-}
-
-.post-card-encrypted-icon {
-    color: #facc15;
-    font-size: 0.7rem;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--overlay-bg-subtle);
+    color: var(--color-text-muted, #6b7280);
+    font-size: 0.65rem;
+    margin-left: auto;
     flex-shrink: 0;
-}
-
-.post-card-encrypted-label {
-    color: #facc15;
-    font-weight: 500;
+    cursor: default;
 }
 
 .post-card-encrypted-text {
