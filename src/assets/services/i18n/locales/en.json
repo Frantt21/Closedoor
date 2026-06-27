@@ -285,6 +285,8 @@
   "create_post.encrypted_no_users": "Select at least one user who can see the obfuscated content",
   "post.encrypted_visible": "🔒 Private content visible to you",
   "post.encrypted_hidden": "🔒 Obfuscated content",
+  "create_post.encrypted_edit_locked": "Post is obfuscated — cannot change",
+  "create_post.obfuscated_preview_label": "How others will see it:",
 
   "post.comment_media_url": "Paste image or video URL...",
   "post.comment_image_url": "Image URL",
