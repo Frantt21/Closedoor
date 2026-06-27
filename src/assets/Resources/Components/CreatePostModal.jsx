@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { createPost, updatePost, notifyMentions } from '../../services/postService';
 import { getFollowing } from '../../services/followService';
+import { searchProfiles } from '../../services/userService';
 import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../services/i18n/useI18n';
-import { FaImage, FaTimes, FaPlus, FaLink } from 'react-icons/fa';
+import { FaImage, FaTimes, FaPlus, FaLink, FaLock, FaUnlock, FaUserPlus, FaCheck, FaSearch } from 'react-icons/fa';
 import SafeImage from './SafeImage';
 import Avatar from './Avatar';
 import { IMG_RE, VID_RE, YOUTUBE_PATTERN, VIMEO_PATTERN, extractUrls, detectMediaFromContent, getEmbedUrl as getEmbedUrlHelper } from '../../services/helpers';
+import { encode as encryptEncode, encryptForUsers } from '../../services/alphabetEncryption';
 import './css/createPostModal.css';
 
 const IMAGE_EXTENSIONS = IMG_RE;
@@ -20,6 +22,7 @@ export default function CreatePostModal({
 }) {
   const { t } = useI18n();
   const { profile } = useAuth();
+  const currentUserId = userId; // alias para usar en callbacks
   const [content, setContent] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -36,6 +39,15 @@ export default function CreatePostModal({
   const [selectedMentionIdx, setSelectedMentionIdx] = useState(0);
   const textareaRef = useRef(null);
   const mentionDropdownRef = useRef(null);
+
+  // ── Encrypted post state ──
+  const [isEncrypted, setIsEncrypted] = useState(false);
+  const [allowedUsers, setAllowedUsers] = useState([]); // { id, username, avatar_url }
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [userSearchResults, setUserSearchResults] = useState([]);
+  const [searchingUsers, setSearchingUsers] = useState(false);
+  const [showUserSearch, setShowUserSearch] = useState(false);
+  const userSearchTimeoutRef = useRef(null);
 
   const isEditing = !!editPost;
 
@@ -92,6 +104,40 @@ export default function CreatePostModal({
   }, []);
 
   // ── Fetch followed users when modal opens ──
+  // ── User search with debounce ──
+  const handleUserSearchChange = useCallback((e) => {
+    const query = e.target.value;
+    setUserSearchQuery(query);
+    if (query.trim().length < 2) {
+      setUserSearchResults([]);
+      return;
+    }
+    setSearchingUsers(true);
+    if (userSearchTimeoutRef.current) clearTimeout(userSearchTimeoutRef.current);
+    userSearchTimeoutRef.current = setTimeout(async () => {
+      const results = await searchProfiles(query.trim(), currentUserId);
+      // Filtrar los que ya están seleccionados
+      const selectedIds = new Set(allowedUsers.map(u => u.id));
+      setUserSearchResults(results.filter(u => !selectedIds.has(u.id)));
+      setSearchingUsers(false);
+    }, 300);
+  }, [currentUserId, allowedUsers]);
+
+  const addAllowedUser = useCallback((user) => {
+    setAllowedUsers(prev => {
+      if (prev.some(u => u.id === user.id)) return prev;
+      return [...prev, { id: user.id, username: user.username, avatar_url: user.avatar_url }];
+    });
+    setUserSearchQuery('');
+    setUserSearchResults([]);
+    setShowUserSearch(false);
+  }, []);
+
+  const removeAllowedUser = useCallback((userId) => {
+    setAllowedUsers(prev => prev.filter(u => u.id !== userId));
+  }, []);
+
+  // ── Reset all state when modal opens ──
   useEffect(() => {
     if (isOpen && userId && !editPost) {
       getFollowing(userId)
@@ -111,12 +157,19 @@ export default function CreatePostModal({
         const existingUrls = editPost.image_urls || (editPost.image_url ? [editPost.image_url] : []);
         setImageUrls(existingUrls.length > 0 ? existingUrls : ['']);
         setShowImageSection(existingUrls.length > 0);
+        setIsEncrypted(editPost.is_encrypted || false);
+        // On edit, we don't reset the user list (still protected)
       } else {
         setContent('');
         setPreviewUrl(null);
         setPreviewType(null);
         setImageUrls(['']);
         setShowImageSection(false);
+        setIsEncrypted(false);
+        setAllowedUsers([]);
+        setUserSearchQuery('');
+        setUserSearchResults([]);
+        setShowUserSearch(false);
       }
       setError(null);
     }
@@ -211,6 +264,12 @@ export default function CreatePostModal({
       return;
     }
 
+    // Validar ofuscación: si está activa, debe haber al menos un usuario seleccionado
+    if (isEncrypted && allowedUsers.length === 0) {
+      setError(t('create_post.encrypted_no_users') || 'Selecciona al menos un usuario para ver el contenido ofuscado');
+      return;
+    }
+
     const { imageUrl, videoUrl } = detectMediaFromContent(trimmed);
     const validImageUrls = getValidImageUrls();
 
@@ -224,6 +283,14 @@ export default function CreatePostModal({
 
     try {
       let newPost;
+      let encryptedResult = null;
+      let obfuscatedDisplay = null;
+
+      // Si es modo ofuscado, encriptar el contenido
+      if (isEncrypted && !isEditing) {
+        obfuscatedDisplay = encryptEncode(trimmed);
+      }
+
       if (isEditing) {
         await updatePost(editPost.id, {
           content: trimmed,
@@ -237,12 +304,27 @@ export default function CreatePostModal({
           setSaving(false);
           return;
         }
+
+        // Si es modo ofuscado, encriptar con AES (clave derivada del autor + usuarios, sin postId)
+        if (isEncrypted) {
+          const userIds = allowedUsers.map(u => u.id);
+          // Incluir al autor también para que pueda verlo
+          if (!userIds.includes(userId)) {
+            userIds.push(userId);
+          }
+          encryptedResult = await encryptForUsers(trimmed, userId, userIds);
+        }
+
         newPost = await createPost({
           userId,
-          content: trimmed,
+          content: isEncrypted ? obfuscatedDisplay : trimmed,
           imageUrl: finalImageUrls[0] || imageUrl,
           imageUrls: finalImageUrls.length > 0 ? finalImageUrls : null,
           videoUrl,
+          encryptedContent: encryptedResult?.ciphertext || null,
+          encryptedIv: encryptedResult?.iv || null,
+          allowedUsers: isEncrypted ? allowedUsers.map(u => u.id) : null,
+          obfuscatedDisplay: isEncrypted ? obfuscatedDisplay : null,
         });
 
         // ── @Mentions: notificar a usuarios mencionados ──
@@ -258,6 +340,11 @@ export default function CreatePostModal({
       setPreviewType(null);
       setImageUrls(['']);
       setShowImageSection(false);
+      setIsEncrypted(false);
+      setAllowedUsers([]);
+      setUserSearchQuery('');
+      setUserSearchResults([]);
+      setShowUserSearch(false);
       if (onSuccess) onSuccess();
       onClose();
     } catch (err) {
@@ -327,27 +414,145 @@ export default function CreatePostModal({
           <span className="create-post-charcount">{content.length}/2000</span>
         </label>
 
-        {/* ── Image URL button (submodal) ── */}
-        <div className="create-post-image-tools">
+        {/* ── Toolbar: icons + tooltips ── */}
+        <div className="create-post-toolbar">
           <button
             type="button"
-            className={`create-post-image-btn ${showImageSection ? 'create-post-image-btn--active' : ''}`}
+            className={`create-post-toolbar-btn ${showImageSection ? 'create-post-toolbar-btn--active' : ''}`}
             onClick={() => setShowImageSection((s) => !s)}
+            title={showImageSection ? t('create_post.hide_media') : t('create_post.show_media')}
           >
             <FaImage />
-            <span>{showImageSection ? t('create_post.hide_media') : t('create_post.show_media')}</span>
             {getValidImageUrls().length > 0 && (
-              <span className="create-post-image-count">{t('create_post.image_count', { n: getValidImageUrls().length })}</span>
+              <span className="create-post-toolbar-badge">{getValidImageUrls().length}</span>
             )}
           </button>
+
+          {!isEditing && (
+            <button
+              type="button"
+              className={`create-post-toolbar-btn ${isEncrypted ? 'create-post-toolbar-btn--encrypted' : ''}`}
+              onClick={() => {
+                setIsEncrypted(s => !s);
+                if (isEncrypted) {
+                  setAllowedUsers([]);
+                  setShowUserSearch(false);
+                }
+              }}
+              title={isEncrypted ? (t('create_post.encrypted_on') || 'Ofuscado: ON') : (t('create_post.encrypted_off') || 'Ofuscar contenido')}
+            >
+              {isEncrypted ? <FaLock /> : <FaUnlock />}
+            </button>
+          )}
         </div>
+
+        {/* ── Allowed users selector (solo si ofuscación activa) ── */}
+        {isEncrypted && !isEditing && (
+          <div className="create-post-encrypt-section">
+            <div className="create-post-encrypt-section-header">
+              <FaUserPlus className="create-post-encrypt-section-icon" />
+              <span className="create-post-encrypt-section-label">{t('create_post.allowed_users_title') || 'Visible para:'}</span>
+              <button
+                type="button"
+                className="create-post-encrypt-add-btn"
+                onClick={() => setShowUserSearch((s) => !s)}
+                title={t('create_post.add_user') || 'Añadir usuario'}
+              >
+                <FaPlus />
+              </button>
+            </div>
+
+            {/* Selected users as chips */}
+            {allowedUsers.length > 0 && (
+              <div className="create-post-encrypt-chips">
+                {allowedUsers.map(u => (
+                  <span key={u.id} className="create-post-encrypt-chip">
+                    <Avatar className="create-post-encrypt-chip-avatar" src={u.avatar_url} alt={u.username} />
+                    <span className="create-post-encrypt-chip-name">@{u.username}</span>
+                    <button
+                      type="button"
+                      className="create-post-encrypt-chip-remove"
+                      onClick={() => removeAllowedUser(u.id)}
+                      title={t('common.delete')}
+                    >
+                      <FaTimes />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* User search */}
+            {showUserSearch && (
+              <div className="create-post-encrypt-search">
+                <div className="create-post-encrypt-search-input-wrap">
+                  <FaSearch className="create-post-encrypt-search-icon" />
+                  <input
+                    className="fc-modal-input create-post-encrypt-search-input"
+                    type="text"
+                    value={userSearchQuery}
+                    onChange={handleUserSearchChange}
+                    placeholder={t('create_post.search_users_placeholder') || 'Buscar usuarios...'}
+                    autoFocus
+                  />
+                </div>
+
+                {/* Search results */}
+                {searchingUsers && <div className="create-post-encrypt-searching">{t('common.loading') || 'Buscando...'}</div>}
+                {userSearchResults.length > 0 && (
+                  <div className="create-post-encrypt-results">
+                    {userSearchResults.map(u => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        className="create-post-encrypt-result-item"
+                        onClick={() => addAllowedUser(u)}
+                      >
+                        <Avatar className="create-post-encrypt-result-avatar" src={u.avatar_url} alt={u.username} />
+                        <span className="create-post-encrypt-result-name">@{u.username}</span>
+                        <FaCheck className="create-post-encrypt-result-add" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {userSearchQuery.length >= 2 && userSearchResults.length === 0 && !searchingUsers && (
+                  <div className="create-post-encrypt-no-results">{t('create_post.no_users_found') || 'Sin resultados'}</div>
+                )}
+
+                {/* Quick add: followed users */}
+                {followedUsers.length > 0 && (
+                  <div className="create-post-encrypt-quick">
+                    <span className="create-post-encrypt-quick-label">{t('create_post.quick_add') || 'Siguiendo:'}</span>
+                    <div className="create-post-encrypt-quick-list">
+                      {followedUsers
+                        .filter(u => !allowedUsers.some(a => a.id === u.id))
+                        .slice(0, 8)
+                        .map(u => (
+                          <button
+                            key={u.id}
+                            type="button"
+                            className="create-post-encrypt-quick-item"
+                            onClick={() => addAllowedUser(u)}
+                            title={`@${u.username}`}
+                          >
+                            <Avatar className="create-post-encrypt-quick-avatar" src={u.avatar_url} alt={u.username} />
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Image URL inputs section ── */}
         {showImageSection && (
           <div className="create-post-image-section">
-            <p className="create-post-image-section-title">
-              <FaLink /> {t('create_post.image_urls_title')}
-            </p>
+            <div className="create-post-image-section-header">
+              <FaLink className="create-post-image-section-icon" />
+              <span className="create-post-image-section-label">{t('create_post.image_urls_title')}</span>
+            </div>
             {imageUrls.map((url, index) => (
               <div key={index} className="create-post-image-input-row">
                 <input
@@ -384,8 +589,9 @@ export default function CreatePostModal({
                 type="button"
                 className="create-post-image-add"
                 onClick={addImageUrlInput}
+                title={t('create_post.add_another_image', { n: imageUrls.length })}
               >
-                <FaPlus /> {t('create_post.add_another_image', { n: imageUrls.length })}
+                <FaPlus />
               </button>
             )}
           </div>

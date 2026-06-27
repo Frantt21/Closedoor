@@ -17,7 +17,7 @@ export async function resolveMentions(content) {
   return mentions;
 }
 
-export async function createPost({ userId, content, imageUrl, imageUrls, videoUrl }) {
+export async function createPost({ userId, content, imageUrl, imageUrls, videoUrl, encryptedContent, encryptedIv, allowedUsers, obfuscatedDisplay }) {
   let mentions = {};
   if (content) {
     try {
@@ -36,6 +36,11 @@ export async function createPost({ userId, content, imageUrl, imageUrls, videoUr
       image_urls: imageUrls && imageUrls.length > 0 ? imageUrls : null,
       video_url: videoUrl || null,
       mentions,
+      is_encrypted: !!encryptedContent,
+      encrypted_content: encryptedContent || null,
+      encrypted_iv: encryptedIv || null,
+      allowed_users: allowedUsers && allowedUsers.length > 0 ? allowedUsers : null,
+      obfuscated_display: obfuscatedDisplay || null,
     })
     .select('*')
     .single();

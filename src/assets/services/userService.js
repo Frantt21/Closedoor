@@ -223,6 +223,38 @@ export async function getUserProfileByUsername(username) {
  * @param {number} [limit=50] - Max results
  * @returns {Promise<Array>} - List of profiles
  */
+/**
+ * Search profiles by username (for user selector in encrypted posts)
+ * @param {string} query - Search query
+ * @param {string} [excludeUserId] - Optional user ID to exclude
+ * @param {number} [limit=10] - Max results
+ * @returns {Promise<Array>} - Matching profiles
+ */
+export async function searchProfiles(query, excludeUserId, limit = 10) {
+  try {
+    let dbQuery = supabase
+      .from('profiles')
+      .select('id, username, avatar_url')
+      .ilike('username', `%${query.toLowerCase()}%`)
+      .order('username', { ascending: true })
+      .limit(limit);
+
+    if (excludeUserId) {
+      dbQuery = dbQuery.neq('id', excludeUserId);
+    }
+
+    const { data, error } = await dbQuery;
+    if (error) {
+      console.error('Error searching profiles:', error);
+      return [];
+    }
+    return data || [];
+  } catch (err) {
+    console.error('Search profiles error:', err);
+    return [];
+  }
+}
+
 export async function listProfiles(excludeUserId, limit = 50) {
   try {
     let query = supabase

@@ -12,7 +12,7 @@ import {
   savePost,
   unsavePost,
 } from '../../services/postService';
-import { FaHeart, FaRegHeart, FaComment, FaRetweet, FaThumbtack, FaEdit, FaTrash, FaEllipsisV, FaBookmark, FaRegBookmark, FaEye } from 'react-icons/fa';
+import { FaHeart, FaRegHeart, FaComment, FaRetweet, FaThumbtack, FaEdit, FaTrash, FaEllipsisV, FaBookmark, FaRegBookmark, FaEye, FaLock } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import Badge from './Badge';
 import SafeImage from './SafeImage';
@@ -20,6 +20,7 @@ import Avatar from './Avatar';
 import RichText from './RichText';
 import { useI18n } from '../../services/i18n/useI18n';
 import { DEFAULT_AVATAR, getTimeAgo, getEmbedUrl as getEmbedUrlHelper, isVideoUrl as isVideoUrlHelper, IMG_RE, VID_RE, VID_RE_EXTENDED } from '../../services/helpers';
+import { decode as encryptDecode, getObfuscatedDisplay, decryptForUser } from '../../services/alphabetEncryption';
 import ConfirmModal from './ConfirmModal';
 import './css/postCard.css';
 
@@ -51,6 +52,39 @@ const PostCard = React.memo(function PostCard({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmExternalLink, setConfirmExternalLink] = useState(null);
   const menuRef = useRef(null);
+  // ── Encrypted post state ──
+  const [decryptedContent, setDecryptedContent] = useState(null);
+  const [decrypting, setDecrypting] = useState(false);
+
+  // ── Decrypt post content if user has access ──
+  useEffect(() => {
+    if (!post.is_encrypted || !post.encrypted_content || !post.allowed_users || !user?.id) {
+      setDecryptedContent(null);
+      return;
+    }
+
+    // Nota: el autor también pasa por decryptForUser porque su ID está en allowed_users
+    // (se agrega automáticamente en CreatePostModal al crear el post)
+
+    setDecrypting(true);
+    decryptForUser(
+      post.encrypted_content,
+      post.encrypted_iv,
+      post.user_id,
+      post.allowed_users,
+      user.id
+    ).then((decrypted) => {
+      if (decrypted) {
+        setDecryptedContent(decrypted);
+      } else {
+        setDecryptedContent(null);
+      }
+    }).catch(() => {
+      setDecryptedContent(null);
+    }).finally(() => {
+      setDecrypting(false);
+    });
+  }, [post.id, post.is_encrypted, post.encrypted_content, post.encrypted_iv, post.allowed_users, post.user_id, user?.id]);
 
   // Sincronizar estado liked/reposted cuando el padre refetchea (navegación)
   // Separado de los contadores para evitar race condition con Realtime:
@@ -93,6 +127,15 @@ const PostCard = React.memo(function PostCard({
   const isPrivateProfile = profile?.is_private === true;
   const repostDisabled = isPrivateProfile && !isOwner;
   const timeAgo = useMemo(() => getTimeAgo(t, locale, post.created_at), [t, locale, post.created_at]);
+
+  // ── Determinar qué contenido mostrar ──
+  const isEncrypted = post.is_encrypted === true;
+  const hasAccess = isOwner || !!decryptedContent;
+  const displayContent = isEncrypted
+    ? (hasAccess ? (decryptedContent || post.content) : null)
+    : post.content;
+  const encryptedLabel = isEncrypted && !hasAccess;
+  const encryptedLoading = isEncrypted && !hasAccess && decrypting;
 
   const handleCancelDelete = useCallback(() => setConfirmDelete(false), []);
   const handleCancelExternal = useCallback(() => setConfirmExternalLink(null), []);
@@ -352,14 +395,34 @@ const PostCard = React.memo(function PostCard({
             )}
           </div>
 
+          {/* ── Encrypted content badge ── */}
+          {isEncrypted && (
+            <div className="post-card-encrypted-badge">
+              <FaLock className="post-card-encrypted-icon" />
+              <span className="post-card-encrypted-label">
+                {hasAccess
+                  ? t('post.encrypted_visible') || 'Contenido privado visible para ti'
+                  : t('post.encrypted_hidden') || 'Contenido ofuscado'}
+              </span>
+            </div>
+          )}
+
           {/* Text content with @mention highlighting */}
           <p className="post-card-text">
-            <RichText
-              text={post.content}
-              skipUrls={getSkipUrls(post)}
-              mentions={post.mentions}
-              onExternalLink={handleExternalLink}
-            />
+            {encryptedLoading ? (
+              <span className="post-card-encrypted-loading">{t('common.loading') || 'Descifrando...'}</span>
+            ) : encryptedLabel ? (
+              <span className="post-card-encrypted-text">
+                {getObfuscatedDisplay(post.obfuscated_display || post.content)}
+              </span>
+            ) : (
+              <RichText
+                text={displayContent || ''}
+                skipUrls={getSkipUrls(post)}
+                mentions={post.mentions}
+                onExternalLink={handleExternalLink}
+              />
+            )}
           </p>
 
           {/* Multiple images from post.image_urls (grid) */}
