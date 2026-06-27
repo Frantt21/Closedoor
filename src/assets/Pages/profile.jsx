@@ -31,6 +31,7 @@ import {
     getRepostedPostIds,
     getSavedPostIds,
     getSavedPosts,
+    getScheduledPosts,
     setCachedFeed,
     getCachedFeed,
     clearFeedCache,
@@ -43,7 +44,7 @@ import "../Resources/Styles/post.css";
 import Modal from "../Resources/Components/Modal";
 import Badge from "../Resources/Components/Badge";
 import { getPlatformIcon, getPlatformName } from "../services/socialPlatforms";
-import { FaFeather, FaBookmark, FaLock, FaEllipsisV, FaBan } from 'react-icons/fa';
+import { FaFeather, FaBookmark, FaLock, FaEllipsisV, FaBan, FaClock } from 'react-icons/fa';
 import FollowButton from "../Resources/Components/FollowButton";
 import { blockUser, unblockUser, isBlocked, cacheBlockStatus, getCachedBlockStatus, unfollowBothWays } from "../services/blockService";
 import { useI18n } from "../services/i18n/useI18n";
@@ -348,11 +349,13 @@ function Profile() {
     const [postsLoading, setPostsLoading] = useState(() => !getCachedPosts());
     const [showCreatePost, setShowCreatePost] = useState(false);
     const [editingPost, setEditingPost] = useState(null);
-    const [tab, setTab] = useState('posts'); // 'posts' | 'saved'
+    const [tab, setTab] = useState('posts'); // 'posts' | 'saved' | 'scheduled'
     // Resetear a 'posts' al navegar a un perfil ajeno
     useEffect(() => {
         if (!isOwnProfile) setTab('posts');
     }, [isOwnProfile]);
+    const [scheduledPosts, setScheduledPosts] = useState([]);
+    const [scheduledPostsLoading, setScheduledPostsLoading] = useState(true);
     const savedCacheKey = user?.id ? `saved_posts_${user.id}` : null;
     const [savedPosts, setSavedPosts] = useState(() => {
         const cached = savedCacheKey ? getCachedFeed(savedCacheKey) : null;
@@ -555,6 +558,22 @@ function Profile() {
         };
     }, [activeProfile?.id, user?.id, isOwnProfile, profileUsername, canViewContent]);
 
+    // ── Load scheduled posts (solo perfil propio) ──
+    useEffect(() => {
+        if (!user?.id) return;
+        setScheduledPostsLoading(true);
+        getScheduledPosts(user.id)
+            .then((items) => {
+                setScheduledPosts(items);
+            })
+            .catch((err) => {
+                console.error('Error loading scheduled posts:', err);
+            })
+            .finally(() => {
+                setScheduledPostsLoading(false);
+            });
+    }, [user?.id]);
+
     // ── Load saved posts (con cache + background refresh) ──
     useEffect(() => {
         if (!user?.id) return;
@@ -710,6 +729,7 @@ function Profile() {
 
     const handlePostDelete = (postId) => {
         setProfilePosts((prev) => prev.filter((p) => p.id !== postId));
+        setScheduledPosts((prev) => prev.filter((p) => p.id !== postId));
     };
 
     // ── Sincronizar saved state desde PostCard ──
@@ -1342,6 +1362,14 @@ function Profile() {
                                 {t('profile.saved_tab')}
                             </button>
                         )}
+                        {isOwnProfile && (
+                            <button
+                                className={`posts-section-tab ${tab === 'scheduled' ? 'posts-section-tab--active' : ''}`}
+                                onClick={() => setTab('scheduled')}
+                            >
+                                {t('profile.scheduled_tab') || 'Programados'}
+                            </button>
+                        )}
                     </div>
                     {isOwnProfile && (
                         <button
@@ -1396,7 +1424,7 @@ function Profile() {
                             />
                         ))
                     )
-                ) : (
+                ) : tab === 'saved' ? (
                     savedPostsLoading ? (
                         <div className="posts-skeleton">
                             {[1, 2, 3].map((i) => (
@@ -1434,7 +1462,45 @@ function Profile() {
                                 onRepostToggle={handleRepostToggle}
                             />
                         ))
-                )}
+                ) : tab === 'scheduled' ? (
+                    scheduledPostsLoading ? (
+                        <div className="posts-skeleton">
+                            {[1, 2, 3].map((i) => (
+                                <div key={i} className="posts-skeleton-card">
+                                    <div className="skeleton posts-skeleton-avatar" />
+                                    <div className="posts-skeleton-lines">
+                                        <div className="posts-skeleton-line posts-skeleton-line--short" />
+                                        <div className="posts-skeleton-line" />
+                                        <div className="posts-skeleton-line posts-skeleton-line--medium" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : scheduledPosts.length === 0 ? (
+                        <div className="posts-empty">
+                            <span className="posts-empty-icon"><FaClock /></span>
+                            <p className="posts-empty-text">
+                                {t('profile.no_scheduled') || 'No tienes posts programados.'}
+                            </p>
+                            <p className="posts-empty-subtext">
+                                {t('profile.no_scheduled_sub') || 'Programa un post para que se publique automáticamente.'}
+                            </p>
+                        </div>
+                    ) : isOwnProfile && scheduledPosts.map((post) => (
+                            <PostCard
+                                key={post.id}
+                                post={post}
+                                liked={false}
+                                reposted={false}
+                                saved={false}
+                                onUpdate={handlePostUpdate}
+                                onDelete={handlePostDelete}
+                                onSaveToggle={handleSaveToggle}
+                                onLikeToggle={handleLikeToggle}
+                                onRepostToggle={handleRepostToggle}
+                            />
+                        ))
+                ) : null}
             </div>
             )}
 

@@ -4,7 +4,7 @@ import { getFollowing } from '../../services/followService';
 import { searchProfiles } from '../../services/userService';
 import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../services/i18n/useI18n';
-import { FaImage, FaTimes, FaPlus, FaMinus, FaLink, FaLock, FaUnlock, FaUserPlus, FaCheck, FaSearch, FaRegHeart, FaComment, FaRetweet, FaEye } from 'react-icons/fa';
+import { FaImage, FaTimes, FaPlus, FaMinus, FaLink, FaLock, FaUnlock, FaUserPlus, FaCheck, FaSearch, FaRegHeart, FaComment, FaRetweet, FaEye, FaPoll, FaCalendarAlt, FaClock } from 'react-icons/fa';
 import SafeImage from './SafeImage';
 import Avatar from './Avatar';
 import Badge from './Badge';
@@ -52,12 +52,22 @@ export default function CreatePostModal({
   const [showUserSearch, setShowUserSearch] = useState(false);
   const userSearchTimeoutRef = useRef(null);
 
+  // ── Poll state ──
+  const [showPoll, setShowPoll] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState(['', '']);
+  const [pollExpiresAt, setPollExpiresAt] = useState('');
+
+  // ── Scheduling state ──
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState('');
+
   // ── Unsaved changes confirmation state ──
   const [pendingClose, setPendingClose] = useState(false);
 
   const hasUnsavedContent = useCallback(() => {
-    return content.trim().length > 0 || getValidImageUrls().length > 0 || allowedUsers.length > 0;
-  }, [content, imageUrls, allowedUsers]);
+    return content.trim().length > 0 || getValidImageUrls().length > 0 || allowedUsers.length > 0 || showPoll || showSchedule;
+  }, [content, imageUrls, allowedUsers, showPoll, showSchedule]);
 
   const confirmClose = useCallback(() => {
     if (hasUnsavedContent()) {
@@ -235,6 +245,12 @@ export default function CreatePostModal({
         setUserSearchQuery('');
         setUserSearchResults([]);
         setShowUserSearch(false);
+        setShowPoll(false);
+        setPollQuestion('');
+        setPollOptions(['', '']);
+        setPollExpiresAt('');
+        setShowSchedule(false);
+        setScheduledAt('');
       }
       setError(null);
     }
@@ -243,6 +259,25 @@ export default function CreatePostModal({
 
   // ── Mostrar preview ofuscado (cuando está activo y hay contenido) ──
   const showObfuscatedPreview = isEncrypted && !isEditing && content.trim().length > 0;
+
+  // ── Poll option handlers ──
+  const handlePollOptionChange = (index, value) => {
+    setPollOptions(prev => {
+      const updated = [...prev];
+      updated[index] = value;
+      return updated;
+    });
+  };
+
+  const addPollOption = () => {
+    if (pollOptions.length >= 10) return;
+    setPollOptions(prev => [...prev, '']);
+  };
+
+  const removePollOption = (index) => {
+    if (pollOptions.length <= 2) return;
+    setPollOptions(prev => prev.filter((_, i) => i !== index));
+  };
 
   if (!isOpen) return null;
 
@@ -327,7 +362,7 @@ export default function CreatePostModal({
 
   const handleSubmit = async () => {
     const trimmed = content.trim();
-    if (!trimmed && getValidImageUrls().length === 0) {
+    if (!trimmed && getValidImageUrls().length === 0 && !showPoll) {
       setError(t('create_post.empty_error'));
       return;
     }
@@ -345,6 +380,49 @@ export default function CreatePostModal({
     const finalImageUrls = validImageUrls.length > 0
       ? validImageUrls
       : (imageUrl ? [imageUrl] : []);
+
+    // ── Validate poll ──
+    let finalPollData = null;
+    if (showPoll) {
+      const question = pollQuestion.trim();
+      if (!question) {
+        setError(t('create_post.poll_question_required') || 'La pregunta de la encuesta es obligatoria');
+        return;
+      }
+      const validOptions = pollOptions
+        .map(o => o.trim())
+        .filter(o => o.length > 0);
+      if (validOptions.length < 2) {
+        setError(t('create_post.poll_min_options') || 'La encuesta necesita al menos 2 opciones');
+        return;
+      }
+      finalPollData = {
+        question,
+        options: validOptions.map((text, i) => ({ id: `opt_${i + 1}`, text })),
+        expires_at: pollExpiresAt || null,
+      };
+    }
+
+    // ── Validate scheduled date ──
+    let finalScheduledAt = null;
+    if (showSchedule && scheduledAt) {
+      const schedDate = new Date(scheduledAt);
+      if (isNaN(schedDate.getTime())) {
+        setError(t('create_post.invalid_schedule_date') || 'Fecha de programación inválida');
+        return;
+      }
+      if (schedDate <= new Date()) {
+        setError(t('create_post.schedule_past') || 'La fecha de programación debe ser futura');
+        return;
+      }
+      finalScheduledAt = scheduledAt;
+    }
+
+    // No permitir encuesta y ofuscación juntas
+    if (showPoll && isEncrypted) {
+      setError(t('create_post.poll_encrypted_conflict') || 'No puedes tener una encuesta en un post ofuscado');
+      return;
+    }
 
     setSaving(true);
     setError(null);
@@ -366,6 +444,18 @@ export default function CreatePostModal({
           image_urls: finalImageUrls.length > 0 ? finalImageUrls : null,
           video_url: videoUrl,
         };
+
+        // Incluir poll_data si hay encuesta
+        if (finalPollData) {
+          updateData.poll_data = finalPollData;
+        }
+        // Incluir scheduled_at si está programado
+        if (finalScheduledAt) {
+          updateData.scheduled_at = finalScheduledAt;
+        } else if (showSchedule && !scheduledAt) {
+          // Si desactivó la programación, quitar scheduled_at
+          updateData.scheduled_at = null;
+        }
 
         // Re-encriptar si el post estaba ofuscado
         if (isEncrypted) {
@@ -419,6 +509,8 @@ export default function CreatePostModal({
           encryptedIv: encryptedResult?.iv || null,
           allowedUsers: fullAllowedIds,
           obfuscatedDisplay: isEncrypted ? obfuscatedDisplay : null,
+          pollData: finalPollData,
+          scheduledAt: finalScheduledAt,
         });
 
         // ── @Mentions: notificar a usuarios mencionados ──
@@ -439,6 +531,12 @@ export default function CreatePostModal({
       setUserSearchQuery('');
       setUserSearchResults([]);
       setShowUserSearch(false);
+      setShowPoll(false);
+      setPollQuestion('');
+      setPollOptions(['', '']);
+      setPollExpiresAt('');
+      setShowSchedule(false);
+      setScheduledAt('');
       if (onSuccess) onSuccess();
       onClose();
     } catch (err) {
@@ -461,7 +559,7 @@ export default function CreatePostModal({
             <button
               className="fc-modal-save"
               onClick={handleSubmit}
-              disabled={saving || (!content.trim() && getValidImageUrls().length === 0)}
+              disabled={saving || (!content.trim() && getValidImageUrls().length === 0 && !showPoll)}
             >
               {isEncrypted && <FaLock className="fc-modal-save-lock" />}
               {saving ? t('create_post.saving') : isEditing ? t('create_post.save_changes') : t('create_post.post')}
@@ -551,7 +649,111 @@ export default function CreatePostModal({
               >
                 {isEncrypted ? <FaLock /> : <FaUnlock />}
               </button>
+
+              <button
+                type="button"
+                className={`create-post-toolbar-btn ${showPoll ? 'create-post-toolbar-btn--active' : ''}`}
+                onClick={() => setShowPoll(s => !s)}
+                title={showPoll ? t('create_post.remove_poll') || 'Quitar encuesta' : t('create_post.add_poll') || 'Añadir encuesta'}
+                disabled={isEncrypted}
+              >
+                <FaPoll />
+              </button>
+
+              <button
+                type="button"
+                className={`create-post-toolbar-btn ${showSchedule ? 'create-post-toolbar-btn--active' : ''}`}
+                onClick={() => setShowSchedule(s => !s)}
+                title={showSchedule ? t('create_post.remove_schedule') || 'Quitar programación' : t('create_post.add_schedule') || 'Programar publicación'}
+              >
+                <FaClock />
+              </button>
             </div>
+
+            {/* ── Poll creation section ── */}
+            {showPoll && (
+              <div className="create-post-poll-section">
+                <div className="create-post-poll-section-header">
+                  <FaPoll className="create-post-poll-section-icon" />
+                  <span className="create-post-poll-section-label">{t('create_post.poll_title') || 'Encuesta'}</span>
+                </div>
+                <input
+                  className="fc-modal-input create-post-poll-input"
+                  type="text"
+                  value={pollQuestion}
+                  onChange={(e) => setPollQuestion(e.target.value)}
+                  placeholder={t('create_post.poll_question_placeholder') || 'Escribe una pregunta...'}
+                  maxLength={280}
+                />
+                <div className="create-post-poll-options">
+                  {pollOptions.map((option, index) => (
+                    <div key={index} className="create-post-poll-option-row">
+                      <span className="create-post-poll-option-num">{index + 1}</span>
+                      <input
+                        className="fc-modal-input create-post-poll-option-input"
+                        type="text"
+                        value={option}
+                        onChange={(e) => handlePollOptionChange(index, e.target.value)}
+                        placeholder={t('create_post.poll_option_placeholder', { n: index + 1 }) || `Opción ${index + 1}`}
+                        maxLength={120}
+                      />
+                      {pollOptions.length > 2 && (
+                        <button
+                          type="button"
+                          className="create-post-poll-option-remove"
+                          onClick={() => removePollOption(index)}
+                          title={t('common.delete')}
+                        >
+                          <FaTimes />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {pollOptions.length < 10 && (
+                  <button
+                    type="button"
+                    className="create-post-poll-add-option"
+                    onClick={addPollOption}
+                  >
+                    <FaPlus /> {t('create_post.poll_add_option') || 'Añadir opción'}
+                  </button>
+                )}
+                <div className="create-post-poll-expiry">
+                  <FaCalendarAlt className="create-post-poll-expiry-icon" />
+                  <span className="create-post-poll-expiry-label">{t('create_post.poll_expires_label') || 'Fecha límite (opcional):'}</span>
+                  <input
+                    className="fc-modal-input create-post-poll-expiry-input"
+                    type="datetime-local"
+                    value={pollExpiresAt}
+                    onChange={(e) => setPollExpiresAt(e.target.value)}
+                    min={new Date().toISOString().slice(0, 16)}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* ── Scheduling section ── */}
+            {showSchedule && (
+              <div className="create-post-schedule-section">
+                <div className="create-post-schedule-section-header">
+                  <FaClock className="create-post-schedule-section-icon" />
+                  <span className="create-post-schedule-section-label">{t('create_post.schedule_title') || 'Programar publicación'}</span>
+                </div>
+                <div className="create-post-schedule-input-row">
+                  <input
+                    className="fc-modal-input create-post-schedule-input"
+                    type="datetime-local"
+                    value={scheduledAt}
+                    onChange={(e) => setScheduledAt(e.target.value)}
+                    min={new Date().toISOString().slice(0, 16)}
+                  />
+                </div>
+                <p className="create-post-schedule-hint">
+                  {t('create_post.schedule_hint') || 'El post se publicará automáticamente en la fecha seleccionada.'}
+                </p>
+              </div>
+            )}
 
             {/* ── Allowed users selector (solo si ofuscación activa) ── */}
             {isEncrypted && (

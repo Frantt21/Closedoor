@@ -11,8 +11,10 @@ import {
   unrepostPost,
   savePost,
   unsavePost,
+  setCachedPollVotes,
+  getCachedPollVotes,
 } from '../../services/postService';
-import { FaHeart, FaRegHeart, FaComment, FaRetweet, FaThumbtack, FaEdit, FaTrash, FaEllipsisV, FaBookmark, FaRegBookmark, FaEye, FaLock } from 'react-icons/fa';
+import { FaHeart, FaRegHeart, FaComment, FaRetweet, FaThumbtack, FaEdit, FaTrash, FaEllipsisV, FaBookmark, FaRegBookmark, FaEye, FaLock, FaCheckCircle, FaRegCheckCircle, FaClock } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import Badge from './Badge';
 import SafeImage from './SafeImage';
@@ -26,6 +28,7 @@ import {
   getCachedDecryptedContent,
   setCachedDecryptedContent,
 } from '../../services/alphabetEncryption';
+import { supabase } from '../../services/supabaseclient';
 import ConfirmModal from './ConfirmModal';
 import './css/postCard.css';
 
@@ -56,6 +59,14 @@ const PostCard = React.memo(function PostCard({
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmExternalLink, setConfirmExternalLink] = useState(null);
+  // ── Poll state (con caché síncrono en localStorage) ──
+  // Nota: no podemos usar hasPoll aquí porque se define más abajo
+  const initialPollCache = post.poll_data && typeof post.poll_data === 'object'
+    ? getCachedPollVotes(post.id)
+    : null;
+  const [pollVotes, setPollVotes] = useState(() => initialPollCache?.votes || null); // [{ option_id, user_id }]
+  const [pollUserVote, setPollUserVote] = useState(() => initialPollCache?.userVote || null); // option_id or null
+  const [pollVotingLoading, setPollVotingLoading] = useState(false);
   const menuRef = useRef(null);
   const menuBtnRef = useRef(null);
   const dropdownRef = useRef(null);
@@ -110,6 +121,112 @@ const PostCard = React.memo(function PostCard({
       setDecrypting(false);
     });
   }, [post.id, post.is_encrypted, post.encrypted_content, post.encrypted_iv, post.allowed_users, post.user_id, user?.id]);
+
+  // ── Load poll data ──
+  const hasPoll = post.poll_data && typeof post.poll_data === 'object';
+  const isPollExpired = hasPoll && post.poll_data.expires_at && new Date(post.poll_data.expires_at) < new Date();
+
+  useEffect(() => {
+    if (!hasPoll) {
+      setPollVotes(null);
+      setPollUserVote(null);
+      return;
+    }
+
+    // Si ya hay cache, no refetchear — se cargó síncrono en useState
+    const cached = getCachedPollVotes(post.id);
+    if (cached && cached.votes) return;
+
+    const loadPollData = async () => {
+      try {
+        const { getPollVotes: fetchPollVotes, getPollUserVotes: fetchUserVotes } = await import('../../services/postService');
+        const [votes, userVotes] = await Promise.all([
+          fetchPollVotes(post.id),
+          user?.id ? fetchUserVotes([post.id], user.id) : {},
+        ]);
+        setPollVotes(votes);
+        const userVote = userVotes[post.id] || null;
+        setPollUserVote(userVote);
+        setCachedPollVotes(post.id, votes, userVote);
+      } catch (err) {
+        console.warn('Error loading poll data:', err);
+      }
+    };
+
+    loadPollData();
+  }, [post.id, hasPoll, user?.id]);
+
+  // ── Realtime: escuchar votos nuevos en la poll ──
+  useEffect(() => {
+    if (!hasPoll) return;
+
+    const channel = supabase
+      .channel(`poll-${post.id}`)
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'poll_votes', filter: `post_id=eq.${post.id}` },
+        (payload) => {
+          setPollVotes(prev => {
+            if (!prev) return [payload.new];
+            if (prev.some(v => v.user_id === payload.new.user_id)) return prev;
+            return [...prev, payload.new];
+          });
+          if (payload.new.user_id === user?.id) {
+            setPollUserVote(payload.new.option_id);
+          }
+        }
+      )
+      .on('postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'poll_votes', filter: `post_id=eq.${post.id}` },
+        (payload) => {
+          setPollVotes(prev => {
+            if (!prev) return [];
+            return prev.filter(v => v.user_id !== payload.old.user_id);
+          });
+          if (payload.old.user_id === user?.id) {
+            setPollUserVote(null);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [post.id, hasPoll, user?.id]);
+
+  // ── Sincronizar estado de la poll a localStorage cache ──
+  useEffect(() => {
+    if (hasPoll && pollVotes) {
+      const currentUserVote = pollUserVote;
+      setCachedPollVotes(post.id, pollVotes, currentUserVote);
+    }
+  }, [post.id, hasPoll, pollVotes, pollUserVote]);
+
+  // ── Handle poll vote ──
+  const handlePollVote = async (optionId) => {
+    if (!user || pollVotingLoading) return;
+    setPollVotingLoading(true);
+    try {
+      const { votePoll } = await import('../../services/postService');
+      if (pollUserVote === optionId) {
+        const { unvotePoll } = await import('../../services/postService');
+        await unvotePoll(post.id, user.id);
+        setPollUserVote(null);
+        setPollVotes(prev => prev.filter(v => v.user_id !== user.id));
+      } else {
+        await votePoll(post.id, optionId, user.id);
+        setPollUserVote(optionId);
+        setPollVotes(prev => {
+          const filtered = prev.filter(v => v.user_id !== user.id);
+          return [...filtered, { option_id: optionId, user_id: user.id }];
+        });
+      }
+    } catch (err) {
+      console.error('Error voting on poll:', err);
+    } finally {
+      setPollVotingLoading(false);
+    }
+  };
 
   // Sincronizar estado liked/reposted cuando el padre refetchea (navegación)
   // Separado de los contadores para evitar race condition con Realtime:
@@ -474,6 +591,76 @@ const PostCard = React.memo(function PostCard({
               />
             )}
           </p>
+
+          {/* ── Scheduled badge ── */}
+          {post.scheduled_at && (
+            <div className="post-card-scheduled-badge">
+              <FaClock />
+              <span>
+                {new Date(post.scheduled_at) > new Date()
+                  ? (t('post.scheduled_future') || 'Programado: {date}').replace('{date}', new Date(post.scheduled_at).toLocaleString())
+                  : (t('post.scheduled_published') || 'Publicado recientemente')}
+              </span>
+            </div>
+          )}
+
+          {/* ── Poll ── */}
+          {hasPoll && (() => {
+            const totalVotes = pollVotes ? pollVotes.length : 0;
+            return (
+            <div className="post-card-poll" onClick={(e) => e.stopPropagation()}>
+              <p className="post-card-poll-question">{post.poll_data.question}</p>
+              <div className="post-card-poll-options">
+                {post.poll_data.options.map((option) => {
+                  const votesCount = pollVotes ? pollVotes.filter(v => v.option_id === option.id).length : 0;
+                  const percentage = totalVotes > 0 ? Math.round((votesCount / totalVotes) * 100) : 0;
+                  const isSelected = pollUserVote === option.id;
+                  const showResults = isSelected || isPollExpired || !user;
+
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      className={`post-card-poll-option ${isSelected ? 'post-card-poll-option--selected' : ''} ${showResults ? 'post-card-poll-option--results' : ''}`}
+                      onClick={(e) => { e.stopPropagation(); handlePollVote(option.id); }}
+                      disabled={isPollExpired || !user || pollVotingLoading}
+                    >
+                      <div className="post-card-poll-option-row">
+                        <span className="post-card-poll-option-check">
+                          {isSelected ? <FaCheckCircle /> : <FaRegCheckCircle />}
+                        </span>
+                        <span className="post-card-poll-option-text">{option.text}</span>
+                        {showResults && (
+                          <span className="post-card-poll-option-pct">{votesCount} · {percentage}%</span>
+                        )}
+                      </div>
+                      {showResults && (
+                        <div className="post-card-poll-bar-track">
+                          <div
+                            className="post-card-poll-bar-fill"
+                            style={{ width: `${percentage}%` }}
+                          />
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="post-card-poll-footer">
+                <span className="post-card-poll-count">
+                  {totalVotes} {totalVotes === 1 ? t('post.poll_vote_singular') || 'voto' : t('post.poll_vote_plural') || 'votos'}
+                </span>
+                {isPollExpired ? (
+                  <span className="post-card-poll-expired">{t('post.poll_ended') || 'Finalizada'}</span>
+                ) : post.poll_data.expires_at ? (
+                  <span className="post-card-poll-expires">
+                    {t('post.poll_ends') || 'Termina'}: {new Date(post.poll_data.expires_at).toLocaleString()}
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          );
+        })()}
 
           {/* Multiple images from post.image_urls (grid) */}
           {renderImageGrid(post, openGallery, t)}

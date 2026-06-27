@@ -106,12 +106,14 @@ async function getTrendingHashtagsFresh(limit) {
     const publicUserIds = publicProfiles.map(p => p.id);
 
     // 2. Get recent post IDs from those profiles (24h) + validar mínimo de actividad
+    // Excluir posts encriptados del trending (is_encrypted != true)
     const hoursAgo = new Date(Date.now() - TRENDING_HOURS * 60 * 60 * 1000).toISOString();
     const { data: recentPosts, error: postError } = await supabase
       .from('posts')
       .select('id')
       .in('user_id', publicUserIds)
-      .gte('created_at', hoursAgo);
+      .gte('created_at', hoursAgo)
+      .neq('is_encrypted', true);
 
     if (postError) throw postError;
     if (!recentPosts?.length || recentPosts.length < MIN_POSTS_FOR_TRENDING) {
@@ -172,6 +174,8 @@ export async function getPostsByHashtag(tag, { limit = 20, offset = 0 } = {}) {
     .from('posts')
     .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private)')
     .in('id', (await getPostIdsByHashtag(cleanTag, limit, offset)))
+    .neq('is_encrypted', true)
+    .or('scheduled_at.is.null,scheduled_at.lte.now')
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -311,6 +315,8 @@ export async function searchPostsByContent(query, { limit = 20, offset = 0 } = {
       .from('posts')
       .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private)')
       .ilike('content', `%${query}%`)
+      .neq('is_encrypted', true)
+      .or('scheduled_at.is.null,scheduled_at.lte.now')
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 

@@ -17,7 +17,7 @@ export async function resolveMentions(content) {
   return mentions;
 }
 
-export async function createPost({ userId, content, imageUrl, imageUrls, videoUrl, encryptedContent, encryptedIv, allowedUsers, obfuscatedDisplay }) {
+export async function createPost({ userId, content, imageUrl, imageUrls, videoUrl, encryptedContent, encryptedIv, allowedUsers, obfuscatedDisplay, pollData, scheduledAt }) {
   let mentions = {};
   if (content) {
     try {
@@ -27,21 +27,30 @@ export async function createPost({ userId, content, imageUrl, imageUrls, videoUr
     }
   }
 
+  const insertData = {
+    user_id: userId,
+    content,
+    image_url: imageUrl || null,
+    image_urls: imageUrls && imageUrls.length > 0 ? imageUrls : null,
+    video_url: videoUrl || null,
+    mentions,
+    is_encrypted: !!encryptedContent,
+    encrypted_content: encryptedContent || null,
+    encrypted_iv: encryptedIv || null,
+    allowed_users: allowedUsers && allowedUsers.length > 0 ? allowedUsers : null,
+    obfuscated_display: obfuscatedDisplay || null,
+  };
+
+  if (pollData) {
+    insertData.poll_data = pollData;
+  }
+  if (scheduledAt) {
+    insertData.scheduled_at = scheduledAt;
+  }
+
   const { data, error } = await supabase
     .from('posts')
-    .insert({
-      user_id: userId,
-      content,
-      image_url: imageUrl || null,
-      image_urls: imageUrls && imageUrls.length > 0 ? imageUrls : null,
-      video_url: videoUrl || null,
-      mentions,
-      is_encrypted: !!encryptedContent,
-      encrypted_content: encryptedContent || null,
-      encrypted_iv: encryptedIv || null,
-      allowed_users: allowedUsers && allowedUsers.length > 0 ? allowedUsers : null,
-      obfuscated_display: obfuscatedDisplay || null,
-    })
+    .insert(insertData)
     .select('*')
     .single();
 
@@ -69,14 +78,18 @@ export async function getPosts({ userId, profileUserId, limit = 20, offset = 0 }
   let query = supabase      .from('posts')
     .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private)');
 
+  // Excluir posts programados (scheduled_at en futuro) — solo aparecen en pestaña "Programados"
   if (profileUserId) {
     query = query
       .eq('user_id', profileUserId)
+      .or('scheduled_at.is.null,scheduled_at.lte.now')
       .order('is_pinned', { ascending: false })
       .order('pinned_at', { ascending: false, nulls_first: false })
       .order('created_at', { ascending: false });
   } else if (userId) {
-    query = query.eq('user_id', userId).order('created_at', { ascending: false });
+    query = query
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
   } else {
     query = query.order('created_at', { ascending: false });
   }
@@ -325,6 +338,10 @@ export async function getFeed({ limit = 20, offset = 0, userId } = {}) {
   let query = supabase
     .from('posts')
     .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private)');
+
+  // Excluir posts encriptados y posts programados del feed
+  query = query.neq('is_encrypted', true);
+  query = query.or('scheduled_at.is.null,scheduled_at.lte.now');
 
   // Resolver IDs visibles con cache (o fetch si cache miss)
   let visibleIdsArray = getCachedVisibleIds(userId);
@@ -623,6 +640,153 @@ export async function trackPostView(postId, userId) {
     console.warn('Error tracking view:', err);
     return false;
   }
+}
+
+// ── POLL CACHE ──
+const POLL_CACHE_PREFIX = 'fc_poll_';
+const POLL_CACHE_TTL = 1000 * 60 * 5; // 5 min
+
+export function setCachedPollVotes(postId, votes, userVote) {
+  if (!postId) return;
+  try {
+    const payload = { ts: Date.now(), ttl: POLL_CACHE_TTL, data: { votes, userVote } };
+    localStorage.setItem(POLL_CACHE_PREFIX + postId, JSON.stringify(payload));
+  } catch (err) {
+    console.warn('Could not cache poll votes:', err);
+  }
+}
+
+export function getCachedPollVotes(postId) {
+  if (!postId) return null;
+  try {
+    const raw = localStorage.getItem(POLL_CACHE_PREFIX + postId);
+    if (!raw) return null;
+    const payload = JSON.parse(raw);
+    if (!payload?.ts) return null;
+    if (Date.now() - payload.ts > (payload.ttl || POLL_CACHE_TTL)) {
+      localStorage.removeItem(POLL_CACHE_PREFIX + postId);
+      return null;
+    }
+    return payload.data || null;
+  } catch (err) {
+    return null;
+  }
+}
+
+export function clearCachedPollVotes(postId) {
+  if (!postId) return;
+  try {
+    localStorage.removeItem(POLL_CACHE_PREFIX + postId);
+  } catch (err) {
+    /* ignore */
+  }
+}
+
+// ── POLLS ──
+
+/**
+ * Vote on a poll (single choice per user per post)
+ */
+export async function votePoll(postId, optionId, userId) {
+  // Upsert: delete existing vote first, then insert new one
+  const { error: delError } = await supabase
+    .from('poll_votes')
+    .delete()
+    .eq('post_id', postId)
+    .eq('user_id', userId);
+
+  if (delError) {
+    console.error('Error removing previous poll vote:', delError);
+    throw delError;
+  }
+
+  const { error } = await supabase
+    .from('poll_votes')
+    .insert({ post_id: postId, option_id: optionId, user_id: userId });
+
+  if (error) {
+    console.error('Error voting on poll:', error);
+    throw error;
+  }
+}
+
+/**
+ * Remove vote from a poll
+ */
+export async function unvotePoll(postId, userId) {
+  const { error } = await supabase
+    .from('poll_votes')
+    .delete()
+    .eq('post_id', postId)
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error removing poll vote:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get all votes for a specific post's poll
+ */
+export async function getPollVotes(postId) {
+  const { data, error } = await supabase
+    .from('poll_votes')
+    .select('option_id, user_id')
+    .eq('post_id', postId);
+
+  if (error) {
+    console.error('Error fetching poll votes:', error);
+    return [];
+  }
+  return data || [];
+}
+
+/**
+ * Get which polls the current user has voted on and which option they chose
+ * Returns: { [postId]: optionId }
+ */
+export async function getPollUserVotes(postIds, userId) {
+  if (!userId || !postIds.length) return {};
+  const { data, error } = await supabase
+    .from('poll_votes')
+    .select('post_id, option_id')
+    .eq('user_id', userId)
+    .in('post_id', postIds);
+
+  if (error) {
+    console.error('Error fetching user poll votes:', error);
+    return {};
+  }
+  const result = {};
+  for (const row of data || []) {
+    result[row.post_id] = row.option_id;
+  }
+  return result;
+}
+
+// ── SCHEDULED POSTS ──
+
+/**
+ * Get scheduled posts for a user (only visible to the post author)
+ */
+export async function getScheduledPosts(userId, { limit = 50, offset = 0 } = {}) {
+  if (!userId) return [];
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('posts')
+    .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private)')
+    .eq('user_id', userId)
+    .not('scheduled_at', 'is', null)
+    .gt('scheduled_at', now)
+    .order('scheduled_at', { ascending: true })
+    .range(offset, offset + limit - 1);
+
+  if (error) {
+    console.error('Error fetching scheduled posts:', error);
+    return [];
+  }
+  return data || [];
 }
 
 // ── SAVED POSTS ──
