@@ -693,6 +693,7 @@ function Profile() {
         const userId = activeProfile?.id;
         if (!userId) return;
         try {
+            // Refrescar posts normales
             const items = await getProfileContent(userId, user?.id);
             setProfilePosts(items);
             let likedIds = [], repostedIds = [], savedIds = [];
@@ -708,6 +709,11 @@ function Profile() {
                 setSavedPostIds(savedIds);
             }
             setCachedFeed(`profile_posts_${userId}`, items, likedIds, repostedIds, savedIds);
+            // Refrescar posts programados (aparecen al instante en la tab "Programados")
+            if (user?.id) {
+                const schedItems = await getScheduledPosts(user.id);
+                setScheduledPosts(schedItems);
+            }
         } catch (err) {
             console.error('Error refreshing posts:', err);
         }

@@ -415,7 +415,9 @@ export default function CreatePostModal({
         setError(t('create_post.schedule_past') || 'La fecha de programación debe ser futura');
         return;
       }
-      finalScheduledAt = scheduledAt;
+      // Convertir hora local a UTC (ISO string con Z) para que Supabase
+      // almacene correctamente independientemente de la zona horaria del servidor
+      finalScheduledAt = new Date(scheduledAt).toISOString();
     }
 
     // No permitir encuesta y ofuscación juntas

@@ -592,14 +592,12 @@ const PostCard = React.memo(function PostCard({
             )}
           </p>
 
-          {/* ── Scheduled badge ── */}
-          {post.scheduled_at && (
+          {/* ── Scheduled badge (solo futuro, ya-publicados son posts normales sin badge) ── */}
+          {post.scheduled_at && new Date(post.scheduled_at) > new Date() && (
             <div className="post-card-scheduled-badge">
               <FaClock />
               <span>
-                {new Date(post.scheduled_at) > new Date()
-                  ? (t('post.scheduled_future') || 'Programado: {date}').replace('{date}', new Date(post.scheduled_at).toLocaleString())
-                  : (t('post.scheduled_published') || 'Publicado recientemente')}
+                {(t('post.scheduled_future') || 'Programado: {date}').replace('{date}', new Date(post.scheduled_at).toLocaleString(locale, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }))}
               </span>
             </div>
           )}
@@ -611,17 +609,21 @@ const PostCard = React.memo(function PostCard({
             <div className="post-card-poll" onClick={(e) => e.stopPropagation()}>
               <p className="post-card-poll-question">{post.poll_data.question}</p>
               <div className="post-card-poll-options">
-                {post.poll_data.options.map((option) => {
-                  const votesCount = pollVotes ? pollVotes.filter(v => v.option_id === option.id).length : 0;
-                  const percentage = totalVotes > 0 ? Math.round((votesCount / totalVotes) * 100) : 0;
-                  const isSelected = pollUserVote === option.id;
-                  const showResults = isSelected || isPollExpired || !user;
+                {(() => {
+                  const hasVoted = !!pollUserVote;
+                  const showAllResults = isPollExpired || !user || hasVoted || totalVotes > 0;
+                  return post.poll_data.options.map((option) => {
+                    const votesCount = pollVotes ? pollVotes.filter(v => v.option_id === option.id).length : 0;
+                    const percentage = totalVotes > 0 ? Math.round((votesCount / totalVotes) * 100) : 0;
+                    const isSelected = pollUserVote === option.id;
+                    const isDimmed = showAllResults && !isSelected;
+                    const showResults = showAllResults;
 
                   return (
                     <button
                       key={option.id}
                       type="button"
-                      className={`post-card-poll-option ${isSelected ? 'post-card-poll-option--selected' : ''} ${showResults ? 'post-card-poll-option--results' : ''}`}
+                      className={`post-card-poll-option ${isSelected ? 'post-card-poll-option--selected' : ''} ${isDimmed && !isSelected ? 'post-card-poll-option--attenuated' : ''} ${showResults ? 'post-card-poll-option--results' : ''}`}
                       onClick={(e) => { e.stopPropagation(); handlePollVote(option.id); }}
                       disabled={isPollExpired || !user || pollVotingLoading}
                     >
@@ -644,7 +646,8 @@ const PostCard = React.memo(function PostCard({
                       )}
                     </button>
                   );
-                })}
+                });
+              })()}
               </div>
               <div className="post-card-poll-footer">
                 <span className="post-card-poll-count">
