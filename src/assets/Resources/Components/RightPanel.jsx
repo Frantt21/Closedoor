@@ -242,7 +242,7 @@ function ProfileContent({ path, ownProfile, user, t }) {
     '--accent-surface-rgba': surfGlass ? 'rgba(255, 255, 255, 0.04)' : (surfColor || 'var(--color-surface, #1a1a1a)'),
     '--accent-surface-rgba-hover': surfGlass ? 'rgba(255, 255, 255, 0.07)' : (surfColor ? `color-mix(in srgb, ${surfColor} 85%, #000)` : 'var(--color-surface-hover, #252525)'),
     '--accent-surface-blur': surfGlass ? 'blur(20px)' : 'none',
-    '--accent-surface-border': surfGlass ? '1px solid rgba(255, 255, 255, 0.06)' : 'none',
+    '--accent-surface-border': 'none',
     '--accent-surface-text-color': !surfGlass && surfColor ? getContrastText(surfColor) : 'var(--color-text, #ffffff)',
     '--accent-surface-text-secondary': !surfGlass && surfColor ? '#374151' : 'var(--color-text-secondary, #9ca3af)',
     '--accent-surface-text-muted': !surfGlass && surfColor ? '#6b7280' : 'var(--color-text-muted, #6b7280)',

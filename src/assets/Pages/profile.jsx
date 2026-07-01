@@ -1128,7 +1128,7 @@ function Profile() {
             '--accent-surface-rgba': 'rgba(255, 255, 255, 0.04)',
             '--accent-surface-rgba-hover': 'rgba(255, 255, 255, 0.07)',
             '--accent-surface-blur': 'blur(20px)',
-            '--accent-surface-border': '1px solid rgba(255, 255, 255, 0.06)',
+            '--accent-surface-border': 'none',
           } : surfColor ? {
             '--accent-surface-rgba': surfColor,
             '--accent-surface-rgba-hover': `color-mix(in srgb, ${surfColor} 85%, #000)`,
@@ -1283,6 +1283,8 @@ function Profile() {
                                         setModalSocialLinks(ownProfile?.social_links || []);
                                         setModalAccentColor(ownProfile?.accent_color || '');
                                         setModalAccentColorSecondary(ownProfile?.accent_color_secondary || '');
+                                        setModalAccentSurface(ownProfile?.accent_surface_color || '');
+                                        setModalAccentSurfaceGlass(ownProfile?.accent_surface_glass === true);
                                         setModalInterests(ownProfile?.interests || []);
                                         setShowModal(true);
                                     }}
