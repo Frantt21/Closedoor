@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../services/i18n/useI18n';
 import { getUserProfile, getUserProfileByUsername, getCachedProfileByUsername, getCachedProfile } from '../../services/userService';
-import { getTrendingHashtags, getTrendingWords, getCachedTrendingWords, getCachedTrendingHashtags } from '../../services/hashtagService';
+import { getTrendingHashtags, getTrendingWords, getCachedTrendingWords, getCachedTrendingHashtags, deduplicateTrending } from '../../services/hashtagService';
 import { getTrendingCategory } from '../../services/trendingDictionary';
 import ProfileSidebar from './ProfileSidebar';
 import { getContrastText, isUUID } from '../../services/helpers';
@@ -30,16 +30,29 @@ export default function RightPanel() {
 }
 
 // ── Trending widget: dos secciones ──
+const REFRESH_INTERVAL = 1000 * 60 * 5; // 5 min
+
 function TrendingHashtags({ t, surfaceStyle }) {
   const [words, setWords] = useState(() => getCachedTrendingWords());
   const [hashtags, setHashtags] = useState(() => getCachedTrendingHashtags());
 
-  useEffect(() => {
+  const fetchTrending = useCallback(() => {
     Promise.all([
-      getTrendingWords(6).then(setWords).catch(() => setWords([])),
-      getTrendingHashtags(6).then(setHashtags).catch(() => setHashtags([])),
-    ]);
+      getTrendingWords(6).catch(() => []),
+      getTrendingHashtags(6).catch(() => []),
+    ]).then(([newWords, newHashtags]) => {
+      // Deduplicar: remover de palabras las que ya aparecen como hashtags
+      const deduped = deduplicateTrending(newWords, newHashtags);
+      setWords(deduped);
+      setHashtags(newHashtags);
+    });
   }, []);
+
+  useEffect(() => {
+    fetchTrending();
+    const interval = setInterval(fetchTrending, REFRESH_INTERVAL);
+    return () => clearInterval(interval);
+  }, [fetchTrending]);
 
   const isLoading = words === null || hashtags === null;
   const isEmpty = (!words?.length && !hashtags?.length);

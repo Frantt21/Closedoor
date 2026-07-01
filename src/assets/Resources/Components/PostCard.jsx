@@ -47,7 +47,7 @@ const PostCard = React.memo(function PostCard({
 }) {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { t, locale } = useI18n();
+  const { t, locale, hour24 } = useI18n();
   const [liked, setLiked] = useState(initialLiked);
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
   const [reposted, setReposted] = useState(initialReposted);
@@ -597,7 +597,7 @@ const PostCard = React.memo(function PostCard({
             <div className="post-card-scheduled-badge">
               <FaClock />
               <span>
-                {(t('post.scheduled_future') || 'Programado: {date}').replace('{date}', new Date(post.scheduled_at).toLocaleString(locale, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }))}
+                {(t('post.scheduled_future') || 'Programado: {date}').replace('{date}', new Date(post.scheduled_at).toLocaleString(locale, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: !hour24 }))}
               </span>
             </div>
           )}
@@ -657,7 +657,7 @@ const PostCard = React.memo(function PostCard({
                   <span className="post-card-poll-expired">{t('post.poll_ended') || 'Finalizada'}</span>
                 ) : post.poll_data.expires_at ? (
                   <span className="post-card-poll-expires">
-                    {t('post.poll_ends') || 'Termina'}: {new Date(post.poll_data.expires_at).toLocaleString()}
+                    {t('post.poll_ends') || 'Termina'}: {new Date(post.poll_data.expires_at).toLocaleString(locale, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: !hour24 })}
                   </span>
                 ) : null}
               </div>

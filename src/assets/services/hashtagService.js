@@ -152,10 +152,12 @@ async function getTrendingHashtagsFresh(limit) {
 
   } catch (err) {
     console.warn('Error fetching trending hashtags, using fallback:', err.message);
-    // Fallback: consulta simple sin filtro de privacidad
+    // Fallback: consulta con filtro de 24h por last_used_at
+    const hoursAgo = new Date(Date.now() - TRENDING_HOURS * 60 * 60 * 1000).toISOString();
     const { data: fallback } = await supabase
       .from('hashtags')
       .select('id, name, use_count, last_used_at')
+      .gte('last_used_at', hoursAgo)
       .order('use_count', { ascending: false })
       .limit(limit);
     const fallbackResult = fallback || [];
@@ -221,7 +223,7 @@ const TRENDING_WORDS_CACHE_KEY = 'fc_trending_words';
 const TRENDING_HASHTAGS_CACHE_KEY = 'fc_trending_hashtags';
 const TRENDING_CACHE_TTL = 1000 * 60 * 10; // 10 min
 const TRENDING_ENDED_TTL = 1000 * 60 * 30; // 30 min (cuando no hay suficientes posts)
-const MIN_POSTS_FOR_TRENDING = 10;
+const MIN_POSTS_FOR_TRENDING = 5;
 const TRENDING_HOURS = 24;
 
 function setCache(key, data, customTtl) {
@@ -267,6 +269,16 @@ export function clearTrendingCache() {
   } catch (err) {
     /* ignore */
   }
+}
+
+/**
+ * Filtra palabras trending que también aparecen como hashtags,
+ * para evitar duplicados entre las dos secciones.
+ */
+export function deduplicateTrending(words, hashtags) {
+  if (!words?.length || !hashtags?.length) return words || [];
+  const hashtagNames = new Set(hashtags.map((h) => h.name?.toLowerCase()));
+  return words.filter((w) => !hashtagNames.has(w.word?.toLowerCase()));
 }
 
 // ── TRENDING WORDS ──

@@ -159,8 +159,8 @@
 }
 
 .notifications-checkbox:checked + .notifications-checkbox-custom {
-  background: #ffffff;
-  border-color: #ffffff;
+  background: var(--color-text, #ffffff);
+  border-color: var(--color-text, #ffffff);
 }
 
 .notifications-checkbox:checked + .notifications-checkbox-custom::after {
@@ -176,7 +176,7 @@
 }
 
 .notifications-checkbox:focus-visible + .notifications-checkbox-custom {
-  outline: 2px solid rgba(255, 255, 255, 0.4);
+  outline: 2px solid var(--overlay-border-strong, rgba(255, 255, 255, 0.4));
   outline-offset: 2px;
 }
 

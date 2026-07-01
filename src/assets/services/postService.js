@@ -789,6 +789,39 @@ export async function getScheduledPosts(userId, { limit = 50, offset = 0 } = {})
   return data || [];
 }
 
+// ── LIKED POSTS (for Likes tab) ──
+
+/**
+ * Get posts liked by a user, ordered by most recent like.
+ * Similar a getSavedPosts pero desde la tabla likes.
+ */
+export async function getLikedPosts(userId, { limit = 50, offset = 0 } = {}) {
+  if (!userId) return [];
+  const { data, error } = await supabase
+    .from('likes')
+    .select(`
+      id, created_at,
+      posts!likes_post_id_fkey (
+        id, user_id, content, image_url, image_urls, video_url, mentions,
+        likes_count, comments_count, reposts_count, views_count, created_at, updated_at,
+        profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private)
+      )
+    `)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) {
+    console.error('Error fetching liked posts:', error);
+    return [];
+  }
+
+  return (data || []).map((l) => ({
+    ...l.posts,
+    _likeInfo: { likeId: l.id, likedAt: l.created_at },
+  }));
+}
+
 // ── SAVED POSTS ──
 
 export async function savePost(postId, userId) {

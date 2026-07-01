@@ -21,10 +21,10 @@
   padding: 16px;
   backdrop-filter: var(--accent-surface-blur, none);
   -webkit-backdrop-filter: var(--accent-surface-blur, none);
-  border: none;
+  border: var(--accent-surface-border, none);
   color: var(--accent-surface-text-color, var(--color-text, #ffffff));
   isolation: isolate;
-  transition: background 0.2s ease;
+  transition: background 0.2s ease, backdrop-filter 0.2s ease, border 0.2s ease;
 }
 
 .right-panel-card--noborder {

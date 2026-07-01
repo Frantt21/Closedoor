@@ -57,7 +57,7 @@
 
 .auth-input:focus {
     border-color: var(--color-text, #ffffff);
-    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 0 2px var(--overlay-bg, rgba(255, 255, 255, 0.08));
 }
 
 .auth-submit {

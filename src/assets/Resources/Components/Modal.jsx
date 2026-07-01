@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import './css/modal.css';
 import '../Styles/explore.css';
 import Badge from './Badge';
@@ -118,7 +118,10 @@ export default function Modal({
   const [profileBgUrlInput, setProfileBgUrlInput] = useState('');
   const [pendingClose, setPendingClose] = useState(false);
 
+  // Resetear todos los campos solo al ABRIR el modal (isOpen → true), no cuando cambian los initial* props
+  // Esto evita que Supabase Realtime (que actualiza ownProfile al reconectar) borre las ediciones del usuario
   useEffect(() => {
+    if (!isOpen) return;
     setUsername(initialUsername || '');
     setBanner(initialBanner || '');
     setAvatar(initialAvatar || '');
@@ -150,7 +153,8 @@ export default function Modal({
     } else {
       setExtractedColors([]);
     }
-  }, [initialUsername, initialBanner, initialAvatar, initialBio, initialSocialLinks, initialAccentColor, initialBannerPosition, initialAvatarPosition, isOpen]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   // ── Detectar cambios pendientes ──
   useEffect(() => {
@@ -218,18 +222,18 @@ export default function Modal({
     return () => { cancelled = true; };
   }, [banner]);
 
-  const confirmClose = () => {
+  const confirmClose = useCallback(() => {
     if (hasChanges) {
       setPendingClose(true);
     } else {
       onClose();
     }
-  };
+  }, [hasChanges, onClose]);
 
-  const executeClose = () => {
+  const executeClose = useCallback(() => {
     setPendingClose(false);
     onClose();
-  };
+  }, [onClose]);
 
   // ── Cerrar al hacer click fuera del modal ──
   // (onClick en el overlay en el return)

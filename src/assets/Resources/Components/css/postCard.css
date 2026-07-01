@@ -57,12 +57,14 @@
     background: var(--accent-surface-rgba, var(--color-surface, #1a1a1a));
     backdrop-filter: var(--accent-surface-blur, none);
     -webkit-backdrop-filter: var(--accent-surface-blur, none);
-    border: none;
+    border: var(--accent-surface-border, none);
     isolation: isolate;
+    transition: background 0.2s ease, backdrop-filter 0.2s ease, border 0.2s ease;
 }
 
 .profile-page .post-card:hover {
     background: var(--accent-surface-rgba-hover, var(--color-surface-hover, #252525));
+    transition: background 0.2s ease;
 }
 
 .post-card--deleting {
@@ -845,20 +847,20 @@
 }
 
 .post-card-poll-option--selected {
-    border-color: #ffffff;
-    background: #ffffff;
+    border-color: var(--color-text, #ffffff);
+    background: var(--color-text, #ffffff);
 }
 
 .post-card-poll-option--selected .post-card-poll-option-check {
-    color: #000000;
+    color: var(--color-bg, #000000);
 }
 
 .post-card-poll-option--selected .post-card-poll-option-text {
-    color: #000000;
+    color: var(--color-bg, #000000);
 }
 
 .post-card-poll-option--selected .post-card-poll-option-pct {
-    color: #000000;
+    color: var(--color-bg, #000000);
 }
 
 .post-card-poll-option--attenuated {
@@ -884,7 +886,7 @@
 }
 
 .post-card-poll-option--attenuated .post-card-poll-bar-fill {
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--overlay-bg-subtle);
 }
 
 .post-card-poll-option--results {
@@ -893,25 +895,25 @@
 
 /* ── Profile page: selected option uses same white style ── */
 .profile-page .post-card-poll-option--selected {
-    border-color: #ffffff;
-    background: #ffffff;
+    border-color: var(--color-text, #ffffff);
+    background: var(--color-text, #ffffff);
 }
 
 .profile-page .post-card-poll-option--selected .post-card-poll-option-check {
-    color: #000000;
+    color: var(--color-bg, #000000);
 }
 
 .profile-page .post-card-poll-option--selected .post-card-poll-option-text {
-    color: #000000;
+    color: var(--color-bg, #000000);
 }
 
 .profile-page .post-card-poll-option--selected .post-card-poll-option-pct {
-    color: #000000;
+    color: var(--color-bg, #000000);
 }
 
 .profile-page .post-card-poll-option:hover:not(:disabled) {
     border-color: var(--color-border, #555555);
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--overlay-bg-subtle);
 }
 
 .post-card-poll-option-row {
@@ -954,7 +956,7 @@
 .post-card-poll-bar-track {
     position: absolute;
     inset: 0;
-    background: var(--overlay-bg-subtle, rgba(255,255,255,0.04));
+    background: var(--overlay-bg-subtle);
     border-radius: inherit;
     z-index: 0;
 }
