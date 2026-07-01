@@ -4,7 +4,7 @@ import usePageTitle from '../../hooks/usePageTitle';
 import { useAuth } from '../../hooks/useAuth';
 import { updateUserProfile } from '../services/userService';
 import { getBlockedUsers, unblockUser, cacheBlockStatus, subscribeBlockChanges } from '../services/blockService';
-import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaFire, FaChartBar, FaBell, FaBrush, FaBan, FaClock } from 'react-icons/fa';
+import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaFire, FaChartBar, FaBell, FaBrush, FaBan, FaClock, FaAt } from 'react-icons/fa';
 import '../Resources/Styles/settings.css';
 
 /* ── SVG Flag Icons ── */
@@ -71,7 +71,7 @@ const CATEGORIES = [
 /* ── Main Settings Component ── */
 
 export default function Settings() {
-  const { locale, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showPushNotifications, setShowPushNotifications, showLikes, setShowLikes, hour24, setHour24, theme, setTheme, t } = useI18n();
+  const { locale, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showPushNotifications, setShowPushNotifications, showLikes, setShowLikes, filterEncrypted, setFilterEncrypted, allowMention, setAllowMention, allowEncryptedAdd, setAllowEncryptedAdd, hour24, setHour24, theme, setTheme, t } = useI18n();
   usePageTitle(t('settings.title'));
   const { user, profile, profileLoading, refreshProfile } = useAuth();
   const [selectOpen, setSelectOpen] = useState(false);
@@ -775,6 +775,94 @@ export default function Settings() {
                     syncProfilePref('show_likes', next);
                   }}
                   aria-pressed={showLikes}
+                >
+                  <span className="settings-toggle-track">
+                    <span className="settings-toggle-thumb" />
+                  </span>
+                </button>
+              </div>
+
+              <div className="settings-row-divider" />
+
+              {/* ── Permisos de interacción ── */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaAt /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.allow_mention')}</h2>
+                    <p className="settings-section-desc">{t('settings.allow_mention_desc')}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={`settings-toggle ${allowMention ? 'settings-toggle--active' : ''}`}
+                  onClick={() => {
+                    const next = !allowMention;
+                    setAllowMention(next);
+                    syncProfilePref('allow_mention', next);
+                  }}
+                  aria-pressed={allowMention}
+                >
+                  <span className="settings-toggle-track">
+                    <span className="settings-toggle-thumb" />
+                  </span>
+                </button>
+              </div>
+
+              <div className="settings-row-divider" />
+
+              {/* ── Filtrar posts encriptados ── */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaEyeSlash /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.filter_encrypted')}</h2>
+                    <p className="settings-section-desc">{t('settings.filter_encrypted_desc')}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={`settings-toggle ${filterEncrypted ? 'settings-toggle--active' : ''}`}
+                  onClick={() => {
+                    const next = !filterEncrypted;
+                    setFilterEncrypted(next);
+                    // Si filterEncrypted se activa, desactivar allowEncryptedAdd
+                    if (next) {
+                      setAllowEncryptedAdd(false);
+                      syncProfilePref('allow_encrypted_add', false);
+                    }
+                  }}
+                  aria-pressed={filterEncrypted}
+                >
+                  <span className="settings-toggle-track">
+                    <span className="settings-toggle-thumb" />
+                  </span>
+                </button>
+              </div>
+
+              <div className="settings-row-divider" />
+
+              {/* ── Permitir inclusión en posts encriptados ── */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaEyeSlash /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.allow_encrypted_add')}</h2>
+                    <p className="settings-section-desc">{t('settings.allow_encrypted_add_desc')}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={`settings-toggle ${allowEncryptedAdd ? 'settings-toggle--active' : ''}`}
+                  onClick={() => {
+                    if (filterEncrypted) return;
+                    const next = !allowEncryptedAdd;
+                    setAllowEncryptedAdd(next);
+                    syncProfilePref('allow_encrypted_add', next);
+                  }}
+                  aria-pressed={allowEncryptedAdd}
+                  disabled={filterEncrypted}
+                  style={filterEncrypted ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                 >
                   <span className="settings-toggle-track">
                     <span className="settings-toggle-thumb" />

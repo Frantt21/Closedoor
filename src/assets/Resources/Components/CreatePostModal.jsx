@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { createPost, updatePost, notifyMentions } from '../../services/postService';
+import { createPost, updatePost, notifyMentions, extractMentions, getMentionUserIds } from '../../services/postService';
 import { getFollowing } from '../../services/followService';
 import { searchProfiles } from '../../services/userService';
 import { useAuth } from '../../../hooks/useAuth';
@@ -159,9 +159,20 @@ export default function CreatePostModal({
     if (userSearchTimeoutRef.current) clearTimeout(userSearchTimeoutRef.current);
     userSearchTimeoutRef.current = setTimeout(async () => {
       const results = await searchProfiles(query.trim(), currentUserId);
-      // Filtrar los que ya están seleccionados
+      // Filtrar usuarios que ya están seleccionados o que no permiten añadirlos a posts encriptados
       const selectedIds = new Set(allowedUsers.map(u => u.id));
-      setUserSearchResults(results.filter(u => !selectedIds.has(u.id)));
+      let filtered = results.filter(u => !selectedIds.has(u.id));
+      if (filtered.length > 0) {
+        const { data: prefs } = await supabase
+          .from('profiles')
+          .select('id, allow_encrypted_add')
+          .in('id', filtered.map(u => u.id));
+        const disabledAdd = new Set(
+          (prefs || []).filter(p => p.allow_encrypted_add === false).map(p => p.id)
+        );
+        filtered = filtered.filter(u => !disabledAdd.has(u.id));
+      }
+      setUserSearchResults(filtered);
       setSearchingUsers(false);
     }, 300);
   }, [currentUserId, allowedUsers]);
@@ -184,7 +195,21 @@ export default function CreatePostModal({
   useEffect(() => {
     if (isOpen && userId) {
       getFollowing(userId)
-        .then((users) => setFollowedUsers(users))
+        .then(async (users) => {
+          // Filtrar usuarios que no permiten ser añadidos a posts encriptados
+          if (users.length > 0) {
+            const { data: prefs } = await supabase
+              .from('profiles')
+              .select('id, allow_encrypted_add')
+              .in('id', users.map(u => u.id));
+            const disabledAdd = new Set(
+              (prefs || []).filter(p => p.allow_encrypted_add === false).map(p => p.id)
+            );
+            setFollowedUsers(users.filter(u => !disabledAdd.has(u.id)));
+          } else {
+            setFollowedUsers([]);
+          }
+        })
         .catch((err) => console.warn('Error fetching followed users:', err));
       setMentionIndex(-1);
       setMentionQuery('');
@@ -424,6 +449,25 @@ export default function CreatePostModal({
     if (showPoll && isEncrypted) {
       setError(t('create_post.poll_encrypted_conflict') || 'No puedes tener una encuesta en un post ofuscado');
       return;
+    }
+
+    // ── @Mentions: verificar que los usuarios mencionados permitan menciones ──
+    const mentionedUsernames = extractMentions(trimmed);
+    if (mentionedUsernames.length > 0) {
+      const mentionedUsers = await getMentionUserIds(mentionedUsernames);
+      const others = mentionedUsers.filter(u => u.id !== userId);
+      if (others.length > 0) {
+        const { data: mentionPrefs } = await supabase
+          .from('profiles')
+          .select('id, username, allow_mention')
+          .in('id', others.map(u => u.id));
+        const disabledMention = (mentionPrefs || []).filter(p => p.allow_mention === false);
+        if (disabledMention.length > 0) {
+          const names = disabledMention.map(p => `@${p.username}`).join(', ');
+          setError(t('create_post.mention_disabled', { users: names }) || `No puedes mencionar a ${names} porque tienen las menciones desactivadas`);
+          return;
+        }
+      }
     }
 
     setSaving(true);

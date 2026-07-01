@@ -277,6 +277,7 @@
   "create_post.post": "Post",
   "create_post.saving": "Posting...",
   "create_post.save_changes": "Save changes",
+  "create_post.mention_disabled": "You cannot mention {users} because they have mentions disabled.",
   "create_post.empty_error": "Post cannot be empty",
   "create_post.auth_error": "You must log in to post",
   "create_post.save_error": "Error saving post",
@@ -388,6 +389,12 @@
 
   "settings.show_likes": "Show my likes",
   "settings.show_likes_desc": "Show the Likes tab on your profile to other users.",
+  "settings.filter_encrypted": "Hide encrypted posts",
+  "settings.filter_encrypted_desc": "Filter out obfuscated/encrypted posts from your feed.",
+  "settings.allow_mention": "Allow mentions",
+  "settings.allow_mention_desc": "Allow other users to @mention you in their posts.",
+  "settings.allow_encrypted_add": "Allow encrypted post inclusion",
+  "settings.allow_encrypted_add_desc": "Allow others to add you to their encrypted post allowed lists.",
   "settings.blocked_users": "Blocked users",
   "settings.blocked_users_desc": "Manage users you have blocked"
 }

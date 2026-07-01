@@ -20,7 +20,7 @@ import PostCard from '../Resources/Components/PostCard';
 import CreatePostModal from '../Resources/Components/CreatePostModal';
 
 function Home() {
-    const { t } = useI18n();
+    const { t, filterEncrypted } = useI18n();
     usePageTitle(t('home.title'));
     const { user, isAuthenticated } = useAuth();
 
@@ -46,7 +46,7 @@ function Home() {
     const [showCreatePost, setShowCreatePost] = useState(false);
     const [editingPost, setEditingPost] = useState(null);
 
-    // ── Load feed (con cache) ──
+    // ── Load feed (con cache, refresca cuando cambia filterEncrypted) ──
     useEffect(() => {
         const cached = getCachedFeed('home_feed');
         if (cached) {
@@ -59,7 +59,7 @@ function Home() {
 
         const loadFeed = async () => {
             try {
-                let data = await getFeed({ limit: 30, userId: user?.id });
+                let data = await getFeed({ limit: 30, userId: user?.id, filterEncrypted });
                 // Filtrar posts de usuarios bloqueados (ambas direcciones, con cache 5min)
                 if (user?.id && data.length > 0) {
                     try {
@@ -95,7 +95,7 @@ function Home() {
         };
 
         loadFeed();
-    }, [user?.id]);
+    }, [user?.id, filterEncrypted]);
 
     // ── Realtime: actualizar contadores de likes/reposts/comments en vivo ──
     useEffect(() => {
@@ -142,7 +142,7 @@ function Home() {
 
     const handlePostCreated = async () => {
         try {
-            const data = await getFeed({ limit: 30, userId: user?.id });
+            const data = await getFeed({ limit: 30, userId: user?.id, filterEncrypted });
             setPosts(data);
             let likedIds = [], repostedIds = [], savedIds = [];
             if (user?.id && data.length > 0) {

@@ -13,6 +13,9 @@ const SHOW_PROFILE_STATS_KEY = 'fc_show_profile_stats';
 const SHOW_TOAST_NOTIFS_KEY = 'fc_show_toast_notifications';
 const SHOW_PUSH_NOTIFS_KEY = 'fc_show_push_notifications';
 const SHOW_LIKES_KEY = 'fc_show_likes';
+const FILTER_ENCRYPTED_KEY = 'fc_filter_encrypted';
+const ALLOW_MENTION_KEY = 'fc_allow_mention';
+const ALLOW_ENCRYPTED_ADD_KEY = 'fc_allow_encrypted_add';
 const HOUR24_KEY = 'fc_hour24';
 
 const locales = { es };
@@ -122,6 +125,27 @@ function getSavedShowLikes() {
   } catch { return false; }
 }
 
+function getSavedFilterEncrypted() {
+  try {
+    const val = localStorage.getItem(FILTER_ENCRYPTED_KEY);
+    return val === null ? true : val === 'true';
+  } catch { return true; }
+}
+
+function getSavedAllowMention() {
+  try {
+    const val = localStorage.getItem(ALLOW_MENTION_KEY);
+    return val === null ? true : val === 'true';
+  } catch { return true; }
+}
+
+function getSavedAllowEncryptedAdd() {
+  try {
+    const val = localStorage.getItem(ALLOW_ENCRYPTED_ADD_KEY);
+    return val === null ? true : val === 'true';
+  } catch { return true; }
+}
+
 function getSavedHour24() {
   try {
     const val = localStorage.getItem(HOUR24_KEY);
@@ -153,6 +177,12 @@ export const I18nContext = createContext({
   setShowPushNotifications: () => {},
   showLikes: false,
   setShowLikes: () => {},
+  filterEncrypted: true,
+  setFilterEncrypted: () => {},
+  allowMention: true,
+  setAllowMention: () => {},
+  allowEncryptedAdd: true,
+  setAllowEncryptedAdd: () => {},
   hour24: true,
   setHour24: () => {},
   theme: 'dark',
@@ -172,6 +202,9 @@ export function I18nProvider({ children }) {
   const [showToastNotifications, setShowToastNotificationsState] = useState(getSavedShowToastNotifications);
   const [showPushNotifications, setShowPushNotificationsState] = useState(getSavedShowPushNotifications);
   const [showLikes, setShowLikesState] = useState(getSavedShowLikes);
+  const [filterEncrypted, setFilterEncryptedState] = useState(getSavedFilterEncrypted);
+  const [allowMention, setAllowMentionState] = useState(getSavedAllowMention);
+  const [allowEncryptedAdd, setAllowEncryptedAddState] = useState(getSavedAllowEncryptedAdd);
   const [hour24, setHour24State] = useState(getSavedHour24);
   const [theme, setThemeState] = useState(getSavedTheme);
 
@@ -269,6 +302,27 @@ export function I18nProvider({ children }) {
     } catch {}
   }, []);
 
+  const setFilterEncrypted = useCallback((value) => {
+    setFilterEncryptedState(value);
+    try {
+      localStorage.setItem(FILTER_ENCRYPTED_KEY, String(value));
+    } catch {}
+  }, []);
+
+  const setAllowMention = useCallback((value) => {
+    setAllowMentionState(value);
+    try {
+      localStorage.setItem(ALLOW_MENTION_KEY, String(value));
+    } catch {}
+  }, []);
+
+  const setAllowEncryptedAdd = useCallback((value) => {
+    setAllowEncryptedAddState(value);
+    try {
+      localStorage.setItem(ALLOW_ENCRYPTED_ADD_KEY, String(value));
+    } catch {}
+  }, []);
+
   const setHour24 = useCallback((value) => {
     setHour24State(value);
     try {
@@ -300,7 +354,7 @@ export function I18nProvider({ children }) {
   }, [translations]);
 
   return (
-    <I18nContext.Provider      value={{ locale, t, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showPushNotifications, setShowPushNotifications, showLikes, setShowLikes, hour24, setHour24, theme, setTheme }}>
+    <I18nContext.Provider      value={{ locale, t, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showPushNotifications, setShowPushNotifications, showLikes, setShowLikes, filterEncrypted, setFilterEncrypted, allowMention, setAllowMention, allowEncryptedAdd, setAllowEncryptedAdd, hour24, setHour24, theme, setTheme }}>
       {children}
     </I18nContext.Provider>
   );

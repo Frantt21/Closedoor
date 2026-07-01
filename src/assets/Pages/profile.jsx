@@ -57,7 +57,7 @@ import CreatePostModal from "../Resources/Components/CreatePostModal";
 import { toast } from 'react-toastify';
 
 function Profile() {
-    const { t, showAccent, accentVisibility, showLikes } = useI18n();
+    const { t, showAccent, accentVisibility, showLikes, filterEncrypted } = useI18n();
     const { username: profileUsername } = useParams();
     const navigate = useNavigate();
     const { user, profile: ownProfile, refreshProfile, isAuthenticated, loading } = useAuth();
@@ -418,7 +418,7 @@ function Profile() {
 
         const loadPosts = async () => {
             try {
-                const items = await getProfileContent(userId, user?.id);
+                const items = await getProfileContent(userId, user?.id, filterEncrypted);
                 setProfilePosts(items);
                 // Batch check likes/reposts/saves for current user
                 let likedIds = [], repostedIds = [], savedIds = [];
@@ -463,7 +463,7 @@ function Profile() {
         const refreshAfterChange = async () => {
             if (!canViewContent) return;
             try {
-                const items = await getProfileContent(profileId, user?.id);
+                const items = await getProfileContent(profileId, user?.id, filterEncrypted);
                 setProfilePosts(items);
                 let likedIds = [], repostedIds = [], savedIds = [];
                 if (user?.id && items.length > 0) {
@@ -817,7 +817,7 @@ function Profile() {
         if (!userId) return;
         try {
             // Refrescar posts normales
-            const items = await getProfileContent(userId, user?.id);
+            const items = await getProfileContent(userId, user?.id, filterEncrypted);
             setProfilePosts(items);
             let likedIds = [], repostedIds = [], savedIds = [];
             if (user?.id && items.length > 0) {

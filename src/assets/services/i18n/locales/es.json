@@ -279,6 +279,7 @@
   "create_post.post": "Publicar",
   "create_post.saving": "Publicando...",
   "create_post.save_changes": "Guardar cambios",
+  "create_post.mention_disabled": "No puedes mencionar a {users} porque tienen las menciones desactivadas.",
   "create_post.empty_error": "El post no puede estar vacío",
   "create_post.auth_error": "Debes iniciar sesión para publicar",
   "create_post.save_error": "Error al guardar el post",
@@ -388,6 +389,12 @@
 
   "settings.show_likes": "Mostrar mis likes",
   "settings.show_likes_desc": "Muestra la pestaña de Me gusta en tu perfil a otros usuarios.",
+  "settings.filter_encrypted": "Ocultar posts encriptados",
+  "settings.filter_encrypted_desc": "Filtra los posts ofuscados/encriptados de tu feed.",
+  "settings.allow_mention": "Permitir menciones",
+  "settings.allow_mention_desc": "Permite que otros usuarios te @mencionen en sus posts.",
+  "settings.allow_encrypted_add": "Permitir inclusión en posts encriptados",
+  "settings.allow_encrypted_add_desc": "Permite que otros te añadan a la lista de usuarios autorizados en posts encriptados.",
   "settings.blocked_users": "Usuarios bloqueados",
   "settings.blocked_users_desc": "Gestiona los usuarios que has bloqueado"
 }

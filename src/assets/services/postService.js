@@ -189,7 +189,7 @@ export async function togglePinPost(postId, userId, currentPinned) {
 
 // ── PROFILE CONTENT (posts + reposts) ──
 
-export async function getProfileContent(profileUserId, currentUserId) {
+export async function getProfileContent(profileUserId, currentUserId, filterEncrypted = true) {
   if (!profileUserId) return [];
 
   const [posts, repostsResult] = await Promise.all([
@@ -237,6 +237,12 @@ export async function getProfileContent(profileUserId, currentUserId) {
     }
   }
   merged.sort(sortProfilePosts);
+
+  // Filtrar posts encriptados si filterEncrypted está activo
+  if (filterEncrypted) {
+    return merged.filter((p) => !p.is_encrypted);
+  }
+
   return merged;
 }
 
@@ -334,13 +340,15 @@ async function refreshVisibleIds(userId) {
 
 // ── FEED (filtrando perfiles privados, con cache de IDs visibles) ──
 
-export async function getFeed({ limit = 20, offset = 0, userId } = {}) {
+export async function getFeed({ limit = 20, offset = 0, userId, filterEncrypted = true } = {}) {
   let query = supabase
     .from('posts')
     .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private)');
 
-  // Excluir posts encriptados y posts programados del feed
-  query = query.neq('is_encrypted', true);
+  // Excluir posts programados del feed
+  if (filterEncrypted) {
+    query = query.neq('is_encrypted', true);
+  }
   query = query.or('scheduled_at.is.null,scheduled_at.lte.now');
 
   // Resolver IDs visibles con cache (o fetch si cache miss)
@@ -946,8 +954,31 @@ export async function notifyMentions(actorId, postId, content) {
   const mentionedUsers = await getMentionUserIds(usernames);
   if (!mentionedUsers.length) return;
 
+  // Verificar allow_mention para cada usuario mencionado
+  const allowedUsers = [];
+  for (const u of mentionedUsers) {
+    if (u.id === actorId) {
+      allowedUsers.push(u);
+      continue;
+    }
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('allow_mention')
+        .eq('id', u.id)
+        .single();
+      // Solo notificar si allow_mention no es false (default: true)
+      if (profile && profile.allow_mention !== false) {
+        allowedUsers.push(u);
+      }
+    } catch (err) {
+      // Si hay error, notificar por defecto (comportamiento seguro)
+      allowedUsers.push(u);
+    }
+  }
+
   // Only notify users that are not the actor themselves
-  const notifications = mentionedUsers
+  const notifications = allowedUsers
     .filter((u) => u.id !== actorId)
     .map((u) => ({
       actor_id: actorId,
