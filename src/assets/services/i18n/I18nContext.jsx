@@ -141,9 +141,12 @@ function getSavedAllowMention() {
 
 function getSavedAllowEncryptedAdd() {
   try {
+    // Si filterEncrypted está activo, allowEncryptedAdd siempre es false
+    const filterVal = localStorage.getItem(FILTER_ENCRYPTED_KEY);
+    if (filterVal === null || filterVal === 'true') return false;
     const val = localStorage.getItem(ALLOW_ENCRYPTED_ADD_KEY);
-    return val === null ? true : val === 'true';
-  } catch { return true; }
+    return val === 'true';
+  } catch { return false; }
 }
 
 function getSavedHour24() {
@@ -181,7 +184,7 @@ export const I18nContext = createContext({
   setFilterEncrypted: () => {},
   allowMention: true,
   setAllowMention: () => {},
-  allowEncryptedAdd: true,
+  allowEncryptedAdd: false,
   setAllowEncryptedAdd: () => {},
   hour24: true,
   setHour24: () => {},
