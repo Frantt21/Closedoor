@@ -57,7 +57,7 @@ import CreatePostModal from "../Resources/Components/CreatePostModal";
 import { toast } from 'react-toastify';
 
 function Profile() {
-    const { t, showAccent, accentVisibility, showLikes, showSaves } = useI18n();
+    const { t, showAccent, accentVisibility, showLikes } = useI18n();
     const { username: profileUsername } = useParams();
     const navigate = useNavigate();
     const { user, profile: ownProfile, refreshProfile, isAuthenticated, loading } = useAuth();
@@ -355,9 +355,12 @@ function Profile() {
     useEffect(() => {
         if (!isOwnProfile) setTab('posts');
     }, [isOwnProfile]);
+    // ── Para likes/saves: usar el ID del perfil activo (propio o ajeno) ──
+    const likesUserId = isOwnProfile ? user?.id : activeProfile?.id;
+    const savesUserId = isOwnProfile ? user?.id : activeProfile?.id;
     const [scheduledPosts, setScheduledPosts] = useState([]);
     const [scheduledPostsLoading, setScheduledPostsLoading] = useState(true);
-    const savedCacheKey = user?.id ? `saved_posts_${user.id}` : null;
+    const savedCacheKey = savesUserId ? `saved_posts_${savesUserId}` : null;
     const [savedPosts, setSavedPosts] = useState(() => {
         const cached = savedCacheKey ? getCachedFeed(savedCacheKey) : null;
         return cached?.items || [];
@@ -374,7 +377,7 @@ function Profile() {
         const cached = savedCacheKey ? getCachedFeed(savedCacheKey) : null;
         return !cached;
     });
-    const likedCacheKey = user?.id ? `liked_posts_${user.id}` : null;
+    const likedCacheKey = likesUserId ? `liked_posts_${likesUserId}` : null;
     const [likedPosts, setLikedPosts] = useState(() => {
         const cached = likedCacheKey ? getCachedFeed(likedCacheKey) : null;
         return cached?.items || [];
@@ -596,10 +599,10 @@ function Profile() {
             });
     }, [user?.id]);
 
-    // ── Load saved posts (con cache + background refresh) ──
+    // ── Load saved posts (con cache + background refresh, solo perfil propio) ──
     useEffect(() => {
-        if (!user?.id) return;
-        const cacheKey = `saved_posts_${user.id}`;
+        if (!savesUserId || !isOwnProfile) return;
+        const cacheKey = `saved_posts_${savesUserId}`;
 
         // Restaurar cache inmediatamente (síncrono)
         const cached = getCachedFeed(cacheKey);
@@ -615,7 +618,7 @@ function Profile() {
         // Fetch en segundo plano
         const loadSaved = async () => {
             try {
-                const items = await getSavedPosts(user.id);
+                const items = await getSavedPosts(savesUserId);
                 setSavedPosts(items);
                 // Check liked/reposted state for these posts
                 let likedIds = [], repostedIds = [];
@@ -637,12 +640,12 @@ function Profile() {
         };
 
         loadSaved();
-    }, [user?.id]);
+    }, [savesUserId]);
 
     // ── Load liked posts (con cache + background refresh) ──
     useEffect(() => {
-        if (!user?.id) return;
-        const cacheKey = `liked_posts_${user.id}`;
+        if (!likesUserId) return;
+        const cacheKey = `liked_posts_${likesUserId}`;
 
         // Restaurar cache inmediatamente (síncrono)
         const cached = getCachedFeed(cacheKey);
@@ -659,7 +662,7 @@ function Profile() {
         // Fetch en segundo plano
         const loadLiked = async () => {
             try {
-                const items = await getLikedPosts(user.id);
+                const items = await getLikedPosts(likesUserId);
                 setLikedPosts(items);
                 // Check liked/reposted/saved state for these posts
                 let likedIds = [], repostedIds = [], savedIds = [];
@@ -683,35 +686,40 @@ function Profile() {
         };
 
         loadLiked();
-    }, [user?.id]);
+    }, [likesUserId]);
 
-    // ── Refetch liked/reposted/saved IDs al cambiar a Saved tab ──
+    // ── Refresh saved posts when switching to Saved tab ──
     useEffect(() => {
-        if (tab !== 'saved' || !user?.id) return;
-        const postIds = savedPosts.map((p) => p.id);
-        if (postIds.length === 0) return;
+        if (tab !== 'saved' || !savesUserId) return;
+        const cacheKey = `saved_posts_${savesUserId}`;
         (async () => {
             try {
-                const [likedIds, repostedIds] = await Promise.all([
-                    getLikedPostIds(postIds, user.id),
-                    getRepostedPostIds(postIds, user.id),
-                ]);
-                setSavedLikedIds(likedIds);
-                setSavedRepostedIds(repostedIds);
-                setCachedFeed(`saved_posts_${user.id}`, savedPosts, likedIds, repostedIds, []);
+                const items = await getSavedPosts(savesUserId);
+                setSavedPosts(items);
+                let likedIds = [], repostedIds = [];
+                if (items.length > 0) {
+                    const postIds = items.map((p) => p.id);
+                    [likedIds, repostedIds] = await Promise.all([
+                        getLikedPostIds(postIds, user.id),
+                        getRepostedPostIds(postIds, user.id),
+                    ]);
+                    setSavedLikedIds(likedIds);
+                    setSavedRepostedIds(repostedIds);
+                }
+                setCachedFeed(cacheKey, items, likedIds, repostedIds, []);
             } catch (err) {
-                console.warn('Error refreshing saved liked/reposted status:', err);
+                console.warn('Error refreshing saved posts:', err);
             }
         })();
-    }, [tab, user?.id]);
+    }, [tab, savesUserId]);
 
     // ── Refresh liked posts when switching to Likes tab ──
     useEffect(() => {
-        if (tab !== 'likes' || !user?.id) return;
-        const cacheKey = `liked_posts_${user.id}`;
+        if (tab !== 'likes' || !likesUserId) return;
+        const cacheKey = `liked_posts_${likesUserId}`;
         (async () => {
             try {
-                const items = await getLikedPosts(user.id);
+                const items = await getLikedPosts(likesUserId);
                 setLikedPosts(items);
                 let likedIds = [], repostedIds = [], savedIds = [];
                 if (items.length > 0) {
@@ -730,7 +738,7 @@ function Profile() {
                 console.warn('Error refreshing liked posts:', err);
             }
         })();
-    }, [tab, user?.id]);
+    }, [tab, likesUserId]);
 
     // ── Handlers for like/repost sync ──
     const handleLikeToggle = (postId, nowLiked) => {
@@ -1488,7 +1496,7 @@ function Profile() {
                                 {t('profile.likes_tab')}
                             </button>
                         )}
-                        {isOwnProfile && showSaves && (
+                        {isOwnProfile && (
                             <button
                                 className={`posts-section-tab ${tab === 'saved' ? 'posts-section-tab--active' : ''}`}
                                 onClick={() => setTab('saved')}
@@ -1582,7 +1590,7 @@ function Profile() {
                                 {t('profile.no_saved_sub')}
                             </p>
                         </div>
-                    ) : isOwnProfile && savedPosts.map((post) => (
+                    ) : savedPosts.map((post) => (
                             <PostCard
                                 key={post.id}
                                 post={post}
@@ -1614,10 +1622,14 @@ function Profile() {
                         <div className="posts-empty">
                             <span className="posts-empty-icon"><FaHeart /></span>
                             <p className="posts-empty-text">
-                                {t('profile.no_likes')}
+                                {isOwnProfile
+                                    ? t('profile.no_likes')
+                                    : t('profile.no_likes_other')}
                             </p>
                             <p className="posts-empty-subtext">
-                                {t('profile.no_likes_sub')}
+                                {isOwnProfile
+                                    ? t('profile.no_likes_sub')
+                                    : t('profile.no_likes_sub_other')}
                             </p>
                         </div>
                     ) : (isOwnProfile ? showLikes : activeProfile?.show_likes) && likedPosts.map((post) => (

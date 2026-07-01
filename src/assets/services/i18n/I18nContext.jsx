@@ -13,7 +13,6 @@ const SHOW_PROFILE_STATS_KEY = 'fc_show_profile_stats';
 const SHOW_TOAST_NOTIFS_KEY = 'fc_show_toast_notifications';
 const SHOW_PUSH_NOTIFS_KEY = 'fc_show_push_notifications';
 const SHOW_LIKES_KEY = 'fc_show_likes';
-const SHOW_SAVES_KEY = 'fc_show_saves';
 const HOUR24_KEY = 'fc_hour24';
 
 const locales = { es };
@@ -123,13 +122,6 @@ function getSavedShowLikes() {
   } catch { return false; }
 }
 
-function getSavedShowSaves() {
-  try {
-    const val = localStorage.getItem(SHOW_SAVES_KEY);
-    return val === null ? false : val === 'true';
-  } catch { return false; }
-}
-
 function getSavedHour24() {
   try {
     const val = localStorage.getItem(HOUR24_KEY);
@@ -161,8 +153,6 @@ export const I18nContext = createContext({
   setShowPushNotifications: () => {},
   showLikes: false,
   setShowLikes: () => {},
-  showSaves: false,
-  setShowSaves: () => {},
   hour24: true,
   setHour24: () => {},
   theme: 'dark',
@@ -182,7 +172,6 @@ export function I18nProvider({ children }) {
   const [showToastNotifications, setShowToastNotificationsState] = useState(getSavedShowToastNotifications);
   const [showPushNotifications, setShowPushNotificationsState] = useState(getSavedShowPushNotifications);
   const [showLikes, setShowLikesState] = useState(getSavedShowLikes);
-  const [showSaves, setShowSavesState] = useState(getSavedShowSaves);
   const [hour24, setHour24State] = useState(getSavedHour24);
   const [theme, setThemeState] = useState(getSavedTheme);
 
@@ -280,13 +269,6 @@ export function I18nProvider({ children }) {
     } catch {}
   }, []);
 
-  const setShowSaves = useCallback((value) => {
-    setShowSavesState(value);
-    try {
-      localStorage.setItem(SHOW_SAVES_KEY, String(value));
-    } catch {}
-  }, []);
-
   const setHour24 = useCallback((value) => {
     setHour24State(value);
     try {
@@ -318,7 +300,7 @@ export function I18nProvider({ children }) {
   }, [translations]);
 
   return (
-    <I18nContext.Provider      value={{ locale, t, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showPushNotifications, setShowPushNotifications, showLikes, setShowLikes, showSaves, setShowSaves, hour24, setHour24, theme, setTheme }}>
+    <I18nContext.Provider      value={{ locale, t, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showPushNotifications, setShowPushNotifications, showLikes, setShowLikes, hour24, setHour24, theme, setTheme }}>
       {children}
     </I18nContext.Provider>
   );

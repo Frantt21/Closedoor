@@ -50,6 +50,8 @@
   "profile.no_posts_other": "Este usuario no ha publicado nada aún.",
   "profile.no_likes": "No has dado me gusta a ningún post todavía.",
   "profile.no_likes_sub": "Los posts que te gusten aparecerán aquí.",
+  "profile.no_likes_other": "Este usuario no ha dado me gusta a ningún post todavía.",
+  "profile.no_likes_sub_other": "Los posts que le gustan aparecerán aquí.",
   "profile.no_saved": "No tienes posts guardados todavía.",
   "profile.no_saved_sub": "Guarda posts que te gusten para verlos después.",
   "profile.updated": "Perfil actualizado correctamente.",
@@ -386,8 +388,6 @@
 
   "settings.show_likes": "Mostrar mis likes",
   "settings.show_likes_desc": "Muestra la pestaña de Me gusta en tu perfil a otros usuarios.",
-  "settings.show_saves": "Mostrar pestaña Guardados",
-  "settings.show_saves_desc": "Muestra la pestaña de Guardados en tu propio perfil.",
   "settings.blocked_users": "Usuarios bloqueados",
   "settings.blocked_users_desc": "Gestiona los usuarios que has bloqueado"
 }

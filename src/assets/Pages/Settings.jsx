@@ -71,7 +71,7 @@ const CATEGORIES = [
 /* ── Main Settings Component ── */
 
 export default function Settings() {
-  const { locale, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showPushNotifications, setShowPushNotifications, showLikes, setShowLikes, showSaves, setShowSaves, hour24, setHour24, theme, setTheme, t } = useI18n();
+  const { locale, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showPushNotifications, setShowPushNotifications, showLikes, setShowLikes, hour24, setHour24, theme, setTheme, t } = useI18n();
   usePageTitle(t('settings.title'));
   const { user, profile, profileLoading, refreshProfile } = useAuth();
   const [selectOpen, setSelectOpen] = useState(false);
@@ -369,116 +369,116 @@ export default function Settings() {
                     <span className="settings-toggle-thumb" />
                   </span>
                 </button>
+
+                {/* Expandir sub-opciones de acento */}
+                <button
+                  type="button"
+                  className="settings-stats-expand-btn"
+                  onClick={() => setAccentExpanded((s) => !s)}
+                >
+                  <span className={`settings-stats-expand-arrow ${accentExpanded ? 'settings-stats-expand-arrow--open' : ''}`}>
+                    <FaChevronRight />
+                  </span>
+                  <span>{accentExpanded ? t('settings.accent_hide_details') : t('settings.accent_show_details')}</span>
+                </button>
+
+                {accentExpanded && (
+                  <div className="settings-accent-list">
+                    {/* Mostrar en el perfil */}
+                    <div className="settings-row">
+                      <div className="settings-row-header">
+                        <span className="settings-section-icon"><FaPalette /></span>
+                        <div>
+                          <h2 className="settings-section-title">{t('settings.show_accent_profile')}</h2>
+                          <p className="settings-section-desc">{t('settings.show_accent_profile_desc')}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className={`settings-toggle ${showAccentProfile ? 'settings-toggle--active' : ''}`}
+                        onClick={() => {
+                          const next = !showAccentProfile;
+                          setShowAccentProfile(next);
+                          syncProfilePref('show_accent_profile', next);
+                        }}
+                        aria-pressed={showAccentProfile}
+                      >
+                        <span className="settings-toggle-track">
+                          <span className="settings-toggle-thumb" />
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Mostrar en Explore */}
+                    <div className="settings-row">
+                      <div className="settings-row-header">
+                        <span className="settings-section-icon"><FaPalette /></span>
+                        <div>
+                          <h2 className="settings-section-title">{t('settings.show_accent_explore')}</h2>
+                          <p className="settings-section-desc">{t('settings.show_accent_explore_desc')}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className={`settings-toggle ${showAccentExplore ? 'settings-toggle--active' : ''}`}
+                        onClick={() => {
+                          const next = !showAccentExplore;
+                          setShowAccentExplore(next);
+                          syncProfilePref('show_accent_explore', next);
+                        }}
+                        aria-pressed={showAccentExplore}
+                      >
+                        <span className="settings-toggle-track">
+                          <span className="settings-toggle-thumb" />
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Visibilidad del color acento */}
+                    <div className="settings-row">
+                      <div className="settings-row-header">
+                        <span className="settings-section-icon"><FaPalette /></span>
+                        <div>
+                          <h2 className="settings-section-title">{t('settings.accent_visibility')}</h2>
+                          <p className="settings-section-desc">{t('settings.accent_visibility_desc')}</p>
+                        </div>
+                      </div>
+                      <div className="settings-segmented">
+                        <button
+                          type="button"
+                          className={`settings-segmented-btn ${accentVisibility === 'others' ? 'settings-segmented-btn--active' : ''}`}
+                          onClick={() => {
+                            setAccentVisibility('others');
+                            syncProfilePref('accent_visibility', 'others');
+                          }}
+                        >
+                          {t('settings.accent_visibility_others')}
+                        </button>
+                        <button
+                          type="button"
+                          className={`settings-segmented-btn ${accentVisibility === 'both' ? 'settings-segmented-btn--active' : ''}`}
+                          onClick={() => {
+                            setAccentVisibility('both');
+                            syncProfilePref('accent_visibility', 'both');
+                          }}
+                        >
+                          {t('settings.accent_visibility_both')}
+                        </button>
+                        <button
+                          type="button"
+                          className={`settings-segmented-btn ${accentVisibility === 'me' ? 'settings-segmented-btn--active' : ''}`}
+                          onClick={() => {
+                            setAccentVisibility('me');
+                            syncProfilePref('accent_visibility', 'me');
+                          }}
+                        >
+                          {t('settings.accent_visibility_me')}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-
-              {/* Expandir sub-opciones de acento */}
-              <button
-                type="button"
-                className="settings-stats-expand-btn"
-                onClick={() => setAccentExpanded((s) => !s)}
-              >
-                <span className={`settings-stats-expand-arrow ${accentExpanded ? 'settings-stats-expand-arrow--open' : ''}`}>
-                  <FaChevronRight />
-                </span>
-                <span>{accentExpanded ? t('settings.accent_hide_details') : t('settings.accent_show_details')}</span>
-              </button>
-
-              {accentExpanded && (
-                <div className="settings-accent-list">
-                  {/* Mostrar en el perfil */}
-                  <div className="settings-row">
-                    <div className="settings-row-header">
-                      <span className="settings-section-icon"><FaPalette /></span>
-                      <div>
-                        <h2 className="settings-section-title">{t('settings.show_accent_profile')}</h2>
-                        <p className="settings-section-desc">{t('settings.show_accent_profile_desc')}</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className={`settings-toggle ${showAccentProfile ? 'settings-toggle--active' : ''}`}
-                      onClick={() => {
-                        const next = !showAccentProfile;
-                        setShowAccentProfile(next);
-                        syncProfilePref('show_accent_profile', next);
-                      }}
-                      aria-pressed={showAccentProfile}
-                    >
-                      <span className="settings-toggle-track">
-                        <span className="settings-toggle-thumb" />
-                      </span>
-                    </button>
-                  </div>
-
-                  {/* Mostrar en Explore */}
-                  <div className="settings-row">
-                    <div className="settings-row-header">
-                      <span className="settings-section-icon"><FaPalette /></span>
-                      <div>
-                        <h2 className="settings-section-title">{t('settings.show_accent_explore')}</h2>
-                        <p className="settings-section-desc">{t('settings.show_accent_explore_desc')}</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className={`settings-toggle ${showAccentExplore ? 'settings-toggle--active' : ''}`}
-                      onClick={() => {
-                        const next = !showAccentExplore;
-                        setShowAccentExplore(next);
-                        syncProfilePref('show_accent_explore', next);
-                      }}
-                      aria-pressed={showAccentExplore}
-                    >
-                      <span className="settings-toggle-track">
-                        <span className="settings-toggle-thumb" />
-                      </span>
-                    </button>
-                  </div>
-
-                  {/* Visibilidad del color acento */}
-                  <div className="settings-row">
-                    <div className="settings-row-header">
-                      <span className="settings-section-icon"><FaPalette /></span>
-                      <div>
-                        <h2 className="settings-section-title">{t('settings.accent_visibility')}</h2>
-                        <p className="settings-section-desc">{t('settings.accent_visibility_desc')}</p>
-                      </div>
-                    </div>
-                    <div className="settings-segmented">
-                      <button
-                        type="button"
-                        className={`settings-segmented-btn ${accentVisibility === 'others' ? 'settings-segmented-btn--active' : ''}`}
-                        onClick={() => {
-                          setAccentVisibility('others');
-                          syncProfilePref('accent_visibility', 'others');
-                        }}
-                      >
-                        {t('settings.accent_visibility_others')}
-                      </button>
-                      <button
-                        type="button"
-                        className={`settings-segmented-btn ${accentVisibility === 'both' ? 'settings-segmented-btn--active' : ''}`}
-                        onClick={() => {
-                          setAccentVisibility('both');
-                          syncProfilePref('accent_visibility', 'both');
-                        }}
-                      >
-                        {t('settings.accent_visibility_both')}
-                      </button>
-                      <button
-                        type="button"
-                        className={`settings-segmented-btn ${accentVisibility === 'me' ? 'settings-segmented-btn--active' : ''}`}
-                        onClick={() => {
-                          setAccentVisibility('me');
-                          syncProfilePref('accent_visibility', 'me');
-                        }}
-                      >
-                        {t('settings.accent_visibility_me')}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               <div className="settings-row-divider" />
 
@@ -491,98 +491,98 @@ export default function Settings() {
                     <p className="settings-section-desc">{t('settings.profile_display_desc')}</p>
                   </div>
                 </div>
+
+                {/* Expandir sub-opciones de cards */}
+                <button
+                  type="button"
+                  className="settings-stats-expand-btn"
+                  onClick={() => setCardsExpanded((s) => !s)}
+                >
+                  <span className={`settings-stats-expand-arrow ${cardsExpanded ? 'settings-stats-expand-arrow--open' : ''}`}>
+                    <FaChevronRight />
+                  </span>
+                  <span>{cardsExpanded ? t('settings.cards_hide_details') : t('settings.cards_show_details')}</span>
+                </button>
+
+                {cardsExpanded && (
+                  <div className="settings-accent-list">
+                    {/* Mostrar intereses */}
+                    <div className="settings-row">
+                      <div className="settings-row-header">
+                        <span className="settings-section-icon"><FaTags /></span>
+                        <div>
+                          <h2 className="settings-section-title">{t('settings.show_interests')}</h2>
+                          <p className="settings-section-desc">{t('settings.show_interests_desc')}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className={`settings-toggle ${showInterests ? 'settings-toggle--active' : ''}`}
+                        onClick={() => {
+                          const next = !showInterests;
+                          setShowInterests(next);
+                          syncProfilePref('show_interests', next);
+                        }}
+                        aria-pressed={showInterests}
+                      >
+                        <span className="settings-toggle-track">
+                          <span className="settings-toggle-thumb" />
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Mostrar estadísticas */}
+                    <div className="settings-row">
+                      <div className="settings-row-header">
+                        <span className="settings-section-icon"><FaChartBar /></span>
+                        <div>
+                          <h2 className="settings-section-title">{t('settings.show_stats_card')}</h2>
+                          <p className="settings-section-desc">{t('settings.show_stats_card_desc')}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className={`settings-toggle ${showProfileStats ? 'settings-toggle--active' : ''}`}
+                        onClick={() => {
+                          const next = !showProfileStats;
+                          setShowProfileStats(next);
+                          syncProfilePref('show_profile_stats', next);
+                        }}
+                        aria-pressed={showProfileStats}
+                      >
+                        <span className="settings-toggle-track">
+                          <span className="settings-toggle-thumb" />
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Mostrar tendencias */}
+                    <div className="settings-row">
+                      <div className="settings-row-header">
+                        <span className="settings-section-icon"><FaFire /></span>
+                        <div>
+                          <h2 className="settings-section-title">{t('settings.show_trending')}</h2>
+                          <p className="settings-section-desc">{t('settings.show_trending_desc')}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className={`settings-toggle ${showTrending ? 'settings-toggle--active' : ''}`}
+                        onClick={() => {
+                          const next = !showTrending;
+                          setShowTrending(next);
+                          syncProfilePref('show_trending', next);
+                        }}
+                        aria-pressed={showTrending}
+                      >
+                        <span className="settings-toggle-track">
+                          <span className="settings-toggle-thumb" />
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-
-              {/* Expandir sub-opciones de cards */}
-              <button
-                type="button"
-                className="settings-stats-expand-btn"
-                onClick={() => setCardsExpanded((s) => !s)}
-              >
-                <span className={`settings-stats-expand-arrow ${cardsExpanded ? 'settings-stats-expand-arrow--open' : ''}`}>
-                  <FaChevronRight />
-                </span>
-                <span>{cardsExpanded ? t('settings.cards_hide_details') : t('settings.cards_show_details')}</span>
-              </button>
-
-              {cardsExpanded && (
-                <div className="settings-accent-list">
-                  {/* Mostrar intereses */}
-                  <div className="settings-row">
-                    <div className="settings-row-header">
-                      <span className="settings-section-icon"><FaTags /></span>
-                      <div>
-                        <h2 className="settings-section-title">{t('settings.show_interests')}</h2>
-                        <p className="settings-section-desc">{t('settings.show_interests_desc')}</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className={`settings-toggle ${showInterests ? 'settings-toggle--active' : ''}`}
-                      onClick={() => {
-                        const next = !showInterests;
-                        setShowInterests(next);
-                        syncProfilePref('show_interests', next);
-                      }}
-                      aria-pressed={showInterests}
-                    >
-                      <span className="settings-toggle-track">
-                        <span className="settings-toggle-thumb" />
-                      </span>
-                    </button>
-                  </div>
-
-                  {/* Mostrar estadísticas */}
-                  <div className="settings-row">
-                    <div className="settings-row-header">
-                      <span className="settings-section-icon"><FaChartBar /></span>
-                      <div>
-                        <h2 className="settings-section-title">{t('settings.show_stats_card')}</h2>
-                        <p className="settings-section-desc">{t('settings.show_stats_card_desc')}</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className={`settings-toggle ${showProfileStats ? 'settings-toggle--active' : ''}`}
-                      onClick={() => {
-                        const next = !showProfileStats;
-                        setShowProfileStats(next);
-                        syncProfilePref('show_profile_stats', next);
-                      }}
-                      aria-pressed={showProfileStats}
-                    >
-                      <span className="settings-toggle-track">
-                        <span className="settings-toggle-thumb" />
-                      </span>
-                    </button>
-                  </div>
-
-                  {/* Mostrar tendencias */}
-                  <div className="settings-row">
-                    <div className="settings-row-header">
-                      <span className="settings-section-icon"><FaFire /></span>
-                      <div>
-                        <h2 className="settings-section-title">{t('settings.show_trending')}</h2>
-                        <p className="settings-section-desc">{t('settings.show_trending_desc')}</p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className={`settings-toggle ${showTrending ? 'settings-toggle--active' : ''}`}
-                      onClick={() => {
-                        const next = !showTrending;
-                        setShowTrending(next);
-                        syncProfilePref('show_trending', next);
-                      }}
-                      aria-pressed={showTrending}
-                    >
-                      <span className="settings-toggle-track">
-                        <span className="settings-toggle-thumb" />
-                      </span>
-                    </button>
-                  </div>
-                </div>
-              )}
             </>
           )}
 
@@ -775,31 +775,6 @@ export default function Settings() {
                     syncProfilePref('show_likes', next);
                   }}
                   aria-pressed={showLikes}
-                >
-                  <span className="settings-toggle-track">
-                    <span className="settings-toggle-thumb" />
-                  </span>
-                </button>
-              </div>
-
-              {/* ── Privacidad de guardados ── */}
-              <div className="settings-row">
-                <div className="settings-row-header">
-                  <span className="settings-section-icon"><FaBookmark /></span>
-                  <div>
-                    <h2 className="settings-section-title">{t('settings.show_saves')}</h2>
-                    <p className="settings-section-desc">{t('settings.show_saves_desc')}</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className={`settings-toggle ${showSaves ? 'settings-toggle--active' : ''}`}
-                  onClick={() => {
-                    const next = !showSaves;
-                    setShowSaves(next);
-                    syncProfilePref('show_saves', next);
-                  }}
-                  aria-pressed={showSaves}
                 >
                   <span className="settings-toggle-track">
                     <span className="settings-toggle-thumb" />
