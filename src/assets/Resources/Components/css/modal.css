@@ -131,19 +131,19 @@
 }
 
 .fc-preview-card--large .fc-preview-card-avatar {
-    width: 80px;
-    height: 80px;
+    width: 72px;
+    height: 72px;
     border-width: 3px;
-    left: 16%;
+    left: 12%;
 }
 
 .fc-preview-card--large .fc-preview-card-info {
-    left: calc(16% + 40px + 1.5rem);
-    gap: 10px;
+    left: calc(12% + 36px + 1.2rem);
+    gap: 6px;
 }
 
 .fc-preview-card--large .fc-preview-card-name {
-    font-size: 1.1rem;
+    font-size: 0.95rem;
 }
 
 .fc-preview-card-info {
@@ -1127,16 +1127,16 @@ textarea.fc-modal-input {
     }
 
     .fc-preview-card--large .fc-preview-card-avatar {
-        width: 64px;
-        height: 64px;
+        width: 56px;
+        height: 56px;
     }
 
     .fc-preview-card--large .fc-preview-card-info {
-        left: calc(16% + 32px + 0.75rem);
+        left: calc(12% + 28px + 0.6rem);
     }
 
     .fc-preview-card--large .fc-preview-card-name {
-        font-size: 0.95rem;
+        font-size: 0.85rem;
     }
 
     .fc-modal-grid {

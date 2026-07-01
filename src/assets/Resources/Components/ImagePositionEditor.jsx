@@ -1,111 +1,134 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { FaSearchPlus, FaSearchMinus, FaUndo, FaArrowsAltH, FaArrowsAltV, FaRedo } from 'react-icons/fa';
 
 /**
  * ImagePositionEditor
- * 
- * Permite arrastrar una imagen dentro de un contenedor con object-fit:cover
- * para ajustar el punto focal. Retorna la posición como "X% Y%" (object-position).
  *
- * NOTA: Este componente se remonta vía key al cambiar la URL o tipo,
- * así que initialPosition solo se usa durante la inicialización.
- * 
+ * Usa un <img> con object-fit: cover para que el zoom=1.0x llene el
+ * contenedor exactamente igual que el perfil real. Zoom, rotación y flip
+ * se aplican mediante CSS transform.
+ *
+ * Almacena la configuración como JSON string:
+ *   { x, y, zoom, rotation, flipX, flipY }
+ *
+ * Compatible hacia atrás con el formato legacy "X% Y%".
+ *
  * Props:
- *  - imageUrl: string | null   — URL de la imagen a posicionar
- *  - initialPosition: string   — posición inicial (ej "50% 50%")
- *  - aspectRatio: number       — aspect ratio del contenedor (default 40/11 ≈ 3.64, como el banner de perfil a su ancho máximo 800px)
- *  - onPositionChange: (pos: string) => void
+ *  - imageUrl: string | null
+ *  - initialPosition: string   — legacy "X% Y%" o JSON string
+ *  - aspectRatio: number       — aspect ratio del contenedor
+ *  - circular: boolean         — si es true, borderRadius: 50%
+ *  - onPositionChange: (encoded: string) => void
  */
+
+function parseEncodedPosition(pos) {
+  if (!pos) return { x: 50, y: 50, zoom: 1, rotation: 0, flipX: false, flipY: false };
+
+  try {
+    const parsed = JSON.parse(pos);
+    if (parsed && typeof parsed === 'object' && 'x' in parsed) {
+      return {
+        x: typeof parsed.x === 'number' ? parsed.x : 50,
+        y: typeof parsed.y === 'number' ? parsed.y : 50,
+        zoom: typeof parsed.zoom === 'number' ? parsed.zoom : 1,
+        rotation: typeof parsed.rotation === 'number' ? parsed.rotation : 0,
+        flipX: !!parsed.flipX,
+        flipY: !!parsed.flipY,
+      };
+    }
+  } catch { /* not JSON */ }
+
+  const parts = pos.split(/\s+/);
+  return {
+    x: parseFloat(parts[0]) || 50,
+    y: parseFloat(parts[1]) || 50,
+    zoom: 1,
+    rotation: 0,
+    flipX: false,
+    flipY: false,
+  };
+}
+
+function encodePosition(data) {
+  return JSON.stringify({
+    x: Math.round(data.x),
+    y: Math.round(data.y),
+    zoom: Math.round(data.zoom * 100) / 100,
+    rotation: Math.round(data.rotation),
+    flipX: data.flipX,
+    flipY: data.flipY,
+  });
+}
+
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 3;
+const ZOOM_STEP = 0.1;
+
 export default function ImagePositionEditor({
   imageUrl,
   initialPosition = '50% 50%',
   aspectRatio = 40 / 11,
+  circular = false,
   onPositionChange,
 }) {
-  const parsePosition = (pos) => {
-    if (!pos) return { x: 50, y: 50 };
-    const parts = pos.split(/\s+/);
-    return {
-      x: parseFloat(parts[0]) || 50,
-      y: parseFloat(parts[1]) || 50,
-    };
-  };
-
-  const [pos, setPos] = useState(() => parsePosition(initialPosition));
+  const [pos, setPos] = useState(() => parseEncodedPosition(initialPosition));
   const containerRef = useRef(null);
   const dragging = useRef(false);
   const lastMouse = useRef({ x: 0, y: 0 });
 
-  // Notificar cambios hacia arriba
-  const notify = useCallback((newPos) => {
-    const str = `${newPos.x}% ${newPos.y}%`;
-    onPositionChange?.(str);
+  const notify = useCallback((newData) => {
+    onPositionChange?.(encodePosition(newData));
   }, [onPositionChange]);
 
+  const updatePos = useCallback((updater) => {
+    setPos((prev) => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      notify(next);
+      return next;
+    });
+  }, [notify]);
+
+  // ── Drag ──
   const handleMouseDown = useCallback((e) => {
     dragging.current = true;
     lastMouse.current = { x: e.clientX, y: e.clientY };
     e.preventDefault();
   }, []);
 
-  const handleMouseMove = useCallback((e) => {
+  const doDrag = useCallback((clientX, clientY) => {
     if (!dragging.current || !containerRef.current) return;
-    const dx = e.clientX - lastMouse.current.x;
-    const dy = e.clientY - lastMouse.current.y;
-    lastMouse.current = { x: e.clientX, y: e.clientY };
+    const dx = clientX - lastMouse.current.x;
+    const dy = clientY - lastMouse.current.y;
+    lastMouse.current = { x: clientX, y: clientY };
 
     const rect = containerRef.current.getBoundingClientRect();
+    // Con background-size: 200%, mover el mouse el ancho del contenedor
+    // equivale a cambiar background-position de 0% a 100%
     const deltaX = (dx / rect.width) * 100;
     const deltaY = (dy / rect.height) * 100;
 
-    setPos((prev) => {
-      const newPos = {
-        x: Math.max(0, Math.min(100, prev.x - deltaX)),
-        y: Math.max(0, Math.min(100, prev.y - deltaY)),
-      };
-      notify(newPos);
-      return newPos;
-    });
-  }, [notify]);
+    updatePos((prev) => ({
+      ...prev,
+      x: Math.max(0, Math.min(100, prev.x - deltaX)),
+      y: Math.max(0, Math.min(100, prev.y - deltaY)),
+    }));
+  }, [updatePos]);
 
-  const handleMouseUp = useCallback(() => {
-    dragging.current = false;
-  }, []);
-
-  // Touch support
+  const handleMouseMove = useCallback((e) => doDrag(e.clientX, e.clientY), [doDrag]);
+  const handleMouseUp = useCallback(() => { dragging.current = false; }, []);
   const handleTouchStart = useCallback((e) => {
-    const touch = e.touches[0];
-    if (!touch) return;
+    const t = e.touches[0];
+    if (!t) return;
     dragging.current = true;
-    lastMouse.current = { x: touch.clientX, y: touch.clientY };
+    lastMouse.current = { x: t.clientX, y: t.clientY };
   }, []);
-
   const handleTouchMove = useCallback((e) => {
-    if (!dragging.current || !containerRef.current) return;
-    const touch = e.touches[0];
-    if (!touch) return;
-    const dx = touch.clientX - lastMouse.current.x;
-    const dy = touch.clientY - lastMouse.current.y;
-    lastMouse.current = { x: touch.clientX, y: touch.clientY };
+    const t = e.touches[0];
+    if (!t) return;
+    doDrag(t.clientX, t.clientY);
+  }, [doDrag]);
+  const handleTouchEnd = useCallback(() => { dragging.current = false; }, []);
 
-    const rect = containerRef.current.getBoundingClientRect();
-    const deltaX = (dx / rect.width) * 100;
-    const deltaY = (dy / rect.height) * 100;
-
-    setPos((prev) => {
-      const newPos = {
-        x: Math.max(0, Math.min(100, prev.x - deltaX)),
-        y: Math.max(0, Math.min(100, prev.y - deltaY)),
-      };
-      notify(newPos);
-      return newPos;
-    });
-  }, [notify]);
-
-  const handleTouchEnd = useCallback(() => {
-    dragging.current = false;
-  }, []);
-
-  // Attach global listeners for mouse/touch
   useEffect(() => {
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
@@ -119,29 +142,57 @@ export default function ImagePositionEditor({
     };
   }, [handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
 
+  // ── Controls ──
+  const handleZoomIn = () => updatePos((p) => ({ ...p, zoom: Math.min(ZOOM_MAX, +(p.zoom + ZOOM_STEP).toFixed(1)) }));
+  const handleZoomOut = () => updatePos((p) => ({ ...p, zoom: Math.max(ZOOM_MIN, +(p.zoom - ZOOM_STEP).toFixed(1)) }));
+  const handleRotateLeft = () => updatePos((p) => ({ ...p, rotation: ((p.rotation - 90) % 360 + 360) % 360 }));
+  const handleRotateRight = () => updatePos((p) => ({ ...p, rotation: (p.rotation + 90) % 360 }));
+  const handleFlipX = () => updatePos((p) => ({ ...p, flipX: !p.flipX }));
+  const handleFlipY = () => updatePos((p) => ({ ...p, flipY: !p.flipY }));
+  const handleReset = () => {
+    const r = { x: 50, y: 50, zoom: 1, rotation: 0, flipX: false, flipY: false };
+    setPos(r);
+    notify(r);
+  };
+
+  const buildTransform = () => {
+    const t = [];
+    if (pos.zoom !== 1) t.push(`scale(${pos.zoom})`);
+    if (pos.rotation !== 0) t.push(`rotate(${pos.rotation}deg)`);
+    if (pos.flipX) t.push(`scaleX(-1)`);
+    if (pos.flipY) t.push(`scaleY(-1)`);
+    return t.join(' ');
+  };
+
   if (!imageUrl) {
     return (
-      <div
-        className="image-position-editor"
-        style={{
-          width: '100%',
-          aspectRatio: `${aspectRatio} / 1`,
-          background: 'var(--color-surface, #1a1a1a)',
-          borderRadius: 'var(--radius-sm, 6px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'var(--color-text-muted, #6b7280)',
-          fontSize: '0.8rem',
-        }}
-      >
+      <div style={{
+        width: '100%', aspectRatio: `${aspectRatio} / 1`,
+        background: 'var(--color-surface, #1a1a1a)', borderRadius: circular ? '50%' : 'var(--radius-sm, 6px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: 'var(--color-text-muted, #6b7280)', fontSize: '0.8rem',
+      }}>
         No image
       </div>
     );
   }
 
+  const btn = {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    width: 32, height: 32,
+    border: '1px solid var(--color-border, #2a2a2a)', borderRadius: 'var(--radius-sm, 6px)',
+    background: 'var(--color-surface, #1a1a1a)', color: 'var(--color-text-secondary, #9ca3af)',
+    cursor: 'pointer', fontSize: '0.78rem', transition: 'background 0.15s ease, color 0.15s ease',
+  };
+  const btnActive = { ...btn, background: 'var(--color-text, #ffffff)', color: 'var(--color-bg, #000000)', borderColor: 'var(--color-text, #ffffff)' };
+  const btnHover = (e) => { e.currentTarget.style.background = 'var(--color-surface-hover, #252525)'; e.currentTarget.style.color = 'var(--color-text, #ffffff)'; };
+  const btnLeave = (e) => { e.currentTarget.style.background = 'var(--color-surface, #1a1a1a)'; e.currentTarget.style.color = 'var(--color-text-secondary, #9ca3af)'; };
+  const btnHoverActive = (e) => { if (!pos.flipX) btnHover(e); };
+  const btnLeaveActive = (e) => { if (!pos.flipX) btnLeave(e); };
+
   return (
     <div className="image-position-editor" style={{ width: '100%', userSelect: 'none' }}>
+      {/* ── Contenedor con <img> + object-fit: cover ── */}
       <div
         ref={containerRef}
         onMouseDown={handleMouseDown}
@@ -150,7 +201,7 @@ export default function ImagePositionEditor({
           width: '100%',
           aspectRatio: `${aspectRatio} / 1`,
           overflow: 'hidden',
-          borderRadius: 'var(--radius-sm, 6px)',
+          borderRadius: circular ? '50%' : 'var(--radius-sm, 6px)',
           cursor: dragging.current ? 'grabbing' : 'grab',
           position: 'relative',
           background: '#000',
@@ -158,48 +209,75 @@ export default function ImagePositionEditor({
       >
         <img
           src={imageUrl}
-          alt="Drag to reposition"
+          alt=""
           draggable={false}
           style={{
             width: '100%',
             height: '100%',
             objectFit: 'cover',
             objectPosition: `${pos.x}% ${pos.y}%`,
-            pointerEvents: 'none',
+            transform: buildTransform(),
+            willChange: 'transform',
             display: 'block',
           }}
-          onError={(e) => {
-            e.target.style.display = 'none';
-          }}
         />
-        {/* Instructional overlay */}
         <div
           style={{
-            position: 'absolute',
-            bottom: 8,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            background: 'rgba(0,0,0,0.6)',
-            color: '#fff',
-            fontSize: '0.72rem',
-            padding: '3px 10px',
-            borderRadius: 999,
-            pointerEvents: 'none',
-            whiteSpace: 'nowrap',
+            position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
+            background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: '0.72rem',
+            padding: '3px 10px', borderRadius: 999, pointerEvents: 'none', whiteSpace: 'nowrap',
           }}
         >
           Drag to reposition
         </div>
       </div>
-      <div
-        style={{
-          fontSize: '0.7rem',
-          color: 'var(--color-text-muted, #6b7280)',
-          marginTop: 4,
-          textAlign: 'center',
-        }}
-      >
-        {pos.x.toFixed(0)}% {pos.y.toFixed(0)}
+
+      {/* ── Controles ── */}
+      <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+          <button type="button" style={btn} onClick={handleZoomOut} title="Zoom out"
+            onMouseEnter={btnHover} onMouseLeave={btnLeave}><FaSearchMinus /></button>
+          <button type="button" style={btn} onClick={handleZoomIn} title="Zoom in"
+            onMouseEnter={btnHover} onMouseLeave={btnLeave}><FaSearchPlus /></button>
+          <div style={{ width: 1, height: 20, background: 'var(--color-border, #2a2a2a)' }} />
+          <button type="button" style={btn} onClick={handleRotateLeft} title="Rotate left (-90°)" 
+            onMouseEnter={btnHover} onMouseLeave={btnLeave}><FaUndo /></button>
+          <button type="button" style={btn} onClick={handleRotateRight} title="Rotate right (+90°)" 
+            onMouseEnter={btnHover} onMouseLeave={btnLeave}><FaRedo /></button>
+          <div style={{ width: 1, height: 20, background: 'var(--color-border, #2a2a2a)' }} />
+          <button type="button" style={pos.flipX ? btnActive : btn} onClick={handleFlipX} title="Flip horizontally"
+            onMouseEnter={btnHoverActive} onMouseLeave={btnLeaveActive}><FaArrowsAltH /></button>
+          <button type="button" style={pos.flipY ? btnActive : btn} onClick={handleFlipY} title="Flip vertically"
+            onMouseEnter={(e) => { if (!pos.flipY) btnHover(e); }} onMouseLeave={(e) => { if (!pos.flipY) btnLeave(e); }}><FaArrowsAltV /></button>
+          <div style={{ flex: 1 }} />
+          <button type="button" onClick={handleReset} title="Reset"
+            style={{ ...btn, width: 'auto', padding: '0 10px', fontSize: '0.72rem' }}
+            onMouseEnter={btnHover} onMouseLeave={btnLeave}>Reset</button>
+        </div>
+
+        {/* Zoom slider */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted, #6b7280)', minWidth: 30, textAlign: 'right' }}>{ZOOM_MIN}x</span>
+          <input type="range" min={ZOOM_MIN} max={ZOOM_MAX} step={ZOOM_STEP} value={pos.zoom}
+            onChange={(e) => updatePos((p) => ({ ...p, zoom: +parseFloat(e.target.value).toFixed(1) }))}
+            style={{ width: '100%', height: 4, accentColor: 'var(--color-text, #ffffff)' }} />
+          <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted, #6b7280)', minWidth: 30 }}>{ZOOM_MAX}x</span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary, #9ca3af)', minWidth: 40, textAlign: 'center' }}>{pos.zoom.toFixed(1)}x</span>
+        </div>
+
+        {/* Rotation slider */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted, #6b7280)', minWidth: 30, textAlign: 'right' }}>0°</span>
+          <input type="range" min={0} max={360} step={1} value={pos.rotation}
+            onChange={(e) => updatePos((p) => ({ ...p, rotation: parseInt(e.target.value, 10) }))}
+            style={{ width: '100%', height: 4, accentColor: 'var(--color-text, #ffffff)' }} />
+          <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted, #6b7280)', minWidth: 30 }}>360°</span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary, #9ca3af)', minWidth: 40, textAlign: 'center' }}>{pos.rotation}°</span>
+        </div>
+      </div>
+
+      <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted, #6b7280)', marginTop: 4, textAlign: 'center' }}>
+        {pos.x.toFixed(0)}% {pos.y.toFixed(0)} · {pos.zoom.toFixed(1)}x · {pos.rotation}°{pos.flipX ? ' · H' : ''}{pos.flipY ? ' · V' : ''}
       </div>
     </div>
   );

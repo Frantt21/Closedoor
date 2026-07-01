@@ -49,6 +49,8 @@
     background: var(--color-surface-hover, #252525);
 }
 
+
+
 /* ── Profile page: surface (glassmorphism) effect ── */
 .profile-page .post-card {
     --color-text: var(--accent-surface-text-color, var(--color-text, #ffffff));
@@ -66,6 +68,8 @@
     background: var(--accent-surface-rgba-hover, var(--color-surface-hover, #252525));
     transition: background 0.2s ease;
 }
+
+
 
 .post-card--deleting {
     opacity: 0.4;
@@ -166,9 +170,7 @@
     transition: opacity 0.2s ease;
 }
 
-.post-card-author:hover {
-    opacity: 0.85;
-}
+
 
 .post-card-username {
     font-weight: 600;
@@ -851,6 +853,12 @@
     background: var(--color-text, #ffffff);
 }
 
+.post-card-poll-option--selected:hover:not(:disabled) {
+    border-color: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.85);
+    cursor: pointer;
+}
+
 .post-card-poll-option--selected .post-card-poll-option-check {
     color: var(--color-bg, #000000);
 }
@@ -897,6 +905,12 @@
 .profile-page .post-card-poll-option--selected {
     border-color: var(--color-text, #ffffff);
     background: var(--color-text, #ffffff);
+}
+
+.profile-page .post-card-poll-option--selected:hover:not(:disabled) {
+    border-color: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.85);
+    cursor: pointer;
 }
 
 .profile-page .post-card-poll-option--selected .post-card-poll-option-check {

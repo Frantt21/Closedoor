@@ -106,3 +106,90 @@ export function isVideoUrl(url) {
   const lower = url.toLowerCase();
   return videoExts.some((ext) => lower.includes(ext)) || lower.includes('youtube.com') || lower.includes('youtu.be') || lower.includes('vimeo.com');
 }
+
+// ── Image position helpers (avatar/banner transforms) ──
+
+/**
+ * Parse a position string (legacy "X% Y%" or JSON "{"x":50,"y":50,"zoom":1,"rotation":0,"flipX":false,"flipY":false}")
+ * and return a normalized position object.
+ */
+export function parseImagePosition(pos) {
+  if (!pos) return { x: 50, y: 50, zoom: 1, rotation: 0, flipX: false, flipY: false };
+
+  try {
+    const parsed = JSON.parse(pos);
+    if (parsed && typeof parsed === 'object' && 'x' in parsed) {
+      return {
+        x: typeof parsed.x === 'number' ? parsed.x : 50,
+        y: typeof parsed.y === 'number' ? parsed.y : 50,
+        zoom: typeof parsed.zoom === 'number' ? parsed.zoom : 1,
+        rotation: typeof parsed.rotation === 'number' ? parsed.rotation : 0,
+        flipX: !!parsed.flipX,
+        flipY: !!parsed.flipY,
+      };
+    }
+  } catch { /* not JSON */ }
+
+  const parts = pos.split(/\s+/);
+  return {
+    x: parseFloat(parts[0]) || 50,
+    y: parseFloat(parts[1]) || 50,
+    zoom: 1,
+    rotation: 0,
+    flipX: false,
+    flipY: false,
+  };
+}
+
+/**
+ * Given a position string, return the style object for an <img> element
+ * with object-fit: cover. Includes objectPosition (X/Y) and CSS transform
+ * (zoom, rotation, flip).
+ */
+export function getImgTransformStyle(positionStr) {
+  const p = parseImagePosition(positionStr || '');
+  const transforms = [];
+  if (p.zoom !== 1) transforms.push(`scale(${p.zoom})`);
+  if (p.rotation !== 0) transforms.push(`rotate(${p.rotation}deg)`);
+  if (p.flipX) transforms.push('scaleX(-1)');
+  if (p.flipY) transforms.push('scaleY(-1)');
+
+  const style = {
+    objectPosition: `${p.x}% ${p.y}%`,
+  };
+  if (transforms.length > 0) {
+    style.transform = transforms.join(' ');
+  }
+  return style;
+}
+
+/**
+ * Given a position string, return just the background-position value
+ * (for use with CSS background-image on a div).
+ */
+export function getBgPositionStyle(positionStr) {
+  const p = parseImagePosition(positionStr || '');
+  return `${p.x}% ${p.y}%`;
+}
+
+/**
+ * Given a position string, return the full set of styles for a <div>
+ * that renders an image via background-image. Includes background-position,
+ * background-size (for zoom), and CSS transform (for rotation/flip).
+ *
+ * Use this on a dedicated inner <div> (not the container) so transforms
+ * don't affect sibling elements like overlay, avatar, etc.
+ */
+export function getBgFullStyle(positionStr) {
+  const p = parseImagePosition(positionStr || '');
+  const transforms = [];
+  if (p.rotation !== 0) transforms.push(`rotate(${p.rotation}deg)`);
+  if (p.flipX) transforms.push('scaleX(-1)');
+  if (p.flipY) transforms.push('scaleY(-1)');
+
+  return {
+    backgroundPosition: `${p.x}% ${p.y}%`,
+    backgroundSize: `${(p.zoom * 100).toFixed(1)}%`,
+    ...(transforms.length > 0 ? { transform: transforms.join(' ') } : {}),
+  };
+}

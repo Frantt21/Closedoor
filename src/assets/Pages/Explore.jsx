@@ -4,9 +4,8 @@ import { useAuth } from "../../hooks/useAuth";
 import { useI18n } from "../services/i18n/useI18n";
 import usePageTitle from "../../hooks/usePageTitle";
 import { supabase } from "../services/supabaseclient";
-import { listProfiles } from "../services/userService";
-import {
-  getFollowCounts,
+import { listProfiles } from "../services/userService";import { getImgTransformStyle } from '../services/helpers';
+import { getFollowCounts,
   setCachedFollowStatus,
   getCachedExploreData,
   setCachedExploreData,
@@ -267,7 +266,7 @@ function ExploreCard({ profile, counts, isOwnProfile, showAccent }) {
             className="explore-card-banner-img"
             src={profile.banner_url}
             alt=""
-            style={{ objectPosition: profile.banner_position || '50% 50%' }}
+            style={getImgTransformStyle(profile.banner_position)}
           />
         )}
         <div className="explore-card-overlay" />
@@ -278,7 +277,7 @@ function ExploreCard({ profile, counts, isOwnProfile, showAccent }) {
           className="explore-card-avatar"
           src={profile.avatar_url}
           alt={profile.username}
-          style={{ objectPosition: profile.avatar_position || '50% 50%' }}
+          style={getImgTransformStyle(profile.avatar_position)}
         />
 
         <div className="explore-card-info">
@@ -294,9 +293,13 @@ function ExploreCard({ profile, counts, isOwnProfile, showAccent }) {
 
           <span className="explore-card-followers">
             {followers} {followers === 1 ? t('explore.followers_singular') : t('explore.followers_plural')}
-          </span>
-
-          {bio && <p className="explore-card-bio">{bio}</p>}
+          </span>                          {bio || profile.pronouns ? (
+                            <p className="explore-card-bio">
+                              {bio}
+                              {bio && profile.pronouns && <span style={{ fontSize: '0.7rem', fontWeight: 400, opacity: 0.5 }}> · {profile.pronouns}</span>}
+                              {!bio && profile.pronouns && <span style={{ fontSize: '0.7rem', fontWeight: 400, opacity: 0.5 }}>{profile.pronouns}</span>}
+                            </p>
+                          ) : null}
 
           {/* ── Interests (max 3, then "see more" → profile) ── */}
           {profile.interests?.length > 0 && (

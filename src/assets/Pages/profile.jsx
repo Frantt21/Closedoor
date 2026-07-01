@@ -49,7 +49,7 @@ import { FaFeather, FaBookmark, FaLock, FaEllipsisV, FaBan, FaClock, FaHeart } f
 import FollowButton from "../Resources/Components/FollowButton";
 import { blockUser, unblockUser, isBlocked, cacheBlockStatus, getCachedBlockStatus, unfollowBothWays } from "../services/blockService";
 import { useI18n } from "../services/i18n/useI18n";
-import { getContrastText, isUUID } from "../services/helpers";
+import { getContrastText, isUUID, getImgTransformStyle } from "../services/helpers";
 import usePageTitle from "../../hooks/usePageTitle";
 import FollowersModal from "../Resources/Components/FollowersModal";
 import PostCard from "../Resources/Components/PostCard";
@@ -960,7 +960,7 @@ function Profile() {
     const roles = activeProfile?.roles || ["user"];
 
     // ── Save profile (own profile only) ──
-    const handleSaveProfile = async ({ username, avatar_url, banner_url, bio, social_links, accent_color, accent_color_secondary, accent_surface_color, accent_surface_glass, interests, banner_position, avatar_position, profile_background_url, profile_background_position, profile_background_blur, profile_background_dim }) => {
+    const handleSaveProfile = async ({ username, avatar_url, banner_url, bio, pronouns, social_links, accent_color, accent_color_secondary, accent_surface_color, accent_surface_glass, interests, banner_position, avatar_position, profile_background_url, profile_background_position, profile_background_blur, profile_background_dim }) => {
         if (!user?.id) return;
 
         const normalizedUsername = (username || "").trim().toLowerCase();
@@ -982,6 +982,7 @@ function Profile() {
                 avatar_url: avatar_url || null,
                 banner_url: banner_url || null,
                 bio: bio || null,
+                pronouns: pronouns || null,
                 social_links: social_links || [],
                 accent_color: accent_color || null,
                 accent_color_secondary: accent_color_secondary || null,
@@ -1156,7 +1157,7 @@ function Profile() {
                             className="profile-banner"
                             src={bannerUrl}
                             alt="Profile Banner"
-                            style={{ objectPosition: activeProfile?.banner_position || '50% 50%' }}
+                            style={getImgTransformStyle(activeProfile?.banner_position)}
                         />
                     ) : (
                         <div className="profile-banner profile-banner--placeholder">
@@ -1172,7 +1173,7 @@ function Profile() {
                                 "https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg"
                             }
                             alt="User Avatar"
-                            style={{ objectPosition: activeProfile?.avatar_position || '50% 50%' }}
+                            style={getImgTransformStyle(activeProfile?.avatar_position)}
                         />
                     </div>
 
@@ -1231,7 +1232,9 @@ function Profile() {
                         </div>
 
                         {activeProfile?.bio ? (
-                            <p className="profile-bio">{activeProfile.bio}</p>
+                            <p className="profile-bio">{activeProfile.bio}{activeProfile?.pronouns && <span style={{ fontSize: '0.75rem', fontWeight: 400, opacity: 0.5 }}> · {activeProfile.pronouns}</span>}</p>
+                        ) : activeProfile?.pronouns ? (
+                            <p className="profile-bio" style={{ opacity: 0.5 }}>{activeProfile.pronouns}</p>
                         ) : (
                             <p className="profile-bio profile-bio--empty">{t('profile.no_bio')}</p>
                         )}
@@ -1420,6 +1423,7 @@ function Profile() {
                     initialProfileBgPosition={ownProfile?.profile_background_position || '50% 50%'}
                     initialProfileBgBlur={ownProfile?.profile_background_blur ?? 0}
                     initialProfileBgDim={ownProfile?.profile_background_dim ?? 50}
+                    initialPronouns={ownProfile?.pronouns || ''}
                     initialFollowersCount={followCounts?.followers || 0}
                     userRoles={roles}
                 />

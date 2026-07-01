@@ -33,12 +33,7 @@
     color: var(--color-text-secondary, #9ca3af);
 }
 
-.role-badge--admin:hover,
-.role-badge--dev:hover,
-.role-badge--mod:hover,
-.role-badge--partner:hover {
-    background: var(--overlay-bg-hover);
-}
+
 
 /* .role-badge--admin::before {
     content: "★";

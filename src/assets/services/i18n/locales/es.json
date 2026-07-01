@@ -76,6 +76,7 @@
   "profile.stats_saved": "Guardados",
   "profile.private_posts_hint": "Las publicaciones y seguidores de este usuario no están visibles.",
   "profile.stats_private_label": "Estadísticas privadas",
+  "profile.pronouns": "Pronombres",
   "profile.follows_you": "Te sigue",
   "profile.checking_access": "Verificando acceso...",
 
@@ -233,6 +234,9 @@
 
   "modal.edit_title": "Editar perfil",
   "modal.username_label": "Nombre de usuario",
+  "modal.pronouns_label": "Pronombres",
+  "modal.pronouns_placeholder": "ej: él/ella, elle, they/them",
+  "modal.pronouns_hint": "Se muestran junto a tu nombre de usuario",
   "modal.bio_label": "Biografía",
   "modal.accent_color": "Color de acento",
   "modal.accent_color_secondary": "Color secundario",

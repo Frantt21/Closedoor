@@ -4,7 +4,7 @@ import '../Styles/explore.css';
 import Badge from './Badge';
 import ConfirmModal from './ConfirmModal';
 import Avatar from './Avatar';
-import { DEFAULT_AVATAR } from '../../services/helpers';
+import { DEFAULT_AVATAR, getBgFullStyle, getImgTransformStyle } from '../../services/helpers';
 import { detectPlatform, getPlatformIcon, getPlatformName } from '../../services/socialPlatforms';
 import { extractColors } from '../../services/colorExtractor';
 import { useI18n } from '../../services/i18n/useI18n';
@@ -56,6 +56,7 @@ export default function Modal({
   initialProfileBgPosition = '50% 50%',
   initialProfileBgBlur = 0,
   initialProfileBgDim = 50,
+  initialPronouns = '',
   initialFollowersCount = 0,
   userRoles = ['user'],
 }) {
@@ -64,6 +65,7 @@ export default function Modal({
   const [banner, setBanner] = useState(initialBanner);
   const [avatar, setAvatar] = useState(initialAvatar);
   const [bio, setBio] = useState(initialBio);
+  const [pronouns, setPronouns] = useState(initialPronouns);
   const [saving, setSaving] = useState(false);
   const [socialLinks, setSocialLinks] = useState([]);
   const [newSocial, setNewSocial] = useState('');
@@ -126,6 +128,7 @@ export default function Modal({
     setBanner(initialBanner || '');
     setAvatar(initialAvatar || '');
     setBio(initialBio || '');
+    setPronouns(initialPronouns || '');
     setSocialLinks(Array.isArray(initialSocialLinks) ? initialSocialLinks : []);
     setSelectedAccent(initialAccentColor || '');
     setSelectedAccentSecondary(initialAccentColorSecondary || '');
@@ -163,6 +166,7 @@ export default function Modal({
       banner !== (initialBanner || '') ||
       avatar !== (initialAvatar || '') ||
       bio !== (initialBio || '') ||
+      pronouns !== (initialPronouns || '') ||
       JSON.stringify(socialLinks) !== JSON.stringify(initialSocialLinks || []) ||
       selectedAccent !== (initialAccentColor || '') ||
       selectedAccentSecondary !== (initialAccentColorSecondary || '') ||
@@ -177,9 +181,9 @@ export default function Modal({
       avatarPosition !== initialAvatarPosition;
     setHasChanges(changed);
   }, [
-    username, banner, avatar, bio, socialLinks,    selectedAccent, selectedAccentSecondary, interests,
+    username, banner, avatar, bio, pronouns, socialLinks,    selectedAccent, selectedAccentSecondary, interests,
     bannerPosition, avatarPosition,
-    initialUsername, initialBanner, initialAvatar, initialBio,
+    initialUsername, initialBanner, initialAvatar, initialBio, initialPronouns,
     initialSocialLinks, initialAccentColor, initialAccentColorSecondary, initialAccentSurface, initialAccentSurfaceGlass, initialProfileBg, initialProfileBgPosition, initialProfileBgBlur, initialProfileBgDim, initialInterests,
     initialBannerPosition, initialAvatarPosition
   ]);
@@ -258,6 +262,7 @@ export default function Modal({
         avatar_url: avatar.trim() || null,
         banner_url: banner.trim() || null,
         bio: bio.trim(),
+        pronouns: pronouns.trim() || null,
         social_links: socialLinks,
         accent_color: selectedAccent || null,
         accent_color_secondary: selectedAccentSecondary || null,
@@ -392,10 +397,18 @@ export default function Modal({
                 '--accent-color-2': selectedAccentSecondary || selectedAccent || 'transparent',
               }}
             >
-              <div
-                className="fc-preview-card-banner"
-                style={banner ? { backgroundImage: `url(${banner})`, backgroundPosition: bannerPosition } : {}}
-              >
+              <div className="fc-preview-card-banner" style={{ position: 'relative', overflow: 'hidden' }}>
+                {banner && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      backgroundImage: `url(${banner})`,
+                      backgroundRepeat: 'no-repeat',
+                      ...getBgFullStyle(bannerPosition),
+                    }}
+                  />
+                )}
                 <div className="fc-preview-card-overlay"></div>
                 {/* Edit banner icon — top right */}
                 <button
@@ -411,6 +424,7 @@ export default function Modal({
                   <img
                     src={avatar || defaultAvatar}
                     alt="Preview"
+                    style={getImgTransformStyle(avatarPosition)}
                     onError={(e) => { e.target.src = defaultAvatar; }}
                   />
                   {/* Edit avatar icon — centered on avatar */}
@@ -422,11 +436,63 @@ export default function Modal({
                   >
                     <FaCamera />
                   </button>
-                </div>
+                </div>                <div className="fc-preview-card-info" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+                  <p style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                    <span className="fc-preview-card-name">{previewUsername}</span>
+                    <Badge roles={userRoles} />
+                  </p>
 
-                <div className="fc-preview-card-info">
-                  <span className="fc-preview-card-name">{previewUsername}</span>
-                  <Badge roles={userRoles} />
+                  {/* Stats */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 10, marginTop: 1,
+                    fontSize: '0.7rem', color: 'rgba(255,255,255,0.7)',
+                    textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+                  }}>
+                    <span style={{ display: 'flex', gap: 2 }}>
+                      <strong style={{ color: '#fff', fontWeight: 700, fontSize: '0.75rem' }}>{initialFollowersCount}</strong>
+                      {t('profile.followers')}
+                    </span>
+                  </div>
+
+                  {/* Bio + pronouns inline */}
+                  {(bio.trim() || pronouns.trim()) && (
+                    <p style={{
+                      margin: 0, fontSize: '0.7rem', lineHeight: 1.4,
+                      color: 'rgba(255,255,255,0.75)', textShadow: '0 1px 2px rgba(0,0,0,0.6)',
+                      maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis',
+                      display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
+                    }}>
+                      {bio.trim()}
+                      {bio.trim() && pronouns.trim() && <span style={{ fontSize: '0.7rem', fontWeight: 400, opacity: 0.5 }}> · {pronouns.trim()}</span>}
+                      {!bio.trim() && pronouns.trim() && <span style={{ fontSize: '0.7rem', fontWeight: 400, opacity: 0.5 }}>{pronouns.trim()}</span>}
+                    </p>
+                  )}
+
+                  {/* Social links */}
+                  {socialLinks.length > 0 && (
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 1 }}>
+                      {socialLinks.slice(0, 3).map((link, i) => (
+                        <span key={i} style={{
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          width: 22, height: 22, borderRadius: '50%',
+                          background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(6px)',
+                          fontSize: '0.6rem', color: 'rgba(255,255,255,0.7)',
+                        }}>
+                          {React.createElement(getPlatformIcon(link.platform))}
+                        </span>
+                      ))}
+                      {socialLinks.length > 3 && (
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                          width: 22, height: 22, borderRadius: '50%',
+                          background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(6px)',
+                          fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,255,255,0.7)',
+                        }}>
+                          +{socialLinks.length - 3}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -454,6 +520,7 @@ export default function Modal({
                         imageUrl={urlInput.trim()}
                         initialPosition={showUrlModal === 'avatar' ? avatarPosition : bannerPosition}
                         aspectRatio={showUrlModal === 'avatar' ? 1 : 40 / 11}
+                        circular={showUrlModal === 'avatar'}
                         onPositionChange={(pos) => {
                           if (showUrlModal === 'avatar') setAvatarPosition(pos);
                           else setBannerPosition(pos);
@@ -483,6 +550,18 @@ export default function Modal({
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="username"
                 />
+              </label>
+              <label className="fc-modal-label" style={{ marginTop: 2 }}>
+                {t('modal.pronouns_label')}
+                <input
+                  className="fc-modal-input"
+                  value={pronouns}
+                  onChange={(e) => setPronouns(e.target.value)}
+                  placeholder={t('modal.pronouns_placeholder')}
+                />
+                <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted, #6b7280)', marginTop: 2, display: 'block' }}>
+                  {t('modal.pronouns_hint')}
+                </span>
               </label>
               <label className="fc-modal-label">
                 {t('modal.bio_label')}
@@ -704,7 +783,7 @@ export default function Modal({
                     className="explore-card-banner-img"
                     src={banner.trim()}
                     alt=""
-                    style={{ objectPosition: bannerPosition }}
+                    style={getImgTransformStyle(bannerPosition)}
                     onError={(e) => { e.target.style.display = 'none'; }}
                   />
                 ) : (
@@ -718,6 +797,7 @@ export default function Modal({
                   className="explore-card-avatar"
                   src={avatar || defaultAvatar}
                   alt=""
+                  style={getImgTransformStyle(avatarPosition)}
                   onError={(e) => { e.target.src = defaultAvatar; }}
                 />
 
