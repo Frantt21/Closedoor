@@ -692,6 +692,51 @@ export function clearCachedPollVotes(postId) {
 
 // ── POLLS ──
 
+// ── NOTIFICATIONS ──
+
+/**
+ * Notify users when they are added to an encrypted post
+ */
+export async function notifyEncryptedAdd(actorId, postId, targetUserIds) {
+  if (!actorId || !postId || !targetUserIds?.length) return;
+
+  const notifications = targetUserIds
+    .filter((uid) => uid !== actorId)
+    .map((userId) => ({
+      actor_id: actorId,
+      user_id: userId,
+      type: 'encrypted_add',
+      reference_id: postId,
+    }));
+
+  if (!notifications.length) return;
+
+  const { error } = await supabase.from('notifications').insert(notifications);
+  if (error) {
+    console.error('Error creating encrypted_add notifications:', error);
+  }
+}
+
+/**
+ * Notify the post owner when someone votes on their poll
+ */
+export async function notifyPollVote(actorId, postId, postOwnerId) {
+  if (!actorId || !postId || !postOwnerId) return;
+  // Don't notify if the voter is the post owner
+  if (actorId === postOwnerId) return;
+
+  const { error } = await supabase.from('notifications').insert({
+    actor_id: actorId,
+    user_id: postOwnerId,
+    type: 'poll_vote',
+    reference_id: postId,
+  });
+
+  if (error) {
+    console.error('Error creating poll_vote notification:', error);
+  }
+}
+
 /**
  * Vote on a poll (single choice per user per post)
  */
@@ -715,6 +760,20 @@ export async function votePoll(postId, optionId, userId) {
   if (error) {
     console.error('Error voting on poll:', error);
     throw error;
+  }
+
+  // Notificar al dueño del post (en background, no bloquear el voto)
+  try {
+    const { data: post } = await supabase
+      .from('posts')
+      .select('user_id')
+      .eq('id', postId)
+      .single();
+    if (post) {
+      notifyPollVote(userId, postId, post.user_id);
+    }
+  } catch (err) {
+    console.warn('Error notifying poll vote:', err);
   }
 }
 

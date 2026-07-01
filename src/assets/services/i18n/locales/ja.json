@@ -141,6 +141,8 @@
   "notifications.follow_request_rejected": "があなたのフォローリクエストを拒否しました",
   "notifications.comment_liked": "があなたのコメントにいいねしました",
   "notifications.mentioned": "が投稿であなたに言及しました",
+  "notifications.encrypted_add": "があなたを暗号化投稿に追加しました",
+  "notifications.poll_vote": "があなたのアンケートに投票しました",
   "notifications.default": "がアクションをしました",
   "notifications.mark_all_read": "すべて既読にする",
   "notifications.select_all": "すべて選択",

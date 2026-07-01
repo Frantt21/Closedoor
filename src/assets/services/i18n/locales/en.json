@@ -147,6 +147,8 @@
   "notifications.follow_request_rejected": "rejected your follow request",
   "notifications.comment_liked": "liked your comment",
   "notifications.mentioned": "mentioned you in a post",
+  "notifications.encrypted_add": "added you to an encrypted post",
+  "notifications.poll_vote": "voted on your poll",
   "notifications.default": "did something",
   "notifications.mark_all_read": "Mark all as read",
   "notifications.select_all": "Select all",

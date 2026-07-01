@@ -141,6 +141,8 @@
   "notifications.follow_request_rejected": "rejeitou sua solicitação de seguimento",
   "notifications.comment_liked": "curtiu seu comentário",
   "notifications.mentioned": "mencionou você em uma publicação",
+  "notifications.encrypted_add": "adicionou você a um post criptografado",
+  "notifications.poll_vote": "votou na sua enquete",
   "notifications.default": "realizou uma ação",
   "notifications.mark_all_read": "Marcar todas como lidas",
   "notifications.select_all": "Selecionar todas",

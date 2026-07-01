@@ -94,6 +94,18 @@
     border-color: #444;
 }
 
+.create-post-toolbar-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
+.create-post-toolbar-btn:disabled:hover {
+    background: transparent;
+    color: var(--color-text-secondary, #9ca3af);
+    border-color: var(--color-border, #2a2a2a);
+}
+
 .create-post-toolbar-btn--active {
     background: var(--overlay-bg, rgba(255, 255, 255, 0.06));
     color: var(--color-text, #ffffff);

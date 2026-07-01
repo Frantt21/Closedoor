@@ -141,6 +141,8 @@
   "notifications.follow_request_rejected": "отклонил(а) ваш запрос на подписку",
   "notifications.comment_liked": "оценил(а) ваш комментарий",
   "notifications.mentioned": "упомянул(а) вас в посте",
+  "notifications.encrypted_add": "добавил(а) вас в скрытый пост",
+  "notifications.poll_vote": "проголосовал(а) в вашем опросе",
   "notifications.default": "совершил(а) действие",
   "notifications.mark_all_read": "Отметить все как прочитанные",
   "notifications.select_all": "Выбрать все",

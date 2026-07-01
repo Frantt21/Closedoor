@@ -4,7 +4,7 @@ import { NotificationContext } from '../../context/NotificationContext';
 import { useAuth } from '../../hooks/useAuth';
 import { useI18n } from '../services/i18n/useI18n';
 import { acceptFollowRequest, rejectFollowRequest } from '../services/followService';
-import { FaUserPlus, FaHeart, FaComment, FaRetweet, FaBullhorn, FaBell, FaCheck, FaTimes } from 'react-icons/fa';
+import { FaUserPlus, FaHeart, FaComment, FaRetweet, FaBullhorn, FaBell, FaLock, FaCheckSquare, FaCheck, FaTimes } from 'react-icons/fa';
 import Avatar from '../Resources/Components/Avatar';
 import '../Resources/Styles/notifications.css';
 import usePageTitle from '../../hooks/usePageTitle';
@@ -27,6 +27,10 @@ function getIcon(type) {
       return <FaHeart />;
     case 'mention':
       return <FaBullhorn />;
+    case 'encrypted_add':
+      return <FaLock />;
+    case 'poll_vote':
+      return <FaCheckSquare />;
     default:
       return <FaBell />;
   }
@@ -52,6 +56,10 @@ function getNotificationMessage(t, type, username) {
       return <><strong>{username}</strong> {t('notifications.comment_liked')}</>;
     case 'mention':
       return <><strong>{username}</strong> {t('notifications.mentioned')}</>;
+    case 'encrypted_add':
+      return <><strong>{username}</strong> {t('notifications.encrypted_add')}</>;
+    case 'poll_vote':
+      return <><strong>{username}</strong> {t('notifications.poll_vote')}</>;
     default:
       return <><strong>{username}</strong> {t('notifications.default')}</>;
   }
@@ -62,7 +70,7 @@ function getNotificationLink(notification) {
   const username = actor.username || '';
 
   // Notificaciones relacionadas a un post → link al post
-  if (['like', 'comment', 'repost', 'comment_like', 'mention'].includes(notification.type) && notification.reference_id) {
+  if (['like', 'comment', 'repost', 'comment_like', 'mention', 'encrypted_add', 'poll_vote'].includes(notification.type) && notification.reference_id) {
     return `/post/${notification.reference_id}`;
   }
   // Seguidores → link al perfil del actor

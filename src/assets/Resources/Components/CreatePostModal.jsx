@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { createPost, updatePost, notifyMentions, extractMentions, getMentionUserIds } from '../../services/postService';
+import { createPost, updatePost, notifyMentions, notifyEncryptedAdd, extractMentions, getMentionUserIds } from '../../services/postService';
 import { getFollowing } from '../../services/followService';
 import { searchProfiles } from '../../services/userService';
 import { useAuth } from '../../../hooks/useAuth';
@@ -565,6 +565,17 @@ export default function CreatePostModal({
             console.warn('Error notifying mentions:', err)
           );
         }
+
+        // ── Encrypted add: notificar a usuarios agregados ──
+        if (isEncrypted && newPost?.id && allowedUsers.length > 0) {
+          notifyEncryptedAdd(
+            userId,
+            newPost.id,
+            allowedUsers.map((u) => u.id)
+          ).catch((err) =>
+            console.warn('Error notifying encrypted add:', err)
+          );
+        }
       }
 
       setContent('');
@@ -679,11 +690,24 @@ export default function CreatePostModal({
                 className={`create-post-toolbar-btn ${isEncrypted ? 'create-post-toolbar-btn--encrypted' : ''}`}
                 onClick={() => {
                   if (isEditing) return; // No permitir cambiar en edición
-                  setIsEncrypted(s => !s);
-                  if (isEncrypted) {
+                  if (!isEncrypted) {
+                    // Activar encriptación → eliminar poll y schedule
+                    if (showPoll) {
+                      setShowPoll(false);
+                      setPollQuestion('');
+                      setPollOptions(['', '']);
+                      setPollExpiresAt('');
+                    }
+                    if (showSchedule) {
+                      setShowSchedule(false);
+                      setScheduledAt('');
+                    }
+                  } else {
+                    // Desactivar encriptación → limpiar usuarios permitidos
                     setAllowedUsers([]);
                     setShowUserSearch(false);
                   }
+                  setIsEncrypted(s => !s);
                 }}
                 title={
                   isEditing
@@ -711,6 +735,7 @@ export default function CreatePostModal({
                 className={`create-post-toolbar-btn ${showSchedule ? 'create-post-toolbar-btn--active' : ''}`}
                 onClick={() => setShowSchedule(s => !s)}
                 title={showSchedule ? t('create_post.remove_schedule') : t('create_post.add_schedule')}
+                disabled={isEncrypted}
               >
                 <FaClock />
               </button>
