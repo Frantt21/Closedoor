@@ -320,6 +320,10 @@
   "settings.theme": "Тема",
   "settings.theme_dark": "Тёмная",
   "settings.theme_desc": "Выберите тему приложения.",
+  "settings.time_format": "Формат времени",
+  "settings.time_format_desc": "Выберите между 12-часовым и 24-часовым форматом для дат.",
+  "settings.time_format_24h": "24ч",
+  "settings.time_format_12h": "12ч",
   "settings.theme_light": "Светлая",
   "settings.title": "Настройки",
 

@@ -31,6 +31,7 @@ import {
     getRepostedPostIds,
     getSavedPostIds,
     getSavedPosts,
+    getLikedPosts,
     getScheduledPosts,
     setCachedFeed,
     getCachedFeed,
@@ -44,7 +45,7 @@ import "../Resources/Styles/post.css";
 import Modal from "../Resources/Components/Modal";
 import Badge from "../Resources/Components/Badge";
 import { getPlatformIcon, getPlatformName } from "../services/socialPlatforms";
-import { FaFeather, FaBookmark, FaLock, FaEllipsisV, FaBan, FaClock } from 'react-icons/fa';
+import { FaFeather, FaBookmark, FaLock, FaEllipsisV, FaBan, FaClock, FaHeart } from 'react-icons/fa';
 import FollowButton from "../Resources/Components/FollowButton";
 import { blockUser, unblockUser, isBlocked, cacheBlockStatus, getCachedBlockStatus, unfollowBothWays } from "../services/blockService";
 import { useI18n } from "../services/i18n/useI18n";
@@ -56,7 +57,7 @@ import CreatePostModal from "../Resources/Components/CreatePostModal";
 import { toast } from 'react-toastify';
 
 function Profile() {
-    const { t, showAccent, accentVisibility } = useI18n();
+    const { t, showAccent, accentVisibility, showLikes, showSaves } = useI18n();
     const { username: profileUsername } = useParams();
     const navigate = useNavigate();
     const { user, profile: ownProfile, refreshProfile, isAuthenticated, loading } = useAuth();
@@ -349,7 +350,7 @@ function Profile() {
     const [postsLoading, setPostsLoading] = useState(() => !getCachedPosts());
     const [showCreatePost, setShowCreatePost] = useState(false);
     const [editingPost, setEditingPost] = useState(null);
-    const [tab, setTab] = useState('posts'); // 'posts' | 'saved' | 'scheduled'
+    const [tab, setTab] = useState('posts'); // 'posts' | 'likes' | 'saved' | 'scheduled'
     // Resetear a 'posts' al navegar a un perfil ajeno
     useEffect(() => {
         if (!isOwnProfile) setTab('posts');
@@ -371,6 +372,27 @@ function Profile() {
     });
     const [savedPostsLoading, setSavedPostsLoading] = useState(() => {
         const cached = savedCacheKey ? getCachedFeed(savedCacheKey) : null;
+        return !cached;
+    });
+    const likedCacheKey = user?.id ? `liked_posts_${user.id}` : null;
+    const [likedPosts, setLikedPosts] = useState(() => {
+        const cached = likedCacheKey ? getCachedFeed(likedCacheKey) : null;
+        return cached?.items || [];
+    });
+    const [likedLikedIds, setLikedLikedIds] = useState(() => {
+        const cached = likedCacheKey ? getCachedFeed(likedCacheKey) : null;
+        return cached?.likedIds || [];
+    });
+    const [likedRepostedIds, setLikedRepostedIds] = useState(() => {
+        const cached = likedCacheKey ? getCachedFeed(likedCacheKey) : null;
+        return cached?.repostedIds || [];
+    });
+    const [likedSavedIds, setLikedSavedIds] = useState(() => {
+        const cached = likedCacheKey ? getCachedFeed(likedCacheKey) : null;
+        return cached?.savedIds || [];
+    });
+    const [likedPostsLoading, setLikedPostsLoading] = useState(() => {
+        const cached = likedCacheKey ? getCachedFeed(likedCacheKey) : null;
         return !cached;
     });
 
@@ -617,7 +639,53 @@ function Profile() {
         loadSaved();
     }, [user?.id]);
 
-    // ── Refetch liked/reposted IDs al cambiar a Saved tab ──
+    // ── Load liked posts (con cache + background refresh) ──
+    useEffect(() => {
+        if (!user?.id) return;
+        const cacheKey = `liked_posts_${user.id}`;
+
+        // Restaurar cache inmediatamente (síncrono)
+        const cached = getCachedFeed(cacheKey);
+        if (cached) {
+            setLikedPosts(cached.items || []);
+            setLikedLikedIds(cached.likedIds || []);
+            setLikedRepostedIds(cached.repostedIds || []);
+            setLikedSavedIds(cached.savedIds || []);
+            setLikedPostsLoading(false);
+        } else {
+            setLikedPostsLoading(true);
+        }
+
+        // Fetch en segundo plano
+        const loadLiked = async () => {
+            try {
+                const items = await getLikedPosts(user.id);
+                setLikedPosts(items);
+                // Check liked/reposted/saved state for these posts
+                let likedIds = [], repostedIds = [], savedIds = [];
+                if (items.length > 0) {
+                    const postIds = items.map((p) => p.id);
+                    [likedIds, repostedIds, savedIds] = await Promise.all([
+                        getLikedPostIds(postIds, user.id),
+                        getRepostedPostIds(postIds, user.id),
+                        getSavedPostIds(postIds, user.id),
+                    ]);
+                    setLikedLikedIds(likedIds);
+                    setLikedRepostedIds(repostedIds);
+                    setLikedSavedIds(savedIds);
+                }
+                setCachedFeed(cacheKey, items, likedIds, repostedIds, savedIds);
+            } catch (err) {
+                console.error('Error loading liked posts:', err);
+            } finally {
+                setLikedPostsLoading(false);
+            }
+        };
+
+        loadLiked();
+    }, [user?.id]);
+
+    // ── Refetch liked/reposted/saved IDs al cambiar a Saved tab ──
     useEffect(() => {
         if (tab !== 'saved' || !user?.id) return;
         const postIds = savedPosts.map((p) => p.id);
@@ -637,6 +705,33 @@ function Profile() {
         })();
     }, [tab, user?.id]);
 
+    // ── Refresh liked posts when switching to Likes tab ──
+    useEffect(() => {
+        if (tab !== 'likes' || !user?.id) return;
+        const cacheKey = `liked_posts_${user.id}`;
+        (async () => {
+            try {
+                const items = await getLikedPosts(user.id);
+                setLikedPosts(items);
+                let likedIds = [], repostedIds = [], savedIds = [];
+                if (items.length > 0) {
+                    const postIds = items.map((p) => p.id);
+                    [likedIds, repostedIds, savedIds] = await Promise.all([
+                        getLikedPostIds(postIds, user.id),
+                        getRepostedPostIds(postIds, user.id),
+                        getSavedPostIds(postIds, user.id),
+                    ]);
+                    setLikedLikedIds(likedIds);
+                    setLikedRepostedIds(repostedIds);
+                    setLikedSavedIds(savedIds);
+                }
+                setCachedFeed(cacheKey, items, likedIds, repostedIds, savedIds);
+            } catch (err) {
+                console.warn('Error refreshing liked posts:', err);
+            }
+        })();
+    }, [tab, user?.id]);
+
     // ── Handlers for like/repost sync ──
     const handleLikeToggle = (postId, nowLiked) => {
       setLikedPostIds((prev) =>
@@ -645,7 +740,10 @@ function Profile() {
       setSavedLikedIds((prev) =>
         nowLiked ? [...prev, postId] : prev.filter((id) => id !== postId)
       );
-      // Sincronizar likes_count en ambos arrays
+      setLikedLikedIds((prev) =>
+        nowLiked ? [...prev, postId] : prev.filter((id) => id !== postId)
+      );
+      // Sincronizar likes_count en todos los arrays
       const delta = nowLiked ? 1 : -1;
       setProfilePosts((prev) =>
         prev.map((p) =>
@@ -661,6 +759,13 @@ function Profile() {
             : p
         )
       );
+      setLikedPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId
+            ? { ...p, likes_count: Math.max((p.likes_count || 0) + delta, 0) }
+            : p
+        )
+      );
     };
 
     const handleRepostToggle = (postId, nowReposted) => {
@@ -670,7 +775,10 @@ function Profile() {
       setSavedRepostedIds((prev) =>
         nowReposted ? [...prev, postId] : prev.filter((id) => id !== postId)
       );
-      // Sincronizar reposts_count en ambos arrays
+      setLikedRepostedIds((prev) =>
+        nowReposted ? [...prev, postId] : prev.filter((id) => id !== postId)
+      );
+      // Sincronizar reposts_count en todos los arrays
       const delta = nowReposted ? 1 : -1;
       setProfilePosts((prev) =>
         prev.map((p) =>
@@ -680,6 +788,13 @@ function Profile() {
         )
       );
       setSavedPosts((prev) =>
+        prev.map((p) =>
+          p.id === postId
+            ? { ...p, reposts_count: Math.max((p.reposts_count || 0) + delta, 0) }
+            : p
+        )
+      );
+      setLikedPosts((prev) =>
         prev.map((p) =>
           p.id === postId
             ? { ...p, reposts_count: Math.max((p.reposts_count || 0) + delta, 0) }
@@ -744,6 +859,9 @@ function Profile() {
         setSavedPostIds((prev) =>
             nowSaved ? [...prev, postId] : prev.filter((id) => id !== postId)
         );
+        setLikedSavedIds((prev) =>
+            nowSaved ? [...prev, postId] : prev.filter((id) => id !== postId)
+        );
         // Refrescar la lista de guardados en background, incluyendo liked/reposted IDs
         if (user?.id && nowSaved) {
             (async () => {
@@ -790,7 +908,6 @@ function Profile() {
     };
 
     // ── Edit modal state (own profile only) ──
-    // ── Edit modal state (own profile only) ──
     const [showModal, setShowModal] = useState(false);
     const [modalUsername, setModalUsername] = useState("");
     const [modalBanner, setModalBanner] = useState("");
@@ -805,9 +922,12 @@ function Profile() {
     const [usernameInput, setUsernameInput] = useState("");
     const [avatarInput, setAvatarInput] = useState("");
     const [bannerInput, setBannerInput] = useState("");
+    // Ref para inicializar los inputs solo una vez (evita que Supabase Realtime los reseteé al cambiar de pestaña)
+    const profileInitRef = useRef(false);
 
     useEffect(() => {
-        if (isOwnProfile) {
+        if (isOwnProfile && ownProfile && !profileInitRef.current) {
+            profileInitRef.current = true;
             setUsernameInput(ownProfile?.username || user?.user_metadata?.username || "");
             setAvatarInput(ownProfile?.avatar_url || "");
             setBannerInput(ownProfile?.banner_url || "");
@@ -1360,7 +1480,15 @@ function Profile() {
                         >
                             {t('profile.posts_tab')}
                         </button>
-                        {isOwnProfile && (
+                        {(isOwnProfile ? showLikes : activeProfile?.show_likes) && (
+                            <button
+                                className={`posts-section-tab ${tab === 'likes' ? 'posts-section-tab--active' : ''}`}
+                                onClick={() => setTab('likes')}
+                            >
+                                {t('profile.likes_tab')}
+                            </button>
+                        )}
+                        {isOwnProfile && showSaves && (
                             <button
                                 className={`posts-section-tab ${tab === 'saved' ? 'posts-section-tab--active' : ''}`}
                                 onClick={() => setTab('saved')}
@@ -1461,6 +1589,44 @@ function Profile() {
                                 liked={savedLikedIds.includes(post.id)}
                                 reposted={savedRepostedIds.includes(post.id)}
                                 saved={true}
+                                onUpdate={handlePostUpdate}
+                                onDelete={handlePostDelete}
+                                onSaveToggle={handleSaveToggle}
+                                onLikeToggle={handleLikeToggle}
+                                onRepostToggle={handleRepostToggle}
+                            />
+                        ))
+                ) : tab === 'likes' ? (
+                    likedPostsLoading ? (
+                        <div className="posts-skeleton">
+                            {[1, 2, 3].map((i) => (
+                                <div key={i} className="posts-skeleton-card">
+                                    <div className="skeleton posts-skeleton-avatar" />
+                                    <div className="posts-skeleton-lines">
+                                        <div className="posts-skeleton-line posts-skeleton-line--short" />
+                                        <div className="posts-skeleton-line" />
+                                        <div className="posts-skeleton-line posts-skeleton-line--medium" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : likedPosts.length === 0 ? (
+                        <div className="posts-empty">
+                            <span className="posts-empty-icon"><FaHeart /></span>
+                            <p className="posts-empty-text">
+                                {t('profile.no_likes')}
+                            </p>
+                            <p className="posts-empty-subtext">
+                                {t('profile.no_likes_sub')}
+                            </p>
+                        </div>
+                    ) : (isOwnProfile ? showLikes : activeProfile?.show_likes) && likedPosts.map((post) => (
+                            <PostCard
+                                key={post.id}
+                                post={post}
+                                liked={likedLikedIds.includes(post.id)}
+                                reposted={likedRepostedIds.includes(post.id)}
+                                saved={likedSavedIds.includes(post.id)}
                                 onUpdate={handlePostUpdate}
                                 onDelete={handlePostDelete}
                                 onSaveToggle={handleSaveToggle}

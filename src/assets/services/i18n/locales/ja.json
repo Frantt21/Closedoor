@@ -320,6 +320,10 @@
   "settings.theme": "テーマ",
   "settings.theme_dark": "ダーク",
   "settings.theme_desc": "アプリケーションのテーマを選択します。",
+  "settings.time_format": "時刻形式",
+  "settings.time_format_desc": "日付に12時間または24時間形式を選択します。",
+  "settings.time_format_24h": "24h",
+  "settings.time_format_12h": "12h",
   "settings.theme_light": "ライト",
   "settings.title": "設定",
 

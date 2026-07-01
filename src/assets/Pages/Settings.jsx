@@ -4,7 +4,7 @@ import usePageTitle from '../../hooks/usePageTitle';
 import { useAuth } from '../../hooks/useAuth';
 import { updateUserProfile } from '../services/userService';
 import { getBlockedUsers, unblockUser, cacheBlockStatus, subscribeBlockChanges } from '../services/blockService';
-import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaFire, FaChartBar, FaBell, FaBrush, FaBan } from 'react-icons/fa';
+import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaFire, FaChartBar, FaBell, FaBrush, FaBan, FaClock } from 'react-icons/fa';
 import '../Resources/Styles/settings.css';
 
 /* ── SVG Flag Icons ── */
@@ -71,7 +71,7 @@ const CATEGORIES = [
 /* ── Main Settings Component ── */
 
 export default function Settings() {
-  const { locale, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showPushNotifications, setShowPushNotifications, theme, setTheme, t } = useI18n();
+  const { locale, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showPushNotifications, setShowPushNotifications, showLikes, setShowLikes, showSaves, setShowSaves, hour24, setHour24, theme, setTheme, t } = useI18n();
   usePageTitle(t('settings.title'));
   const { user, profile, profileLoading, refreshProfile } = useAuth();
   const [selectOpen, setSelectOpen] = useState(false);
@@ -287,6 +287,33 @@ export default function Settings() {
                       ))}
                     </div>
                   )}
+                </div>
+              </div>
+
+              {/* Formato de hora */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaClock /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.time_format')}</h2>
+                    <p className="settings-section-desc">{t('settings.time_format_desc')}</p>
+                  </div>
+                </div>
+                <div className="settings-segmented">
+                  <button
+                    type="button"
+                    className={`settings-segmented-btn ${hour24 ? 'settings-segmented-btn--active' : ''}`}
+                    onClick={() => setHour24(true)}
+                  >
+                    {t('settings.time_format_24h')}
+                  </button>
+                  <button
+                    type="button"
+                    className={`settings-segmented-btn ${!hour24 ? 'settings-segmented-btn--active' : ''}`}
+                    onClick={() => setHour24(false)}
+                  >
+                    {t('settings.time_format_12h')}
+                  </button>
                 </div>
               </div>
 
@@ -726,6 +753,58 @@ export default function Settings() {
                     })}
                   </div>
                 )}
+              </div>
+
+              <div className="settings-row-divider" />
+
+              {/* ── Privacidad de likes ── */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaHeart /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.show_likes')}</h2>
+                    <p className="settings-section-desc">{t('settings.show_likes_desc')}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={`settings-toggle ${showLikes ? 'settings-toggle--active' : ''}`}
+                  onClick={() => {
+                    const next = !showLikes;
+                    setShowLikes(next);
+                    syncProfilePref('show_likes', next);
+                  }}
+                  aria-pressed={showLikes}
+                >
+                  <span className="settings-toggle-track">
+                    <span className="settings-toggle-thumb" />
+                  </span>
+                </button>
+              </div>
+
+              {/* ── Privacidad de guardados ── */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaBookmark /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.show_saves')}</h2>
+                    <p className="settings-section-desc">{t('settings.show_saves_desc')}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={`settings-toggle ${showSaves ? 'settings-toggle--active' : ''}`}
+                  onClick={() => {
+                    const next = !showSaves;
+                    setShowSaves(next);
+                    syncProfilePref('show_saves', next);
+                  }}
+                  aria-pressed={showSaves}
+                >
+                  <span className="settings-toggle-track">
+                    <span className="settings-toggle-thumb" />
+                  </span>
+                </button>
               </div>
 
               <div className="settings-row-divider" />
