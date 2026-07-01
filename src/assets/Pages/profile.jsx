@@ -44,6 +44,7 @@ import "../Resources/Styles/skeleton.css";
 import "../Resources/Styles/post.css";
 import Modal from "../Resources/Components/Modal";
 import Badge from "../Resources/Components/Badge";
+import Tooltip from "../Resources/Components/Tooltip";
 import { getPlatformIcon, getPlatformName } from "../services/socialPlatforms";
 import { FaFeather, FaBookmark, FaLock, FaEllipsisV, FaBan, FaClock, FaHeart } from 'react-icons/fa';
 import FollowButton from "../Resources/Components/FollowButton";
@@ -1243,17 +1244,17 @@ function Profile() {
                         {activeProfile?.social_links?.length > 0 && (
                             <div className="profile-social-links">
                                 {activeProfile.social_links.slice(0, 3).map((link, i) => (
+                                    <Tooltip key={i} text={getPlatformName(link.platform)}>
                                     <a
-                                        key={i}
                                         href={link.url}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="profile-social-link"
-                                        title={getPlatformName(link.platform)}
                                         onClick={(e) => e.stopPropagation()}
                                     >
                                         <span className="profile-social-icon">{React.createElement(getPlatformIcon(link.platform))}</span>
                                     </a>
+                                    </Tooltip>
                                 ))}
                                 {activeProfile.social_links.length > 3 && (
                                     <button

@@ -687,10 +687,10 @@ export default function CreatePostModal({
                 }}
                 title={
                   isEditing
-                    ? (t('create_post.encrypted_edit_locked') || 'Post ofuscado — no se puede cambiar')
+                    ? t('create_post.encrypted_edit_locked')
                     : isEncrypted
-                      ? (t('create_post.encrypted_on') || 'Ofuscado: ON')
-                      : (t('create_post.encrypted_off') || 'Ofuscar contenido')
+                      ? t('create_post.encrypted_on')
+                      : t('create_post.encrypted_off')
                 }
               >
                 {isEncrypted ? <FaLock /> : <FaUnlock />}
@@ -700,7 +700,7 @@ export default function CreatePostModal({
                 type="button"
                 className={`create-post-toolbar-btn ${showPoll ? 'create-post-toolbar-btn--active' : ''}`}
                 onClick={() => setShowPoll(s => !s)}
-                title={showPoll ? t('create_post.remove_poll') || 'Quitar encuesta' : t('create_post.add_poll') || 'Añadir encuesta'}
+                title={showPoll ? t('create_post.remove_poll') : t('create_post.add_poll')}
                 disabled={isEncrypted}
               >
                 <FaPoll />
@@ -710,7 +710,7 @@ export default function CreatePostModal({
                 type="button"
                 className={`create-post-toolbar-btn ${showSchedule ? 'create-post-toolbar-btn--active' : ''}`}
                 onClick={() => setShowSchedule(s => !s)}
-                title={showSchedule ? t('create_post.remove_schedule') || 'Quitar programación' : t('create_post.add_schedule') || 'Programar publicación'}
+                title={showSchedule ? t('create_post.remove_schedule') : t('create_post.add_schedule')}
               >
                 <FaClock />
               </button>
@@ -762,7 +762,7 @@ export default function CreatePostModal({
                     className="create-post-poll-add-option"
                     onClick={addPollOption}
                   >
-                    <FaPlus /> {t('create_post.poll_add_option') || 'Añadir opción'}
+                    <FaPlus /> {t('create_post.poll_add_option')}
                   </button>
                 )}
                 <div className="create-post-poll-expiry">
@@ -784,7 +784,7 @@ export default function CreatePostModal({
               <div className="create-post-schedule-section">
                 <div className="create-post-schedule-section-header">
                   <FaClock className="create-post-schedule-section-icon" />
-                  <span className="create-post-schedule-section-label">{t('create_post.schedule_title') || 'Programar publicación'}</span>
+                  <span className="create-post-schedule-section-label">{t('create_post.schedule_title')}</span>
                 </div>
                 <div className="create-post-schedule-input-row">
                   <input
@@ -811,7 +811,7 @@ export default function CreatePostModal({
                     type="button"
                     className="create-post-encrypt-add-btn"
                     onClick={() => setShowUserSearch((s) => !s)}
-                    title={t('create_post.add_user') || 'Añadir usuario'}
+                    title={t('create_post.add_user')}
                   >
                     {showUserSearch ? <FaMinus /> : <FaPlus />}
                   </button>
@@ -871,7 +871,7 @@ export default function CreatePostModal({
                       </div>
                     )}
                     {userSearchQuery.length >= 2 && userSearchResults.length === 0 && !searchingUsers && (
-                      <div className="create-post-encrypt-no-results">{t('create_post.no_users_found') || 'Sin resultados'}</div>
+                      <div className="create-post-encrypt-no-results">{t('create_post.no_users_found')}</div>
                     )}
 
                     {/* Quick add: followed users */}
@@ -1043,7 +1043,7 @@ export default function CreatePostModal({
                     </div>
                     <p className="create-post-live-preview-text">
                       <FaLock style={{ marginRight: 6, fontSize: '0.75rem', opacity: 0.6 }} />
-                      {t('post.encrypted_hidden_placeholder') || 'Contenido oculto'}
+                      {t('post.encrypted_hidden_placeholder')}
                     </p>
                   </div>
                 </div>

@@ -539,7 +539,7 @@ const PostCard = React.memo(function PostCard({
 
             {/* ── Encrypted badge (sutil, en el header) ── */}
             {isEncrypted && (
-              <span className="post-card-encrypted-badge" title={t('post.encrypted_hidden') || 'Post ofuscado'}>
+              <span className="post-card-encrypted-badge" title={t('post.encrypted_hidden')}>
                 <FaLock />
               </span>
             )}
@@ -580,7 +580,7 @@ const PostCard = React.memo(function PostCard({
               <span className="post-card-encrypted-loading">{t('common.loading') || 'Descifrando...'}</span>
             ) : showEncryptedLabel ? (
               <span className="post-card-encrypted-text">
-                <FaLock style={{ marginRight: 4, fontSize: '0.65rem' }} /> {t('post.encrypted_hidden_placeholder') || 'Contenido oculto'}
+                <FaLock style={{ marginRight: 4, fontSize: '0.65rem' }} /> {t('post.encrypted_hidden_placeholder')}
               </span>
             ) : (
               <RichText

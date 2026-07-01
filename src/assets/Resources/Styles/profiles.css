@@ -311,13 +311,12 @@
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
     text-decoration: none;
-    transition: background 0.2s ease, transform 0.2s ease;
+    transition: background 0.2s ease;
     font-size: 0.85rem;
 }
 
 .profile-social-link:hover {
     background: rgba(255, 255, 255, 0.14);
-    transform: translateY(-2px);
 }
 
 .profile-social-icon {
@@ -345,12 +344,11 @@
     font-size: 0.75rem;
     font-weight: 700;
     color: rgba(255, 255, 255, 0.7);
-    transition: background 0.2s ease, transform 0.2s ease;
+    transition: background 0.2s ease;
 }
 
 .profile-social-link--more:hover {
     background: rgba(255, 255, 255, 0.14);
-    transform: translateY(-2px);
     color: #fff;
 }
 

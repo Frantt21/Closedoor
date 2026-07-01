@@ -809,8 +809,12 @@ export default function Modal({
                   <span className="explore-card-followers">
                     {initialFollowersCount} {initialFollowersCount === 1 ? t('explore.followers_singular') : t('explore.followers_plural')}
                   </span>
-                  {bio.trim() && (
-                    <p className="explore-card-bio">{bio.trim()}</p>
+                  {(bio.trim() || pronouns.trim()) && (
+                    <p className="explore-card-bio">
+                      {bio.trim()}
+                      {bio.trim() && pronouns.trim() && <span style={{ fontSize: '0.7rem', fontWeight: 400, opacity: 0.5 }}> · {pronouns.trim()}</span>}
+                      {!bio.trim() && pronouns.trim() && <span style={{ fontSize: '0.7rem', fontWeight: 400, opacity: 0.5 }}>{pronouns.trim()}</span>}
+                    </p>
                   )}
 
                   {/* ── Interests (max 3, then "see more" → profile) ── */}
@@ -853,7 +857,7 @@ export default function Modal({
               )}
 
               <div className="fc-modal-color-section">
-                <span className="fc-modal-color-subtitle">Color principal</span>
+                <span className="fc-modal-color-subtitle">{t('modal.color_primary')}</span>
                 <div className="fc-modal-color-picker">
                   {banner.trim() && !extracting && extractedColors.length >= 4 && extractedColors.map((color, i) => (
                     <button

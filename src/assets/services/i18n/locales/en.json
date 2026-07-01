@@ -254,6 +254,7 @@
   "modal.apply": "Apply",
   "modal.extracting_colors": "Extracting colors from banner...",
   "modal.add_banner_hint": "Add a banner to extract accent colors",
+  "modal.color_primary": "Primary color",
   "modal.accent_color_custom": "Custom",
   "modal.social_detect_error": "Could not detect platform",
   "modal.social_duplicate": "This link was already added",

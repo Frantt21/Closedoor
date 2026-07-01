@@ -255,6 +255,7 @@
   "modal.apply": "Aplicar",
   "modal.extracting_colors": "Extrayendo colores del banner...",
   "modal.add_banner_hint": "Agrega un banner para extraer colores de acento",
+  "modal.color_primary": "Color principal",
   "modal.accent_color_custom": "Personalizado",
   "modal.social_detect_error": "No se pudo detectar la plataforma",
   "modal.social_duplicate": "Este enlace ya fue agregado",
