@@ -12,6 +12,8 @@ import Explore from './assets/Pages/Explore.jsx';
 import PostDetail from './assets/Pages/PostDetail.jsx';
 import Settings from './assets/Pages/Settings.jsx';
 import HashtagPage from './assets/Pages/HashtagPage.jsx';
+import Chat from './assets/Pages/Chat.jsx';
+import Comunidades from './assets/Pages/Comunidades.jsx';
 import { I18nProvider } from './assets/services/i18n/I18nContext';
 import RightPanel from './assets/Resources/Components/RightPanel';
 import { ToastContainer } from 'react-toastify';
@@ -52,6 +54,8 @@ function App() {
             <Route path="/Settings" element={<Settings />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/hashtag/:tag" element={<HashtagPage />} />
+            <Route path="/Chat" element={<Chat />} />
+            <Route path="/Comunidades" element={<Comunidades />} />
           </Routes>
         </main>
 

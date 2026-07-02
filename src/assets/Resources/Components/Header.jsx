@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useState, useContext } from 'react';
 import './css/header.css';
-import { FaHome, FaUser, FaBars, FaBell, FaCompass, FaCog } from 'react-icons/fa';
+import { FaHome, FaUser, FaBars, FaBell, FaCompass, FaCog, FaComment, FaUsers } from 'react-icons/fa';
 import { MdLogout } from "react-icons/md";
 import { useAuth } from '../../../hooks/useAuth';
 import { NotificationContext } from '../../../context/NotificationContext';
@@ -67,6 +67,14 @@ function Header() {
             <Link to="/Explore" className={`sidebar-link${location.pathname.toLowerCase() === '/explore' ? ' active' : ''}`}>
               <span className="sidebar-icon"><FaCompass /></span>
               <span>{t('nav.explore')}</span>
+            </Link>
+            <Link to="/Chat" className={`sidebar-link${location.pathname.toLowerCase() === '/chat' ? ' active' : ''}`}>
+              <span className="sidebar-icon"><FaComment /></span>
+              <span>{t('nav.chat')}</span>
+            </Link>
+            <Link to="/Comunidades" className={`sidebar-link${location.pathname.toLowerCase() === '/comunidades' ? ' active' : ''}`}>
+              <span className="sidebar-icon"><FaUsers /></span>
+              <span>{t('nav.comunidades')}</span>
             </Link>
             <Link to="/Notifications" className={`sidebar-link${location.pathname.toLowerCase() === '/notifications' ? ' active' : ''}`}>
               <span className="sidebar-icon">
