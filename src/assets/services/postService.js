@@ -17,7 +17,7 @@ export async function resolveMentions(content) {
   return mentions;
 }
 
-export async function createPost({ userId, content, imageUrl, imageUrls, videoUrl, encryptedContent, encryptedIv, allowedUsers, obfuscatedDisplay, pollData, scheduledAt }) {
+export async function createPost({ userId, content, imageUrl, imageUrls, videoUrl, encryptedContent, encryptedIv, allowedUsers, obfuscatedDisplay, pollData, scheduledAt, commentsAllowed }) {
   let mentions = {};
   if (content) {
     try {
@@ -46,6 +46,9 @@ export async function createPost({ userId, content, imageUrl, imageUrls, videoUr
   }
   if (scheduledAt) {
     insertData.scheduled_at = scheduledAt;
+  }
+  if (commentsAllowed) {
+    insertData.comments_allowed = commentsAllowed;
   }
 
   const { data, error } = await supabase
@@ -447,7 +450,59 @@ export async function getRepostedPostIds(postIds, userId) {
 
 // ── COMMENTS ──
 
+/**
+ * Check if a user can comment on a post based on its comments_allowed setting
+ */
+export async function canCommentOnPost(postId, userId) {
+  if (!userId) return { allowed: false, reason: 'login_required' };
+
+  try {
+    const { data: post, error } = await supabase
+      .from('posts')
+      .select('user_id, comments_allowed')
+      .eq('id', postId)
+      .single();
+
+    if (error || !post) return { allowed: false, reason: 'post_not_found' };
+
+    // Post owner can always comment
+    if (post.user_id === userId) return { allowed: true };
+
+    const setting = post.comments_allowed || 'everyone';
+
+    if (setting === 'everyone') return { allowed: true };
+    if (setting === 'nobody') return { allowed: false, reason: 'comments_disabled' };
+
+    // 'followers': check if user follows the post author
+    if (setting === 'followers') {
+      const { data: follow } = await supabase
+        .from('follows')
+        .select('id')
+        .eq('follower_id', userId)
+        .eq('following_id', post.user_id)
+        .eq('status', 'accepted')
+        .maybeSingle();
+
+      if (follow) return { allowed: true };
+      return { allowed: false, reason: 'followers_only' };
+    }
+
+    return { allowed: true };
+  } catch (err) {
+    console.error('Error checking comment permission:', err);
+    return { allowed: false, reason: 'error' };
+  }
+}
+
 export async function createComment({ postId, userId, content, parentId = null, imageUrl = null, videoUrl = null }) {
+  // Check comment permissions
+  const permission = await canCommentOnPost(postId, userId);
+  if (!permission.allowed) {
+    const error = new Error('comment_permission_denied');
+    error.permissionReason = permission.reason;
+    throw error;
+  }
+
   const { data, error } = await supabase
     .from('comments')
     .insert({

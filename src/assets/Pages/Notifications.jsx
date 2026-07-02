@@ -6,6 +6,7 @@ import { useI18n } from '../services/i18n/useI18n';
 import { acceptFollowRequest, rejectFollowRequest } from '../services/followService';
 import { FaUserPlus, FaHeart, FaComment, FaRetweet, FaBullhorn, FaBell, FaLock, FaPoll, FaCheck, FaTimes } from 'react-icons/fa';
 import Avatar from '../Resources/Components/Avatar';
+import Tooltip from '../Resources/Components/Tooltip';
 import '../Resources/Styles/notifications.css';
 import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/skeleton.css';
@@ -189,23 +190,27 @@ export default function Notifications() {
       <div className="notifications-header">
         <div className="notifications-header-actions">
           {notifications.length > 0 && (
-            <button
-              type="button"
-              className="notifications-select-all-btn"
-              onClick={handleSelectAll}
-            >
-              {t('notifications.select_all')}
-            </button>
+            <Tooltip text={t('notifications.select_all')} placement="bottom">
+              <button
+                type="button"
+                className="notifications-select-all-btn"
+                onClick={handleSelectAll}
+              >
+                {t('notifications.select_all')}
+              </button>
+            </Tooltip>
           )}
 
           {unreadCount > 0 && !hasSelection && (
-            <button
-              type="button"
-              className="notifications-mark-all-btn"
-              onClick={markAllAsRead}
-            >
-              {t('notifications.mark_all_read')}
-            </button>
+            <Tooltip text={t('notifications.mark_all_read')} placement="bottom">
+              <button
+                type="button"
+                className="notifications-mark-all-btn"
+                onClick={markAllAsRead}
+              >
+                {t('notifications.mark_all_read')}
+              </button>
+            </Tooltip>
           )}
 
           {hasSelection && (
@@ -215,13 +220,15 @@ export default function Notifications() {
           )}
 
           {hasSelection && (
-            <button
-              type="button"
-              className="notifications-delete-selected-btn"
-              onClick={handleDeleteSelectedAction}
-            >
-              {t('notifications.delete_selected', { n: selectedIds.length })}
-            </button>
+            <Tooltip text={t('notifications.delete_selected', { n: selectedIds.length })} placement="bottom">
+              <button
+                type="button"
+                className="notifications-delete-selected-btn"
+                onClick={handleDeleteSelectedAction}
+              >
+                {t('notifications.delete_selected', { n: selectedIds.length })}
+              </button>
+            </Tooltip>
           )}
         </div>
       </div>
@@ -357,41 +364,43 @@ function NotificationItem({
       {/* ── Accept/Reject buttons for follow requests ── */}
       {notification.type === 'follow_request' && (
         <div className="notification-follow-actions">
-          <button
-            type="button"
-            className="notification-accept-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onAcceptRequest(notification, notification.actor_id);
-            }}
-            title={t('notifications.accept')}
-          >
-            <FaCheck />
-          </button>
-          <button
-            type="button"
-            className="notification-reject-btn"
-            onClick={(e) => {
-              e.stopPropagation();
-              onRejectRequest(notification, notification.actor_id);
-            }}
-            title={t('notifications.reject')}
-          >
-            <FaTimes />
-          </button>
+          <Tooltip text={t('notifications.accept')} placement="bottom">
+            <button
+              type="button"
+              className="notification-accept-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAcceptRequest(notification, notification.actor_id);
+              }}
+            >
+              <FaCheck />
+            </button>
+          </Tooltip>
+          <Tooltip text={t('notifications.reject')} placement="bottom">
+            <button
+              type="button"
+              className="notification-reject-btn"
+              onClick={(e) => {
+                e.stopPropagation();
+                onRejectRequest(notification, notification.actor_id);
+              }}
+            >
+              <FaTimes />
+            </button>
+          </Tooltip>
         </div>
       )}
 
-      <button
-        type="button"
-        className="notification-delete-btn"
-        onClick={(e) => {
-          e.stopPropagation();
-          onDelete();
-        }}
-        aria-label={t('notifications.delete_label')}
-        title={t('common.delete')}
-      >
+      <Tooltip text={t('common.delete')} placement="bottom">
+        <button
+          type="button"
+          className="notification-delete-btn"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          aria-label={t('notifications.delete_label')}
+        >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="3 6 5 6 21 6" />
           <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
@@ -399,6 +408,7 @@ function NotificationItem({
           <line x1="14" y1="11" x2="14" y2="17" />
         </svg>
       </button>
+      </Tooltip>
     </div>
   );
 }

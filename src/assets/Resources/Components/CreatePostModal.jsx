@@ -4,12 +4,13 @@ import { getFollowing } from '../../services/followService';
 import { searchProfiles } from '../../services/userService';
 import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../services/i18n/useI18n';
-import { FaImage, FaTimes, FaPlus, FaMinus, FaLink, FaLock, FaUnlock, FaUserPlus, FaCheck, FaSearch, FaRegHeart, FaComment, FaRetweet, FaEye, FaPoll, FaCalendarAlt, FaClock } from 'react-icons/fa';
+import { FaImage, FaTimes, FaPlus, FaMinus, FaLink, FaLock, FaUnlock, FaUserPlus, FaCheck, FaSearch, FaRegHeart, FaComment, FaRetweet, FaEye, FaPoll, FaCalendarAlt, FaClock, FaGlobe, FaUserFriends, FaBan } from 'react-icons/fa';
 import SafeImage from './SafeImage';
 import Avatar from './Avatar';
 import Badge from './Badge';
 import { IMG_RE, VID_RE, YOUTUBE_PATTERN, VIMEO_PATTERN, extractUrls, detectMediaFromContent, getEmbedUrl as getEmbedUrlHelper } from '../../services/helpers';
 import ConfirmModal from './ConfirmModal';
+import Tooltip from './Tooltip';
 import { encode as encryptEncode, encryptForUsers, decryptForUser } from '../../services/alphabetEncryption';
 import { supabase } from '../../services/supabaseclient';
 import './css/createPostModal.css';
@@ -57,6 +58,9 @@ export default function CreatePostModal({
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState(['', '']);
   const [pollExpiresAt, setPollExpiresAt] = useState('');
+
+  // ── Comment permissions state ──
+  const [commentsAllowed, setCommentsAllowed] = useState('everyone');
 
   // ── Scheduling state ──
   const [showSchedule, setShowSchedule] = useState(false);
@@ -226,6 +230,8 @@ export default function CreatePostModal({
         setImageUrls(existingUrls.length > 0 ? existingUrls : ['']);
         setShowImageSection(existingUrls.length > 0);
 
+        setCommentsAllowed(editPost.comments_allowed || 'everyone');
+
         // ── Encrypted post: descifrar contenido + mantener estado ──
         const wasEncrypted = editPost.is_encrypted === true;
         setIsEncrypted(wasEncrypted);
@@ -276,6 +282,7 @@ export default function CreatePostModal({
         setPollExpiresAt('');
         setShowSchedule(false);
         setScheduledAt('');
+        setCommentsAllowed('everyone');
       }
       setError(null);
     }
@@ -489,6 +496,7 @@ export default function CreatePostModal({
           image_url: finalImageUrls[0] || imageUrl,
           image_urls: finalImageUrls.length > 0 ? finalImageUrls : null,
           video_url: videoUrl,
+          comments_allowed: commentsAllowed,
         };
 
         // Incluir poll_data si hay encuesta
@@ -557,6 +565,7 @@ export default function CreatePostModal({
           obfuscatedDisplay: isEncrypted ? obfuscatedDisplay : null,
           pollData: finalPollData,
           scheduledAt: finalScheduledAt,
+          commentsAllowed,
         });
 
         // ── @Mentions: notificar a usuarios mencionados ──
@@ -613,22 +622,26 @@ export default function CreatePostModal({
         <div className="fc-modal-header">
           <h3 className="fc-modal-title">{isEditing ? t('create_post.edit_title') : t('create_post.title')}</h3>
           <div className="fc-modal-header-actions">
-            <button
-              className="fc-modal-save"
-              onClick={handleSubmit}
-              disabled={saving || (!content.trim() && getValidImageUrls().length === 0 && !showPoll)}
-            >
-              {isEncrypted && <FaLock className="fc-modal-save-lock" />}
-              {saving ? t('create_post.saving') : isEditing ? t('create_post.save_changes') : t('create_post.post')}
-            </button>
-            <button
-              type="button"
-              className="create-post-header-close"
-              onClick={confirmClose}
-              aria-label={t('common.close')}
-            >
-              ×
-            </button>
+            <Tooltip text={isEditing ? t('create_post.save_changes') : t('create_post.post')} placement="bottom">
+              <button
+                className="fc-modal-save"
+                onClick={handleSubmit}
+                disabled={saving || (!content.trim() && getValidImageUrls().length === 0 && !showPoll)}
+              >
+                {isEncrypted && <FaLock className="fc-modal-save-lock" />}
+                {saving ? t('create_post.saving') : isEditing ? t('create_post.save_changes') : t('create_post.post')}
+              </button>
+            </Tooltip>
+            <Tooltip text={t('common.close')} placement="bottom">
+              <button
+                type="button"
+                className="create-post-header-close"
+                onClick={confirmClose}
+                aria-label={t('common.close')}
+              >
+                ×
+              </button>
+            </Tooltip>
           </div>
         </div>
 
@@ -673,18 +686,29 @@ export default function CreatePostModal({
 
             {/* ── Toolbar: icons + tooltips ── */}
             <div className="create-post-toolbar">
+              <Tooltip text={showImageSection ? t('create_post.hide_media') : t('create_post.show_media')} placement="bottom">
               <button
                 type="button"
                 className={`create-post-toolbar-btn ${showImageSection ? 'create-post-toolbar-btn--active' : ''}`}
                 onClick={() => setShowImageSection((s) => !s)}
-                title={showImageSection ? t('create_post.hide_media') : t('create_post.show_media')}
               >
                 <FaImage />
                 {getValidImageUrls().length > 0 && (
                   <span className="create-post-toolbar-badge">{getValidImageUrls().length}</span>
                 )}
               </button>
+              </Tooltip>
 
+              <Tooltip
+                text={
+                  isEditing
+                    ? t('create_post.encrypted_edit_locked')
+                    : isEncrypted
+                      ? t('create_post.encrypted_on')
+                      : t('create_post.encrypted_off')
+                }
+                placement="bottom"
+              >
               <button
                 type="button"
                 className={`create-post-toolbar-btn ${isEncrypted ? 'create-post-toolbar-btn--encrypted' : ''}`}
@@ -709,36 +733,56 @@ export default function CreatePostModal({
                   }
                   setIsEncrypted(s => !s);
                 }}
-                title={
-                  isEditing
-                    ? t('create_post.encrypted_edit_locked')
-                    : isEncrypted
-                      ? t('create_post.encrypted_on')
-                      : t('create_post.encrypted_off')
-                }
               >
                 {isEncrypted ? <FaLock /> : <FaUnlock />}
               </button>
+              </Tooltip>
 
+              <Tooltip text={showPoll ? t('create_post.remove_poll') : t('create_post.add_poll')} placement="bottom">
               <button
                 type="button"
                 className={`create-post-toolbar-btn ${showPoll ? 'create-post-toolbar-btn--active' : ''}`}
                 onClick={() => setShowPoll(s => !s)}
-                title={showPoll ? t('create_post.remove_poll') : t('create_post.add_poll')}
                 disabled={isEncrypted}
               >
                 <FaPoll />
               </button>
+              </Tooltip>
 
+              <Tooltip text={showSchedule ? t('create_post.remove_schedule') : t('create_post.add_schedule')} placement="bottom">
               <button
                 type="button"
                 className={`create-post-toolbar-btn ${showSchedule ? 'create-post-toolbar-btn--active' : ''}`}
                 onClick={() => setShowSchedule(s => !s)}
-                title={showSchedule ? t('create_post.remove_schedule') : t('create_post.add_schedule')}
                 disabled={isEncrypted}
               >
                 <FaClock />
               </button>
+              </Tooltip>
+
+              {/* ── Comment permissions toggle ── */}
+              <Tooltip
+                text={
+                  commentsAllowed === 'everyone'
+                    ? t('create_post.comments_everyone')
+                    : commentsAllowed === 'followers'
+                      ? t('create_post.comments_followers')
+                      : t('create_post.comments_nobody')
+                }
+                placement="bottom"
+              >
+              <button
+                type="button"
+                className={`create-post-toolbar-btn ${commentsAllowed !== 'everyone' ? 'create-post-toolbar-btn--active' : ''}`}
+                onClick={() => {
+                  const options = ['everyone', 'followers', 'nobody'];
+                  const idx = options.indexOf(commentsAllowed);
+                  setCommentsAllowed(options[(idx + 1) % options.length]);
+                }}
+              >
+                {commentsAllowed === 'everyone' ? <FaGlobe /> : commentsAllowed === 'followers' ? <FaUserFriends /> : <FaBan />}
+              </button>
+              </Tooltip>
             </div>
 
             {/* ── Poll creation section ── */}
@@ -769,14 +813,15 @@ export default function CreatePostModal({
                         maxLength={120}
                       />
                       {pollOptions.length > 2 && (
+                        <Tooltip text={t('common.delete')} placement="bottom">
                         <button
                           type="button"
                           className="create-post-poll-option-remove"
                           onClick={() => removePollOption(index)}
-                          title={t('common.delete')}
                         >
                           <FaTimes />
                         </button>
+                        </Tooltip>
                       )}
                     </div>
                   ))}
@@ -832,14 +877,15 @@ export default function CreatePostModal({
                 <div className="create-post-encrypt-section-header">
                   <FaUserPlus className="create-post-encrypt-section-icon" />
                   <span className="create-post-encrypt-section-label">{t('create_post.allowed_users_title') || 'Visible para:'}</span>
+                  <Tooltip text={t('create_post.add_user')} placement="bottom">
                   <button
                     type="button"
                     className="create-post-encrypt-add-btn"
                     onClick={() => setShowUserSearch((s) => !s)}
-                    title={t('create_post.add_user')}
                   >
                     {showUserSearch ? <FaMinus /> : <FaPlus />}
                   </button>
+                  </Tooltip>
                 </div>
 
                 {/* Selected users as chips */}
@@ -849,14 +895,15 @@ export default function CreatePostModal({
                       <span key={u.id} className="create-post-encrypt-chip">
                         <Avatar className="create-post-encrypt-chip-avatar" src={u.avatar_url} alt={u.username} />
                         <span className="create-post-encrypt-chip-name">@{u.username}</span>
+                        <Tooltip text={t('common.delete')} placement="bottom">
                         <button
                           type="button"
                           className="create-post-encrypt-chip-remove"
                           onClick={() => removeAllowedUser(u.id)}
-                          title={t('common.delete')}
                         >
                           <FaTimes />
                         </button>
+                        </Tooltip>
                       </span>
                     ))}
                   </div>
@@ -943,14 +990,15 @@ export default function CreatePostModal({
                       placeholder={`https://.../imagen-${index + 1}.jpg`}
                     />
                     {imageUrls.length > 1 && (
+                      <Tooltip text={t('common.delete')} placement="bottom">
                       <button
                         type="button"
                         className="create-post-image-remove"
                         onClick={() => removeImageUrlInput(index)}
-                        title={t('common.delete')}
                       >
                         <FaTimes />
                       </button>
+                      </Tooltip>
                     )}
                     {/* Mini preview */}
                     {url && IMAGE_EXTENSIONS.test(url) && (
@@ -965,14 +1013,15 @@ export default function CreatePostModal({
                   </div>
                 ))}
                 {imageUrls.length < 4 && (
+                  <Tooltip text={t('create_post.add_another_image', { n: imageUrls.length })} placement="bottom">
                   <button
                     type="button"
                     className="create-post-image-add"
                     onClick={addImageUrlInput}
-                    title={t('create_post.add_another_image', { n: imageUrls.length })}
                   >
                     <FaPlus />
                   </button>
+                  </Tooltip>
                 )}
               </div>
             )}

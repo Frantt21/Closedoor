@@ -14,7 +14,7 @@ import {
   setCachedPollVotes,
   getCachedPollVotes,
 } from '../../services/postService';
-import { FaHeart, FaRegHeart, FaComment, FaRetweet, FaThumbtack, FaEdit, FaTrash, FaEllipsisV, FaBookmark, FaRegBookmark, FaEye, FaLock, FaCheckCircle, FaRegCheckCircle, FaClock } from 'react-icons/fa';
+import { FaHeart, FaRegHeart, FaComment, FaRetweet, FaThumbtack, FaEdit, FaTrash, FaEllipsisV, FaBookmark, FaRegBookmark, FaEye, FaLock, FaCheckCircle, FaRegCheckCircle, FaClock, FaBan, FaUserFriends } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import Badge from './Badge';
 import SafeImage from './SafeImage';
@@ -30,6 +30,7 @@ import {
 } from '../../services/alphabetEncryption';
 import { supabase } from '../../services/supabaseclient';
 import ConfirmModal from './ConfirmModal';
+import Tooltip from './Tooltip';
 import './css/postCard.css';
 
 const PostCard = React.memo(function PostCard({
@@ -539,9 +540,11 @@ const PostCard = React.memo(function PostCard({
 
             {/* ── Encrypted badge (sutil, en el header) ── */}
             {isEncrypted && (
-              <span className="post-card-encrypted-badge" title={t('post.encrypted_hidden')}>
-                <FaLock />
-              </span>
+              <Tooltip text={t('post.encrypted_hidden')} placement="bottom">
+                <span className="post-card-encrypted-badge">
+                  <FaLock />
+                </span>
+              </Tooltip>
             )}
 
             {isOwner && (
@@ -737,44 +740,66 @@ const PostCard = React.memo(function PostCard({
 
           {/* Actions */}
           <div className="post-card-actions">
-            <button
-              className={`post-card-action ${liked ? 'post-card-action--liked' : ''}`}
-              onClick={handleLike}
-            >
-              <span className="post-card-action-icon">{liked ? <FaHeart /> : <FaRegHeart />}</span>
-              <span className="post-card-action-count">{likesCount}</span>
-            </button>
+            <Tooltip text={t('post.like')} placement="bottom">
+              <button
+                className={`post-card-action ${liked ? 'post-card-action--liked' : ''}`}
+                onClick={handleLike}
+              >
+                <span className="post-card-action-icon">{liked ? <FaHeart /> : <FaRegHeart />}</span>
+                <span className="post-card-action-count">{likesCount}</span>
+              </button>
+            </Tooltip>
 
-            <button
-              className="post-card-action"
-              onClick={(e) => { e.stopPropagation(); navigate(`/post/${post.id}`); }}
+            <Tooltip
+              text={
+                post.comments_allowed === 'nobody'
+                  ? t('post.comments_disabled')
+                  : post.comments_allowed === 'followers'
+                    ? t('post.comments_followers_only')
+                    : t('post.comment')
+              }
+              placement="bottom"
             >
-              <span className="post-card-action-icon"><FaComment /></span>
-              <span className="post-card-action-count">{post.comments_count || 0}</span>
-            </button>
+              <button
+                className={`post-card-action ${post.comments_allowed && post.comments_allowed !== 'everyone' ? 'post-card-action--restricted' : ''}`}
+                onClick={(e) => { e.stopPropagation(); navigate(`/post/${post.id}`); }}
+              >
+                <span className="post-card-action-icon">
+                  {post.comments_allowed === 'nobody' ? <FaBan /> : post.comments_allowed === 'followers' ? <FaUserFriends /> : <FaComment />}
+                </span>
+                <span className="post-card-action-count">{post.comments_count || 0}</span>
+              </button>
+            </Tooltip>
 
-            <button
-              className={`post-card-action ${reposted ? 'post-card-action--reposted' : ''} ${repostDisabled ? 'post-card-action--disabled' : ''}`}
-              onClick={repostDisabled ? undefined : handleRepost}
-              title={repostDisabled ? t('post.repost_private_forbidden') : ''}
-              disabled={repostDisabled}
+            <Tooltip
+              text={repostDisabled ? t('post.repost_private_forbidden') : t('post.repost')}
+              placement="bottom"
             >
-              <span className="post-card-action-icon"><FaRetweet /></span>
-              <span className="post-card-action-count">{repostsCount}</span>
-            </button>
+              <button
+                className={`post-card-action ${reposted ? 'post-card-action--reposted' : ''} ${repostDisabled ? 'post-card-action--disabled' : ''}`}
+                onClick={repostDisabled ? undefined : handleRepost}
+                disabled={repostDisabled}
+              >
+                <span className="post-card-action-icon"><FaRetweet /></span>
+                <span className="post-card-action-count">{repostsCount}</span>
+              </button>
+            </Tooltip>
 
-            <button
-              className={`post-card-action ${saved ? 'post-card-action--saved' : ''}`}
-              onClick={handleSave}
-              title={saved ? t('post.saved') : t('post.save')}
-            >
-              <span className="post-card-action-icon">{saved ? <FaBookmark /> : <FaRegBookmark />}</span>
-            </button>
+            <Tooltip text={saved ? t('post.saved') : t('post.save')} placement="bottom">
+              <button
+                className={`post-card-action ${saved ? 'post-card-action--saved' : ''}`}
+                onClick={handleSave}
+              >
+                <span className="post-card-action-icon">{saved ? <FaBookmark /> : <FaRegBookmark />}</span>
+              </button>
+            </Tooltip>
 
-            <button type="button" className="post-card-action post-card-action--view">
-              <span className="post-card-action-icon"><FaEye /></span>
-              <span className="post-card-action-count">{post.views_count || 0}</span>
-            </button>
+            <Tooltip text={t('post.views_count') || 'Views'} placement="bottom">
+              <button type="button" className="post-card-action post-card-action--view">
+                <span className="post-card-action-icon"><FaEye /></span>
+                <span className="post-card-action-count">{post.views_count || 0}</span>
+              </button>
+            </Tooltip>
           </div>
         </div>
       </div>
@@ -831,43 +856,46 @@ const PostCard = React.memo(function PostCard({
                   {galleryIndex + 1} / {galleryUrls.length}
                 </span>
               )}
-              <a
-                href={galleryUrls[galleryIndex]}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="post-card-lightbox-btn"
-                title={t('post.open_new_tab')}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                  <polyline points="15 3 21 3 21 9" />
-                  <line x1="10" y1="14" x2="21" y2="3" />
-                </svg>
-              </a>
-              <a
-                href={galleryUrls[galleryIndex]}
-                download
-                className="post-card-lightbox-btn"
-                title={t('post.download')}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-              </a>
-              <button
-                className="post-card-lightbox-btn post-card-lightbox-close"
-                onClick={closeGallery}
-                title={t('post.close')}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
+              <Tooltip text={t('post.open_new_tab')} placement="bottom">
+                <a
+                  href={galleryUrls[galleryIndex]}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="post-card-lightbox-btn"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
+                </a>
+              </Tooltip>
+              <Tooltip text={t('post.download')} placement="bottom">
+                <a
+                  href={galleryUrls[galleryIndex]}
+                  download
+                  className="post-card-lightbox-btn"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                </a>
+              </Tooltip>
+              <Tooltip text={t('post.close')} placement="bottom">
+                <button
+                  className="post-card-lightbox-btn post-card-lightbox-close"
+                  onClick={closeGallery}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </Tooltip>
             </div>
 
             {/* ── Thumbnail strip ── */}

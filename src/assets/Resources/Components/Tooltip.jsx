@@ -23,23 +23,25 @@ const TOOLTIP_STYLES = {
 /**
  * Custom tooltip rendered at the document body level via createPortal,
  * so it's never affected by parent transforms or overflow clipping.
- * Shows a small popup above the child element on hover with a smooth fade.
+ * Shows a small popup above (default) or below the child element on hover.
  */
-export default function Tooltip({ text, children, style, className }) {
+export default function Tooltip({ text, children, style, className, placement = 'top' }) {
   const [visible, setVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const targetRef = useRef(null);
   const showTimeoutRef = useRef(null);
   const hideTimeoutRef = useRef(null);
 
+  const isBottom = placement === 'bottom';
+
   const updatePosition = useCallback(() => {
     if (!targetRef.current) return;
     const rect = targetRef.current.getBoundingClientRect();
     setPosition({
-      top: rect.top - 6,
+      top: isBottom ? rect.bottom + 6 : rect.top - 6,
       left: rect.left + rect.width / 2,
     });
-  }, []);
+  }, [isBottom]);
 
   // Update position on scroll / resize while visible
   useEffect(() => {
@@ -68,6 +70,39 @@ export default function Tooltip({ text, children, style, className }) {
 
   if (!text) return <>{children}</>;
 
+  const visibleTransform = isBottom
+    ? 'translate(-50%, 6px)'
+    : 'translate(-50%, -100%)';
+  const hiddenTransform = isBottom
+    ? 'translate(-50%, 0)'
+    : 'translate(-50%, calc(-100% + 4px))';
+
+  // Arrow: for 'top' placement, arrow at bottom pointing down;
+  // for 'bottom' placement, arrow at top pointing up.
+  const arrowStyle = isBottom
+    ? {
+        position: 'absolute',
+        top: -4,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: 0,
+        height: 0,
+        borderLeft: '5px solid transparent',
+        borderRight: '5px solid transparent',
+        borderBottom: '5px solid rgba(30, 30, 35, 0.95)',
+      }
+    : {
+        position: 'absolute',
+        bottom: -4,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        width: 0,
+        height: 0,
+        borderLeft: '5px solid transparent',
+        borderRight: '5px solid transparent',
+        borderTop: '5px solid rgba(30, 30, 35, 0.95)',
+      };
+
   return (
     <>
       <span
@@ -85,27 +120,13 @@ export default function Tooltip({ text, children, style, className }) {
             ...TOOLTIP_STYLES,
             top: position.top,
             left: position.left,
-            transform: visible
-              ? 'translate(-50%, -100%)'
-              : 'translate(-50%, calc(-100% + 4px))',
+            transform: visible ? visibleTransform : hiddenTransform,
             opacity: visible ? 1 : 0,
           }}
         >
           {text}
-          {/* Arrow pointing down */}
-          <div
-            style={{
-              position: 'absolute',
-              bottom: -4,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: 0,
-              height: 0,
-              borderLeft: '5px solid transparent',
-              borderRight: '5px solid transparent',
-              borderTop: '5px solid rgba(30, 30, 35, 0.95)',                  transition: 'opacity 0.15s ease',
-            }}
-          />
+          {/* Arrow */}
+          <div style={arrowStyle} />
         </div>,
         document.body
       )}

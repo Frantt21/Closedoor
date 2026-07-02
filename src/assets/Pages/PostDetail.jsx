@@ -19,6 +19,7 @@ import {
   getCachedComments,
   setCachedComments,
   trackPostView,
+  canCommentOnPost,
 } from '../services/postService';
 import { FaHeart, FaRegHeart, FaReply, FaTrash, FaRegComment, FaRegSadTear, FaArrowLeft, FaImage } from 'react-icons/fa';
 import PostCard from '../Resources/Components/PostCard';
@@ -62,6 +63,7 @@ export default function PostDetail() {
   const [confirmExternalLink, setConfirmExternalLink] = useState(null);
   const handleCancelDeleteComment = useCallback(() => setConfirmDeleteComment(null), []);
   const handleCancelExternalLink = useCallback(() => setConfirmExternalLink(null), []);
+  const [commentPermission, setCommentPermission] = useState({ allowed: true });
   const [replyTo, setReplyTo] = useState(null); // { id, username } — para form inline
   // Estado del form inline (reply)
   const [replyContent, setReplyContent] = useState('');
@@ -168,6 +170,17 @@ export default function PostDetail() {
     isLiked(postId, user.id).then(setLiked).catch(() => {});
     isReposted(postId, user.id).then(setReposted).catch(() => {});
   }, [user?.id, postId]);
+
+  // Check comment permission when post loads
+  useEffect(() => {
+    if (!postId || !user?.id) {
+      setCommentPermission({ allowed: true });
+      return;
+    }
+    canCommentOnPost(postId, user.id).then(setCommentPermission).catch(() => {
+      setCommentPermission({ allowed: true });
+    });
+  }, [postId, user?.id]);
 
   // ── Keyboard nav for comment gallery ──
   useEffect(() => {
@@ -793,7 +806,7 @@ export default function PostDetail() {
         <h3 className="comments-title">{t('post.comments_title')}</h3>
 
         {/* Top-level comment form */}
-        {user && (
+        {user && commentPermission.allowed && (
           <div className="comment-form">
             <Avatar
               className="comment-form-avatar"
@@ -853,6 +866,12 @@ export default function PostDetail() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+        {user && !commentPermission.allowed && (
+          <div className="comments-disabled-banner">
+            {commentPermission.reason === 'comments_disabled' && t('post.comments_disabled')}
+            {commentPermission.reason === 'followers_only' && t('post.comments_followers_only')}
           </div>
         )}
 

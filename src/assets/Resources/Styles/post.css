@@ -226,6 +226,21 @@
 
 /* Comment form */
 
+.comments-disabled-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  background: var(--overlay-bg-subtle);
+  border: 1px solid var(--color-border, #2a2a2a);
+  border-radius: var(--radius, 10px);
+  font-size: 0.85rem;
+  color: var(--color-text-secondary, #9ca3af);
+  text-align: center;
+}
+
 .comment-form {
     display: flex;
     gap: 10px;
