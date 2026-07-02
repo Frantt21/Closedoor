@@ -72,7 +72,7 @@ function Header() {
               <span className="sidebar-icon"><FaComment /></span>
               <span>{t('nav.chat')}</span>
             </Link>
-            <Link to="/Comunidades" className={`sidebar-link${location.pathname.toLowerCase() === '/comunidades' ? ' active' : ''}`}>
+            <Link to="/Communities" className={`sidebar-link${location.pathname.toLowerCase() === '/communities' ? ' active' : ''}`}>
               <span className="sidebar-icon"><FaUsers /></span>
               <span>{t('nav.comunidades')}</span>
             </Link>

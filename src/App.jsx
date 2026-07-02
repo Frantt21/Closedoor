@@ -55,7 +55,7 @@ function App() {
             <Route path="/settings" element={<Settings />} />
             <Route path="/hashtag/:tag" element={<HashtagPage />} />
             <Route path="/Chat" element={<Chat />} />
-            <Route path="/Comunidades" element={<Comunidades />} />
+            <Route path="/Communities" element={<Comunidades />} />
           </Routes>
         </main>
 
