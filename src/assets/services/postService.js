@@ -477,7 +477,7 @@ export async function canCommentOnPost(postId, userId) {
     if (setting === 'followers') {
       const { data: follow } = await supabase
         .from('follows')
-        .select('id')
+        .select('follower_id')
         .eq('follower_id', userId)
         .eq('following_id', post.user_id)
         .eq('status', 'accepted')

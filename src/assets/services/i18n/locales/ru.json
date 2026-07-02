@@ -7,6 +7,8 @@
   "nav.notifications": "Уведомления",
   "nav.login": "Войти",
   "nav.settings": "Настройки",
+  "nav.chat": "Чат",
+  "nav.comunidades": "Сообщества",
   "nav.logout": "Выйти",
   "nav.expand": "Развернуть",
   "nav.collapse": "Свернуть",
@@ -152,6 +154,15 @@
   "notifications.selected_count_plural": "{n} выбрано",
   "notifications.delete_label": "Удалить уведомление",
   "notifications.unread": "Непрочитано",
+
+  "chat.title": "Чат",
+  "chat.empty": "Чатов пока нет",
+  "chat.empty_sub": "Когда вы начнёте разговор с кем-то, он появится здесь.",
+
+  "comunidades.title": "Сообщества",
+  "comunidades.empty": "Сообществ пока нет",
+  "comunidades.empty_sub": "Присоединяйтесь или создайте сообщество, чтобы начать.",
+
   "explore.title": "Поиск",
   "explore.subtitle": "Находите новых пользователей",
   "explore.search_placeholder": "Поиск пользователей...",

@@ -8,6 +8,8 @@
   "nav.notifications": "Notificaciones",
   "nav.login": "Iniciar sesión",
   "nav.settings": "Ajustes",
+  "nav.chat": "Chat",
+  "nav.comunidades": "Comunidades",
   "nav.logout": "Cerrar sesión",
   "nav.expand": "Expandir",
   "nav.collapse": "Colapsar",
@@ -160,6 +162,14 @@
   "notifications.selected_count_plural": "{n} seleccionadas",
   "notifications.delete_label": "Eliminar notificación",
   "notifications.unread": "No leída",
+
+  "chat.title": "Chat",
+  "chat.empty": "Aún no hay conversaciones",
+  "chat.empty_sub": "Cuando inicies una conversación con alguien, aparecerá aquí.",
+
+  "comunidades.title": "Comunidades",
+  "comunidades.empty": "Aún no hay comunidades",
+  "comunidades.empty_sub": "Únete o crea una comunidad para empezar.",
 
   "explore.title": "Explorar",
   "explore.subtitle": "Descubre nuevos usuarios para seguir",

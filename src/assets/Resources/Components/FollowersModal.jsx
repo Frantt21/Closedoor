@@ -1,7 +1,7 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useI18n } from "../../services/i18n/useI18n";
-import { getFollowers, getFollowing } from "../../services/followService";
+import { getFollowers, getFollowing, getCachedFollowers, getCachedFollowing, setCachedFollowers, setCachedFollowing } from "../../services/followService";
 import FollowButton from "./FollowButton";
 import Avatar from "./Avatar";
 import "./css/followersModal.css";
@@ -40,22 +40,27 @@ function FollowersModalItem({ user, onClose }) {
 
 export default function FollowersModal({ userId, type, onClose }) {
   const { t } = useI18n();
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const cacheRef = useRef({ followers: null, following: null });
 
   const isFollowers = type === "followers";
   const title = isFollowers ? t('followers.title') : t('following.title');
 
+  // Restaurar cache síncrono en useState para evitar flicker
+  const [users, setUsers] = useState(() => {
+    if (!userId) return [];
+    return isFollowers
+      ? getCachedFollowers(userId) || []
+      : getCachedFollowing(userId) || [];
+  });
+  const [loading, setLoading] = useState(() => {
+    if (!userId) return true;
+    const cached = isFollowers
+      ? getCachedFollowers(userId)
+      : getCachedFollowing(userId);
+    return !cached;
+  });
+
   useEffect(() => {
     if (!userId) return;
-
-    const cached = cacheRef.current[type];
-    if (cached) {
-      setUsers(cached);
-      setLoading(false);
-      return;
-    }
 
     const fetchUsers = async () => {
       setLoading(true);
@@ -63,8 +68,13 @@ export default function FollowersModal({ userId, type, onClose }) {
         const data = isFollowers
           ? await getFollowers(userId)
           : await getFollowing(userId);
-        cacheRef.current[type] = data || [];
         setUsers(data || []);
+        // Actualizar cache
+        if (isFollowers) {
+          setCachedFollowers(userId, data || []);
+        } else {
+          setCachedFollowing(userId, data || []);
+        }
       } catch (err) {
         console.warn(`Error fetching ${type}:`, err);
       } finally {
@@ -72,6 +82,7 @@ export default function FollowersModal({ userId, type, onClose }) {
       }
     };
 
+    // Siempre hacer fetch en background para refrescar datos
     fetchUsers();
   }, [userId, type, isFollowers]);
 

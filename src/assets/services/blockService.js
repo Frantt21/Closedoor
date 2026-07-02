@@ -173,6 +173,34 @@ export function clearCachedBlockStatus(blockerId, blockedId) {
  * @returns {Promise<Array>} - List of blocked user profiles
  */
 export async function getBlockedUsers(userId) {
+  // Check cache first
+  const cached = getCachedBlockedUsers(userId);
+  if (cached !== null) {
+    // Background refresh
+    supabase
+      .from('blocks')
+      .select(`
+        blocked_id,
+        created_at,
+        profiles!blocks_blocked_id_fkey (
+          id,
+          username,
+          avatar_url,
+          roles
+        )
+      `)
+      .eq('blocker_id', userId)
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (!error) {
+          const fresh = data.map((item) => ({ ...item.profiles, blocked_at: item.created_at }));
+          setCachedBlockedUsers(userId, fresh);
+        }
+      })
+      .catch(() => {});
+    return cached;
+  }
+
   const { data, error } = await supabase
     .from('blocks')
     .select(`
@@ -193,10 +221,13 @@ export async function getBlockedUsers(userId) {
     throw error;
   }
 
-  return data.map((item) => ({
+  const result = data.map((item) => ({
     ...item.profiles,
     blocked_at: item.created_at,
   }));
+
+  setCachedBlockedUsers(userId, result);
+  return result;
 }
 
 /**
@@ -281,7 +312,35 @@ export function clearBlockedListsCache(userId) {
   try {
     localStorage.removeItem(BLOCKED_IDS_CACHE_PREFIX + userId);
     localStorage.removeItem(BLOCKED_ME_IDS_CACHE_PREFIX + userId);
+    localStorage.removeItem(BLOCKED_USERS_CACHE_PREFIX + userId);
   } catch {}
+}
+
+// ── localStorage cache for blocked users list (full profiles) ──
+const BLOCKED_USERS_CACHE_PREFIX = 'fc_blocked_users_';
+const BLOCKED_USERS_TTL = 1000 * 60 * 5; // 5 minutes
+
+function setCachedBlockedUsers(userId, data) {
+  if (!userId) return;
+  try {
+    const payload = { ts: Date.now(), ttl: BLOCKED_USERS_TTL, data };
+    localStorage.setItem(BLOCKED_USERS_CACHE_PREFIX + userId, JSON.stringify(payload));
+  } catch {}
+}
+
+export function getCachedBlockedUsers(userId) {
+  if (!userId) return null;
+  try {
+    const raw = localStorage.getItem(BLOCKED_USERS_CACHE_PREFIX + userId);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    if (!p || !p.ts) return null;
+    if (Date.now() - p.ts > (p.ttl || BLOCKED_USERS_TTL)) {
+      localStorage.removeItem(BLOCKED_USERS_CACHE_PREFIX + userId);
+      return null;
+    }
+    return p.data || null;
+  } catch { return null; }
 }
 
 /**

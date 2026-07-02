@@ -7,6 +7,8 @@
   "nav.notifications": "通知",
   "nav.login": "ログイン",
   "nav.settings": "設定",
+  "nav.chat": "チャット",
+  "nav.comunidades": "コミュニティ",
   "nav.logout": "ログアウト",
   "nav.expand": "拡大",
   "nav.collapse": "折りたたむ",
@@ -152,6 +154,15 @@
   "notifications.selected_count_plural": "{n}件選択中",
   "notifications.delete_label": "通知を削除",
   "notifications.unread": "未読",
+
+  "chat.title": "チャット",
+  "chat.empty": "会話がまだありません",
+  "chat.empty_sub": "誰かと会話を始めると、ここに表示されます。",
+
+  "comunidades.title": "コミュニティ",
+  "comunidades.empty": "コミュニティがまだありません",
+  "comunidades.empty_sub": "コミュニティに参加するか作成して始めましょう。",
+
   "explore.title": "探索",
   "explore.subtitle": "新しいユーザーを見つける",
   "explore.search_placeholder": "ユーザーを検索...",

@@ -453,3 +453,64 @@ export function getCachedFollowCounts(userId) {
     return null;
   }
 }
+
+// ── localStorage cache for followers/following lists ──
+const FOLLOWERS_LIST_PREFIX = 'fc_followers_list_';
+const FOLLOWING_LIST_PREFIX = 'fc_following_list_';
+const FOLLOW_LIST_TTL = 1000 * 60 * 5; // 5 minutes
+
+export function setCachedFollowers(userId, data) {
+  if (!userId) return;
+  try {
+    const payload = { ts: Date.now(), ttl: FOLLOW_LIST_TTL, data };
+    localStorage.setItem(FOLLOWERS_LIST_PREFIX + userId, JSON.stringify(payload));
+  } catch (err) {
+    console.warn('Could not cache followers list:', err);
+  }
+}
+
+export function getCachedFollowers(userId) {
+  if (!userId) return null;
+  try {
+    const raw = localStorage.getItem(FOLLOWERS_LIST_PREFIX + userId);
+    if (!raw) return null;
+    const payload = JSON.parse(raw);
+    if (!payload || !payload.ts) return null;
+    if (Date.now() - payload.ts > (payload.ttl || FOLLOW_LIST_TTL)) {
+      localStorage.removeItem(FOLLOWERS_LIST_PREFIX + userId);
+      return null;
+    }
+    return payload.data || null;
+  } catch (err) {
+    console.warn('Could not read cached followers list:', err);
+    return null;
+  }
+}
+
+export function setCachedFollowing(userId, data) {
+  if (!userId) return;
+  try {
+    const payload = { ts: Date.now(), ttl: FOLLOW_LIST_TTL, data };
+    localStorage.setItem(FOLLOWING_LIST_PREFIX + userId, JSON.stringify(payload));
+  } catch (err) {
+    console.warn('Could not cache following list:', err);
+  }
+}
+
+export function getCachedFollowing(userId) {
+  if (!userId) return null;
+  try {
+    const raw = localStorage.getItem(FOLLOWING_LIST_PREFIX + userId);
+    if (!raw) return null;
+    const payload = JSON.parse(raw);
+    if (!payload || !payload.ts) return null;
+    if (Date.now() - payload.ts > (payload.ttl || FOLLOW_LIST_TTL)) {
+      localStorage.removeItem(FOLLOWING_LIST_PREFIX + userId);
+      return null;
+    }
+    return payload.data || null;
+  } catch (err) {
+    console.warn('Could not read cached following list:', err);
+    return null;
+  }
+}

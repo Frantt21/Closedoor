@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -21,12 +21,13 @@ import {
   trackPostView,
   canCommentOnPost,
 } from '../services/postService';
-import { FaHeart, FaRegHeart, FaReply, FaTrash, FaRegComment, FaRegSadTear, FaArrowLeft, FaImage } from 'react-icons/fa';
+import { FaHeart, FaRegHeart, FaReply, FaTrash, FaRegComment, FaRegSadTear, FaArrowLeft, FaImage, FaEllipsisV } from 'react-icons/fa';
 import PostCard from '../Resources/Components/PostCard';
 import SafeImage from '../Resources/Components/SafeImage';
 import Avatar from '../Resources/Components/Avatar';
 import RichText from '../Resources/Components/RichText';
 import ConfirmModal from '../Resources/Components/ConfirmModal';
+import Tooltip from '../Resources/Components/Tooltip';
 import { getTimeAgo, IMG_RE, VID_RE } from '../services/helpers';
 import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/post.css';
@@ -63,7 +64,51 @@ export default function PostDetail() {
   const [confirmExternalLink, setConfirmExternalLink] = useState(null);
   const handleCancelDeleteComment = useCallback(() => setConfirmDeleteComment(null), []);
   const handleCancelExternalLink = useCallback(() => setConfirmExternalLink(null), []);
-  const [commentPermission, setCommentPermission] = useState({ allowed: true });
+
+  // ── Comment context menu ──
+  const [commentMenuState, setCommentMenuState] = useState({ commentId: null, style: null });
+  const commentMenuDropdownRef = useRef(null);
+
+  const openCommentMenu = (e, commentId) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setCommentMenuState((prev) => {
+      if (prev.commentId === commentId) {
+        // Toggle close
+        return { commentId: null, style: null };
+      }
+      return {
+        commentId,
+        style: {
+          position: 'fixed',
+          right: `${window.innerWidth - rect.right}px`,
+          top: `${rect.bottom + 4}px`,
+          zIndex: 9999,
+        },
+      };
+    });
+  };
+
+  const closeCommentMenu = useCallback(() => {
+    setCommentMenuState({ commentId: null, style: null });
+  }, []);
+
+  // Cerrar menú de comentario al hacer clic fuera
+  useEffect(() => {
+    if (!commentMenuState.commentId) return;
+    const handleClick = (e) => {
+      // Ignorar clics en botones del menú (el onClick se encarga)
+      if (e.target.closest('[data-comment-menu-btn]')) return;
+      if (commentMenuDropdownRef.current && !commentMenuDropdownRef.current.contains(e.target)) {
+        closeCommentMenu();
+      }
+    };
+    // Usar mousedown para cerrar antes de que se abra otro menú
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [commentMenuState.commentId, closeCommentMenu]);
+  const [commentPermission, setCommentPermission] = useState(null);
+  const [commentPermissionLoading, setCommentPermissionLoading] = useState(true);
   const [replyTo, setReplyTo] = useState(null); // { id, username } — para form inline
   // Estado del form inline (reply)
   const [replyContent, setReplyContent] = useState('');
@@ -174,11 +219,17 @@ export default function PostDetail() {
   // Check comment permission when post loads
   useEffect(() => {
     if (!postId || !user?.id) {
-      setCommentPermission({ allowed: true });
+      setCommentPermission(null);
+      setCommentPermissionLoading(false);
       return;
     }
-    canCommentOnPost(postId, user.id).then(setCommentPermission).catch(() => {
-      setCommentPermission({ allowed: true });
+    setCommentPermissionLoading(true);
+    canCommentOnPost(postId, user.id).then((result) => {
+      setCommentPermission(result);
+      setCommentPermissionLoading(false);
+    }).catch(() => {
+      setCommentPermission(null);
+      setCommentPermissionLoading(false);
     });
   }, [postId, user?.id]);
 
@@ -296,6 +347,13 @@ export default function PostDetail() {
       setCommentShowMedia(false);
     } catch (err) {
       console.error('Error creating comment:', err);
+      if (err.message === 'comment_permission_denied') {
+        const reason = err.permissionReason;
+        if (reason === 'followers_only' || reason === 'comments_disabled') {
+          // Re-check permission to sync the UI
+          canCommentOnPost(postId, user.id).then(setCommentPermission).catch(() => {});
+        }
+      }
     } finally {
       setSubmittingComment(false);
     }
@@ -431,6 +489,7 @@ export default function PostDetail() {
     // Encontrar el autor del comentario padre
     const parentComment = comments.find((c) => c.id === reply.parent_id);
     const parentUsername = parentComment?.profiles?.username;
+    const canDelete = user?.id && (user.id === reply.user_id || user.id === post?.user_id);
 
     return (
       <div key={reply.id} className="comment-card comment-card--reply">
@@ -497,19 +556,23 @@ export default function PostDetail() {
           )}
 
           <div className="comment-card-actions-row">
-            <button
-              className={`comment-card-btn ${isLikedComment ? 'comment-card-btn--liked' : ''}`}
-              onClick={() => handleLikeComment(reply.id)}
-            >
-              {isLikedComment ? <FaHeart /> : <FaRegHeart />}
-              {reply.comment_likes_count > 0 && <span className="comment-card-btn-count">{reply.comment_likes_count}</span>}
-            </button>
+            <Tooltip text={t('post.like')} placement="bottom">
+              <button
+                className={`comment-card-btn ${isLikedComment ? 'comment-card-btn--liked' : ''}`}
+                onClick={() => handleLikeComment(reply.id)}
+              >
+                {isLikedComment ? <FaHeart /> : <FaRegHeart />}
+                {reply.comment_likes_count > 0 && <span className="comment-card-btn-count">{reply.comment_likes_count}</span>}
+              </button>
+            </Tooltip>
 
             {/* Only direct replies (depth=1) can be replied to */}
             {isDirectReply && (
-              <button className="comment-card-btn" onClick={() => startReply(reply, true)}>
-                <FaReply /> {t('post.reply')}
-              </button>
+              <Tooltip text={t('post.reply')} placement="bottom">
+                <button className="comment-card-btn" onClick={() => startReply(reply, true)}>
+                  <FaReply /> {t('post.reply')}
+                </button>
+              </Tooltip>
             )}
 
             {isDirectReply && hasChildren && (
@@ -520,10 +583,38 @@ export default function PostDetail() {
                 {childrenExpanded ? t('post.hide_replies') : t('post.replies_count', { n: childReplies.length })}
               </button>
             )}
-            {(user?.id === reply.user_id) && (
-              <button className="comment-card-btn comment-card-btn--danger" onClick={() => handleDeleteComment(reply.id)}>
-                <FaTrash />
-              </button>
+
+            {/* Spacer flex para empujar el menú a la derecha */}
+            {canDelete && <div style={{ flex: 1 }} />}
+
+            {/* Context menu */}
+            {canDelete && (
+              <>
+                <button
+                  data-comment-menu-btn
+                  className="comment-card-menu-btn"
+                  onClick={(e) => openCommentMenu(e, reply.id)}
+                  aria-label="Comment options"
+                >
+                  <FaEllipsisV />
+                </button>
+                {commentMenuState.commentId === reply.id && commentMenuState.style && createPortal(
+                  <div
+                    ref={commentMenuDropdownRef}
+                    className="fc-dropdown"
+                    style={commentMenuState.style}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      className="fc-dropdown-btn fc-dropdown-btn--danger"
+                      onClick={() => handleDeleteComment(reply.id)}
+                    >
+                      <FaTrash /> {t('post.delete')}
+                    </button>
+                  </div>,
+                  document.body
+                )}
+              </>
             )}
           </div>
 
@@ -590,6 +681,7 @@ export default function PostDetail() {
     const isLikedComment = commentLikes[comment.id] || false;
     const directReplies = getReplies(comment.id);
     const isReplying = replyTo?.id === comment.id;
+    const canDelete = user?.id && (user.id === comment.user_id || user.id === post?.user_id);
 
     return (
       <div key={comment.id} className="comment-card">
@@ -652,23 +744,27 @@ export default function PostDetail() {
 
           <div className="comment-card-actions-row">
             {/* Like button */}
-            <button
-              className={`comment-card-btn ${isLikedComment ? 'comment-card-btn--liked' : ''}`}
-              onClick={() => handleLikeComment(comment.id)}
-            >
-              {isLikedComment ? <FaHeart /> : <FaRegHeart />}
-              {comment.comment_likes_count > 0 && (
-                <span className="comment-card-btn-count">{comment.comment_likes_count}</span>
-              )}
-            </button>
+            <Tooltip text={t('post.like')} placement="bottom">
+              <button
+                className={`comment-card-btn ${isLikedComment ? 'comment-card-btn--liked' : ''}`}
+                onClick={() => handleLikeComment(comment.id)}
+              >
+                {isLikedComment ? <FaHeart /> : <FaRegHeart />}
+                {comment.comment_likes_count > 0 && (
+                  <span className="comment-card-btn-count">{comment.comment_likes_count}</span>
+                )}
+              </button>
+            </Tooltip>
 
             {/* Reply button */}
-            <button
-              className="comment-card-btn"
-              onClick={() => startReply(comment, false)}
-            >
-              <FaReply /> {t('post.reply')}
-            </button>
+            <Tooltip text={t('post.reply')} placement="bottom">
+              <button
+                className="comment-card-btn"
+                onClick={() => startReply(comment, false)}
+              >
+                <FaReply /> {t('post.reply')}
+              </button>
+            </Tooltip>
 
             {/* Show replies count */}
             {directReplies.length > 0 && (() => {
@@ -683,14 +779,37 @@ export default function PostDetail() {
               );
             })()}
 
-            {/* Delete (owner only) */}
-            {(user?.id === comment.user_id) && (
-              <button
-                className="comment-card-btn comment-card-btn--danger"
-                onClick={() => handleDeleteComment(comment.id)}
-              >
-                <FaTrash />
-              </button>
+            {/* Spacer flex para empujar el menú a la derecha */}
+            {canDelete && <div style={{ flex: 1 }} />}
+
+            {/* Context menu */}
+            {canDelete && (
+              <>
+                <button
+                  data-comment-menu-btn
+                  className="comment-card-menu-btn"
+                  onClick={(e) => openCommentMenu(e, comment.id)}
+                  aria-label="Comment options"
+                >
+                  <FaEllipsisV />
+                </button>
+                {commentMenuState.commentId === comment.id && commentMenuState.style && createPortal(
+                  <div
+                    ref={commentMenuDropdownRef}
+                    className="fc-dropdown"
+                    style={commentMenuState.style}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      className="fc-dropdown-btn fc-dropdown-btn--danger"
+                      onClick={() => handleDeleteComment(comment.id)}
+                    >
+                      <FaTrash /> {t('post.delete')}
+                    </button>
+                  </div>,
+                  document.body
+                )}
+              </>
             )}
           </div>
 
@@ -806,7 +925,14 @@ export default function PostDetail() {
         <h3 className="comments-title">{t('post.comments_title')}</h3>
 
         {/* Top-level comment form */}
-        {user && commentPermission.allowed && (
+        {user && commentPermissionLoading && (
+          <div className="comment-form" style={{ opacity: 0.4, pointerEvents: 'none' }}>
+            <div className="comment-form-input-wrapper">
+              <div className="skeleton" style={{ width: '100%', height: 60, borderRadius: 8 }} />
+            </div>
+          </div>
+        )}
+        {user && !commentPermissionLoading && commentPermission?.allowed && (
           <div className="comment-form">
             <Avatar
               className="comment-form-avatar"
@@ -868,7 +994,7 @@ export default function PostDetail() {
             </div>
           </div>
         )}
-        {user && !commentPermission.allowed && (
+        {user && !commentPermissionLoading && !commentPermission?.allowed && commentPermission && (
           <div className="comments-disabled-banner">
             {commentPermission.reason === 'comments_disabled' && t('post.comments_disabled')}
             {commentPermission.reason === 'followers_only' && t('post.comments_followers_only')}

@@ -490,54 +490,6 @@
     background: rgba(255, 255, 255, 0.2);
 }
 
-.profile-actions-dropdown {
-    position: fixed;
-    min-width: 180px;
-    background: var(--color-surface, #1a1a1a);
-    border: 1px solid var(--color-border, #2a2a2a);
-    border-radius: var(--radius, 10px);
-    padding: 4px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-    z-index: 50;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.profile-actions-dropdown-btn {
-    all: unset;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    padding: 10px 14px;
-    border-radius: var(--radius-sm, 6px);
-    font-size: 0.85rem;
-    color: var(--color-text, #ffffff);
-    cursor: pointer;
-    transition: background 0.15s ease;
-    box-sizing: border-box;
-}
-
-.profile-actions-dropdown-btn:hover {
-    background: var(--overlay-bg, rgba(255, 255, 255, 0.06));
-}
-
-.profile-actions-dropdown-btn:active {
-    background: rgba(255, 255, 255, 0.1);
-}
-
-.profile-actions-dropdown-btn svg {
-    font-size: 0.95rem;
-    opacity: 0.7;
-    flex-shrink: 0;
-}
-
-.profile-actions-dropdown-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
 /* ── Blocked profile stats (replaces followers/following) ── */
 
 .profile-stat--blocked {

@@ -3,7 +3,7 @@ import { useI18n } from '../services/i18n/useI18n';
 import usePageTitle from '../../hooks/usePageTitle';
 import { useAuth } from '../../hooks/useAuth';
 import { updateUserProfile } from '../services/userService';
-import { getBlockedUsers, unblockUser, cacheBlockStatus, subscribeBlockChanges } from '../services/blockService';
+import { getBlockedUsers, getCachedBlockedUsers, unblockUser, cacheBlockStatus, subscribeBlockChanges } from '../services/blockService';
 import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaFire, FaChartBar, FaBell, FaBrush, FaBan, FaClock, FaAt } from 'react-icons/fa';
 import '../Resources/Styles/settings.css';
 
@@ -83,8 +83,13 @@ export default function Settings() {
   const [cardsExpanded, setCardsExpanded] = useState(false);
   const [statsExpanded, setStatsExpanded] = useState(false);
   const [showBlockedModal, setShowBlockedModal] = useState(false);
-  const [blockedUsers, setBlockedUsers] = useState([]);
-  const [blockedUsersLoading, setBlockedUsersLoading] = useState(false);
+  const [blockedUsers, setBlockedUsers] = useState(() => {
+    if (!user?.id) return [];
+    return getCachedBlockedUsers(user.id) || [];
+  });
+  const [blockedUsersLoading, setBlockedUsersLoading] = useState(() => {
+    return !user?.id || !getCachedBlockedUsers(user.id);
+  });
   const [unblockingId, setUnblockingId] = useState(null);
 
   // ── Forzar re-render cuando cambia el estado de bloqueo (subscribeBlockChanges) ──
@@ -93,14 +98,18 @@ export default function Settings() {
     return subscribeBlockChanges(() => setBlockRevision(v => v + 1));
   }, []);
 
-  // ── Cargar usuarios bloqueados al abrir el modal ──
+  // ── Cargar usuarios bloqueados al abrir el modal (siempre refresca en background) ──
   useEffect(() => {
     if (!showBlockedModal || !user?.id) return;
-    setBlockedUsersLoading(true);
     getBlockedUsers(user.id)
-      .then(setBlockedUsers)
-      .catch((err) => console.warn('Error loading blocked users:', err))
-      .finally(() => setBlockedUsersLoading(false));
+      .then((data) => {
+        setBlockedUsers(data);
+        setBlockedUsersLoading(false);
+      })
+      .catch((err) => {
+        console.warn('Error loading blocked users:', err);
+        setBlockedUsersLoading(false);
+      });
   }, [showBlockedModal, user?.id, blockRevision]);
 
   const handleUnblock = async (blockedId) => {

@@ -561,13 +561,13 @@ const PostCard = React.memo(function PostCard({
                 {showMenu && dropdownStyle && createPortal(
                   <div
                     ref={dropdownRef}
-                    className="post-card-menu-dropdown"
-                    style={dropdownStyle}
+                    className="fc-dropdown"
+                    style={{ ...dropdownStyle, minWidth: 170 }}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <button onClick={handleEdit}><FaEdit /> {t('post.edit')}</button>
-                    <button onClick={handlePin}><FaThumbtack /> {post.is_pinned ? t('post.unpin') : t('post.pin')}</button>
-                    <button className="post-card-menu-danger" onClick={handleDelete}><FaTrash /> {t('post.delete')}</button>
+                    <button className="fc-dropdown-btn" onClick={handleEdit}><FaEdit /> {t('post.edit')}</button>
+                    <button className="fc-dropdown-btn" onClick={handlePin}><FaThumbtack /> {post.is_pinned ? t('post.unpin') : t('post.pin')}</button>
+                    <button className="fc-dropdown-btn fc-dropdown-btn--danger" onClick={handleDelete}><FaTrash /> {t('post.delete')}</button>
                   </div>,
                   document.body
                 )}

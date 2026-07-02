@@ -1353,10 +1353,10 @@ function Profile() {
 
             {/* ── Context Menu Dropdown (fuera de .profile-card para evitar overflow clipping) ── */}
             {contextMenuOpen && (
-              <div className="profile-actions-dropdown" ref={dropdownRef} style={dropdownStyle} onClick={(e) => e.stopPropagation()}>
+              <div className="fc-dropdown" ref={dropdownRef} style={{ ...dropdownStyle, minWidth: 180, padding: 4, display: 'flex', flexDirection: 'column', gap: 2 }} onClick={(e) => e.stopPropagation()}>
                 <button
                   type="button"
-                  className="profile-actions-dropdown-btn"
+                  className="fc-dropdown-btn"
                   onClick={async () => {
                     setBlockLoading(true);
                     try {

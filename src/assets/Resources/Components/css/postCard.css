@@ -346,51 +346,23 @@
     color: var(--color-text, #ffffff);
 }
 
-.post-card-menu-dropdown {
-    position: absolute;
-    right: 0;
-    top: 100%;
-    background: var(--color-surface, #1a1a1a);
-    border: 1px solid var(--color-border, #2a2a2a);
-    border-radius: var(--radius, 8px);
-    overflow: hidden;
-    z-index: 10;
-    min-width: 170px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-    animation: fcFadeIn 0.15s ease;
-}
-
-.post-card-menu-dropdown button {
+.post-card-menu-btn {
     display: flex;
     align-items: center;
-    gap: 8px;
-    width: 100%;
-    padding: 10px 14px;
-    text-align: left;
+    justify-content: center;
     background: transparent;
     border: none;
-    color: var(--color-text, #ffffff);
+    color: var(--color-text-muted, #6b7280);
     font-size: 0.85rem;
+    padding: 4px 8px;
+    border-radius: var(--radius, 6px);
     cursor: pointer;
-    transition: background 0.1s ease;
-    font-family: inherit;
+    transition: background 0.15s ease, color 0.15s ease;
 }
 
-.post-card-menu-dropdown button:hover {
-    background: var(--overlay-bg-subtle);
-}
-
-.post-card-menu-dropdown button svg {
-    font-size: 0.8rem;
-    opacity: 0.6;
-}
-
-.post-card-menu-danger {
-    color: #fca5a5 !important;
-}
-
-.post-card-menu-danger:hover {
-    background: rgba(255, 80, 80, 0.12) !important;
+.post-card-menu-btn:hover {
+    background: var(--overlay-bg);
+    color: var(--color-text, #ffffff);
 }
 
 /* ── @Mention links ── */

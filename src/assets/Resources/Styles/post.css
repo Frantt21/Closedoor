@@ -579,33 +579,36 @@
 .comment-card-actions-row {
     display: flex;
     align-items: center;
-    gap: 6px;
-    margin-top: 6px;
+    gap: 4px;
+    margin-top: 8px;
     flex-wrap: wrap;
 }
 
 .comment-card-btn {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 4px 8px;
+    justify-content: center;
+    gap: 5px;
+    padding: 6px 12px;
     border: none;
-    background: transparent;
-    color: var(--color-text-muted, #6b7280);
-    font-size: 0.75rem;
+    background: var(--overlay-bg-subtle);
+    color: var(--color-text-secondary, #9ca3af);
+    font-size: 0.78rem;
+    font-weight: 500;
     cursor: pointer;
-    border-radius: var(--radius-sm, 6px);
-    transition: color 0.15s ease, background 0.15s ease;
+    border-radius: var(--radius, 10px);
+    transition: background 0.2s ease, color 0.2s ease;
     font-family: inherit;
+    user-select: none;
 }
 
 .comment-card-btn:hover {
-    background: var(--overlay-bg-subtle);
+    background: var(--overlay-bg-hover);
     color: var(--color-text, #ffffff);
 }
 
 .comment-card-btn svg {
-    font-size: 0.75rem;
+    font-size: 0.8rem;
 }
 
 .comment-card-btn-count {
@@ -616,12 +619,13 @@
 }
 
 .comment-card-btn--liked {
-    color: #f472b6;
+    background: color-mix(in srgb, var(--accent-color, #f472b6) 8%, transparent);
+    color: var(--accent-color, #f472b6);
 }
 
 .comment-card-btn--liked:hover {
-    background: rgba(244, 114, 182, 0.1);
-    color: #f472b6;
+    background: color-mix(in srgb, var(--accent-color, #f472b6) 15%, transparent);
+    color: var(--accent-color, #f472b6);
 }
 
 .comment-card-btn--danger {
@@ -629,8 +633,31 @@
 }
 
 .comment-card-btn--danger:hover {
-    background: rgba(255, 80, 80, 0.1);
+    background: rgba(255, 80, 80, 0.12);
     color: #fca5a5;
+}
+
+/* ── Comment context menu ── */
+.comment-card-menu-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 8px;
+    border: none;
+    background: transparent;
+    color: var(--color-text-muted, #6b7280);
+    font-size: 0.7rem;
+    cursor: pointer;
+    border-radius: var(--radius-sm, 6px);
+    transition: background 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+    opacity: 0.5;
+    line-height: 1;
+}
+
+.comment-card-menu-btn:hover {
+    background: var(--overlay-bg-subtle);
+    color: var(--color-text, #ffffff);
+    opacity: 1;
 }
 
 /* ---- Reply info bar ---- */

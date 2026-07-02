@@ -173,3 +173,59 @@ body:has(.sidebar--collapsed) .app-layout {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/* ==========================================
+   Shared Dropdown / Context Menu
+   ========================================== */
+.fc-dropdown {
+    background: var(--color-surface, #1a1a1a);
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius, 8px);
+    overflow: hidden;
+    min-width: 160px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    animation: fcFadeIn 0.12s ease;
+}
+
+.fc-dropdown-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 14px;
+    text-align: left;
+    background: transparent;
+    border: none;
+    color: var(--color-text, #ffffff);
+    font-size: 0.85rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.1s ease;
+}
+
+.fc-dropdown-btn:hover {
+    background: var(--overlay-bg-subtle);
+}
+
+.fc-dropdown-btn svg {
+    font-size: 0.8rem;
+    opacity: 0.6;
+    flex-shrink: 0;
+}
+
+.fc-dropdown-btn:active {
+    background: var(--overlay-bg);
+}
+
+.fc-dropdown-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.fc-dropdown-btn--danger {
+    color: #fca5a5 !important;
+}
+
+.fc-dropdown-btn--danger:hover {
+    background: rgba(255, 80, 80, 0.12) !important;
+}
