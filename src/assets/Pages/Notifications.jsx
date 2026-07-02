@@ -4,7 +4,7 @@ import { NotificationContext } from '../../context/NotificationContext';
 import { useAuth } from '../../hooks/useAuth';
 import { useI18n } from '../services/i18n/useI18n';
 import { acceptFollowRequest, rejectFollowRequest } from '../services/followService';
-import { FaUserPlus, FaHeart, FaComment, FaRetweet, FaBullhorn, FaBell, FaLock, FaCheckSquare, FaCheck, FaTimes } from 'react-icons/fa';
+import { FaUserPlus, FaHeart, FaComment, FaRetweet, FaBullhorn, FaBell, FaLock, FaPoll, FaCheck, FaTimes } from 'react-icons/fa';
 import Avatar from '../Resources/Components/Avatar';
 import '../Resources/Styles/notifications.css';
 import usePageTitle from '../../hooks/usePageTitle';
@@ -30,7 +30,7 @@ function getIcon(type) {
     case 'encrypted_add':
       return <FaLock />;
     case 'poll_vote':
-      return <FaCheckSquare />;
+      return <FaPoll />;
     default:
       return <FaBell />;
   }
@@ -188,11 +188,16 @@ export default function Notifications() {
     <div className="notifications-page">
       <div className="notifications-header">
         <div className="notifications-header-actions">
-          {hasSelection && (
-            <span className="notifications-selected-count">
-              {selectedIds.length === 1 ? t('notifications.selected_count', { n: selectedIds.length }) : t('notifications.selected_count_plural', { n: selectedIds.length })}
-            </span>
+          {notifications.length > 0 && (
+            <button
+              type="button"
+              className="notifications-select-all-btn"
+              onClick={handleSelectAll}
+            >
+              {t('notifications.select_all')}
+            </button>
           )}
+
           {unreadCount > 0 && !hasSelection && (
             <button
               type="button"
@@ -202,22 +207,12 @@ export default function Notifications() {
               {t('notifications.mark_all_read')}
             </button>
           )}
-        </div>
-      </div>
 
-      {/* Bulk actions bar */}
-      {notifications.length > 0 && (
-        <div className="notifications-bulk-bar">
-          <label className="notifications-checkbox-label">
-            <input
-              type="checkbox"
-              className="notifications-checkbox"
-              checked={allSelected}
-              onChange={handleSelectAll}
-            />
-            <span className="notifications-checkbox-custom" />
-            {t('notifications.select_all')}
-          </label>
+          {hasSelection && (
+            <span className="notifications-selected-count">
+              {selectedIds.length === 1 ? t('notifications.selected_count', { n: selectedIds.length }) : t('notifications.selected_count_plural', { n: selectedIds.length })}
+            </span>
+          )}
 
           {hasSelection && (
             <button
@@ -229,7 +224,7 @@ export default function Notifications() {
             </button>
           )}
         </div>
-      )}
+      </div>
 
       {loading ? (
         <div className="notif-skeleton-list">
@@ -297,11 +292,10 @@ function NotificationItem({
     : null;
 
   const handleClick = (e) => {
+    // Solo evitar propagación para checkbox y delete; 
+    // el markAsRead lo maneja el onClick del Link
     if (e.target.closest('.notification-checkbox-area') || e.target.closest('.notification-delete-btn')) {
       return;
-    }
-    if (!notification.is_read) {
-      onMarkAsRead(notification.id);
     }
   };
 
@@ -320,7 +314,6 @@ function NotificationItem({
             checked={isSelected}
             onChange={onSelect}
           />
-          <span className="notifications-checkbox-custom" />
         </label>
       </div>
 

@@ -4,7 +4,6 @@ import { toast } from 'react-toastify';
 import { supabase } from '../assets/services/supabaseclient';
 import {
   getNotifications,
-  getUnreadCount,
   markAsRead,
   markAllAsRead,
   deleteNotification,
@@ -189,12 +188,9 @@ export function NotificationProvider({ children }) {
     }
 
     try {
-      const [notifs, count] = await Promise.all([
-        getNotifications(userId),
-        getUnreadCount(userId),
-      ]);
+      const notifs = await getNotifications(userId);
       setNotifications(notifs);
-      setUnreadCount(count);
+      setUnreadCount(notifs.filter((n) => !n.is_read).length);
       saveToCache(notifs);
     } catch (err) {
       console.warn('Error fetching notifications:', err);
@@ -235,9 +231,9 @@ export function NotificationProvider({ children }) {
               if (prev.some((n) => n.id === data.id)) return prev;
               const updated = [data, ...prev];
               setCachedNotifications(userId, updated);
+              setUnreadCount(updated.filter((n) => !n.is_read).length);
               return updated;
             });
-            setUnreadCount((prev) => prev + 1);
             // Mostrar notificación en vivo (toast u OS según visibilidad del tab)
             showLiveNotification(data);
           }
@@ -257,13 +253,8 @@ export function NotificationProvider({ children }) {
               n.id === payload.new.id ? { ...n, ...payload.new } : n
             );
             setCachedNotifications(userId, updated);
+            setUnreadCount(updated.filter((n) => !n.is_read).length);
             return updated;
-          });
-          setUnreadCount((prev) => {
-            const wasUnread = !payload.old?.is_read;
-            const isNowRead = payload.new?.is_read;
-            if (wasUnread && isNowRead) return Math.max(0, prev - 1);
-            return prev;
           });
         }
       )
@@ -276,17 +267,12 @@ export function NotificationProvider({ children }) {
           filter: `user_id=eq.${userId}`,
         },
         (payload) => {
-          let wasUnread = false;
           setNotifications((prev) => {
-            const removed = prev.find((n) => n.id === payload.old.id);
-            wasUnread = !!(removed && !removed.is_read);
             const updated = prev.filter((n) => n.id !== payload.old.id);
             setCachedNotifications(userId, updated);
+            setUnreadCount(updated.filter((n) => !n.is_read).length);
             return updated;
           });
-          if (wasUnread) {
-            setUnreadCount((u) => Math.max(0, u - 1));
-          }
         }
       )
       .on(
@@ -329,9 +315,9 @@ export function NotificationProvider({ children }) {
           n.id === notificationId ? { ...n, is_read: true } : n
         );
         saveToCache(updated);
+        setUnreadCount(updated.filter((n) => !n.is_read).length);
         return updated;
       });
-      setUnreadCount((prev) => Math.max(0, prev - 1));
     } catch (err) {
       console.warn('Error marking as read:', err);
     }
@@ -344,9 +330,9 @@ export function NotificationProvider({ children }) {
       setNotifications((prev) => {
         const updated = prev.map((n) => ({ ...n, is_read: true }));
         saveToCache(updated);
+        setUnreadCount(0);
         return updated;
       });
-      setUnreadCount(0);
     } catch (err) {
       console.warn('Error marking all as read:', err);
     }
@@ -355,17 +341,12 @@ export function NotificationProvider({ children }) {
   const handleDeleteNotification = useCallback(async (notificationId) => {
     try {
       await deleteNotification(notificationId);
-      let wasUnread = false;
       setNotifications((prev) => {
-        const removed = prev.find((n) => n.id === notificationId);
-        wasUnread = !!(removed && !removed.is_read);
         const updated = prev.filter((n) => n.id !== notificationId);
         saveToCache(updated);
+        setUnreadCount(updated.filter((n) => !n.is_read).length);
         return updated;
       });
-      if (wasUnread) {
-        setUnreadCount((u) => Math.max(0, u - 1));
-      }
     } catch (err) {
       console.warn('Error deleting notification:', err);
     }
@@ -375,18 +356,12 @@ export function NotificationProvider({ children }) {
     if (!notificationIds || notificationIds.length === 0) return;
     try {
       await deleteNotifications(notificationIds);
-      let removedUnreadCount = 0;
       setNotifications((prev) => {
-        removedUnreadCount = prev.filter(
-          (n) => notificationIds.includes(n.id) && !n.is_read
-        ).length;
         const updated = prev.filter((n) => !notificationIds.includes(n.id));
         saveToCache(updated);
+        setUnreadCount(updated.filter((n) => !n.is_read).length);
         return updated;
       });
-      if (removedUnreadCount > 0) {
-        setUnreadCount((u) => Math.max(0, u - removedUnreadCount));
-      }
     } catch (err) {
       console.warn('Error deleting notifications:', err);
     }
