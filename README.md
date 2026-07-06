@@ -58,9 +58,7 @@ FastChange/
   vite.config.js
   eslint.config.js
   README.md
-  POSTS_SYSTEM.md              -- Documentacion del sistema de publicaciones
-  SUPABASE_SETUP.md            -- Guia de configuracion de Supabase
-  SUPABASE_QUERIES.md          -- Consultas SQL de referencia
+  SUPABASE_REFERENCE.md        -- Referencia unificada de Supabase (configuracion, esquema, RLS, triggers)
   src/
     main.jsx                   -- Punto de entrada de la aplicacion
     App.jsx                    -- Configuracion de rutas y layout principal
@@ -287,7 +285,7 @@ Soporte para los siguientes idiomas:
 
 ## Arquitectura de base de datos
 
-Las migraciones SQL se encuentran en `src/assets/services/migrations/` (migraciones 001 a 030). La guia completa de configuracion de la base de datos se encuentra en los archivos `POSTS_SYSTEM.md` y `SUPABASE_QUERIES.md`.
+Las migraciones SQL se encuentran en `src/assets/services/migrations/` (migraciones 001 a 030). La guia completa de configuracion, esquema de base de datos, politicas RLS y funciones se encuentra en `SUPABASE_REFERENCE.md`.
 
 ### Tablas principales
 
@@ -355,4 +353,4 @@ El sistema de internacionalizacion (i18n) se encuentra en `src/assets/services/i
 - El cliente de Supabase normaliza automaticamente la URL del proyecto, eliminando rutas adicionales de la URL si es necesario.
 - El sistema de cache local utiliza prefijos `fc_` y expiracion por TTL para mantener los datos frescos sin sobrecargar la base de datos.
 - Las migraciones SQL en `src/assets/services/migrations/` deben aplicarse en orden numerico en el SQL Editor de Supabase.
-- Para informacion adicional sobre la configuracion de Supabase, consultar `SUPABASE_SETUP.md`.
+- Para informacion adicional sobre la configuracion de Supabase, consultar `SUPABASE_REFERENCE.md`.
