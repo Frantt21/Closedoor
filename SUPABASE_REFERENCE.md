@@ -478,7 +478,6 @@ erDiagram
     posts ||--o{ post_hashtags : "1:N (post_id)"
     posts ||--o{ poll_votes : "1:N (post_id)"
     posts ||--o{ notifications : "1:N (reference_id)"
-    posts ||--o{ comments : "1:N (parent_id)"
     comments ||--o{ comment_likes : "1:N (comment_id)"
     comments ||--o{ comments : "1:N (parent_id)"
     hashtags ||--o{ post_hashtags : "1:N (hashtag_id)"
