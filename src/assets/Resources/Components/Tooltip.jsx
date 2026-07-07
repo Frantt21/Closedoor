@@ -33,15 +33,23 @@ export default function Tooltip({ text, children, style, className, placement = 
   const hideTimeoutRef = useRef(null);
 
   const isBottom = placement === 'bottom';
+  const isRight = placement === 'right';
 
   const updatePosition = useCallback(() => {
     if (!targetRef.current) return;
     const rect = targetRef.current.getBoundingClientRect();
-    setPosition({
-      top: isBottom ? rect.bottom + 6 : rect.top - 6,
-      left: rect.left + rect.width / 2,
-    });
-  }, [isBottom]);
+    if (isRight) {
+      setPosition({
+        top: rect.top + rect.height / 2,
+        left: rect.right + 8,
+      });
+    } else {
+      setPosition({
+        top: isBottom ? rect.bottom + 6 : rect.top - 6,
+        left: rect.left + rect.width / 2,
+      });
+    }
+  }, [isBottom, isRight]);
 
   // Update position on scroll / resize while visible
   // Throttled with requestAnimationFrame to avoid layout thrashing
@@ -81,38 +89,54 @@ export default function Tooltip({ text, children, style, className, placement = 
 
   if (!text) return <>{children}</>;
 
-  const visibleTransform = isBottom
-    ? 'translate(-50%, 6px)'
-    : 'translate(-50%, -100%)';
-  const hiddenTransform = isBottom
-    ? 'translate(-50%, 0)'
-    : 'translate(-50%, calc(-100% + 4px))';
+  let visibleTransform, hiddenTransform, arrowStyle;
 
-  // Arrow: for 'top' placement, arrow at bottom pointing down;
-  // for 'bottom' placement, arrow at top pointing up.
-  const arrowStyle = isBottom
-    ? {
-        position: 'absolute',
-        top: -4,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        width: 0,
-        height: 0,
-        borderLeft: '5px solid transparent',
-        borderRight: '5px solid transparent',
-        borderBottom: '5px solid rgba(30, 30, 35, 0.95)',
-      }
-    : {
-        position: 'absolute',
-        bottom: -4,
-        left: '50%',
-        transform: 'translateX(-50%)',
-        width: 0,
-        height: 0,
-        borderLeft: '5px solid transparent',
-        borderRight: '5px solid transparent',
-        borderTop: '5px solid rgba(30, 30, 35, 0.95)',
-      };
+  if (isRight) {
+    visibleTransform = 'translateY(-50%)';
+    hiddenTransform = 'translateY(calc(-50% + 2px))';
+    arrowStyle = {
+      position: 'absolute',
+      left: -4,
+      top: '50%',
+      transform: 'translateY(-50%)',
+      width: 0,
+      height: 0,
+      borderTop: '5px solid transparent',
+      borderBottom: '5px solid transparent',
+      borderRight: '5px solid rgba(30, 30, 35, 0.95)',
+    };
+  } else {
+    visibleTransform = isBottom
+      ? 'translate(-50%, 6px)'
+      : 'translate(-50%, -100%)';
+    hiddenTransform = isBottom
+      ? 'translate(-50%, 0)'
+      : 'translate(-50%, calc(-100% + 4px))';
+
+    arrowStyle = isBottom
+      ? {
+          position: 'absolute',
+          top: -4,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 0,
+          height: 0,
+          borderLeft: '5px solid transparent',
+          borderRight: '5px solid transparent',
+          borderBottom: '5px solid rgba(30, 30, 35, 0.95)',
+        }
+      : {
+          position: 'absolute',
+          bottom: -4,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 0,
+          height: 0,
+          borderLeft: '5px solid transparent',
+          borderRight: '5px solid transparent',
+          borderTop: '5px solid rgba(30, 30, 35, 0.95)',
+        };
+  }
 
   return (
     <>

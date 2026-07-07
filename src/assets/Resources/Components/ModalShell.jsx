@@ -34,11 +34,17 @@ export default function ModalShell({ isOpen, onClose, onEscape, className = '', 
   // This is the recommended React pattern for deriving state from prop changes.
   // It ensures state updates happen BEFORE the next render, so the component
   // never briefly renders in an inconsistent state.
-  if (isOpen && !prevOpenRef.current && (state === 'idle' || state === 'leaving')) {
+  // ── Mounted with isOpen=true, or isOpen just changed from false → true ──
+  if (isOpen && state === 'idle') {
     setState('entering');
   }
+  // ── isOpen changed from true → false (close) ──
   if (!isOpen && prevOpenRef.current && (state === 'open' || state === 'entering')) {
     setState('leaving');
+  }
+  // ── Re-open while leaving animation is still playing ──
+  if (isOpen && !prevOpenRef.current && state === 'leaving') {
+    setState('entering');
   }
   prevOpenRef.current = isOpen;
 
