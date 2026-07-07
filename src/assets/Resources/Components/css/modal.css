@@ -1,34 +1,72 @@
 /* ==========================================
-   Modal Styles
+   Modal Styles — Native <dialog> element
    Tema: negro / blanco / gris oscuro
    ========================================== */
 
-.fc-modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.75);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    padding: 16px;
-    box-sizing: border-box;
+/* ── Native <dialog> backdrop (replaces .fc-modal-overlay) ── */
+dialog.fc-modal::backdrop {
+    background: rgba(0, 0, 0, 0.80);
     animation: fcFadeIn 0.2s ease;
 }
 
-.fc-modal {
-    width: 100%;
-    max-width: 960px;
-    background: var(--color-surface, #1a1a1a);
+/* ── The <dialog> element itself (replaces .fc-modal) ── */
+dialog.fc-modal {
+    /* Reset default dialog styles */
     border: none;
-    border-radius: var(--radius, 10px);
     padding: 28px;
+    background: var(--color-surface, #1a1a1a);
+    border-radius: var(--radius, 10px);
     box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+    /* Size */
+    max-width: 960px;
+    width: 100%;
     max-height: 90vh;
     overflow-y: auto;
-    animation: fcSlideUp 0.25s ease;
+    overscroll-behavior: contain;
+    /* Position (overrides browser default) */
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    margin: 0;
+    /* Animation — start hidden */
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 16px)) scale(0.97);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+/* Show state */
+dialog.fc-modal.fc-dialog--open {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+/* Leaving state (reverse animation before close()) */
+dialog.fc-modal.fc-dialog--leaving {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 16px)) scale(0.97);
+}
+
+/* Ensure the dialog doesn't have display: none issues when closed */
+dialog.fc-modal:not([open]) {
+    display: none;
+}
+
+/* ── Custom scrollbar for <dialog> ── */
+dialog.fc-modal::-webkit-scrollbar {
+    width: 6px;
+}
+
+dialog.fc-modal::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+dialog.fc-modal::-webkit-scrollbar-thumb {
+    background: var(--color-border, #2a2a2a);
+    border-radius: 3px;
+}
+
+dialog.fc-modal::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-muted, #6b7280);
 }
 
 .fc-modal-title {
@@ -466,24 +504,6 @@ textarea.fc-modal-input {
     }
 }
 
-/* Scroll personalizado dentro del modal */
-.fc-modal::-webkit-scrollbar {
-    width: 6px;
-}
-
-.fc-modal::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.fc-modal::-webkit-scrollbar-thumb {
-    background: var(--color-border, #2a2a2a);
-    border-radius: 3px;
-}
-
-.fc-modal::-webkit-scrollbar-thumb:hover {
-    background: var(--color-text-muted, #6b7280);
-}
-
 /* ── Accent Color Picker ── */
 
 .fc-modal-color-picker {
@@ -552,9 +572,7 @@ textarea.fc-modal-input {
 .fc-modal-sub-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.6);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
+    background: rgba(0, 0, 0, 0.70);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1096,13 +1114,7 @@ textarea.fc-modal-input {
 }
 
 @media (max-width: 480px) {
-    .fc-modal-overlay {
-        padding: 12px;
-        align-items: flex-start;
-        padding-top: 40px;
-    }
-
-    .fc-modal {
+    dialog.fc-modal {
         padding: 20px;
         max-height: 85vh;
     }
@@ -1160,11 +1172,7 @@ textarea.fc-modal-input {
    Responsive: tablets
    ========================================== */
 @media (min-width: 481px) and (max-width: 768px) {
-    .fc-modal-overlay {
-        padding: 20px;
-    }
-
-    .fc-modal {
+    dialog.fc-modal {
         padding: 24px;
         max-width: 520px;
     }

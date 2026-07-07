@@ -44,9 +44,20 @@ export default function Tooltip({ text, children, style, className, placement = 
   }, [isBottom]);
 
   // Update position on scroll / resize while visible
+  // Throttled with requestAnimationFrame to avoid layout thrashing
+  // from getBoundingClientRect() on every scroll event
   useEffect(() => {
     if (!visible) return;
-    const onScroll = () => updatePosition();
+    let ticking = false;
+    const onScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          updatePosition();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
     window.addEventListener('scroll', onScroll, true);
     window.addEventListener('resize', onScroll);
     return () => {

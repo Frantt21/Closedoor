@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import ModalShell from './ModalShell';
 import { createPost, updatePost, notifyMentions, notifyEncryptedAdd, extractMentions, getMentionUserIds } from '../../services/postService';
 import { getFollowing } from '../../services/followService';
 import { searchProfiles } from '../../services/userService';
@@ -81,20 +82,16 @@ export default function CreatePostModal({
     }
   }, [hasUnsavedContent, onClose]);
 
+  // Ref estable para evitar que el efecto se re-ejecute al cambiar de dependencias
+  const confirmCloseRef = useRef(confirmClose);
+  confirmCloseRef.current = confirmClose;
+
   const executeClose = useCallback(() => {
     setPendingClose(false);
     onClose();
   }, [onClose]);
 
-  // ── Cerrar con Escape ──
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') confirmClose();
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, confirmClose]);
+  // ── Cerrar con Escape y scroll locking: manejado por ModalShell (<dialog> nativo)
 
   const isEditing = !!editPost;
 
@@ -311,11 +308,7 @@ export default function CreatePostModal({
     setPollOptions(prev => prev.filter((_, i) => i !== index));
   };
 
-  if (!isOpen) return null;
-
-  const handleOverlayClick = (e) => {
-    if (e.target === e.currentTarget) confirmClose();
-  };
+  // Scroll locking, Escape: manejado por ModalShell (<dialog> nativo)
 
   const handleContentChange = (e) => {
     const text = e.target.value;
@@ -617,8 +610,7 @@ export default function CreatePostModal({
   const getEmbedUrl = getEmbedUrlHelper;
 
   return (
-    <div className="fc-modal-overlay" role="dialog" aria-modal="true" onClick={handleOverlayClick}>
-      <div className="fc-modal create-post-modal">
+    <ModalShell isOpen={isOpen} onClose={onClose} onEscape={() => confirmCloseRef.current()} className="create-post-modal">
         <div className="fc-modal-header">
           <h3 className="fc-modal-title">{isEditing ? t('create_post.edit_title') : t('create_post.title')}</h3>
           <div className="fc-modal-header-actions">
@@ -1125,7 +1117,6 @@ export default function CreatePostModal({
             )}
           </div>
         </div>
-      </div>
 
       {/* ── Discard changes confirmation ── */}
       {pendingClose && (
@@ -1135,6 +1126,6 @@ export default function CreatePostModal({
           onCancel={() => setPendingClose(false)}
         />
       )}
-    </div>
+    </ModalShell>
   );
 }

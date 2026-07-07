@@ -1403,9 +1403,9 @@ function Profile() {
               </div>
             )}
 
-            {/* Edit modal (own profile only) */}
-            {isOwnProfile && (                      <Modal
-                    isOpen={showModal}
+            {/* Edit modal (always mounted, visibility via isOpen) */}
+            <Modal
+                    isOpen={isOwnProfile && showModal}
                     onClose={() => setShowModal(false)}
                     onSave={handleSaveProfile}
                     initialUsername={modalUsername}
@@ -1428,16 +1428,13 @@ function Profile() {
                     initialFollowersCount={followCounts?.followers || 0}
                     userRoles={roles}
                 />
-            )}
-
-            {/* Followers/Following modal */}
-            {followersModal.open && (
-                <FollowersModal
+            {/* Followers/Following modal (always mounted, visibility via isOpen) */}
+            <FollowersModal
+                    isOpen={followersModal.open}
                     userId={activeProfile.id}
                     type={followersModal.type}
                     onClose={closeFollowersModal}
-                />
-            )}
+            />
 
             {/* Social Links modal */}
             {socialLinksModal && (
@@ -1696,9 +1693,8 @@ function Profile() {
             )}
 
             {/* Create/Edit Post modal */}
-            {isOwnProfile && (
-                <CreatePostModal
-                    isOpen={showCreatePost}
+            <CreatePostModal
+                    isOpen={isOwnProfile && showCreatePost}
                     onClose={() => {
                         setShowCreatePost(false);
                         setEditingPost(null);
@@ -1707,7 +1703,6 @@ function Profile() {
                     editPost={editingPost}
                     userId={user?.id}
                 />
-            )}
         </div>
     );
 }

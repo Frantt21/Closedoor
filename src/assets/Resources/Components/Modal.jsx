@@ -1,4 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import ModalShell from './ModalShell';
 import './css/modal.css';
 import '../Styles/explore.css';
 import Badge from './Badge';
@@ -188,11 +189,12 @@ export default function Modal({
     initialBannerPosition, initialAvatarPosition
   ]);
 
-  // Extract colors when banner URL changes (with cache)
+  // Extract colors when banner URL changes (with cache + debounce)
   useEffect(() => {
     const bannerUrl = banner.trim();
     if (!bannerUrl) {
       setExtractedColors([]);
+      setExtracting(false);
       return;
     }
 
@@ -206,25 +208,33 @@ export default function Modal({
       return;
     }
 
-    let cancelled = false;
-    setExtracting(true);
+    // Debounce 400ms: no extraer colores mientras el usuario escribe la URL
+    setExtracting(false);
 
-    extractColors(bannerUrl)
-      .then((colors) => {
-        if (!cancelled && colors.length >= 4) {
+    const timer = setTimeout(async () => {
+      try {
+        setExtracting(true);
+        const colors = await extractColors(bannerUrl);
+
+        // Solo aplicar si la URL sigue siendo la misma después de la extracción
+        if (banner.trim() === bannerUrl && colors.length >= 4) {
           setExtractedColors(colors);
           colorCache[bannerUrl] = colors;
           if (!selectedAccent) {
             setSelectedAccent(colors[0]);
           }
         }
-      })
-      .finally(() => {
-        if (!cancelled) setExtracting(false);
-      });
+      } catch {
+        // Silently fail
+      } finally {
+        setExtracting(false);
+      }
+    }, 400);
 
-    return () => { cancelled = true; };
-  }, [banner]);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [banner, selectedAccent]);
 
   const confirmClose = useCallback(() => {
     if (hasChanges) {
@@ -234,25 +244,16 @@ export default function Modal({
     }
   }, [hasChanges, onClose]);
 
+  // Ref estable para evitar que el efecto se re-ejecute al cambiar de dependencias
+  const confirmCloseRef = useRef(confirmClose);
+  confirmCloseRef.current = confirmClose;
+
   const executeClose = useCallback(() => {
     setPendingClose(false);
     onClose();
   }, [onClose]);
 
-  // ── Cerrar al hacer click fuera del modal ──
-  // (onClick en el overlay en el return)
-
-  // ── Cerrar con Escape (modal principal) ──
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') confirmClose();
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, hasChanges, onClose, t]);
-
-  if (!isOpen) return null;
+  // ── Cerrar con Escape y scroll locking: manejado por ModalShell (<dialog> nativo)
 
   const handleSave = async () => {
     setSaving(true);
@@ -368,25 +369,25 @@ export default function Modal({
   const defaultAvatar = DEFAULT_AVATAR;
   const previewUsername = username || 'username';
 
-  return (      <div className="fc-modal-overlay" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) confirmClose(); }}>
-      <div className="fc-modal">
-        {/* ── Header bar: title + actions ── */}
-        <div className="fc-modal-header">
-          <h3 className="fc-modal-title">{t('modal.edit_title')}</h3>
-          <div className="fc-modal-header-actions">
-            <button className="fc-modal-save" onClick={handleSave} disabled={saving}>
-              {saving ? t('modal.saving') : t('modal.save')}
-            </button>
-            <button className="fc-modal-close" onClick={confirmClose} disabled={saving} title={t('modal.cancel')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          </div>
+  return (
+    <ModalShell isOpen={isOpen} onClose={onClose} onEscape={() => confirmCloseRef.current()}>
+      {/* ── Header bar: title + actions ── */}
+      <div className="fc-modal-header">
+        <h3 className="fc-modal-title">{t('modal.edit_title')}</h3>
+        <div className="fc-modal-header-actions">
+          <button className="fc-modal-save" onClick={handleSave} disabled={saving}>
+            {saving ? t('modal.saving') : t('modal.save')}
+          </button>
+          <button className="fc-modal-close" onClick={confirmClose} disabled={saving} title={t('modal.cancel')}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
         </div>
+      </div>
 
-        {/* ── Two-column grid layout ── */}
+      {/* ── Two-column grid layout ── */}
         <div className="fc-modal-grid">
           {/* ── LEFT COLUMN ── */}
           <div className="fc-modal-grid-left">
@@ -1133,7 +1134,6 @@ export default function Modal({
           </div>
         )}
 
-      </div>
 
       {/* ── Discard changes confirmation ── */}
       {pendingClose && (
@@ -1143,6 +1143,6 @@ export default function Modal({
           onCancel={() => setPendingClose(false)}
         />
       )}
-    </div>
+    </ModalShell>
   );
 }

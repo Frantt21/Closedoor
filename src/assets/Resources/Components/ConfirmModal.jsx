@@ -1,31 +1,24 @@
 import React, { useEffect, useRef } from 'react';
+import ModalShell from './ModalShell';
 import { useI18n } from '../../services/i18n/useI18n';
 
-export default function ConfirmModal({ message, onConfirm, onCancel }) {
+export default function ConfirmModal({ isOpen = true, message, onConfirm, onCancel }) {
   const { t } = useI18n();
   const confirmRef = useRef(null);
   const onCancelRef = useRef(onCancel);
   useEffect(() => { onCancelRef.current = onCancel; }, [onCancel]);
 
+  // Scroll locking, Escape handling, focus trapping: manejado por ModalShell (<dialog> nativo)
+
   useEffect(() => {
-    const handleKey = (e) => {
-      if (e.key === 'Escape') onCancelRef.current();
-    };
-    document.addEventListener('keydown', handleKey);
     confirmRef.current?.focus();
-    return () => document.removeEventListener('keydown', handleKey);
   }, []);
 
   return (
-    <div
-      className="fc-modal-overlay"
-      onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
-    >
+    <ModalShell isOpen={isOpen} onClose={onCancel} onEscape={onCancel}>
       <div
-        className="fc-modal"
         style={{ maxWidth: 400, padding: 24 }}
         ref={confirmRef}
-        tabIndex={-1}
       >
         <p style={{
           fontSize: '0.95rem',
@@ -55,6 +48,6 @@ export default function ConfirmModal({ message, onConfirm, onCancel }) {
           </button>
         </div>
       </div>
-    </div>
+    </ModalShell>
   );
 }

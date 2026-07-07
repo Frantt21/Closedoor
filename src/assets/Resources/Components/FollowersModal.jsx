@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
+import ModalShell from './ModalShell';
 import { useNavigate } from "react-router-dom";
 import { useI18n } from "../../services/i18n/useI18n";
 import { getFollowers, getFollowing, getCachedFollowers, getCachedFollowing, setCachedFollowers, setCachedFollowing } from "../../services/followService";
@@ -38,11 +39,13 @@ function FollowersModalItem({ user, onClose }) {
   );
 }
 
-export default function FollowersModal({ userId, type, onClose }) {
+export default function FollowersModal({ isOpen = true, userId, type, onClose }) {
   const { t } = useI18n();
 
   const isFollowers = type === "followers";
   const title = isFollowers ? t('followers.title') : t('following.title');
+
+  // Scroll locking, Escape handling: manejado por ModalShell (<dialog> nativo)
 
   // Restaurar cache síncrono en useState para evitar flicker
   const [users, setUsers] = useState(() => {
@@ -86,15 +89,8 @@ export default function FollowersModal({ userId, type, onClose }) {
     fetchUsers();
   }, [userId, type, isFollowers]);
 
-  const handleOverlayClick = (e) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
   return (
-    <div className="fc-modal-overlay" role="dialog" aria-modal="true" onClick={handleOverlayClick}>
-      <div className="fc-modal followers-modal">
+    <ModalShell isOpen={isOpen} onClose={onClose} onEscape={onClose} className="followers-modal">
         <div className="followers-modal-header">
           <h3 className="fc-modal-title">{title}</h3>
           <button
@@ -124,7 +120,6 @@ export default function FollowersModal({ userId, type, onClose }) {
             ))}
           </div>
         )}
-      </div>
-    </div>
+    </ModalShell>
   );
 }
