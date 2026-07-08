@@ -176,6 +176,10 @@
   "explore.search_placeholder": "Buscar usuarios...",
   "explore.no_results": "No se encontraron usuarios.",
   "explore.search_hint": "Busca usuarios por nombre de usuario.",
+  "explore.filter_relevance": "Relevancia",
+  "explore.filter_newest": "Más recientes",
+  "explore.filter_interests": "Intereses",
+  "explore.filter_name": "Nombre A-Z",
   "explore.followers_singular": "seguidor",
   "explore.followers_plural": "seguidores",
 
