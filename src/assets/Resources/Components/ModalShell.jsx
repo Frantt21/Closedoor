@@ -23,9 +23,10 @@ import { useEffect, useRef, useState, useCallback } from 'react';
  *  - onClose: () => void — called when dialog should close (Escape, backdrop click)
  *  - onEscape: (e) => void — optional custom Escape handler (e.g. confirm before close)
  *  - className: string — additional classes for the <dialog> element
+ *  - disableBackdropClose: boolean — if true, clicking outside the dialog won't close it
  *  - children: ReactNode
  */
-export default function ModalShell({ isOpen, onClose, onEscape, className = '', children }) {
+export default function ModalShell({ isOpen, onClose, onEscape, className = '', disableBackdropClose = false, children }) {
   const dialogRef = useRef(null);
   const [state, setState] = useState('idle'); // 'idle' | 'entering' | 'open' | 'leaving'
   const prevOpenRef = useRef(isOpen);
@@ -107,13 +108,15 @@ export default function ModalShell({ isOpen, onClose, onEscape, className = '', 
   // ── Click on backdrop (target === dialog) ──
   const handleBackdropClick = useCallback((e) => {
     if (e.target === dialogRef.current) {
-      if (onEscape) {
-        onEscape(e);
-      } else if (onClose) {
-        onClose();
+      if (!disableBackdropClose) {
+        if (onEscape) {
+          onEscape(e);
+        } else if (onClose) {
+          onClose();
+        }
       }
     }
-  }, [onClose, onEscape]);
+  }, [onClose, onEscape, disableBackdropClose]);
 
   // Nothing to render when idle
   if (state === 'idle') return null;

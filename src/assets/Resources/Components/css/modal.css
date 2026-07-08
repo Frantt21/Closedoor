@@ -1168,6 +1168,12 @@ textarea.fc-modal-input {
 
 }
 
+/* ── Confirm modal (narrower, no backdrop close) ── */
+
+dialog.fc-modal.fc-modal--confirm {
+    max-width: 400px;
+}
+
 /* ==========================================
    Responsive: tablets
    ========================================== */

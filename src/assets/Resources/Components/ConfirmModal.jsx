@@ -15,9 +15,9 @@ export default function ConfirmModal({ isOpen = true, message, onConfirm, onCanc
   }, []);
 
   return (
-    <ModalShell isOpen={isOpen} onClose={onCancel} onEscape={onCancel}>
+    <ModalShell isOpen={isOpen} onClose={onCancel} onEscape={onCancel} className="fc-modal--confirm" disableBackdropClose>
       <div
-        style={{ maxWidth: 400, padding: 24 }}
+        style={{ maxWidth: 400 }}
         ref={confirmRef}
       >
         <p style={{
