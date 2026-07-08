@@ -381,6 +381,9 @@
   "followers.title": "Followers",
   "following.title": "Following",
   "followers.close": "Close",
+  "followers.search_placeholder": "Search followers...",
+  "followers.search_empty": "No followers match your search",
+  "following.search_placeholder": "Search following...",
   "followers.empty": "You don't have followers yet",
   "following.empty": "You're not following anyone yet",
 

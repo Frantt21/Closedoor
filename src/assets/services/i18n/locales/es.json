@@ -380,6 +380,9 @@
   "followers.title": "Seguidores",
   "following.title": "Seguidos",
   "followers.close": "Cerrar",
+  "followers.search_placeholder": "Buscar seguidores...",
+  "followers.search_empty": "Sin seguidores que coincidan",
+  "following.search_placeholder": "Buscar seguidos...",
   "followers.empty": "Aún no tienes seguidores",
   "following.empty": "No sigues a nadie todavía",
 
