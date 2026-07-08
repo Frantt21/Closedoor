@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import ModalShell from './ModalShell';
 import { useNavigate } from "react-router-dom";
 import { useI18n } from "../../services/i18n/useI18n";
@@ -47,6 +47,23 @@ export default function FollowersModal({ isOpen = true, userId, type, onClose })
   const { t } = useI18n();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const searchTimeoutRef = useRef(null);
+
+  // Debounce 200ms antes de actualizar el filtro
+  useEffect(() => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    if (!searchQuery) {
+      setDebouncedQuery('');
+      return;
+    }
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 200);
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, [searchQuery]);
 
   const isFollowers = type === "followers";
   const title = isFollowers ? t('followers.title') : t('following.title');
@@ -95,9 +112,9 @@ export default function FollowersModal({ isOpen = true, userId, type, onClose })
     fetchUsers();
   }, [userId, type, isFollowers]);
 
-  const filteredUsers = searchQuery
+  const filteredUsers = debouncedQuery
     ? users.filter((u) =>
-        u.username.toLowerCase().includes(searchQuery.toLowerCase())
+        u.username.toLowerCase().includes(debouncedQuery.toLowerCase())
       )
     : users;
 
