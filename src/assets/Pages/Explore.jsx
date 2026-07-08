@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { useI18n } from "../services/i18n/useI18n";
@@ -14,7 +14,7 @@ import FollowButton from "../Resources/Components/FollowButton";
 import SafeImage from "../Resources/Components/SafeImage";
 import Avatar from "../Resources/Components/Avatar";
 import Badge from "../Resources/Components/Badge";
-import { FaLock, FaBan } from 'react-icons/fa';
+import { FaLock } from 'react-icons/fa';
 import { getBlockedUserIds, getUsersWhoBlockedMeIds, clearBlockedListsCache, subscribeBlockChanges } from "../services/blockService";
 import "../Resources/Styles/explore.css";
 import "../Resources/Styles/skeleton.css";
@@ -22,7 +22,27 @@ import "../Resources/Styles/skeleton.css";
 function Explore() {
   const { t, showAccent } = useI18n();
   usePageTitle(t('explore.title'));
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
+
+  // ── Search & Filters ──
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [activeFilter, setActiveFilter] = useState('relevance');
+  const searchTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    if (!searchQuery) {
+      setDebouncedQuery('');
+      return;
+    }
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedQuery(searchQuery);
+    }, 200);
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, [searchQuery]);
 
   // Lazy initializers: leen cache sincrónicamente durante el 1er render
   // Si hay cache, loading arranca en false y el skeleton nunca se muestra.
@@ -188,9 +208,70 @@ function Explore() {
     };
   }, [user?.id]);
 
+  // ── Compute sorted & filtered list ──
+  const sortedProfiles = useMemo(() => {
+    // First, filter by search query
+    let filtered = debouncedQuery
+      ? profiles.filter((p) =>
+          p.username.toLowerCase().includes(debouncedQuery.toLowerCase())
+        )
+      : [...profiles];
+
+    // Then, sort/filter based on active filter mode
+    switch (activeFilter) {
+      case 'relevance':
+        // Sort by follower count descending
+        filtered.sort((a, b) => {
+          const aCount = countsMap[a.id]?.followers ?? 0;
+          const bCount = countsMap[b.id]?.followers ?? 0;
+          return bCount - aCount;
+        });
+        break;
+      case 'newest':
+        // Sort by created_at descending (already the default from API)
+        filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        break;
+      case 'interests':
+        // Filter users whose interests overlap with the current user's interests
+        // Then sort by number of matching interests
+        if (profile?.interests?.length > 0) {
+          const myInterests = profile.interests.map((i) => i.toLowerCase());
+          const withMatch = [];
+          const withoutMatch = [];
+          filtered.forEach((p) => {
+            if (p.interests?.length > 0) {
+              const overlap = p.interests.filter((i) =>
+                myInterests.includes(i.toLowerCase())
+              ).length;
+              if (overlap > 0) {
+                withMatch.push({ profile: p, overlap });
+              } else {
+                withoutMatch.push(p);
+              }
+            } else {
+              withoutMatch.push(p);
+            }
+          });
+          // Sort by overlap (descending), then alpha
+          withMatch.sort((a, b) => b.overlap - a.overlap || a.profile.username.localeCompare(b.profile.username));
+          filtered = [...withMatch.map((w) => w.profile), ...withoutMatch];
+        } else {
+          // If current user has no interests, fall back to alphabetical
+          filtered.sort((a, b) => a.username.localeCompare(b.username));
+        }
+        break;
+      case 'name':
+        filtered.sort((a, b) => a.username.localeCompare(b.username));
+        break;
+      default:
+        break;
+    }
+
+    return filtered;
+  }, [profiles, countsMap, debouncedQuery, activeFilter, profile?.interests]);
+
   return (
     <div className="explore-page">
-
       {loading ? (
         <div className="explore-skeleton-grid">
           {[1, 2, 3].map((i) => (
@@ -208,31 +289,72 @@ function Explore() {
             </div>
           ))}
         </div>
-      ) : profiles.length === 0 ? (
-        <div className="explore-empty">
-          <p>{t('explore.no_results')}</p>
-        </div>
       ) : (
-        <div className="explore-grid">
-          {profiles.map((profile) => {
-            const isOwn = user?.id === profile.id;
-            const profAccentVis = profile.accent_visibility ?? 'both';
-            const accentVisible = showAccent && (profile.show_accent_explore ?? true) && (
-              profAccentVis === 'both' ||
-              (profAccentVis === 'me' && isOwn) ||
-              (profAccentVis === 'others' && !isOwn)
-            );
-            return (
-              <ExploreCard
-                key={profile.id}
-                profile={profile}
-                counts={countsMap[profile.id]}
-                isOwnProfile={isOwn}
-                showAccent={accentVisible}
+        <>
+          {/* ── Search bar ── */}
+          <div className="explore-search">
+            <div className="explore-search-wrap">
+              <svg className="explore-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                className="explore-search-input"
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t('explore.search_placeholder')}
               />
-            );
-          })}
-        </div>
+            </div>
+          </div>
+
+          {/* ── Filter tabs ── */}
+          <div className="explore-filters">
+            {[
+              { key: 'relevance', label: t('explore.filter_relevance') || 'Relevance' },
+              { key: 'newest', label: t('explore.filter_newest') || 'Newest' },
+              { key: 'interests', label: t('explore.filter_interests') || 'Interests' },
+              { key: 'name', label: t('explore.filter_name') || 'Name A-Z' },
+            ].map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                className={`explore-filter-btn${activeFilter === f.key ? ' explore-filter-btn--active' : ''}`}
+                onClick={() => setActiveFilter(f.key)}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* ── Sorted & filtered grid ── */}
+          {sortedProfiles.length === 0 ? (
+            <div className="explore-empty">
+              <p>{t('explore.no_results')}</p>
+            </div>
+          ) : (
+            <div className="explore-grid">
+              {sortedProfiles.map((profile) => {
+                const isOwn = user?.id === profile.id;
+                const profAccentVis = profile.accent_visibility ?? 'both';
+                const accentVisible = showAccent && (profile.show_accent_explore ?? true) && (
+                  profAccentVis === 'both' ||
+                  (profAccentVis === 'me' && isOwn) ||
+                  (profAccentVis === 'others' && !isOwn)
+                );
+                return (
+                  <ExploreCard
+                    key={profile.id}
+                    profile={profile}
+                    counts={countsMap[profile.id]}
+                    isOwnProfile={isOwn}
+                    showAccent={accentVisible}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
