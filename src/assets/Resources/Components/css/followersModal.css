@@ -2,7 +2,7 @@
    Followers Modal Styles
    ========================================== */
 
-.followers-modal {
+dialog.fc-modal.followers-modal {
     max-width: 420px;
     max-height: 480px;
     display: flex;
@@ -40,6 +40,49 @@
 .followers-modal-close:hover {
     background: var(--color-surface-hover, #252525);
     color: var(--color-text, #ffffff);
+}
+
+/* ── Search bar ── */
+
+.followers-modal-search {
+    padding: 12px 24px 8px;
+    flex-shrink: 0;
+}
+
+.followers-modal-search-input {
+    width: 100%;
+    padding: 10px 14px 10px 36px;
+    border: none;
+    border-radius: var(--radius, 10px);
+    font-size: 0.85rem;
+    font-family: inherit;
+    color: var(--color-text, #ffffff);
+    background: var(--color-surface-hover, #252525);
+    outline: none;
+    box-sizing: border-box;
+    transition: box-shadow 0.2s ease;
+}
+
+.followers-modal-search-input::placeholder {
+    color: var(--color-text-muted, #6b7280);
+}
+
+.followers-modal-search-input:focus {
+    box-shadow: 0 0 0 2px var(--accent-color, #ffffff);
+}
+
+.followers-modal-search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--color-text-muted, #6b7280);
+    font-size: 0.8rem;
+    pointer-events: none;
+}
+
+.followers-modal-search-wrap {
+    position: relative;
 }
 
 .followers-modal-loading,
@@ -102,6 +145,13 @@
     gap: 1px;
 }
 
+.followers-modal-name-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
 .followers-modal-username {
     font-size: 0.9rem;
     font-weight: 600;
@@ -111,12 +161,11 @@
     text-overflow: ellipsis;
 }
 
-.followers-modal-roles {
-    font-size: 0.75rem;
-    color: var(--color-text-muted, #6b7280);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+.followers-modal-badges {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    flex-shrink: 0;
 }
 
 .followers-modal-action {
@@ -131,12 +180,16 @@
 
 /* ---- Responsive ---- */
 @media (max-width: 480px) {
-    .followers-modal {
+    dialog.fc-modal.followers-modal {
         max-height: 85vh;
     }
 
     .followers-modal-header {
         padding: 16px 16px 10px;
+    }
+
+    .followers-modal-search {
+        padding: 10px 16px 8px;
     }
 
     .followers-modal-item {
