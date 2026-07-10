@@ -400,6 +400,10 @@
   "block.stats_hidden": "Conteúdo oculto devido ao bloqueio",
   "block.interests_hidden": "Interesses ocultos devido ao bloqueio",
   "block.no_blocked_users": "Você não bloqueou nenhum usuário ainda.",
+
+  "profile.share_profile": "Compartilhar perfil",
+  "profile.share_text": "Confira @{user} no FastChange!",
+  "profile.share_copied": "Link do perfil copiado!",
   "settings.show_likes": "Mostrar minhas curtidas",
   "settings.show_likes_desc": "Mostrar a aba Curtidas no seu perfil para outros usuários.",
   "settings.filter_encrypted": "Ocultar posts criptografados",

@@ -421,6 +421,10 @@
   "block.interests_hidden": "Interests hidden due to block",
   "block.no_blocked_users": "You haven't blocked any users yet.",
 
+  "profile.share_profile": "Share profile",
+  "profile.share_text": "Check out @{user} on FastChange!",
+  "profile.share_copied": "Profile link copied!",
+
   "settings.show_likes": "Show my likes",
   "settings.show_likes_desc": "Show the Likes tab on your profile to other users.",
   "settings.filter_encrypted": "Hide encrypted posts",

@@ -420,6 +420,10 @@
   "block.interests_hidden": "Intereses ocultos por bloqueo",
   "block.no_blocked_users": "No has bloqueado a ningún usuario todavía.",
 
+  "profile.share_profile": "Compartir perfil",
+  "profile.share_text": "¡Mira a @{user} en FastChange!",
+  "profile.share_copied": "¡Enlace del perfil copiado!",
+
   "settings.show_likes": "Mostrar mis likes",
   "settings.show_likes_desc": "Muestra la pestaña de Me gusta en tu perfil a otros usuarios.",
   "settings.filter_encrypted": "Ocultar posts encriptados",
