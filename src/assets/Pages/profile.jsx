@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { supabase } from "../services/supabaseclient";
@@ -46,12 +47,12 @@ import Modal from "../Resources/Components/Modal";
 import Badge from "../Resources/Components/Badge";
 import Tooltip from "../Resources/Components/Tooltip";
 import { getPlatformIcon, getPlatformName } from "../services/socialPlatforms";
-import { FaFeather, FaBookmark, FaLock, FaEllipsisV, FaBan, FaClock, FaHeart, FaRetweet, FaChevronDown } from 'react-icons/fa';
+import { FaFeather, FaBookmark, FaLock, FaEllipsisH, FaBan, FaClock, FaHeart, FaRetweet, FaChevronDown, FaShareAlt } from 'react-icons/fa';
 import FollowButton from "../Resources/Components/FollowButton";
 import { blockUser, unblockUser, isBlocked, cacheBlockStatus, getCachedBlockStatus, unfollowBothWays } from "../services/blockService";
 import { useI18n } from "../services/i18n/useI18n";
 import { getContrastText, isUUID, getImgTransformStyle, getBgFullStyle } from "../services/helpers";
-import usePageTitle from "../../hooks/usePageTitle";
+import usePageMeta from "../../hooks/usePageMeta";
 import FollowersModal from "../Resources/Components/FollowersModal";
 import PostCard from "../Resources/Components/PostCard";
 import CreatePostModal from "../Resources/Components/CreatePostModal";
@@ -82,7 +83,12 @@ function Profile() {
     const [profileError, setProfileError] = useState(null);
 
     const activeProfile = isOwnProfile ? ownProfile : viewedProfile;
-    usePageTitle(activeProfile?.username ? `@${activeProfile.username}` : t('profile.title'));
+    usePageMeta({
+        title: activeProfile?.username ? `@${activeProfile.username}` : t('profile.title'),
+        description: activeProfile?.bio ? (activeProfile.bio.length > 200 ? activeProfile.bio.slice(0, 200) + '...' : activeProfile.bio) : `Check out ${activeProfile?.username ? `@${activeProfile.username}` : ''} on Closedoor!`,
+        image: activeProfile?.banner_url || activeProfile?.avatar_url || undefined,
+        url: activeProfile?.username ? `${window.location.origin}/profile/${activeProfile.username}` : undefined,
+    });
     const isPrivate = activeProfile?.is_private === true;
 
     // ── Obtener userId incluso cuando activeProfile aún no cargó ──
@@ -256,7 +262,10 @@ function Profile() {
 
   // ── Close context menu on outside click ──
   useEffect(() => {
-    if (!contextMenuOpen) return;
+    if (!contextMenuOpen) {
+      setDropdownStyle(null);
+      return;
+    }
     const handleClick = (e) => {
       if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)
           && dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -932,6 +941,42 @@ function Profile() {
         }
     };
 
+    // ── Share profile ──
+    const handleShareProfile = async () => {
+        const shareUrl = `${window.location.origin}/profile/${activeProfile?.username}`;
+        const followerCount = followCounts?.followers ?? 0;
+        const shareBio = activeProfile?.bio || '';
+        const shareTitle = t('profile.share_text', { user: activeProfile?.username }) || `${activeProfile?.username}`;
+        const shareText = `👤 ${shareTitle}\n📝 ${shareBio || '(no bio)'}\n👥 ${followerCount} followers\n\n${shareUrl}`;
+
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: `@${activeProfile?.username}`,
+                    text: shareText,
+                    url: shareUrl,
+                });
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    try {
+                        await navigator.clipboard.writeText(shareUrl);
+                        toast.success(t('profile.share_copied') || 'Profile link copied!');
+                    } catch {
+                        window.prompt('Copy this link:', shareUrl);
+                    }
+                }
+            }
+        } else {
+            try {
+                await navigator.clipboard.writeText(shareUrl);
+                toast.success(t('profile.share_copied') || 'Profile link copied!');
+            } catch {
+                window.prompt('Copy this link:', shareUrl);
+            }
+        }
+        setContextMenuOpen(false);
+    };
+
     // ── Edit modal state (own profile only) ──
     const [showModal, setShowModal] = useState(false);
     const [modalUsername, setModalUsername] = useState("");
@@ -1364,14 +1409,16 @@ function Profile() {
                                         e.stopPropagation();
                                         const rect = e.currentTarget.getBoundingClientRect();
                                         setDropdownStyle({
-                                          top: rect.bottom + 6,
-                                          right: window.innerWidth - rect.right,
+                                          position: 'fixed',
+                                          top: `${rect.bottom + 6}px`,
+                                          right: `${window.innerWidth - rect.right}px`,
+                                          zIndex: 9999,
                                         });
                                         setContextMenuOpen((s) => !s);
                                       }}
                                       aria-label="More actions"
                                     >
-                                      <FaEllipsisV />
+                                      <FaEllipsisH />
                                     </button>
                                   </div>
                                 )}
@@ -1383,8 +1430,16 @@ function Profile() {
             </div>
 
             {/* ── Context Menu Dropdown (fuera de .profile-card para evitar overflow clipping) ── */}
-            {contextMenuOpen && (
+            {contextMenuOpen && dropdownStyle && createPortal(
               <div className="fc-dropdown" ref={dropdownRef} style={{ ...dropdownStyle, minWidth: 180, padding: 4, display: 'flex', flexDirection: 'column', gap: 2 }} onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  className="fc-dropdown-btn"
+                  onClick={handleShareProfile}
+                >
+                  <FaShareAlt />
+                  {t('profile.share_profile') || 'Share profile'}
+                </button>
                 <button
                   type="button"
                   className="fc-dropdown-btn"
@@ -1431,7 +1486,8 @@ function Profile() {
                   <FaBan />
                   {isBlockedByMe ? t('block.unblock') : t('block.block')}
                 </button>
-              </div>
+              </div>,
+              document.body
             )}
 
             {/* Edit modal (always mounted, visibility via isOpen) */}
