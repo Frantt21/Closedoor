@@ -23,11 +23,12 @@
         linear-gradient(rgba(0,0,0, var(--profile-bg-dim, 0)), rgba(0,0,0, var(--profile-bg-dim, 0))),
         /* Background image (when set) */
         var(--profile-bg-image, none);
-    background-size: auto, cover;
+    background-size: var(--profile-bg-size, auto, cover);
     background-position: center, var(--profile-bg-position, center);
     background-repeat: no-repeat;
     filter: var(--profile-bg-blur, none);
     -webkit-filter: var(--profile-bg-blur, none);
+    transform: var(--profile-bg-transform, none);
     pointer-events: none;
     z-index: -2;
 }

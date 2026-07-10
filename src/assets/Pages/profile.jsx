@@ -46,11 +46,11 @@ import Modal from "../Resources/Components/Modal";
 import Badge from "../Resources/Components/Badge";
 import Tooltip from "../Resources/Components/Tooltip";
 import { getPlatformIcon, getPlatformName } from "../services/socialPlatforms";
-import { FaFeather, FaBookmark, FaLock, FaEllipsisV, FaBan, FaClock, FaHeart } from 'react-icons/fa';
+import { FaFeather, FaBookmark, FaLock, FaEllipsisV, FaBan, FaClock, FaHeart, FaRetweet, FaChevronDown } from 'react-icons/fa';
 import FollowButton from "../Resources/Components/FollowButton";
 import { blockUser, unblockUser, isBlocked, cacheBlockStatus, getCachedBlockStatus, unfollowBothWays } from "../services/blockService";
 import { useI18n } from "../services/i18n/useI18n";
-import { getContrastText, isUUID, getImgTransformStyle } from "../services/helpers";
+import { getContrastText, isUUID, getImgTransformStyle, getBgFullStyle } from "../services/helpers";
 import usePageTitle from "../../hooks/usePageTitle";
 import FollowersModal from "../Resources/Components/FollowersModal";
 import PostCard from "../Resources/Components/PostCard";
@@ -352,6 +352,22 @@ function Profile() {
     const [showCreatePost, setShowCreatePost] = useState(false);
     const [editingPost, setEditingPost] = useState(null);
     const [tab, setTab] = useState('posts'); // 'posts' | 'likes' | 'saved' | 'scheduled'
+    const [postSubFilter, setPostSubFilter] = useState('all'); // 'all' | 'reposts'
+    const [postFilterOpen, setPostFilterOpen] = useState(false);
+    const postFilterRef = useRef(null);
+
+  // ── Close post filter dropdown on outside click ──
+  useEffect(() => {
+    if (!postFilterOpen) return;
+    const handleClick = (e) => {
+      if (postFilterRef.current && !postFilterRef.current.contains(e.target)) {
+        setPostFilterOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [postFilterOpen]);
+
     // Resetear a 'posts' al navegar a un perfil ajeno
     useEffect(() => {
         if (!isOwnProfile) setTab('posts');
@@ -1038,6 +1054,12 @@ function Profile() {
         }
     };
 
+    // ── Filtered posts (all vs only reposts) ──
+    const filteredProfilePosts = useMemo(() => {
+        if (postSubFilter === 'reposts') return profilePosts.filter(p => p._repostInfo);
+        return profilePosts;
+    }, [profilePosts, postSubFilter]);
+
     // ── Render ──
     if (!isAuthenticated && !profileUsername) {
         return <p>{t('profile.title')}</p>;
@@ -1100,6 +1122,7 @@ function Profile() {
     const bgBlur = (activeProfile?.profile_background_blur ?? 0);
     const bgDim = (activeProfile?.profile_background_dim ?? 50) / 100; // 0-1
     const hasBg = !!bgUrl;
+    const bgFullStyle = hasBg ? getBgFullStyle(activeProfile?.profile_background_position) : null;
 
     // Para perfiles ajenos: usar las preferencias guardadas en la BD del dueño del perfil
     // Para perfil propio: siempre mostrar (el toggle es para controlar qué ven los demás)
@@ -1143,9 +1166,17 @@ function Profile() {
           }),
           // ── Background image vars ──
           '--profile-bg-image': hasBg ? `url(${bgUrl})` : 'none',
-          '--profile-bg-position': bgPosition,
+          '--profile-bg-position': hasBg && bgFullStyle
+            ? `center, ${bgFullStyle.backgroundPosition}`
+            : bgPosition,
           '--profile-bg-blur': hasBg && bgBlur > 0 ? `blur(${bgBlur}px)` : 'none',
           '--profile-bg-dim': hasBg ? String(bgDim) : '0',
+          '--profile-bg-size': hasBg && bgFullStyle
+            ? `auto, ${bgFullStyle.backgroundSize}`
+            : 'auto, cover',
+          '--profile-bg-transform': hasBg && bgFullStyle?.transform
+            ? bgFullStyle.transform
+            : 'none',
           '--profile-accent-opacity': hasBg ? '8%' : '18%',
         }
       : {};
@@ -1486,12 +1517,42 @@ function Profile() {
             <div className="posts-section">
                 <div className="posts-section-header">
                     <div className="posts-section-tabs">
-                        <button
-                            className={`posts-section-tab ${tab === 'posts' ? 'posts-section-tab--active' : ''}`}
-                            onClick={() => setTab('posts')}
-                        >
-                            {t('profile.posts_tab')}
-                        </button>
+                        <div className="posts-section-tab-with-dropdown" ref={postFilterRef}>
+                            <button
+                                className={`posts-section-tab ${tab === 'posts' ? 'posts-section-tab--active' : ''}`}
+                                onClick={() => setTab('posts')}
+                            >
+                                {postSubFilter === 'reposts' ? t('profile.filter_reposts') : t('profile.posts_tab')}
+                                {tab === 'posts' && (
+                                    <span
+                                        className={`posts-tab-filter-toggle ${postFilterOpen ? 'posts-tab-filter-toggle--open' : ''}`}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setPostFilterOpen(prev => !prev);
+                                        }}
+                                    >
+                                        <FaChevronDown />
+                                    </span>
+                                )}
+                            </button>
+                            {tab === 'posts' && postFilterOpen && (
+                                <div className="posts-tab-filter-dropdown">
+                                    <button
+                                        className={`posts-tab-filter-item ${postSubFilter === 'all' ? 'posts-tab-filter-item--active' : ''}`}
+                                        onClick={() => { setPostSubFilter('all'); setPostFilterOpen(false); }}
+                                    >
+                                        {t('profile.filter_all')}
+                                    </button>
+                                    <button
+                                        className={`posts-tab-filter-item ${postSubFilter === 'reposts' ? 'posts-tab-filter-item--active' : ''}`}
+                                        onClick={() => { setPostSubFilter('reposts'); setPostFilterOpen(false); }}
+                                    >
+                                        <FaRetweet style={{ fontSize: '0.72rem' }} />
+                                        {t('profile.filter_reposts')}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                         {(isOwnProfile ? showLikes : activeProfile?.show_likes) && (
                             <button
                                 className={`posts-section-tab ${tab === 'likes' ? 'posts-section-tab--active' : ''}`}
@@ -1553,8 +1614,13 @@ function Profile() {
                                     : t('profile.no_posts_other')}
                             </p>
                         </div>
+                    ) : filteredProfilePosts.length === 0 ? (
+                        <div className="posts-empty">
+                            <span className="posts-empty-icon"><FaRetweet /></span>
+                            <p className="posts-empty-text">{t('profile.no_reposts') || 'No hay reposts'}</p>
+                        </div>
                     ) : (
-                        profilePosts.map((post) => (
+                        filteredProfilePosts.map((post) => (
                             <PostCard
                                 key={post.id}
                                 post={post}
