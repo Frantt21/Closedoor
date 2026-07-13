@@ -13,6 +13,9 @@ export default defineConfig({
       true,
     ],
   },
+  build: {
+    cssMinify: 'esbuild',
+  },
   plugins: [
     ogTagsPlugin(),
     react(),
