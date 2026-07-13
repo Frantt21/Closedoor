@@ -13,7 +13,7 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
-const FALLBACK_IMAGE = 'https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg';
+const FALLBACK_IMAGE = 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -50,7 +50,7 @@ export default async function handler(req, res) {
           description: data.bio
             ? (data.bio.length > 200 ? data.bio.slice(0, 200) + '...' : data.bio)
             : `Check out @${data.username || username} on Closedoor!`,
-          image: data.banner_url || data.avatar_url || FALLBACK_IMAGE,
+          image: data.avatar_url || data.banner_url || FALLBACK_IMAGE,
         };
       }
     } catch (err) {

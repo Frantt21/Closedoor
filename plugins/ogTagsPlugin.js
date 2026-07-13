@@ -72,7 +72,7 @@ export default function ogTagsPlugin() {
           og = {
             title: `@${username}`,
             description: `Check out @${username} on Closedoor!`,
-            image: 'https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg',
+            image: 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor',
           };
 
           if (supabase) {
@@ -89,7 +89,7 @@ export default function ogTagsPlugin() {
                   description: data.bio
                     ? (data.bio.length > 200 ? data.bio.slice(0, 200) + '...' : data.bio)
                     : `Check out @${data.username || username} on Closedoor!`,
-                  image: data.banner_url || data.avatar_url || 'https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg',
+                  image: data.avatar_url || data.banner_url || 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor',
                 };
                 cache.set(username, og);
               }
