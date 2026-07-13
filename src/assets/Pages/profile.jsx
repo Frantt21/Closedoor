@@ -690,9 +690,9 @@ function Profile() {
             try {
                 const items = await getLikedPosts(likesUserId);
                 setLikedPosts(items);
-                // Check liked/reposted/saved state for these posts
+                // Check liked/reposted/saved state for these posts (solo si hay usuario logueado)
                 let likedIds = [], repostedIds = [], savedIds = [];
-                if (items.length > 0) {
+                if (items.length > 0 && user?.id) {
                     const postIds = items.map((p) => p.id);
                     [likedIds, repostedIds, savedIds] = await Promise.all([
                         getLikedPostIds(postIds, user.id),
@@ -712,7 +712,7 @@ function Profile() {
         };
 
         loadLiked();
-    }, [likesUserId]);
+    }, [likesUserId, user?.id]);
 
     // ── Refresh saved posts when switching to Saved tab ──
     useEffect(() => {
