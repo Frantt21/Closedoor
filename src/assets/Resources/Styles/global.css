@@ -86,23 +86,72 @@ a {
 }
 
 .app-layout {
-    margin-left: 210px;
+    max-width: 1400px;
+    margin: 0 auto;
     display: flex;
     justify-content: center;
     gap: 20px;
     padding: 30px;
+    padding-left: 240px;
     min-height: 100vh;
     align-items: flex-start;
-    transition: margin-left 0.3s ease;
+    transition: padding-left 0.3s ease, max-width 0.3s ease;
 }
 
 body:has(.sidebar--collapsed) .app-layout {
-    margin-left: 76px;
+    padding-left: 106px;
 }
 
 .app-content {
     flex: 0 1 800px;
     min-width: 0;
+    width: 100%;
+}
+
+/* ── Page container centering ── */
+.profile-page,
+.explore-page,
+.settings-page,
+.notifications-page,
+.comunidades-page,
+.chat-page,
+.post-detail-page,
+.auth-page {
+  max-width: 800px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* ── Responsive: <= 1024px (ocultar sidebar, padding reducido, bottom nav) ── */
+@media (max-width: 1024px) {
+    .app-layout {
+        max-width: 100%;
+        margin: 0;
+        padding: 16px;
+        padding-bottom: 80px;
+        padding-left: 16px !important;
+    }
+
+    .app-content {
+        flex: 1;
+        max-width: 100%;
+        width: 100%;
+    }
+
+    /* Hide the text-based "New Post" button on mobile, FAB takes over */
+    .posts-section-action {
+        display: none !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .app-layout {
+        max-width: 100%;
+        margin: 0;
+        padding: 12px;
+        padding-bottom: 76px;
+        padding-left: 12px !important;
+    }
 }
 
 /* ── react-toastify custom dark theme ── */

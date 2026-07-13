@@ -7,8 +7,8 @@
     --avatar-size: clamp(88px, 12vw, 160px);
     --banner-height: 220px;
     padding: 0;
-    margin: 0;
-    max-width: 100%;
+    margin: 0 auto;
+    max-width: 800px;
     position: relative;
 }
 
@@ -668,9 +668,39 @@
 
 /* ---- Responsive ---- */
 
+@media (max-width: 1024px) {
+    .profile-page {
+        --banner-height: 200px;
+    }
+
+    .profile-card {
+        border-radius: var(--radius-sm, 6px);
+    }
+
+    .profile-bio {
+        font-size: 0.8rem;
+        max-width: 220px;
+    }
+
+    .profile-stat {
+        font-size: 0.8rem;
+    }
+}
+
 @media (max-width: 480px) {
+    .profile-page {
+        --avatar-size: clamp(72px, 14vw, 120px);
+        --banner-height: 160px;
+    }
+
     .profile-banner-container {
-        height: 180px;
+        height: var(--banner-height);
+    }
+
+    .profile-card {
+        border-radius: 0;
+        margin-left: -12px;
+        margin-right: -12px;
     }
 
     .profile-user-info {
@@ -678,12 +708,45 @@
         max-width: calc(100% - 12% - var(--avatar-size) / 2 - 1rem);
     }
 
+    .profile-username {
+        font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+    }
+
     .profile-bio {
-        max-width: 200px;
+        font-size: 0.78rem;
+        max-width: 180px;
+        -webkit-line-clamp: 2;
     }
 
     .profile-stats {
-        gap: 12px;
+        gap: 10px;
         flex-wrap: wrap;
+    }
+
+    .profile-stat-value {
+        font-size: 0.8rem;
+    }
+
+    .profile-stat-label {
+        font-size: 0.72rem;
+    }
+
+    .profile-edit-button {
+        padding: 6px 12px;
+        font-size: 0.78rem;
+    }
+
+    .profile-social-link {
+        width: 28px;
+        height: 28px;
+        font-size: 0.78rem;
+    }
+
+    .posts-section-header {
+        gap: 8px;
+    }
+
+    .posts-section-action {
+        flex-shrink: 0;
     }
 }

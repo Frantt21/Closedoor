@@ -19,6 +19,7 @@ import {
 } from '../services/postService';
 import PostCard from '../Resources/Components/PostCard';
 import CreatePostModal from '../Resources/Components/CreatePostModal';
+import FloatingActionButton from '../Resources/Components/FloatingActionButton';
 
 function Home() {
     const { t, filterEncrypted } = useI18n();
@@ -274,6 +275,14 @@ function Home() {
                         ))
                     )}
                 </div>
+            )}
+
+            {/* FAB for mobile */}
+            {isAuthenticated && (
+              <FloatingActionButton onClick={() => {
+                setEditingPost(null);
+                setShowCreatePost(true);
+              }} />
             )}
 
             <CreatePostModal

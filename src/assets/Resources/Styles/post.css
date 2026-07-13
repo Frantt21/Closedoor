@@ -46,6 +46,34 @@
 .posts-section-tabs {
     display: flex;
     gap: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    flex-shrink: 1;
+    min-width: 0;
+}
+
+.posts-section-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.posts-section-tab {
+    white-space: nowrap;
+    flex-shrink: 0;
+    padding: 8px 18px;
+    border: none;
+    border-radius: var(--radius, 10px);
+    background: var(--overlay-bg, rgba(255, 255, 255, 0.08));
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: var(--overlay-text, rgba(255, 255, 255, 0.8));
+    font-size: 0.85rem;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
 }
 
 .posts-section-tab-with-dropdown {
@@ -122,20 +150,7 @@
     color: var(--accent-text-color, #000000);
 }
 
-.posts-section-tab {
-    padding: 8px 18px;
-    border: none;
-    border-radius: var(--radius, 10px);
-    background: var(--overlay-bg, rgba(255, 255, 255, 0.08));
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    color: var(--overlay-text, rgba(255, 255, 255, 0.8));
-    font-size: 0.85rem;
-    font-weight: 500;
-    font-family: inherit;
-    cursor: pointer;
-    transition: background 0.2s ease, color 0.2s ease;
-}
+
 
 .posts-section-tab:hover {
     background: var(--overlay-bg-hover, rgba(255, 255, 255, 0.14));

@@ -694,6 +694,132 @@
 
 /* ── Saved (bookmark) action ── */
 
+@media (max-width: 1024px) {
+    .post-card-action--save {
+        display: none;
+    }
+
+    .post-card-menu--non-owner .post-card-menu-btn {
+        display: flex;
+    }
+}
+
+@media (min-width: 1025px) {
+    .post-card-menu--non-owner .post-card-menu-btn {
+        display: none;
+    }
+}
+
+/* ==========================================
+   Responsive: mobile/tablet density
+   ========================================== */
+@media (max-width: 1024px) {
+    .post-card {
+        padding: 14px;
+        margin-bottom: 10px;
+    }
+
+    .post-card--compact {
+        padding: 10px;
+        margin-bottom: 6px;
+    }
+
+    .post-card-avatar {
+        width: 42px;
+        height: 42px;
+    }
+
+    .post-card-avatar-link {
+        max-height: 42px;
+    }
+
+    .post-card-body {
+        gap: 10px;
+    }
+
+    .post-card-username {
+        font-size: 0.92rem;
+    }
+
+    .post-card-text {
+        font-size: 0.88rem;
+    }
+
+    .post-card-action {
+        padding: 5px 10px;
+        font-size: 0.75rem;
+    }
+
+    .post-card-action-icon {
+        font-size: 0.8rem;
+    }
+
+    .post-card-actions {
+        gap: 4px;
+    }
+}
+
+@media (max-width: 480px) {
+    .post-card {
+        padding: 12px;
+        margin-bottom: 8px;
+        border-radius: var(--radius-sm, 6px);
+    }
+
+    .post-card-avatar {
+        width: 36px;
+        height: 36px;
+    }
+
+    .post-card-avatar-link {
+        max-height: 36px;
+    }
+
+    .post-card-body {
+        gap: 8px;
+    }
+
+    .post-card-username {
+        font-size: 0.85rem;
+    }
+
+    .post-card-text {
+        font-size: 0.83rem;
+        margin-bottom: 8px;
+    }
+
+    .post-card-action {
+        padding: 4px 8px;
+        font-size: 0.7rem;
+        gap: 4px;
+    }
+
+    .post-card-action-icon {
+        font-size: 0.72rem;
+    }
+
+    .post-card-actions {
+        gap: 3px;
+        flex-wrap: wrap;
+    }
+
+    .post-card-poll {
+        padding: 10px;
+    }
+
+    .post-card-poll-option {
+        padding: 6px 8px;
+    }
+
+    .post-card-header {
+        margin-bottom: 4px;
+    }
+
+    .post-card-time {
+        font-size: 0.7rem;
+    }
+}
+
 /* ── SafeImage fallback (image load error) ── */
 
 .safe-image-fallback {

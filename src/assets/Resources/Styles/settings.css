@@ -589,6 +589,25 @@
   background: var(--overlay-bg-hover, rgba(255, 255, 255, 0.1));
 }
 
+.settings-danger-btn {
+  padding: 8px 14px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--radius-sm, 6px);
+  color: #ef4444;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+}
+
+.settings-danger-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
 @media (max-width: 600px) {
   .settings-page {
     max-width: 100%;

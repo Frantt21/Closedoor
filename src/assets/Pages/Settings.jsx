@@ -4,7 +4,9 @@ import usePageTitle from '../../hooks/usePageTitle';
 import { useAuth } from '../../hooks/useAuth';
 import { updateUserProfile } from '../services/userService';
 import { getBlockedUsers, getCachedBlockedUsers, unblockUser, cacheBlockStatus, subscribeBlockChanges } from '../services/blockService';
+import { useNavigate } from 'react-router-dom';
 import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaFire, FaChartBar, FaBell, FaBrush, FaBan, FaClock, FaAt } from 'react-icons/fa';
+import { MdLogout } from 'react-icons/md';
 import '../Resources/Styles/settings.css';
 
 /* ── SVG Flag Icons ── */
@@ -73,7 +75,8 @@ const CATEGORIES = [
 export default function Settings() {
   const { locale, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showPushNotifications, setShowPushNotifications, showLikes, setShowLikes, filterEncrypted, setFilterEncrypted, allowMention, setAllowMention, allowEncryptedAdd, setAllowEncryptedAdd, hour24, setHour24, theme, setTheme, t } = useI18n();
   usePageTitle(t('settings.title'));
-  const { user, profile, profileLoading, refreshProfile } = useAuth();
+  const { user, profile, profileLoading, refreshProfile, logout } = useAuth();
+  const navigate = useNavigate();
   const [selectOpen, setSelectOpen] = useState(false);
   const selectRef = useRef(null);
   const [privacyUpdating, setPrivacyUpdating] = useState(false);
@@ -353,6 +356,30 @@ export default function Settings() {
                     <FaSun style={{ marginRight: 6 }} />{t('settings.theme_light')}
                   </button>
                 </div>
+              </div>
+
+              <div className="settings-row-divider" />
+
+              {/* ── Cerrar sesión ── */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><MdLogout /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.logout')}</h2>
+                    <p className="settings-section-desc">{t('settings.logout_desc')}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="settings-danger-btn"
+                  onClick={async () => {
+                    await logout();
+                    navigate('/');
+                  }}
+                >
+                  <MdLogout style={{ marginRight: 6 }} />
+                  {t('settings.logout_btn')}
+                </button>
               </div>
             </>
           )}

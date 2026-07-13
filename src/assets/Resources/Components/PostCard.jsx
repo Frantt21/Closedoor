@@ -632,7 +632,44 @@ const PostCard = React.memo(function PostCard({
                   >
                     <button className="fc-dropdown-btn" onClick={handleEdit}><FaEdit /> {t('post.edit')}</button>
                     <button className="fc-dropdown-btn" onClick={handlePin}><FaThumbtack /> {post.is_pinned ? t('post.unpin') : t('post.pin')}</button>
+                    <button className="fc-dropdown-btn" onClick={async (e) => {
+                      await handleSave(e);
+                      setShowMenu(false);
+                    }}>
+                      {saved ? <FaBookmark /> : <FaRegBookmark />}
+                      {saved ? (t('post.unsave') || 'Quitar guardado') : t('post.save')}
+                    </button>
                     <button className="fc-dropdown-btn fc-dropdown-btn--danger" onClick={handleDelete}><FaTrash /> {t('post.delete')}</button>
+                  </div>,
+                  document.body
+                )}
+              </div>
+            )}
+            {/* ── Mobile-only: universal menu (save for all users) ── */}
+            {!isOwner && (
+              <div className="post-card-menu-wrapper post-card-menu--non-owner">
+                <button
+                  ref={menuBtnRef}
+                  className="post-card-menu-btn"
+                  onClick={(e) => { e.stopPropagation(); setShowMenu((s) => !s); }}
+                  aria-label="More options"
+                >
+                  <FaEllipsisV />
+                </button>
+                {showMenu && dropdownStyle && createPortal(
+                  <div
+                    ref={dropdownRef}
+                    className="fc-dropdown"
+                    style={{ ...dropdownStyle, minWidth: 170 }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button className="fc-dropdown-btn" onClick={async (e) => {
+                      await handleSave(e);
+                      setShowMenu(false);
+                    }}>
+                      {saved ? <FaBookmark /> : <FaRegBookmark />}
+                      {saved ? (t('post.unsave') || 'Quitar guardado') : t('post.save')}
+                    </button>
                   </div>,
                   document.body
                 )}
@@ -862,7 +899,7 @@ const PostCard = React.memo(function PostCard({
 
             <Tooltip text={saved ? t('post.saved') : t('post.save')} placement="bottom">
               <button
-                className={`post-card-action ${saved ? 'post-card-action--saved' : ''}`}
+                className={`post-card-action post-card-action--save ${saved ? 'post-card-action--saved' : ''}`}
                 onClick={handleSave}
               >
                 <span className="post-card-action-icon">{saved ? <FaBookmark /> : <FaRegBookmark />}</span>

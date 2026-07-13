@@ -664,6 +664,106 @@
     text-align: center;
 }
 
+/* ==========================================
+   Responsive: CreatePostModal
+   ========================================== */
+@media (max-width: 1024px) {
+    .create-post-modal {
+        max-width: 95vw;
+    }
+
+    .create-post-body {
+        flex-direction: column;
+    }
+
+    .create-post-body-left {
+        padding: 4px 0;
+        width: 100%;
+    }
+
+    .create-post-body-right {
+        min-width: 0;
+        width: 100%;
+        padding: 16px 0 4px;
+        border-left: none;
+        border-top: 1px solid var(--color-border, #2a2a2a);
+        margin-top: 8px;
+    }
+
+    .create-post-encrypt-quick-list {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    dialog.fc-modal.create-post-modal {
+        max-height: 90vh;
+    }
+}
+
+@media (max-width: 480px) {
+    .create-post-modal {
+        max-width: calc(100vw - 32px);
+    }
+
+    dialog.fc-modal.create-post-modal {
+        max-height: 85vh;
+        max-width: calc(100vw - 32px);
+        padding: 20px;
+        width: 100%;
+    }
+
+    dialog.fc-modal.create-post-modal.fc-dialog--leaving {
+        transform: translate(-50%, calc(-50% + 16px)) scale(0.97);
+    }
+
+    .create-post-body-right {
+        padding: 12px 0 4px;
+    }
+
+    .create-post-toolbar {
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+
+    .create-post-encrypt-quick-list {
+        grid-template-columns: 1fr;
+    }
+
+    .create-post-poll-expiry-input {
+        min-width: 100%;
+    }
+
+    .create-post-live-preview-card {
+        padding: 12px;
+        gap: 8px;
+    }
+
+    .create-post-live-preview-avatar {
+        width: 36px;
+        height: 36px;
+    }
+
+    .create-post-textarea {
+        min-height: 100px;
+        height: 100px;
+    }
+
+    .create-post-body-left {
+        width: 100%;
+    }
+
+    /* Ensure left panel content uses full width */
+    .create-post-body-left .fc-modal-input,
+    .create-post-body-left input,
+    .create-post-body-left textarea {
+        width: 100%;
+        box-sizing: border-box;
+    }
+
+    .create-post-body-left .create-post-toolbar {
+        width: 100%;
+    }
+}
+
 /* ── Obfuscated preview (cómo lo ven los demás) ── */
 .create-post-obfuscated-preview {
     margin-bottom: 12px;

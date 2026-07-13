@@ -17,6 +17,7 @@ import Comunidades from './assets/Pages/Comunidades.jsx';
 import { I18nProvider } from './assets/services/i18n/I18nContext';
 import RightPanel from './assets/Resources/Components/RightPanel';
 import AppLoader from './assets/Resources/Components/AppLoader';
+import MobileNav from './assets/Resources/Components/MobileNav';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -62,6 +63,7 @@ function App() {
           </main>
 
           <RightPanel />
+          <MobileNav />
           <ToastContainer
             position="top-right"
             autoClose={3000}

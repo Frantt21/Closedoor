@@ -221,22 +221,8 @@
 }
 
 /* ---- Responsive ---- */
-@media (max-width: 980px) {
+@media (max-width: 1024px) {
     .sidebar {
-        position: relative;
-        width: 100% !important;
-        height: auto;
-        border-right: none;
-        padding: 16px;
-    }
-
-    .sidebar--collapsed {
-        width: 100% !important;
-    }
-
-    .sidebar-footer {
-        margin-top: 0;
-        border-top: none;
-        padding-top: 0;
+        display: none;
     }
 }

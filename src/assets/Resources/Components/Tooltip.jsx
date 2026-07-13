@@ -25,7 +25,7 @@ const TOOLTIP_STYLES = {
  * so it's never affected by parent transforms or overflow clipping.
  * Shows a small popup above (default) or below the child element on hover.
  */
-export default function Tooltip({ text, children, style, className, placement = 'top' }) {
+export default function Tooltip({ text, children, style, className, placement = 'top', suppress = false }) {
   const [visible, setVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const targetRef = useRef(null);
@@ -75,12 +75,13 @@ export default function Tooltip({ text, children, style, className, placement = 
   }, [visible, updatePosition]);
 
   const handleMouseEnter = useCallback(() => {
+    if (suppress) return;
     clearTimeout(hideTimeoutRef.current);
     showTimeoutRef.current = setTimeout(() => {
       updatePosition();
       setVisible(true);
     }, 150);
-  }, [updatePosition]);
+  }, [updatePosition, suppress]);
 
   const handleMouseLeave = useCallback(() => {
     clearTimeout(showTimeoutRef.current);

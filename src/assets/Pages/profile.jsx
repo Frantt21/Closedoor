@@ -57,6 +57,7 @@ import usePageMeta from "../../hooks/usePageMeta";
 import FollowersModal from "../Resources/Components/FollowersModal";
 import PostCard from "../Resources/Components/PostCard";
 import CreatePostModal from "../Resources/Components/CreatePostModal";
+import FloatingActionButton from "../Resources/Components/FloatingActionButton";
 import { toast } from 'react-toastify';
 
 function Profile() {
@@ -1812,6 +1813,14 @@ function Profile() {
                         ))
                 ) : null}
             </div>
+            )}
+
+            {/* FAB for mobile */}
+            {isOwnProfile && (
+              <FloatingActionButton onClick={() => {
+                setEditingPost(null);
+                setShowCreatePost(true);
+              }} />
             )}
 
             {/* Create/Edit Post modal */}

@@ -1113,6 +1113,50 @@ textarea.fc-modal-input {
     font-variant-numeric: tabular-nums;
 }
 
+/* ── Confirm modal (narrower, no backdrop close) ── */
+
+dialog.fc-modal.fc-modal--confirm {
+    max-width: 400px;
+}
+
+/* ==========================================
+   Responsive: tablet landscape (<= 1024px)
+   ========================================== */
+@media (max-width: 1024px) {
+    dialog.fc-modal {
+        max-width: 90vw;
+        padding: 24px;
+        max-height: 85vh;
+    }
+
+    .fc-modal-grid {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    .fc-modal-grid-right {
+        padding-left: 0;
+        padding-top: 20px;
+        margin-top: 8px;
+    }
+
+    .fc-preview-card--large .fc-preview-card-banner {
+        max-height: 160px;
+    }
+
+    .fc-preview-card--large .fc-preview-card-avatar {
+        width: 56px;
+        height: 56px;
+    }
+
+    .fc-preview-card--large .fc-preview-card-info {
+        left: calc(12% + 28px + 0.6rem);
+    }
+}
+
+/* ==========================================
+   Responsive: mobile (<= 480px)
+   ========================================== */
 @media (max-width: 480px) {
     dialog.fc-modal {
         padding: 20px;
@@ -1168,29 +1212,12 @@ textarea.fc-modal-input {
 
 }
 
-/* ── Confirm modal (narrower, no backdrop close) ── */
-
-dialog.fc-modal.fc-modal--confirm {
-    max-width: 400px;
-}
-
 /* ==========================================
-   Responsive: tablets
+   Responsive: tablets (481px - 768px)
    ========================================== */
 @media (min-width: 481px) and (max-width: 768px) {
     dialog.fc-modal {
         padding: 24px;
         max-width: 520px;
-    }
-
-    .fc-modal-grid {
-        grid-template-columns: 1fr;
-        gap: 0;
-    }
-
-    .fc-modal-grid-right {
-        padding-left: 0;
-        padding-top: 20px;
-        margin-top: 8px;
     }
 }
