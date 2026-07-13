@@ -1283,6 +1283,25 @@ export function clearFeedCache(key) {
   }
 }
 
+/**
+ * Clear ALL app caches from localStorage (keys starting with fc_).
+ * Called on logout to wipe all user-specific cached data.
+ */
+export function clearAllAppCaches() {
+  try {
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('fc_')) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
+  } catch (err) {
+    console.warn('Could not clear app caches:', err);
+  }
+}
+
 export function getCachedFeed(key) {
   if (!key) return null;
   try {

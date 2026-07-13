@@ -20,7 +20,7 @@
   "auth.password": "Contraseña",
   "auth.username": "Nombre de usuario",
   "auth.login_title": "Iniciar sesión",
-  "auth.login_subtitle": "¡Bienvenido de nuevo! Ingresa tus credenciales.",
+  "auth.login_subtitle": "¡Bienvenido de nuevo! Inicia Sesión.",
   "auth.login_placeholder": "Email, Usuario o Nombre",
   "auth.login_btn": "Iniciar sesión",
   "auth.register_title": "Crear cuenta",
@@ -36,6 +36,7 @@
   "auth.login_error": "Error al iniciar sesión",
   "auth.password_length": "La contraseña debe tener al menos 6 caracteres",
   "auth.register_error": "Error al registrarse",
+  "auth.login_required": "Necesitas iniciar sesión para hacer eso",
 
   "profile.title": "Perfil",
   "profile.edit": "Editar perfil",
@@ -365,7 +366,7 @@
   "post.comments_followers_only": "Solo seguidores pueden comentar en este post",
 
   "home.title": "Home",
-  "home.hero_title": "Bienvenido a la mejor comunidad de posts",
+  "home.hero_title": "Bienvenido a Closeedoor",
   "home.hero_subtitle": "Publica lo que quieras, cuando quieras, donde quieras. Únete a la comunidad y comparte tus pensamientos con el mundo.",
   "home.hero_subtitle2": "No esperes más, regístrate o inicia sesión para empezar a publicar.",
   "home.feed_title": "Feed",

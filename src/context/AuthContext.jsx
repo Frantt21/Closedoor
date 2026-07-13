@@ -9,7 +9,13 @@ import {
   getUserProfile,
   getCachedProfile,
   setCachedProfile,
+  clearCachedProfile,
+  clearCachedProfileByUsername,
 } from '../assets/services/userService';
+import { clearAllAppCaches } from '../assets/services/postService';
+import { clearDecryptedCache } from '../assets/services/alphabetEncryption';
+import { clearBlockedListsCache } from '../assets/services/blockService';
+import { clearCachedFollowCounts } from '../assets/services/followService';
 
 export const AuthContext = createContext();
 
@@ -316,8 +322,24 @@ export function AuthProvider({ children }) {
         return { success: false, error: error.message };
       }
 
+      const currentUserId = user?.id;
+      const currentUsername = profile?.username;
+
       setUser(null);
       setProfile(null);
+
+      // ── Limpiar todo el caché de la sesión ──
+      clearAllAppCaches();          // Elimina todos los localStorage fc_*
+      clearDecryptedCache();        // Limpia el caché en memoria de contenido descifrado
+      if (currentUserId) {
+        clearCachedProfile(currentUserId);
+        clearBlockedListsCache(currentUserId);
+        clearCachedFollowCounts(currentUserId);
+      }
+      if (currentUsername) {
+        clearCachedProfileByUsername(currentUsername);
+      }
+
       return { success: true };
     } catch (err) {
       setError(err.message);

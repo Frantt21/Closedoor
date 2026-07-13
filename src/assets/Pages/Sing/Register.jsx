@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../services/i18n/useI18n';
 import usePageTitle from '../../../hooks/usePageTitle';
@@ -15,6 +15,7 @@ function Register() {
   const [error, setError] = useState('');
   const { register } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -36,7 +37,9 @@ function Register() {
     const result = await register(email, password, username);
 
     if (result.success) {
-      navigate('/');
+      const params = new URLSearchParams(location.search);
+      const redirect = params.get('redirect') || '/';
+      navigate(redirect);
     } else {
       setError(result.error || t('auth.register_error'));
     }

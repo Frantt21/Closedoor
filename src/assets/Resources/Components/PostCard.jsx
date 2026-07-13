@@ -211,7 +211,12 @@ const PostCard = React.memo(function PostCard({
 
   // ── Handle poll vote ──
   const handlePollVote = async (optionId) => {
-    if (!user || pollVotingLoading) return;
+    if (!user) {
+      toast.info(t('auth.login_required'));
+      navigate(`/Login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+      return;
+    }
+    if (pollVotingLoading) return;
     setPollVotingLoading(true);
     try {
       const { votePoll } = await import('../../services/postService');
@@ -319,7 +324,11 @@ const PostCard = React.memo(function PostCard({
 
   const handleLike = useCallback(async (e) => {
     e.stopPropagation();
-    if (!user) return;
+    if (!user) {
+      toast.info(t('auth.login_required'));
+      navigate(`/Login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+      return;
+    }
     try {
       const nowLiked = !liked;
       if (liked) {
@@ -340,11 +349,15 @@ const PostCard = React.memo(function PostCard({
     } catch (err) {
       console.error('Like error:', err);
     }
-  }, [user, liked, disliked, post.id, onLikeToggle]);
+  }, [user, liked, disliked, post.id, onLikeToggle, navigate, t]);
 
   const handleDislike = useCallback(async (e) => {
     e.stopPropagation();
-    if (!user) return;
+    if (!user) {
+      toast.info(t('auth.login_required'));
+      navigate(`/Login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+      return;
+    }
     try {
       const nowDisliked = !disliked;
       if (disliked) {
@@ -365,11 +378,15 @@ const PostCard = React.memo(function PostCard({
     } catch (err) {
       console.error('Dislike error:', err);
     }
-  }, [user, disliked, liked, post.id, onDislikeToggle]);
+  }, [user, disliked, liked, post.id, onDislikeToggle, navigate, t]);
 
   const handleRepost = useCallback(async (e) => {
     e.stopPropagation();
-    if (!user) return;
+    if (!user) {
+      toast.info(t('auth.login_required'));
+      navigate(`/Login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+      return;
+    }
     try {
       const nowReposted = !reposted;
       if (reposted) {
@@ -385,7 +402,7 @@ const PostCard = React.memo(function PostCard({
     } catch (err) {
       console.error('Repost error:', err);
     }
-  }, [user, reposted, post.id, onRepostToggle]);
+  }, [user, reposted, post.id, onRepostToggle, navigate, t]);
 
   const handlePin = async (e) => {
     e.stopPropagation();
@@ -438,7 +455,11 @@ const PostCard = React.memo(function PostCard({
 
   const handleSave = async (e) => {
     e.stopPropagation();
-    if (!user) return;
+    if (!user) {
+      toast.info(t('auth.login_required'));
+      navigate(`/Login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+      return;
+    }
     try {
       if (saved) {
         await unsavePost(post.id, user.id);

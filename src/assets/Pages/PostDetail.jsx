@@ -25,6 +25,7 @@ import {
   undislikePost,
 } from '../services/postService';
 import { FaHeart, FaRegHeart, FaReply, FaTrash, FaRegComment, FaRegSadTear, FaArrowLeft, FaImage, FaEllipsisV } from 'react-icons/fa';
+import { toast } from 'react-toastify';
 import PostCard from '../Resources/Components/PostCard';
 import SafeImage from '../Resources/Components/SafeImage';
 import Avatar from '../Resources/Components/Avatar';
@@ -326,7 +327,12 @@ export default function PostDetail() {
 
   const handleSubmitComment = async () => {
     const trimmed = commentInput.trim();
-    if (!trimmed || !user?.id || !postId) return;
+    if (!user?.id) {
+      toast.info(t('auth.login_required'));
+      navigate(`/Login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+      return;
+    }
+    if (!trimmed || !postId) return;
 
     const trimmedMedia = commentMediaUrl.trim();
     const isImage = IMG_RE.test(trimmedMedia);
@@ -368,7 +374,12 @@ export default function PostDetail() {
   const handleSubmitReply = async () => {
     if (!replyTo) return;
     const trimmed = replyContent.trim();
-    if (!trimmed || !user?.id || !postId) return;
+    if (!user?.id) {
+      toast.info(t('auth.login_required'));
+      navigate(`/Login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+      return;
+    }
+    if (!trimmed || !postId) return;
 
     const trimmedMedia = replyMediaUrl.trim();
     const isImage = IMG_RE.test(trimmedMedia);
@@ -450,7 +461,11 @@ export default function PostDetail() {
   };
 
   const handleLikeComment = async (commentId) => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      toast.info(t('auth.login_required'));
+      navigate(`/Login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+      return;
+    }
     try {
       if (commentLikes[commentId]) {
         await unlikeComment(commentId, user.id);

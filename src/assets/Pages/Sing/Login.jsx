@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../services/i18n/useI18n';
 import usePageTitle from '../../../hooks/usePageTitle';
@@ -14,6 +14,7 @@ function Login() {
   const [error, setError] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -29,7 +30,9 @@ function Login() {
     const result = await login(emailOrUsername, password);
 
     if (result.success) {
-      navigate('/');
+      const params = new URLSearchParams(location.search);
+      const redirect = params.get('redirect') || '/';
+      navigate(redirect);
     } else {
       setError(result.error || t('auth.login_error'));
     }

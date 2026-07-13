@@ -20,12 +20,40 @@ const HOUR24_KEY = 'fc_hour24';
 
 const locales = { es };
 
-// Cargar locale guardado o default español
+// Mapeo de idiomas del navegador a locales disponibles
+const BROWSER_LOCALE_MAP = {
+  en: 'en',
+  es: 'es',
+  pt: 'pt',
+  ru: 'ru',
+  ja: 'ja',
+};
+
+/**
+ * Detecta el idioma del navegador y lo mapea a un locale disponible.
+ * Solo se usa si el usuario no ha guardado una preferencia explícita.
+ */
+function detectBrowserLocale() {
+  try {
+    const langs = navigator.languages || [navigator.language || navigator.userLanguage || ''];
+    for (const full of langs) {
+      const code = full.split('-')[0].toLowerCase();
+      if (BROWSER_LOCALE_MAP[code]) {
+        return BROWSER_LOCALE_MAP[code];
+      }
+    }
+  } catch {}
+  return 'es';
+}
+
+// Cargar locale guardado o auto-detectar del navegador
 function getSavedLocale() {
   try {
-    return localStorage.getItem(LOCALE_KEY) || 'es';
+    const saved = localStorage.getItem(LOCALE_KEY);
+    if (saved) return saved;
+    return detectBrowserLocale();
   } catch {
-    return 'es';
+    return detectBrowserLocale();
   }
 }
 

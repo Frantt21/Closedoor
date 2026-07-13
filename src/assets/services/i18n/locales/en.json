@@ -36,6 +36,7 @@
   "auth.login_error": "Failed to login",
   "auth.password_length": "Password must be at least 6 characters",
   "auth.register_error": "Failed to register",
+  "auth.login_required": "You need to log in to do that",
 
   "profile.title": "Profile",
   "profile.edit": "Edit profile",
@@ -366,7 +367,7 @@
   "post.comment_media_added": "Media added",
 
   "home.title": "Home",
-  "home.hero_title": "Welcome to the best posting community",
+  "home.hero_title": "Welcome to the Closeedoor",
   "home.hero_subtitle": "Post what you want, when you want, where you want. Join the community and share your thoughts with the world.",
   "home.hero_subtitle2": "Don't wait any longer, register or login to start posting.",
   "home.feed_title": "Feed",

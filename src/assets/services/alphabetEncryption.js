@@ -45,6 +45,14 @@ export function setCachedDecryptedContent(postId, userId, content) {
   DECRYPTED_CACHE.set(key, { content, ts: Date.now() });
 }
 
+/**
+ * Limpia todo el caché en memoria de contenido descifrado.
+ * Se llama al cerrar sesión para no dejar datos sensibles.
+ */
+export function clearDecryptedCache() {
+  DECRYPTED_CACHE.clear();
+}
+
 // ── Mapeo letra → código palindrómico ──
 const LETTER_MAP = {
   a: '2112', b: '4114', c: '6116', d: '8118',
