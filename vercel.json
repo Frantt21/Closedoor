@@ -1,0 +1,17 @@
+{
+  "functions": {
+    "api/og-profile.js": {
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/profile/:username",
+      "destination": "/api/og-profile"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

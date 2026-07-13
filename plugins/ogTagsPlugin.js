@@ -1,87 +1,131 @@
 import { createClient } from '@supabase/supabase-js';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 
 /**
- * Vite plugin (dev mode) that injects Open Graph meta tags into
- * /profile/:username pages so Discord/Twitter previews include
- * username, bio, and avatar/banner image.
+ * Vite plugin that injects Open Graph meta tags into /profile/:username pages.
  *
- * Note: Discord cannot reach localhost. To test:
- *   1. Run `npm run dev`
- *   2. Use ngrok: `npx ngrok http 5173`
- *   3. Share the ngrok URL in Discord
+ * For bot/crawler requests (Discord, Twitter, Facebook, etc.):
+ *   - Reads index.html directly from disk
+ *   - Injects OG/twitter meta tags with profile data from Supabase
+ *   - Sends the modified HTML (crawlers don't execute JS anyway)
+ *
+ * For real browser requests:
+ *   - Passes through to Vite's normal middleware chain
+ *   - The React SPA loads normally with HMR
  */
 export default function ogTagsPlugin() {
   let supabase = null;
   const cache = new Map();
+  let indexHtml = '';
+  let htmlLoaded = false;
+
+  function loadIndexHtml(root) {
+    if (!htmlLoaded) {
+      try {
+        indexHtml = readFileSync(resolve(root, 'index.html'), 'utf-8');
+        htmlLoaded = true;
+      } catch (e) {
+        console.warn('[og-tags] Could not read index.html:', e.message);
+      }
+    }
+    return indexHtml;
+  }
 
   return {
     name: 'og-tags',
+
+    configResolved(config) {
+      loadIndexHtml(config.root);
+    },
+
     configureServer(server) {
-      // Lazy-init Supabase client from env vars (Vite loads .env automatically)
+      // Lazy-init Supabase client from env vars
       const url = process.env.VITE_SUPABASE_URL || process.env.VITE_SUPABASE_DATA_API_URL || '';
       const key = process.env.VITE_SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
       if (url && key) {
         supabase = createClient(url, key);
       }
-    },
-    transformIndexHtml: {
-      order: 'post',
-      handler: async (html, ctx) => {
-        const match = ctx.path?.match(/^\/profile\/([a-zA-Z0-9_]+)/);
-        if (!match) return html;
+
+      // ── Middleware: intercept /profile/:username for crawlers only ──
+      server.middlewares.use(async (req, res, next) => {
+        const match = req.url?.match(/^\/profile\/([a-zA-Z0-9_]+)/);
+        if (!match) {
+          next();
+          return;
+        }
+
+        // Check if OG tags are forced via query param (?og) or request is from a known crawler
+        const hasOgParam = req.url?.includes('?og') || req.url?.includes('&og');
+        const ua = (req.headers['user-agent'] || '').toLowerCase();
+        const isCrawler = /discord|twitterbot|facebookexternalhit|slack|telegram|whatsapp|bot\//.test(ua);
+        if (!isCrawler && !hasOgParam) {
+          next();
+          return;
+        }
 
         const username = match[1];
 
-        // Build fallback OG data (always available)
-        const getFallback = () => ({
-          title: `@${username}`,
-          description: `Check out @${username} on Closedoor!`,
-          image: 'https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg',
-        });
-
+        // ── Fetch or get cached OG data ──
         let og = cache.get(username);
+        if (!og) {
+          og = {
+            title: `@${username}`,
+            description: `Check out @${username} on Closedoor!`,
+            image: 'https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg',
+          };
 
-        // Fetch from Supabase if not cached
-        if (!og && supabase) {
-          try {
-            const { data } = await supabase
-              .from('profiles')
-              .select('username, bio, avatar_url, banner_url')
-              .eq('username', username.toLowerCase())
-              .maybeSingle();
+          if (supabase) {
+            try {
+              const { data } = await supabase
+                .from('profiles')
+                .select('username, bio, avatar_url, banner_url')
+                .eq('username', username.toLowerCase())
+                .maybeSingle();
 
-            if (data) {
-              og = {
-                title: `@${data.username || username}`,
-                description: data.bio
-                  ? (data.bio.length > 200 ? data.bio.slice(0, 200) + '...' : data.bio)
-                  : `Check out @${data.username || username} on Closedoor!`,
-                image: data.banner_url || data.avatar_url || 'https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg',
-              };
-              cache.set(username, og);
+              if (data) {
+                og = {
+                  title: `@${data.username || username}`,
+                  description: data.bio
+                    ? (data.bio.length > 200 ? data.bio.slice(0, 200) + '...' : data.bio)
+                    : `Check out @${data.username || username} on Closedoor!`,
+                  image: data.banner_url || data.avatar_url || 'https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg',
+                };
+                cache.set(username, og);
+              }
+            } catch (err) {
+              console.warn('[og-tags] Profile fetch error:', err.message);
             }
-          } catch (err) {
-            console.warn('[og-tags] Error fetching profile:', err.message);
           }
         }
 
-        og = og || getFallback();
+        // ── Build modified HTML with OG tags ──
+        const html = loadIndexHtml(server.config.root);
+        if (!html) {
+          next();
+          return;
+        }
 
-        const meta = `
+        const siteName = 'Closedoor';
+        const metaTags = `
     <meta property="og:title" content="${esc(og.title)}" />
     <meta property="og:description" content="${esc(og.description)}" />
     <meta property="og:image" content="${esc(og.image)}" />
-    <meta property="og:url" content="${esc(ctx.path)}" />
+    <meta property="og:url" content="${esc(req.url)}" />
     <meta property="og:type" content="profile" />
-    <meta property="og:site_name" content="Closedoor" />
+    <meta property="og:site_name" content="${esc(siteName)}" />
     <meta name="description" content="${esc(og.description)}" />
+    <meta property="profile:username" content="${esc(username)}" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${esc(og.title)}" />
     <meta name="twitter:description" content="${esc(og.description)}" />
     <meta name="twitter:image" content="${esc(og.image)}" />`;
 
-        return html.replace('</title>', `</title>${meta}`);
-      },
+        const modifiedHtml = html.replace('</title>', `</title>${metaTags}`);
+
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.end(modifiedHtml);
+      });
     },
   };
 }

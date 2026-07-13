@@ -1,8 +1,21 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+
+// ── Load env files like Vite does: .env → .env.local → .env.development → .env.development.local ──
+const cwd = process.cwd();
+const envFiles = [
+  '.env',
+  '.env.local',
+  '.env.development',
+  '.env.development.local',
+];
+for (const file of envFiles) {
+  dotenv.config({ path: resolve(cwd, file), override: false });
+}
+
 import express from 'express';
 import { createClient } from '@supabase/supabase-js';
 import { readFileSync, existsSync } from 'fs';
-import { join, dirname } from 'path';
+import { resolve, join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -137,6 +150,7 @@ app.listen(PORT, () => {
   console.log(`   OG tags active for /profile/:username routes`);
   if (!supabase) {
     console.warn('   ⚠️  Supabase credentials not found in environment. OG data will be minimal.');
-    console.warn('   Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY env vars.');
+    console.warn('   Tried env files: ' + envFiles.join(', '));
+    console.warn('   Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in one of these files or system env.');
   }
 });
