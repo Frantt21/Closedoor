@@ -64,6 +64,10 @@ html, body, #root {
     min-height: 100%;
 }
 
+html {
+    scrollbar-gutter: stable;
+}
+
 body {
     font-family: 'Poppins', sans-serif;
     background-color: var(--color-bg);

@@ -34,6 +34,7 @@ import {
     getSavedPosts,
     getLikedPosts,
     getScheduledPosts,
+    getDislikedPostIds,
     setCachedFeed,
     getCachedFeed,
     clearFeedCache,
@@ -356,6 +357,7 @@ function Profile() {
     const [profilePosts, setProfilePosts] = useState(() => getCachedPosts()?.items || []);
     const [likedPostIds, setLikedPostIds] = useState(() => getCachedPosts()?.likedIds || []);
     const [repostedPostIds, setRepostedPostIds] = useState(() => getCachedPosts()?.repostedIds || []);
+    const [dislikedPostIds, setDislikedPostIds] = useState(() => getCachedPosts()?.dislikedIds || []);
     const [savedPostIds, setSavedPostIds] = useState(() => getCachedPosts()?.savedIds || []);
     const [postsLoading, setPostsLoading] = useState(() => !getCachedPosts());
     const [showCreatePost, setShowCreatePost] = useState(false);
@@ -399,6 +401,10 @@ function Profile() {
         const cached = savedCacheKey ? getCachedFeed(savedCacheKey) : null;
         return cached?.repostedIds || [];
     });
+    const [savedDislikedIds, setSavedDislikedIds] = useState(() => {
+        const cached = savedCacheKey ? getCachedFeed(savedCacheKey) : null;
+        return cached?.dislikedIds || [];
+    });
     const [savedPostsLoading, setSavedPostsLoading] = useState(() => {
         const cached = savedCacheKey ? getCachedFeed(savedCacheKey) : null;
         return !cached;
@@ -420,6 +426,10 @@ function Profile() {
         const cached = likedCacheKey ? getCachedFeed(likedCacheKey) : null;
         return cached?.savedIds || [];
     });
+    const [likedDislikedIds, setLikedDislikedIds] = useState(() => {
+        const cached = likedCacheKey ? getCachedFeed(likedCacheKey) : null;
+        return cached?.dislikedIds || [];
+    });
     const [likedPostsLoading, setLikedPostsLoading] = useState(() => {
         const cached = likedCacheKey ? getCachedFeed(likedCacheKey) : null;
         return !cached;
@@ -437,6 +447,7 @@ function Profile() {
             setLikedPostIds(cached.likedIds || []);
             setRepostedPostIds(cached.repostedIds || []);
             setSavedPostIds(cached.savedIds || []);
+            setDislikedPostIds(cached.dislikedIds || []);
             setPostsLoading(false);
         } else {
             setPostsLoading(true);
@@ -447,19 +458,21 @@ function Profile() {
                 const items = await getProfileContent(userId, user?.id, filterEncrypted);
                 setProfilePosts(items);
                 // Batch check likes/reposts/saves for current user
-                let likedIds = [], repostedIds = [], savedIds = [];
+                let likedIds = [], repostedIds = [], savedIds = [], dislikedIds = [];
                 if (user?.id && items.length > 0) {
                     const postIds = items.map((p) => p.id);
-                    [likedIds, repostedIds, savedIds] = await Promise.all([
+                    [likedIds, repostedIds, savedIds, dislikedIds] = await Promise.all([
                         getLikedPostIds(postIds, user.id),
                         getRepostedPostIds(postIds, user.id),
                         getSavedPostIds(postIds, user.id),
+                        getDislikedPostIds(postIds, user.id),
                     ]);
                     setLikedPostIds(likedIds);
                     setRepostedPostIds(repostedIds);
                     setSavedPostIds(savedIds);
+                    setDislikedPostIds(dislikedIds);
                 }
-                setCachedFeed(`profile_posts_${userId}`, items, likedIds, repostedIds, savedIds);
+                setCachedFeed(`profile_posts_${userId}`, items, likedIds, repostedIds, savedIds, dislikedIds);
             } catch (err) {
                 console.error('Error loading posts:', err);
             } finally {
@@ -491,19 +504,21 @@ function Profile() {
             try {
                 const items = await getProfileContent(profileId, user?.id, filterEncrypted);
                 setProfilePosts(items);
-                let likedIds = [], repostedIds = [], savedIds = [];
+                let likedIds = [], repostedIds = [], savedIds = [], dislikedIds = [];
                 if (user?.id && items.length > 0) {
                     const postIds = items.map((p) => p.id);
-                    [likedIds, repostedIds, savedIds] = await Promise.all([
+                    [likedIds, repostedIds, savedIds, dislikedIds] = await Promise.all([
                         getLikedPostIds(postIds, user.id),
                         getRepostedPostIds(postIds, user.id),
                         getSavedPostIds(postIds, user.id),
+                        getDislikedPostIds(postIds, user.id),
                     ]);
                     setLikedPostIds(likedIds);
                     setRepostedPostIds(repostedIds);
                     setSavedPostIds(savedIds);
+                    setDislikedPostIds(dislikedIds);
                 }
-                setCachedFeed(`profile_posts_${profileId}`, items, likedIds, repostedIds, savedIds);
+                setCachedFeed(`profile_posts_${profileId}`, items, likedIds, repostedIds, savedIds, dislikedIds);
             } catch (err) {
                 console.warn('Error refreshing after change:', err);
             }
@@ -596,7 +611,7 @@ function Profile() {
                 setProfilePosts((prev) => {
                     const mapped = prev.map((p) =>
                         p.id === updated.id
-                            ? { ...p, likes_count: updated.likes_count, reposts_count: updated.reposts_count, comments_count: updated.comments_count, views_count: updated.views_count, is_pinned: updated.is_pinned, pinned_at: updated.pinned_at }
+                            ? { ...p, likes_count: updated.likes_count, dislikes_count: updated.dislikes_count, reposts_count: updated.reposts_count, comments_count: updated.comments_count, views_count: updated.views_count, is_pinned: updated.is_pinned, pinned_at: updated.pinned_at }
                             : p
                     );
                     return [...mapped].sort(sortProfilePosts);
@@ -646,18 +661,20 @@ function Profile() {
             try {
                 const items = await getSavedPosts(savesUserId);
                 setSavedPosts(items);
-                // Check liked/reposted state for these posts
-                let likedIds = [], repostedIds = [];
+                // Check liked/reposted/disliked state for these posts
+                let likedIds = [], repostedIds = [], dislikedIds = [];
                 if (items.length > 0) {
                     const postIds = items.map((p) => p.id);
-                    [likedIds, repostedIds] = await Promise.all([
+                    [likedIds, repostedIds, dislikedIds] = await Promise.all([
                         getLikedPostIds(postIds, user.id),
                         getRepostedPostIds(postIds, user.id),
+                        getDislikedPostIds(postIds, user.id),
                     ]);
                     setSavedLikedIds(likedIds);
                     setSavedRepostedIds(repostedIds);
+                    setSavedDislikedIds(dislikedIds);
                 }
-                setCachedFeed(cacheKey, items, likedIds, repostedIds, []);
+                setCachedFeed(cacheKey, items, likedIds, repostedIds, [], dislikedIds);
             } catch (err) {
                 console.error('Error loading saved posts:', err);
             } finally {
@@ -691,19 +708,21 @@ function Profile() {
                 const items = await getLikedPosts(likesUserId);
                 setLikedPosts(items);
                 // Check liked/reposted/saved state for these posts (solo si hay usuario logueado)
-                let likedIds = [], repostedIds = [], savedIds = [];
+                let likedIds = [], repostedIds = [], savedIds = [], dislikedIds = [];
                 if (items.length > 0 && user?.id) {
                     const postIds = items.map((p) => p.id);
-                    [likedIds, repostedIds, savedIds] = await Promise.all([
+                    [likedIds, repostedIds, savedIds, dislikedIds] = await Promise.all([
                         getLikedPostIds(postIds, user.id),
                         getRepostedPostIds(postIds, user.id),
                         getSavedPostIds(postIds, user.id),
+                        getDislikedPostIds(postIds, user.id),
                     ]);
                     setLikedLikedIds(likedIds);
                     setLikedRepostedIds(repostedIds);
                     setLikedSavedIds(savedIds);
+                    setLikedDislikedIds(dislikedIds);
                 }
-                setCachedFeed(cacheKey, items, likedIds, repostedIds, savedIds);
+                setCachedFeed(cacheKey, items, likedIds, repostedIds, savedIds, dislikedIds);
             } catch (err) {
                 console.error('Error loading liked posts:', err);
             } finally {
@@ -722,17 +741,19 @@ function Profile() {
             try {
                 const items = await getSavedPosts(savesUserId);
                 setSavedPosts(items);
-                let likedIds = [], repostedIds = [];
+                let likedIds = [], repostedIds = [], dislikedIds = [];
                 if (items.length > 0) {
                     const postIds = items.map((p) => p.id);
-                    [likedIds, repostedIds] = await Promise.all([
+                    [likedIds, repostedIds, dislikedIds] = await Promise.all([
                         getLikedPostIds(postIds, user.id),
                         getRepostedPostIds(postIds, user.id),
+                        getDislikedPostIds(postIds, user.id),
                     ]);
                     setSavedLikedIds(likedIds);
                     setSavedRepostedIds(repostedIds);
+                    setSavedDislikedIds(dislikedIds);
                 }
-                setCachedFeed(cacheKey, items, likedIds, repostedIds, []);
+                setCachedFeed(cacheKey, items, likedIds, repostedIds, [], dislikedIds);
             } catch (err) {
                 console.warn('Error refreshing saved posts:', err);
             }
@@ -747,26 +768,30 @@ function Profile() {
             try {
                 const items = await getLikedPosts(likesUserId);
                 setLikedPosts(items);
-                let likedIds = [], repostedIds = [], savedIds = [];
+                let likedIds = [], repostedIds = [], savedIds = [], dislikedIds = [];
                 if (items.length > 0) {
                     const postIds = items.map((p) => p.id);
-                    [likedIds, repostedIds, savedIds] = await Promise.all([
+                    [likedIds, repostedIds, savedIds, dislikedIds] = await Promise.all([
                         getLikedPostIds(postIds, user.id),
                         getRepostedPostIds(postIds, user.id),
                         getSavedPostIds(postIds, user.id),
+                        getDislikedPostIds(postIds, user.id),
                     ]);
                     setLikedLikedIds(likedIds);
                     setLikedRepostedIds(repostedIds);
                     setLikedSavedIds(savedIds);
+                    setLikedDislikedIds(dislikedIds);
                 }
-                setCachedFeed(cacheKey, items, likedIds, repostedIds, savedIds);
+                setCachedFeed(cacheKey, items, likedIds, repostedIds, savedIds, dislikedIds);
             } catch (err) {
                 console.warn('Error refreshing liked posts:', err);
             }
         })();
     }, [tab, likesUserId]);
 
-    // ── Handlers for like/repost sync ──
+    // ── Handlers for like/repost/dislike sync ──
+    // Solo actualizan arrays booleanos de IDs. Los contadores los maneja PostCard localmente
+    // y Realtime los sincroniza desde la DB.
     const handleLikeToggle = (postId, nowLiked) => {
       setLikedPostIds((prev) =>
         nowLiked ? [...prev, postId] : prev.filter((id) => id !== postId)
@@ -776,29 +801,6 @@ function Profile() {
       );
       setLikedLikedIds((prev) =>
         nowLiked ? [...prev, postId] : prev.filter((id) => id !== postId)
-      );
-      // Sincronizar likes_count en todos los arrays
-      const delta = nowLiked ? 1 : -1;
-      setProfilePosts((prev) =>
-        prev.map((p) =>
-          p.id === postId
-            ? { ...p, likes_count: Math.max((p.likes_count || 0) + delta, 0) }
-            : p
-        )
-      );
-      setSavedPosts((prev) =>
-        prev.map((p) =>
-          p.id === postId
-            ? { ...p, likes_count: Math.max((p.likes_count || 0) + delta, 0) }
-            : p
-        )
-      );
-      setLikedPosts((prev) =>
-        prev.map((p) =>
-          p.id === postId
-            ? { ...p, likes_count: Math.max((p.likes_count || 0) + delta, 0) }
-            : p
-        )
       );
     };
 
@@ -812,28 +814,17 @@ function Profile() {
       setLikedRepostedIds((prev) =>
         nowReposted ? [...prev, postId] : prev.filter((id) => id !== postId)
       );
-      // Sincronizar reposts_count en todos los arrays
-      const delta = nowReposted ? 1 : -1;
-      setProfilePosts((prev) =>
-        prev.map((p) =>
-          p.id === postId
-            ? { ...p, reposts_count: Math.max((p.reposts_count || 0) + delta, 0) }
-            : p
-        )
+    };
+
+    const handleDislikeToggle = (postId, nowDisliked) => {
+      setDislikedPostIds((prev) =>
+        nowDisliked ? [...prev, postId] : prev.filter((id) => id !== postId)
       );
-      setSavedPosts((prev) =>
-        prev.map((p) =>
-          p.id === postId
-            ? { ...p, reposts_count: Math.max((p.reposts_count || 0) + delta, 0) }
-            : p
-        )
+      setSavedDislikedIds((prev) =>
+        nowDisliked ? [...prev, postId] : prev.filter((id) => id !== postId)
       );
-      setLikedPosts((prev) =>
-        prev.map((p) =>
-          p.id === postId
-            ? { ...p, reposts_count: Math.max((p.reposts_count || 0) + delta, 0) }
-            : p
-        )
+      setLikedDislikedIds((prev) =>
+        nowDisliked ? [...prev, postId] : prev.filter((id) => id !== postId)
       );
     };
 
@@ -843,21 +834,22 @@ function Profile() {
         if (!userId) return;
         try {
             // Refrescar posts normales
-            const items = await getProfileContent(userId, user?.id, filterEncrypted);
-            setProfilePosts(items);
-            let likedIds = [], repostedIds = [], savedIds = [];
-            if (user?.id && items.length > 0) {
-                const postIds = items.map((p) => p.id);
-                [likedIds, repostedIds, savedIds] = await Promise.all([
-                    getLikedPostIds(postIds, user.id),
-                    getRepostedPostIds(postIds, user.id),
-                    getSavedPostIds(postIds, user.id),
-                ]);
-                setLikedPostIds(likedIds);
-                setRepostedPostIds(repostedIds);
-                setSavedPostIds(savedIds);
-            }
-            setCachedFeed(`profile_posts_${userId}`, items, likedIds, repostedIds, savedIds);
+            const items = await getProfileContent(userId, user?.id, filterEncrypted);                setProfilePosts(items);
+                        let likedIds = [], repostedIds = [], savedIds = [], dislikedIds = [];
+                        if (user?.id && items.length > 0) {
+                            const postIds = items.map((p) => p.id);
+                            [likedIds, repostedIds, savedIds, dislikedIds] = await Promise.all([
+                                getLikedPostIds(postIds, user.id),
+                                getRepostedPostIds(postIds, user.id),
+                                getSavedPostIds(postIds, user.id),
+                                getDislikedPostIds(postIds, user.id),
+                            ]);
+                            setLikedPostIds(likedIds);
+                            setRepostedPostIds(repostedIds);
+                            setSavedPostIds(savedIds);
+                            setDislikedPostIds(dislikedIds);
+                        }
+                        setCachedFeed(`profile_posts_${userId}`, items, likedIds, repostedIds, savedIds, dislikedIds);
             // Refrescar posts programados (aparecen al instante en la tab "Programados")
             if (user?.id) {
                 const schedItems = await getScheduledPosts(user.id);
@@ -1681,12 +1673,14 @@ function Profile() {
                                 key={post.id}
                                 post={post}
                                 liked={likedPostIds.includes(post.id)}
+                                disliked={dislikedPostIds.includes(post.id)}
                                 reposted={repostedPostIds.includes(post.id)}
                                 saved={savedPostIds.includes(post.id)}
                                 onUpdate={handlePostUpdate}
                                 onDelete={handlePostDelete}
                                 onSaveToggle={handleSaveToggle}
                                 onLikeToggle={handleLikeToggle}
+                                onDislikeToggle={handleDislikeToggle}
                                 onRepostToggle={handleRepostToggle}
                                 repostInfo={post._repostInfo ? { ...post._repostInfo, repostedBy: activeProfile?.username } : null}
                             />
@@ -1721,12 +1715,14 @@ function Profile() {
                                 key={post.id}
                                 post={post}
                                 liked={savedLikedIds.includes(post.id)}
+                                disliked={savedDislikedIds.includes(post.id)}
                                 reposted={savedRepostedIds.includes(post.id)}
                                 saved={true}
                                 onUpdate={handlePostUpdate}
                                 onDelete={handlePostDelete}
                                 onSaveToggle={handleSaveToggle}
                                 onLikeToggle={handleLikeToggle}
+                                onDislikeToggle={handleDislikeToggle}
                                 onRepostToggle={handleRepostToggle}
                             />
                         ))
@@ -1763,12 +1759,14 @@ function Profile() {
                                 key={post.id}
                                 post={post}
                                 liked={likedLikedIds.includes(post.id)}
+                                disliked={likedDislikedIds.includes(post.id)}
                                 reposted={likedRepostedIds.includes(post.id)}
                                 saved={likedSavedIds.includes(post.id)}
                                 onUpdate={handlePostUpdate}
                                 onDelete={handlePostDelete}
                                 onSaveToggle={handleSaveToggle}
                                 onLikeToggle={handleLikeToggle}
+                                onDislikeToggle={handleDislikeToggle}
                                 onRepostToggle={handleRepostToggle}
                             />
                         ))
@@ -1801,12 +1799,14 @@ function Profile() {
                                 key={post.id}
                                 post={post}
                                 liked={false}
+                                disliked={false}
                                 reposted={false}
                                 saved={false}
                                 onUpdate={handlePostUpdate}
                                 onDelete={handlePostDelete}
                                 onSaveToggle={handleSaveToggle}
                                 onLikeToggle={handleLikeToggle}
+                                onDislikeToggle={handleDislikeToggle}
                                 onRepostToggle={handleRepostToggle}
                             />
                         ))

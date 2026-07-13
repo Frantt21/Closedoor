@@ -11,10 +11,12 @@ import {
   unrepostPost,
   savePost,
   unsavePost,
+  dislikePost,
+  undislikePost,
   setCachedPollVotes,
   getCachedPollVotes,
 } from '../../services/postService';
-import { FaHeart, FaRegHeart, FaComment, FaRetweet, FaThumbtack, FaEdit, FaTrash, FaEllipsisV, FaBookmark, FaRegBookmark, FaEye, FaLock, FaCheckCircle, FaRegCheckCircle, FaClock, FaBan, FaUserFriends } from 'react-icons/fa';
+import { FaHeart, FaRegHeart, FaHeartBroken, FaComment, FaRetweet, FaThumbtack, FaEdit, FaTrash, FaEllipsisV, FaBookmark, FaRegBookmark, FaEye, FaLock, FaCheckCircle, FaRegCheckCircle, FaClock, FaBan, FaUserFriends } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import Badge from './Badge';
 import SafeImage from './SafeImage';
@@ -36,12 +38,14 @@ import './css/postCard.css';
 const PostCard = React.memo(function PostCard({
   post,
   liked: initialLiked = false,
+  disliked: initialDisliked = false,
   reposted: initialReposted = false,
   saved: initialSaved = false,
   onUpdate,
   onDelete,
   onSaveToggle,
   onLikeToggle,
+  onDislikeToggle,
   onRepostToggle,
   compact = false,
   repostInfo = null,
@@ -51,6 +55,8 @@ const PostCard = React.memo(function PostCard({
   const { t, locale, hour24 } = useI18n();
   const [liked, setLiked] = useState(initialLiked);
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
+  const [disliked, setDisliked] = useState(initialDisliked);
+  const [dislikesCount, setDislikesCount] = useState(post.dislikes_count || 0);
   const [reposted, setReposted] = useState(initialReposted);
   const [repostsCount, setRepostsCount] = useState(post.reposts_count || 0);
   const [saved, setSaved] = useState(initialSaved);
@@ -236,10 +242,18 @@ const PostCard = React.memo(function PostCard({
     setLiked(initialLiked);
   }, [initialLiked]);
 
+  useEffect(() => {
+    setDisliked(initialDisliked);
+  }, [initialDisliked]);
+
   // Sincronizar contadores desde la DB (Realtime o refetch)
   useEffect(() => {
     setLikesCount(post.likes_count || 0);
   }, [post.likes_count]);
+
+  useEffect(() => {
+    setDislikesCount(post.dislikes_count || 0);
+  }, [post.dislikes_count]);
 
   useEffect(() => {
     setReposted(initialReposted);
@@ -316,12 +330,42 @@ const PostCard = React.memo(function PostCard({
         await likePost(post.id, user.id);
         setLiked(true);
         setLikesCount((c) => c + 1);
+        // If was disliked, remove dislike state (mutual exclusion)
+        if (disliked) {
+          setDisliked(false);
+          setDislikesCount((c) => Math.max(c - 1, 0));
+        }
       }
       if (onLikeToggle) onLikeToggle(post.id, nowLiked);
     } catch (err) {
       console.error('Like error:', err);
     }
-  }, [user, liked, post.id, onLikeToggle]);
+  }, [user, liked, disliked, post.id, onLikeToggle]);
+
+  const handleDislike = useCallback(async (e) => {
+    e.stopPropagation();
+    if (!user) return;
+    try {
+      const nowDisliked = !disliked;
+      if (disliked) {
+        await undislikePost(post.id, user.id);
+        setDisliked(false);
+        setDislikesCount((c) => Math.max(c - 1, 0));
+      } else {
+        await dislikePost(post.id, user.id);
+        setDisliked(true);
+        setDislikesCount((c) => c + 1);
+        // If was liked, remove like state
+        if (liked) {
+          setLiked(false);
+          setLikesCount((c) => Math.max(c - 1, 0));
+        }
+      }
+      if (onDislikeToggle) onDislikeToggle(post.id, nowDisliked);
+    } catch (err) {
+      console.error('Dislike error:', err);
+    }
+  }, [user, disliked, liked, post.id, onDislikeToggle]);
 
   const handleRepost = useCallback(async (e) => {
     e.stopPropagation();
@@ -747,6 +791,16 @@ const PostCard = React.memo(function PostCard({
               >
                 <span className="post-card-action-icon">{liked ? <FaHeart /> : <FaRegHeart />}</span>
                 <span className="post-card-action-count">{likesCount}</span>
+              </button>
+            </Tooltip>
+
+            <Tooltip text={t('post.dislike') || 'Dislike'} placement="bottom">
+              <button
+                className={`post-card-action ${disliked ? 'post-card-action--disliked' : ''}`}
+                onClick={handleDislike}
+              >
+                <span className="post-card-action-icon"><FaHeartBroken /></span>
+                <span className="post-card-action-count">{dislikesCount}</span>
               </button>
             </Tooltip>
 

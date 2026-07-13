@@ -86,6 +86,7 @@
   "profile.checking_access": "Checking access...",
 
   "post.like": "Like",
+  "post.dislike": "Dislike",
   "post.comment": "Comment",
   "post.repost": "Repost",
   "post.views_count": "Views",

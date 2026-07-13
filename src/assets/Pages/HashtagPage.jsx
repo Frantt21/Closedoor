@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth';
 import { useI18n } from '../services/i18n/useI18n';
 import { getPostsByHashtag, searchPostsByContent } from '../services/hashtagService';
-import { getLikedPostIds, getRepostedPostIds, clearFeedCache } from '../services/postService';
+import { getLikedPostIds, getRepostedPostIds, getDislikedPostIds, clearFeedCache } from '../services/postService';
 import PostCard from '../Resources/Components/PostCard';
 import { FaArrowLeft, FaHashtag, FaRegSadTear, FaFire } from 'react-icons/fa';
 import usePageTitle from '../../hooks/usePageTitle';
@@ -23,6 +23,7 @@ export default function HashtagPage() {
   const [error, setError] = useState(null);
   const [likedIds, setLikedIds] = useState([]);
   const [repostedIds, setRepostedIds] = useState([]);
+  const [dislikedIds, setDislikedIds] = useState([]);
 
   const decodedTag = tag ? decodeURIComponent(tag) : '';
   usePageTitle(decodedTag ? `#${decodedTag}` : t('hashtag.not_found'));
@@ -42,15 +43,17 @@ export default function HashtagPage() {
           : await getPostsByHashtag(decodedTag, { limit: 30 });
         setPosts(data);
 
-        // Fetch liked/reposted states
+        // Fetch liked/reposted/disliked states
         if (user?.id && data.length > 0) {
           const postIds = data.map(p => p.id);
-          const [liked, reposted] = await Promise.all([
+          const [liked, reposted, disliked] = await Promise.all([
             getLikedPostIds(postIds, user.id),
             getRepostedPostIds(postIds, user.id),
+            getDislikedPostIds(postIds, user.id),
           ]);
           setLikedIds(liked);
           setRepostedIds(reposted);
+          setDislikedIds(disliked);
         }
 
         if (data.length === 0) {
@@ -72,6 +75,24 @@ export default function HashtagPage() {
       prev.map((p) => (p.id === updatedPost.id ? { ...p, ...updatedPost } : p))
     );
     clearFeedCache('hashtag_' + decodedTag);
+  };
+
+  const handleLikeToggle = (postId, nowLiked) => {
+    setLikedIds((prev) =>
+      nowLiked ? [...prev, postId] : prev.filter((id) => id !== postId)
+    );
+  };
+
+  const handleRepostToggle = (postId, nowReposted) => {
+    setRepostedIds((prev) =>
+      nowReposted ? [...prev, postId] : prev.filter((id) => id !== postId)
+    );
+  };
+
+  const handleDislikeToggle = (postId, nowDisliked) => {
+    setDislikedIds((prev) =>
+      nowDisliked ? [...prev, postId] : prev.filter((id) => id !== postId)
+    );
   };
 
   const handlePostDelete = (postId) => {
@@ -122,9 +143,13 @@ export default function HashtagPage() {
               key={post.id}
               post={post}
               liked={likedIds.includes(post.id)}
+              disliked={dislikedIds.includes(post.id)}
               reposted={repostedIds.includes(post.id)}
               onUpdate={handlePostUpdate}
               onDelete={handlePostDelete}
+              onLikeToggle={handleLikeToggle}
+              onDislikeToggle={handleDislikeToggle}
+              onRepostToggle={handleRepostToggle}
             />
           ))}
         </div>

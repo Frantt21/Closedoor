@@ -13,6 +13,7 @@ import {
   getLikedPostIds,
   getRepostedPostIds,
   getSavedPostIds,
+  getDislikedPostIds,
   setCachedFeed,
   getCachedFeed,
 } from '../services/postService';
@@ -40,6 +41,10 @@ function Home() {
         const cached = getCachedFeed('home_feed');
         return cached?.savedIds || [];
     });
+    const [dislikedPostIds, setDislikedPostIds] = useState(() => {
+        const cached = getCachedFeed('home_feed');
+        return cached?.dislikedIds || [];
+    });
     const [postsLoading, setPostsLoading] = useState(() => {
         return !getCachedFeed('home_feed');
     });
@@ -54,6 +59,7 @@ function Home() {
             setLikedPostIds(cached.likedIds || []);
             setRepostedPostIds(cached.repostedIds || []);
             setSavedPostIds(cached.savedIds || []);
+            setDislikedPostIds(cached.dislikedIds || []);
             setPostsLoading(false);
         }
 
@@ -74,19 +80,21 @@ function Home() {
                     }
                 }
                 setPosts(data);
-                let likedIds = [], repostedIds = [], savedIds = [];
+                let likedIds = [], repostedIds = [], savedIds = [], dislikedIds = [];
                 if (user?.id && data.length > 0) {
                     const postIds = data.map((p) => p.id);
-                    [likedIds, repostedIds, savedIds] = await Promise.all([
+                    [likedIds, repostedIds, savedIds, dislikedIds] = await Promise.all([
                         getLikedPostIds(postIds, user.id),
                         getRepostedPostIds(postIds, user.id),
                         getSavedPostIds(postIds, user.id),
+                        getDislikedPostIds(postIds, user.id),
                     ]);
                     setLikedPostIds(likedIds);
                     setRepostedPostIds(repostedIds);
                     setSavedPostIds(savedIds);
+                    setDislikedPostIds(dislikedIds);
                 }
-                setCachedFeed('home_feed', data, likedIds, repostedIds, savedIds);
+                setCachedFeed('home_feed', data, likedIds, repostedIds, savedIds, dislikedIds);
             } catch (err) {
                 console.error('Error loading feed:', err);
             } finally {
@@ -109,7 +117,7 @@ function Home() {
                     setPosts((prev) =>
                         prev.map((p) =>
                             p.id === updated.id
-                                ? { ...p, likes_count: updated.likes_count, reposts_count: updated.reposts_count, comments_count: updated.comments_count }
+                                ? { ...p, likes_count: updated.likes_count, dislikes_count: updated.dislikes_count, reposts_count: updated.reposts_count, comments_count: updated.comments_count }
                                 : p
                         )
                     );
@@ -144,19 +152,21 @@ function Home() {
         try {
             const data = await getFeed({ limit: 30, userId: user?.id, filterEncrypted });
             setPosts(data);
-            let likedIds = [], repostedIds = [], savedIds = [];
+            let likedIds = [], repostedIds = [], savedIds = [], dislikedIds = [];
             if (user?.id && data.length > 0) {
                 const postIds = data.map((p) => p.id);
-                [likedIds, repostedIds, savedIds] = await Promise.all([
+                [likedIds, repostedIds, savedIds, dislikedIds] = await Promise.all([
                     getLikedPostIds(postIds, user.id),
                     getRepostedPostIds(postIds, user.id),
                     getSavedPostIds(postIds, user.id),
+                    getDislikedPostIds(postIds, user.id),
                 ]);
                 setLikedPostIds(likedIds);
                 setRepostedPostIds(repostedIds);
                 setSavedPostIds(savedIds);
+                setDislikedPostIds(dislikedIds);
             }
-            setCachedFeed('home_feed', data, likedIds, repostedIds, savedIds);
+            setCachedFeed('home_feed', data, likedIds, repostedIds, savedIds, dislikedIds);
         } catch (err) {
             console.error('Error refreshing feed:', err);
         }
@@ -170,6 +180,24 @@ function Home() {
         }
         setPosts((prev) =>
             prev.map((p) => (p.id === updatedPost.id ? { ...p, ...updatedPost } : p))
+        );
+    };
+
+    const handleLikeToggle = (postId, nowLiked) => {
+        setLikedPostIds((prev) =>
+            nowLiked ? [...prev, postId] : prev.filter((id) => id !== postId)
+        );
+    };
+
+    const handleRepostToggle = (postId, nowReposted) => {
+        setRepostedPostIds((prev) =>
+            nowReposted ? [...prev, postId] : prev.filter((id) => id !== postId)
+        );
+    };
+
+    const handleDislikeToggle = (postId, nowDisliked) => {
+        setDislikedPostIds((prev) =>
+            nowDisliked ? [...prev, postId] : prev.filter((id) => id !== postId)
         );
     };
 
@@ -234,10 +262,14 @@ function Home() {
                                 key={post.id}
                                 post={post}
                                 liked={likedPostIds.includes(post.id)}
+                                disliked={dislikedPostIds.includes(post.id)}
                                 reposted={repostedPostIds.includes(post.id)}
                                 saved={savedPostIds.includes(post.id)}
                                 onUpdate={handlePostUpdate}
                                 onDelete={handlePostDelete}
+                                onLikeToggle={handleLikeToggle}
+                                onDislikeToggle={handleDislikeToggle}
+                                onRepostToggle={handleRepostToggle}
                             />
                         ))
                     )}

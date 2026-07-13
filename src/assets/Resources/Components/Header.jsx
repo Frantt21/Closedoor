@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { useState, useContext } from 'react';
+import { useState, useContext, useEffect } from 'react';
 import './css/header.css';
 import { FaHome, FaUser, FaBars, FaBell, FaCompass, FaCog, FaComment, FaUsers } from 'react-icons/fa';
 import { MdLogout } from "react-icons/md";
@@ -9,21 +9,29 @@ import { useI18n } from '../../../assets/services/i18n/useI18n';
 import Tooltip from './Tooltip';
 import React from 'react';
 
+const SIDEBAR_STORAGE_KEY = 'fc_sidebar_collapsed';
+
+function getInitialCollapsed() {
+  try {
+    const stored = localStorage.getItem(SIDEBAR_STORAGE_KEY);
+    if (stored !== null) return JSON.parse(stored);
+  } catch { /* ignore */ }
+  return true;
+}
+
 function Header() {
-  const { user, profile, isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, logout } = useAuth();
   const { unreadCount } = useContext(NotificationContext);
   const { t } = useI18n();
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(getInitialCollapsed);
   const location = useLocation();
 
-  const avatarUrl = profile?.avatar_url || user?.user_metadata?.avatar_url || null;
-  const displayName =
-    profile?.username ||
-    user?.user_metadata?.display_name ||
-    user?.user_metadata?.displayname ||
-    user?.user_metadata?.username ||
-    user?.email?.split('@')[0] ||
-    'Guest';
+  // Persistir preferencia de sidebar colapsado/expandido
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_STORAGE_KEY, JSON.stringify(collapsed));
+    } catch { /* ignore */ }
+  }, [collapsed]);
 
   const handleLogout = async () => {
     await logout();
@@ -32,25 +40,16 @@ function Header() {
   return (
     <aside className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}`}>
       <div className="sidebar-brand">
-        <div className="minicard_profile">
-          <div>
-              <img
-                className="user_pfp"
-                src={avatarUrl || 'https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg'}
-                alt="User Profile Picture"
-              />
-            </div>
-
-          {isAuthenticated ? (
-            <div className="user_nick">
-              <p>{displayName}</p>
-            </div>
-          ) : (
-            <div className="user_nick">
-              <p>{t('common.username')}</p>
-            </div>
-          )}
-        </div>
+        <Link to="/" className="minicard_profile" style={{ textDecoration: 'none' }}>
+          <img
+            className="sidebar-brand-logo"
+            src="/mini_icon_white.webp"
+            alt="Closedoor"
+          />
+          <div className="user_nick">
+            <p>Closedoor</p>
+          </div>
+        </Link>
       </div>
 
       <nav className="sidebar-nav">

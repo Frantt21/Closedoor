@@ -388,6 +388,13 @@ export async function getFeed({ limit = 20, offset = 0, userId, filterEncrypted 
 // ── LIKES ──
 
 export async function likePost(postId, userId) {
+  // Remove any existing dislike first (mutual exclusion)
+  await supabase
+    .from('dislikes')
+    .delete()
+    .eq('user_id', userId)
+    .eq('post_id', postId);
+
   const { error } = await supabase
     .from('likes')
     .insert({ user_id: userId, post_id: postId });
@@ -944,6 +951,64 @@ export async function getLikedPosts(userId, { limit = 50, offset = 0 } = {}) {
   }));
 }
 
+// ── DISLIKES ──
+
+export async function dislikePost(postId, userId) {
+  // First remove any existing like (mutual exclusion)
+  await supabase
+    .from('likes')
+    .delete()
+    .eq('user_id', userId)
+    .eq('post_id', postId);
+
+  const { error } = await supabase
+    .from('dislikes')
+    .insert({ user_id: userId, post_id: postId });
+
+  if (error && error.code !== '23505') {
+    console.error('Error disliking post:', error);
+    throw error;
+  }
+}
+
+export async function undislikePost(postId, userId) {
+  const { error } = await supabase
+    .from('dislikes')
+    .delete()
+    .eq('user_id', userId)
+    .eq('post_id', postId);
+
+  if (error) {
+    console.error('Error undisliking post:', error);
+    throw error;
+  }
+}
+
+export async function isDisliked(postId, userId) {
+  if (!userId || !postId) return false;
+  const { data, error } = await supabase
+    .from('dislikes')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('post_id', postId)
+    .maybeSingle();
+
+  if (error) return false;
+  return !!data;
+}
+
+export async function getDislikedPostIds(postIds, userId) {
+  if (!userId || !postIds.length) return [];
+  const { data, error } = await supabase
+    .from('dislikes')
+    .select('post_id')
+    .eq('user_id', userId)
+    .in('post_id', postIds);
+
+  if (error) return [];
+  return (data || []).map((d) => d.post_id);
+}
+
 // ── SAVED POSTS ──
 
 export async function savePost(postId, userId) {
@@ -1195,13 +1260,13 @@ export function sortProfilePosts(a, b) {
 const FEED_CACHE_PREFIX = 'fc_feed_';
 const FEED_CACHE_TTL = 1000 * 60 * 10; // 10 min
 
-export function setCachedFeed(key, items, likedIds, repostedIds, savedIds) {
+export function setCachedFeed(key, items, likedIds, repostedIds, savedIds, dislikedIds) {
   if (!items) return;
   try {
     const payload = {
       ts: Date.now(),
       ttl: FEED_CACHE_TTL,
-      data: { items, likedIds: likedIds || [], repostedIds: repostedIds || [], savedIds: savedIds || [] },
+      data: { items, likedIds: likedIds || [], repostedIds: repostedIds || [], savedIds: savedIds || [], dislikedIds: dislikedIds || [] },
     };
     localStorage.setItem(FEED_CACHE_PREFIX + key, JSON.stringify(payload));
   } catch (err) {

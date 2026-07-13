@@ -292,6 +292,16 @@
   color: inherit;
 }
 
+.post-card-action--disliked {
+    background: rgba(239, 68, 68, 0.08);
+    color: #ef4444;
+}
+
+.post-card-action--disliked:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
 /* Repost activo: verde */
 .post-card-action--reposted {
     background: rgba(74, 222, 128, 0.08);

@@ -1,0 +1,38 @@
+/* ── Full-screen loader overlay ── */
+.app-loader-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-bg, #000000);
+    transition: opacity 0.4s ease;
+    opacity: 1;
+}
+
+.app-loader-overlay--hidden {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* ── Loader container ── */
+.app-loader-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* ── Logo ── */
+.app-loader-logo {
+    width: 80px;
+    height: 80px;
+    object-fit: contain;
+    animation: appLoaderPulse 1.5s ease-in-out infinite;
+}
+
+/* ── Keyframes ── */
+@keyframes appLoaderPulse {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.08); }
+}

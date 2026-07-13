@@ -86,6 +86,7 @@
   "profile.checking_access": "Verificando acceso...",
 
   "post.like": "Me gusta",
+  "post.dislike": "No me gusta",
   "post.comment": "Comentar",
   "post.repost": "Repostear",
   "post.views_count": "Vistas",

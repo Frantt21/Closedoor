@@ -117,6 +117,15 @@
     object-fit: cover;
 }
 
+/* Sidebar brand logo (sin bordes redondos, mantiene posición al expandir/colapsar) */
+.sidebar-brand-logo {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    object-fit: contain;
+    margin-left: 4px;
+}
+
 .user_nick {
     font-size: 0.9rem;
     font-weight: 600;

@@ -13,6 +13,7 @@ import {
   deleteComment,
   isLiked,
   isReposted,
+  isDisliked,
   likeComment,
   unlikeComment,
   isCommentLiked,
@@ -20,6 +21,8 @@ import {
   setCachedComments,
   trackPostView,
   canCommentOnPost,
+  dislikePost,
+  undislikePost,
 } from '../services/postService';
 import { FaHeart, FaRegHeart, FaReply, FaTrash, FaRegComment, FaRegSadTear, FaArrowLeft, FaImage, FaEllipsisV } from 'react-icons/fa';
 import PostCard from '../Resources/Components/PostCard';
@@ -130,6 +133,7 @@ export default function PostDetail() {
   const goCommentGalleryNext = () => setCommentGalleryIndex((prev) => (prev < commentGalleryUrls.length - 1 ? prev + 1 : 0));
 
   const [liked, setLiked] = useState(false);
+  const [disliked, setDisliked] = useState(false);
   const [reposted, setReposted] = useState(false);
   const [expandedReplies, setExpandedReplies] = useState({}); // { [commentId]: boolean }
 
@@ -209,11 +213,12 @@ export default function PostDetail() {
     trackPostView(postId, user?.id);
   }, [postId, user?.id]);
 
-  // Check if current user liked/reposted this post
+  // Check if current user liked/reposted/disliked this post
   useEffect(() => {
     if (!user?.id || !postId) return;
     isLiked(postId, user.id).then(setLiked).catch(() => {});
     isReposted(postId, user.id).then(setReposted).catch(() => {});
+    isDisliked(postId, user.id).then(setDisliked).catch(() => {});
   }, [user?.id, postId]);
 
   // Check comment permission when post loads
@@ -278,8 +283,7 @@ export default function PostDetail() {
             console.warn('Error fetching new comment:', err);
           }
         }
-      )
-      .on(
+      )          .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'posts', filter: `id=eq.${postId}` },
         (payload) => {
@@ -290,6 +294,7 @@ export default function PostDetail() {
             const merged = {
               ...prev,
               likes_count: updated.likes_count,
+              dislikes_count: updated.dislikes_count,
               reposts_count: updated.reposts_count,
               comments_count: updated.comments_count,
               views_count: updated.views_count,
@@ -456,6 +461,22 @@ export default function PostDetail() {
       }
     } catch (err) {
       console.error('Error toggling comment like:', err);
+    }
+  };
+
+  const handleDislikeToggle = async (postId, nowDisliked) => {
+    if (!user) return;
+    try {
+      if (nowDisliked) {
+        await dislikePost(postId, user.id);
+        setDisliked(true);
+        setLiked(false);
+      } else {
+        await undislikePost(postId, user.id);
+        setDisliked(false);
+      }
+    } catch (err) {
+      console.error('Dislike error:', err);
     }
   };
 
@@ -915,9 +936,13 @@ export default function PostDetail() {
       <PostCard
         post={post}
         liked={liked}
+        disliked={disliked}
         reposted={reposted}
         onUpdate={handlePostUpdate}
         onDelete={handlePostDelete}
+        onLikeToggle={(id, nowLiked) => setLiked(nowLiked)}
+        onDislikeToggle={handleDislikeToggle}
+        onRepostToggle={(id, nowReposted) => setReposted(nowReposted)}
       />
 
       {/* Comments Section */}
