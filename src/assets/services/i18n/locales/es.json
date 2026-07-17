@@ -435,5 +435,8 @@
   "settings.allow_encrypted_add": "Permitir inclusión en posts encriptados",
   "settings.allow_encrypted_add_desc": "Permite que otros te añadan a la lista de usuarios autorizados en posts encriptados.",
   "settings.blocked_users": "Usuarios bloqueados",
-  "settings.blocked_users_desc": "Gestiona los usuarios que has bloqueado"
+  "settings.blocked_users_desc": "Gestiona los usuarios que has bloqueado",
+  "settings.logout": "Cerrar sesión",
+  "settings.logout_desc": "Cierra tu sesión actual y sal de tu cuenta.",
+  "settings.logout_btn": "Cerrar sesión"
 }

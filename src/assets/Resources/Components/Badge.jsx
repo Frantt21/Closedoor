@@ -1,22 +1,29 @@
 import React from 'react';
+import Tooltip from './Tooltip';
 import './css/badge.css';
 
 const ROLE_CONFIG = {
   admin: {
     className: 'role-badge--admin',
-    label: 'Admin',
+    img: '/admin_badge.png',
+    alt: 'Admin',
+    tooltip: 'Admin',
   },
   dev: {
     className: 'role-badge--dev',
-    label: 'Dev',
+    img: '/dev_badge.png',
+    alt: 'Dev',
+    tooltip: 'Dev',
   },
   mod: {
     className: 'role-badge--mod',
     label: 'Mod',
+    tooltip: 'Mod',
   },
   partner: {
     className: 'role-badge--partner',
     label: 'Partner',
+    tooltip: 'Partner',
   },
 };
 
@@ -28,12 +35,24 @@ export default function Badge({ roles = ['user'] }) {
   if (items.length === 0) return null;
 
   return (
-    <>
+    <div className="role-badges">
       {items.map((item) => (
-        <span key={item.className} className={`role-badge ${item.className}`}>
-          {item.label}
-        </span>
+        <Tooltip key={item.className} text={item.tooltip}>
+          <span className={`role-badge ${item.className}`}>
+            {item.img ? (
+              <img 
+                src={item.img} 
+                alt={item.alt} 
+                className="role-badge-img" 
+                draggable={false}
+                loading="lazy"
+              />
+            ) : (
+              item.label
+            )}
+          </span>
+        </Tooltip>
       ))}
-    </>
+    </div>
   );
 }

@@ -34,6 +34,7 @@
   "auth.login_error": "ログインに失敗しました",
   "auth.password_length": "パスワードは6文字以上必要です",
   "auth.register_error": "登録に失敗しました",
+  "auth.login_required": "この操作を行うにはログインが必要です",
   "profile.title": "プロフィール",
   "profile.edit": "編集",
   "profile.followers": "フォロワー",
@@ -81,6 +82,7 @@
   "profile.pronouns": "代名詞",
   "profile.follows_you": "フォローされています",
   "profile.checking_access": "アクセス確認中...",
+  "post.dislike": "よくないね",
   "post.like": "いいね",
   "post.comment": "コメント",
   "post.repost": "リポスト",
@@ -413,5 +415,8 @@
   "settings.allow_encrypted_add": "暗号化投稿への追加を許可",
   "settings.allow_encrypted_add_desc": "他のユーザーがあなたを暗号化投稿の許可リストに追加できるようにします。",
   "settings.blocked_users": "ブロックしたユーザー",
-  "settings.blocked_users_desc": "ブロックしたユーザーを管理"
+  "settings.blocked_users_desc": "ブロックしたユーザーを管理",
+  "settings.logout": "ログアウト",
+  "settings.logout_desc": "現在のセッションを終了してログアウトします。",
+  "settings.logout_btn": "ログアウト"
 }

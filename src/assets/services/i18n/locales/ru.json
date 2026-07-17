@@ -34,6 +34,7 @@
   "auth.login_error": "Ошибка входа",
   "auth.password_length": "Пароль должен содержать не менее 6 символов",
   "auth.register_error": "Ошибка регистрации",
+  "auth.login_required": "Вам нужно войти, чтобы сделать это",
   "profile.title": "Профиль",
   "profile.edit": "Редактировать",
   "profile.followers": "подписчиков",
@@ -81,6 +82,7 @@
   "profile.pronouns": "Местоимения",
   "profile.follows_you": "Подписан на вас",
   "profile.checking_access": "Проверка доступа...",
+  "post.dislike": "Не нравится",
   "post.like": "Нравится",
   "post.comment": "Комментировать",
   "post.repost": "Репост",
@@ -413,5 +415,8 @@
   "settings.allow_encrypted_add": "Разрешить включение в скрытые посты",
   "settings.allow_encrypted_add_desc": "Разрешить другим добавлять вас в списки доступа к скрытым постам.",
   "settings.blocked_users": "Заблокированные пользователи",
-  "settings.blocked_users_desc": "Управление заблокированными пользователями"
+  "settings.blocked_users_desc": "Управление заблокированными пользователями",
+  "settings.logout": "Выйти",
+  "settings.logout_desc": "Завершите текущий сеанс и выйдите из учётной записи.",
+  "settings.logout_btn": "Выйти"
 }

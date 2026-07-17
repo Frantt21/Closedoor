@@ -367,13 +367,17 @@ function Profile() {
     const [tab, setTab] = useState('posts'); // 'posts' | 'likes' | 'saved' | 'scheduled'
     const [postSubFilter, setPostSubFilter] = useState('all'); // 'all' | 'reposts'
     const [postFilterOpen, setPostFilterOpen] = useState(false);
+    const [postFilterDropdownStyle, setPostFilterDropdownStyle] = useState(null);
     const postFilterRef = useRef(null);
+    const postFilterDropdownRef = useRef(null);
 
   // ── Close post filter dropdown on outside click ──
   useEffect(() => {
     if (!postFilterOpen) return;
     const handleClick = (e) => {
-      if (postFilterRef.current && !postFilterRef.current.contains(e.target)) {
+      const inTrigger = postFilterRef.current && postFilterRef.current.contains(e.target);
+      const inDropdown = postFilterDropdownRef.current && postFilterDropdownRef.current.contains(e.target);
+      if (!inTrigger && !inDropdown) {
         setPostFilterOpen(false);
       }
     };
@@ -1249,10 +1253,10 @@ function Profile() {
                     </div>
 
                     <div className="profile-user-info">
-                        <p className="profile-username">
+                        <div className="profile-username">
                             {profileDisplayName}
                             <Badge roles={roles} />
-                        </p>
+                        </div>
 
                         {!isOwnProfile && isBlockedByMe ? (
                           <div className="profile-stats">
@@ -1379,7 +1383,7 @@ function Profile() {
                                     }}
                                 >
                                     <FaPen className="profile-edit-icon" />
-                                    <span className="profile-edit-label">{t('profile.edit')}</span>
+                                    {/* <span className="profile-edit-label">{t('profile.edit')}</span> */}
                                 </button>
                             ) : (
                                 <>
@@ -1592,6 +1596,15 @@ function Profile() {
                                         className={`posts-tab-filter-toggle ${postFilterOpen ? 'posts-tab-filter-toggle--open' : ''}`}
                                         onClick={(e) => {
                                             e.stopPropagation();
+                                            const parentRect = postFilterRef.current?.getBoundingClientRect();
+                                            if (parentRect) {
+                                                setPostFilterDropdownStyle({
+                                                    position: 'fixed',
+                                                    top: `${parentRect.bottom + 4}px`,
+                                                    left: `${parentRect.left}px`,
+                                                    zIndex: 9999,
+                                                });
+                                            }
                                             setPostFilterOpen(prev => !prev);
                                         }}
                                     >
@@ -1599,8 +1612,12 @@ function Profile() {
                                     </span>
                                 )}
                             </button>
-                            {tab === 'posts' && postFilterOpen && (
-                                <div className="posts-tab-filter-dropdown">
+                            {tab === 'posts' && postFilterOpen && postFilterDropdownStyle && createPortal(
+                                <div
+                                    ref={postFilterDropdownRef}
+                                    className="posts-tab-filter-dropdown"
+                                    style={postFilterDropdownStyle}
+                                >
                                     <button
                                         className={`posts-tab-filter-item ${postSubFilter === 'all' ? 'posts-tab-filter-item--active' : ''}`}
                                         onClick={() => { setPostSubFilter('all'); setPostFilterOpen(false); }}
@@ -1614,7 +1631,8 @@ function Profile() {
                                         <FaRetweet style={{ fontSize: '0.72rem' }} />
                                         {t('profile.filter_reposts')}
                                     </button>
-                                </div>
+                                </div>,
+                                document.body
                             )}
                         </div>
                         {(isOwnProfile ? showLikes : activeProfile?.show_likes) && (

@@ -3,6 +3,13 @@
    Mismo estilo glass/blur que el botón de follow
    ========================================== */
 
+/* ── Badge container ── */
+.role-badges {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
 .role-badge {
     display: inline-flex;
     align-items: center;
@@ -24,6 +31,15 @@
     transition: background 0.2s ease;
 }
 
+/* ── Badge image ── */
+.role-badge-img {
+    display: block;
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
 /* ── All badges use the same neutral glass style ── */
 .role-badge--admin,
 .role-badge--dev,
@@ -31,7 +47,17 @@
 .role-badge--partner {
     background: var(--overlay-bg);
     color: var(--color-text-secondary, #9ca3af);
+    padding: 3px 10px;
 }
+
+/* Badges with images — no background, no padding, image only */
+.role-badge--admin,
+.role-badge--dev {
+    background: none !important;
+    padding: 0;
+}
+
+
 
 
 

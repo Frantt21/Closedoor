@@ -153,9 +153,7 @@
     pointer-events: none;
 }
 
-/* Body — fondo completo con gradiente de acento (primario + secundario)
-   Por defecto: solo fondo de superficie (gris)
-   Con acento: gradiente sobre fondo negro */
+/* Body */
 .explore-card-body {
     position: relative;
     padding: 16px;
@@ -176,11 +174,11 @@
 }
 
 .explore-card-avatar {
-    width: 56px;
-    height: 56px;
+    width: 64px;
+    height: 64px;
     border-radius: 50%;
     object-fit: cover;
-    margin-top: -28px;
+    margin-top: -32px;
     margin-bottom: 8px;
     border: 3px solid var(--color-surface, #1a1a1a);
     background: var(--color-bg, #000000);

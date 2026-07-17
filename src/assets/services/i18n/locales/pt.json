@@ -34,6 +34,7 @@
   "auth.login_error": "Erro ao entrar",
   "auth.password_length": "A senha deve ter pelo menos 6 caracteres",
   "auth.register_error": "Erro ao cadastrar",
+  "auth.login_required": "Você precisa fazer login para fazer isso",
   "profile.title": "Perfil",
   "profile.edit": "Editar perfil",
   "profile.followers": "seguidores",
@@ -81,6 +82,7 @@
   "profile.pronouns": "Pronomes",
   "profile.follows_you": "Segue você",
   "profile.checking_access": "Verificando acesso...",
+  "post.dislike": "Não curtir",
   "post.like": "Curtir",
   "post.comment": "Comentar",
   "post.repost": "Repostar",
@@ -413,5 +415,8 @@
   "settings.allow_encrypted_add": "Permitir inclusão em posts criptografados",
   "settings.allow_encrypted_add_desc": "Permitir que outros adicionem você às listas de permissão de posts criptografados.",
   "settings.blocked_users": "Usuários bloqueados",
-  "settings.blocked_users_desc": "Gerenciar usuários que você bloqueou"
+  "settings.blocked_users_desc": "Gerenciar usuários que você bloqueou",
+  "settings.logout": "Sair",
+  "settings.logout_desc": "Encerre sua sessão atual e saia da sua conta.",
+  "settings.logout_btn": "Sair"
 }

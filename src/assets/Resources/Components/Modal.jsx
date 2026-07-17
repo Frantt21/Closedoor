@@ -438,10 +438,10 @@ export default function Modal({
                     <FaCamera />
                   </button>
                 </div>                <div className="fc-preview-card-info" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
-                  <p style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+                  <div style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
                     <span className="fc-preview-card-name">{previewUsername}</span>
                     <Badge roles={userRoles} />
-                  </p>
+                  </div>
 
                   {/* Stats */}
                   <div style={{
