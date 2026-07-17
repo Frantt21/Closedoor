@@ -6,6 +6,7 @@
   max-width: 800px;
   margin: 0 auto;
   padding: 0;
+  overflow-x: hidden;
 }
 
 /* ── Card ── */
@@ -459,15 +460,86 @@
   font-size: 0.7rem;
 }
 
-/* ── Responsive: stack vertically on small screens ── */
+/* ── Responsive ── */
 
-@media (max-width: 600px) {
+@media (max-width: 850px) {
+  .settings-card--split {
+    flex-direction: column;
+  }
+
   .settings-nav {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    padding: 10px;
+    min-width: auto;
     border-radius: var(--radius, 10px) var(--radius, 10px) 0 0;
   }
 
+  .settings-nav-btn {
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 8px 4px;
+    gap: 4px;
+    width: 100%;
+    min-height: 60px;
+  }
+
+  .settings-nav-icon {
+    font-size: 1rem;
+  }
+
+  .settings-nav-title {
+    font-size: 0.75rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+
+  .settings-nav-info {
+    flex: none;
+  }
+
+  .settings-nav-desc {
+    display: none;
+  }
+
   .settings-panel {
+    border-left: none;
+    border-top: 1px solid var(--color-border, #2a2a2a);
     border-radius: 0 0 var(--radius, 10px) var(--radius, 10px);
+    padding: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .settings-nav-btn {
+    padding: 6px 2px;
+    min-height: 50px;
+  }
+
+  .settings-nav-icon {
+    font-size: 0.85rem;
+  }
+
+  .settings-nav-title {
+    font-size: 0.65rem;
+  }
+
+  .settings-panel {
+    padding: 12px;
+  }
+
+  .settings-segmented-btn {
+    padding: 4px 10px;
+    font-size: 0.7rem;
+  }
+
+  .settings-select-wrapper {
+    min-width: 120px;
   }
 }
 
@@ -608,39 +680,4 @@
   background: rgba(239, 68, 68, 0.2);
 }
 
-@media (max-width: 600px) {
-  .settings-page {
-    max-width: 100%;
-    padding: 0 12px 40px;
-  }
 
-  .settings-card--split {
-    flex-direction: column;
-  }
-
-  .settings-nav {
-    flex-direction: row;
-    overflow-x: auto;
-    gap: 6px;
-    padding: 10px;
-    min-width: auto;
-  }
-
-  .settings-nav-btn {
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    min-width: 100px;
-    padding: 10px;
-  }
-
-  .settings-nav-desc {
-    display: none;
-  }
-
-  .settings-panel {
-    border-left: none;
-    border-top: 1px solid var(--color-border, #2a2a2a);
-    padding: 16px;
-  }
-}

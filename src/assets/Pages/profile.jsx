@@ -48,13 +48,14 @@ import Modal from "../Resources/Components/Modal";
 import Badge from "../Resources/Components/Badge";
 import Tooltip from "../Resources/Components/Tooltip";
 import { getPlatformIcon, getPlatformName } from "../services/socialPlatforms";
-import { FaFeather, FaBookmark, FaLock, FaEllipsisH, FaBan, FaClock, FaHeart, FaRetweet, FaChevronDown, FaShareAlt } from 'react-icons/fa';
+import { FaFeather, FaBookmark, FaLock, FaEllipsisH, FaBan, FaClock, FaHeart, FaRetweet, FaChevronDown, FaShareAlt, FaPen } from 'react-icons/fa';
 import FollowButton from "../Resources/Components/FollowButton";
 import { blockUser, unblockUser, isBlocked, cacheBlockStatus, getCachedBlockStatus, unfollowBothWays } from "../services/blockService";
 import { useI18n } from "../services/i18n/useI18n";
 import { getContrastText, isUUID, getImgTransformStyle, getBgFullStyle } from "../services/helpers";
 import usePageMeta from "../../hooks/usePageMeta";
 import FollowersModal from "../Resources/Components/FollowersModal";
+import ModalShell from "../Resources/Components/ModalShell";
 import PostCard from "../Resources/Components/PostCard";
 import CreatePostModal from "../Resources/Components/CreatePostModal";
 import FloatingActionButton from "../Resources/Components/FloatingActionButton";
@@ -1309,6 +1310,21 @@ function Profile() {
                             <p className="profile-bio profile-bio--empty">{t('profile.no_bio')}</p>
                         )}
 
+                        {/* ── Mobile social links trigger ("..." after bio) ── */}
+                        {activeProfile?.social_links?.length > 0 && (
+                            <button
+                                type="button"
+                                className="profile-social-links-trigger"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSocialLinksModal(true);
+                                }}
+                                aria-label={t('profile.social_links') || 'Social links'}
+                            >
+                                <FaEllipsisH />
+                            </button>
+                        )}
+
                         {/* ── Social Links (max 3, then "+N" modal) ── */}
                         {activeProfile?.social_links?.length > 0 && (
                             <div className="profile-social-links">
@@ -1362,7 +1378,8 @@ function Profile() {
                                         setShowModal(true);
                                     }}
                                 >
-                                    {t('profile.edit')}
+                                    <FaPen className="profile-edit-icon" />
+                                    <span className="profile-edit-label">{t('profile.edit')}</span>
                                 </button>
                             ) : (
                                 <>
@@ -1517,40 +1534,38 @@ function Profile() {
             />
 
             {/* Social Links modal */}
-            {socialLinksModal && (
-                <div className="fc-modal-overlay" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) setSocialLinksModal(false); }}>
-                    <div className="fc-modal social-links-modal">
-                        <div className="followers-modal-header">
-                            <h3 className="fc-modal-title">{t('modal.social_links')}</h3>
-                            <button
-                                type="button"
-                                className="followers-modal-close"
-                                onClick={() => setSocialLinksModal(false)}
-                                aria-label={t('common.close')}
-                            >
-                                ×
-                            </button>
-                        </div>
-                        <div className="social-links-modal-list">
-                            {activeProfile.social_links.map((link, i) => (
-                                <a
-                                    key={i}
-                                    href={link.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="social-links-modal-item"
-                                    onClick={() => setSocialLinksModal(false)}
-                                >
-                                    <span className="social-links-modal-icon">{React.createElement(getPlatformIcon(link.platform))}</span>
-                                    <div className="social-links-modal-info">
-                                        <span className="social-links-modal-platform">{getPlatformName(link.platform)}</span>
-                                        <span className="social-links-modal-url">{link.url}</span>
-                                    </div>
-                                </a>
-                            ))}
-                        </div>
+            {activeProfile && (
+                <ModalShell isOpen={socialLinksModal} onClose={() => setSocialLinksModal(false)} onEscape={() => setSocialLinksModal(false)} className="social-links-modal">
+                    <div className="followers-modal-header">
+                        <h3 className="fc-modal-title">{t('modal.social_links')}</h3>
+                        <button
+                            type="button"
+                            className="followers-modal-close"
+                            onClick={() => setSocialLinksModal(false)}
+                            aria-label={t('common.close')}
+                        >
+                            ×
+                        </button>
                     </div>
-                </div>
+                    <div className="social-links-modal-list">
+                        {activeProfile.social_links.map((link, i) => (
+                            <a
+                                key={i}
+                                href={link.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="social-links-modal-item"
+                                onClick={() => setSocialLinksModal(false)}
+                            >
+                                <span className="social-links-modal-icon">{React.createElement(getPlatformIcon(link.platform))}</span>
+                                <div className="social-links-modal-info">
+                                    <span className="social-links-modal-platform">{getPlatformName(link.platform)}</span>
+                                    <span className="social-links-modal-url">{link.url}</span>
+                                </div>
+                            </a>
+                        ))}
+                    </div>
+                </ModalShell>
             )}
 
             {/* ── Posts Section ── */}

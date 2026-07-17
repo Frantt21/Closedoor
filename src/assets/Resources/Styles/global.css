@@ -122,19 +122,19 @@ body:has(.sidebar--collapsed) .app-layout {
   width: 100%;
 }
 
-/* ── Responsive: <= 1024px (ocultar sidebar, padding reducido, bottom nav) ── */
+/* ── Responsive: <= 1024px (ocultar sidebar, block layout, bottom nav) ── */
 @media (max-width: 1024px) {
     .app-layout {
+        display: block;
         max-width: 100%;
-        margin: 0;
         padding: 16px;
         padding-bottom: 80px;
         padding-left: 16px !important;
     }
 
     .app-content {
-        flex: 1;
-        max-width: 100%;
+        max-width: 680px;
+        margin: 0 auto;
         width: 100%;
     }
 
@@ -146,8 +146,6 @@ body:has(.sidebar--collapsed) .app-layout {
 
 @media (max-width: 480px) {
     .app-layout {
-        max-width: 100%;
-        margin: 0;
         padding: 12px;
         padding-bottom: 76px;
         padding-left: 12px !important;
