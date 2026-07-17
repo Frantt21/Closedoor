@@ -416,6 +416,12 @@
   "settings.allow_encrypted_add_desc": "他のユーザーがあなたを暗号化投稿の許可リストに追加できるようにします。",
   "settings.blocked_users": "ブロックしたユーザー",
   "settings.blocked_users_desc": "ブロックしたユーザーを管理",
+  "settings.cache": "キャッシュ",
+  "settings.cache_desc": "ローカルに保存されたデータを管理して容量を解放します。",
+  "settings.cache_size": "キャッシュサイズ: {size}",
+  "settings.cache_clear": "キャッシュを消去",
+  "settings.cache_clear_confirm": "これにより、ローカルにキャッシュされたすべてのデータ（投稿、プロフィール、画像など）が削除されます。アカウント設定には影響しません。続行しますか？",
+  "settings.cache_cleared": "キャッシュが正常に消去されました！",
   "settings.logout": "ログアウト",
   "settings.logout_desc": "現在のセッションを終了してログアウトします。",
   "settings.logout_btn": "ログアウト"

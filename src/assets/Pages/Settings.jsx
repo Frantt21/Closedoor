@@ -1,12 +1,15 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useI18n } from '../services/i18n/useI18n';
 import usePageTitle from '../../hooks/usePageTitle';
 import { useAuth } from '../../hooks/useAuth';
 import { updateUserProfile } from '../services/userService';
+import { clearAllAppCaches } from '../services/postService';
 import { getBlockedUsers, getCachedBlockedUsers, unblockUser, cacheBlockStatus, subscribeBlockChanges } from '../services/blockService';
 import { useNavigate } from 'react-router-dom';
-import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaFire, FaChartBar, FaBell, FaBrush, FaBan, FaClock, FaAt } from 'react-icons/fa';
+import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaFire, FaChartBar, FaBell, FaBrush, FaBan, FaClock, FaAt, FaTrashAlt } from 'react-icons/fa';
 import { MdLogout } from 'react-icons/md';
+import { toast } from 'react-toastify';
+import ConfirmModal from '../Resources/Components/ConfirmModal';
 import '../Resources/Styles/settings.css';
 
 /* ── SVG Flag Icons ── */
@@ -94,6 +97,35 @@ export default function Settings() {
     return !user?.id || !getCachedBlockedUsers(user.id);
   });
   const [unblockingId, setUnblockingId] = useState(null);
+  const [showClearCacheModal, setShowClearCacheModal] = useState(false);
+  const [cacheRevision, setCacheRevision] = useState(0);
+
+  // ── Calculate cache size ──
+  const cacheSize = useMemo(() => {
+    try {
+      let total = 0;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('fc_')) {
+          const value = localStorage.getItem(key);
+          if (value) total += value.length * 2; // UTF-16: 2 bytes per char
+        }
+      }
+      if (total === 0) return '0 KB';
+      if (total < 1024) return `${total} B`;
+      if (total < 1024 * 1024) return `${(total / 1024).toFixed(1)} KB`;
+      return `${(total / (1024 * 1024)).toFixed(1)} MB`;
+    } catch {
+      return '0 KB';
+    }
+  }, [cacheRevision]);
+
+  const handleClearCache = () => {
+    clearAllAppCaches();
+    setCacheRevision(v => v + 1);
+    setShowClearCacheModal(false);
+    toast.success(t('settings.cache_cleared'));
+  };
 
   // ── Forzar re-render cuando cambia el estado de bloqueo (subscribeBlockChanges) ──
   const [blockRevision, setBlockRevision] = useState(0);
@@ -356,6 +388,28 @@ export default function Settings() {
                     <FaSun style={{ marginRight: 6 }} />{t('settings.theme_light')}
                   </button>
                 </div>
+              </div>
+
+              <div className="settings-row-divider" />
+
+              {/* ── Caché ── */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaTrashAlt /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.cache')}</h2>
+                    <p className="settings-section-desc">{t('settings.cache_desc')}</p>
+                  </div>
+                </div>
+                <span className="settings-cache-size">{t('settings.cache_size', { size: cacheSize })}</span>
+                <button
+                  type="button"
+                  className="settings-edit-btn"
+                  onClick={() => setShowClearCacheModal(true)}
+                >
+                  <FaTrashAlt style={{ marginRight: 6 }} />
+                  {t('settings.cache_clear')}
+                </button>
               </div>
 
               <div className="settings-row-divider" />
@@ -930,6 +984,15 @@ export default function Settings() {
           )}
         </div>
       </div>
+
+      {/* ── Clear Cache Confirmation ── */}
+      {showClearCacheModal && (
+        <ConfirmModal
+          message={t('settings.cache_clear_confirm')}
+          onConfirm={handleClearCache}
+          onCancel={() => setShowClearCacheModal(false)}
+        />
+      )}
 
       {/* ── Blocked Users Modal ── */}
       {showBlockedModal && (

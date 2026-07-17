@@ -437,6 +437,12 @@
   "settings.allow_encrypted_add_desc": "Allow others to add you to their encrypted post allowed lists.",
   "settings.blocked_users": "Blocked users",
   "settings.blocked_users_desc": "Manage users you have blocked",
+  "settings.cache": "Cache",
+  "settings.cache_desc": "Manage locally stored data to free up space.",
+  "settings.cache_size": "Cache size: {size}",
+  "settings.cache_clear": "Clear cache",
+  "settings.cache_clear_confirm": "This will delete all locally cached data (posts, profiles, images, etc.). Your account settings will not be affected. Continue?",
+  "settings.cache_cleared": "Cache cleared successfully!",
   "settings.logout": "Log out",
   "settings.logout_desc": "Close your current session and log out of your account.",
   "settings.logout_btn": "Log out"

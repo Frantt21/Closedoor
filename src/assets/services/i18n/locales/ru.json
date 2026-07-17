@@ -416,6 +416,12 @@
   "settings.allow_encrypted_add_desc": "Разрешить другим добавлять вас в списки доступа к скрытым постам.",
   "settings.blocked_users": "Заблокированные пользователи",
   "settings.blocked_users_desc": "Управление заблокированными пользователями",
+  "settings.cache": "Кэш",
+  "settings.cache_desc": "Управляйте локально сохранёнными данными, чтобы освободить место.",
+  "settings.cache_size": "Размер кэша: {size}",
+  "settings.cache_clear": "Очистить кэш",
+  "settings.cache_clear_confirm": "Это удалит все локально кэшированные данные (посты, профили, изображения и т.д.). Настройки аккаунта не будут затронуты. Продолжить?",
+  "settings.cache_cleared": "Кэш успешно очищен!",
   "settings.logout": "Выйти",
   "settings.logout_desc": "Завершите текущий сеанс и выйдите из учётной записи.",
   "settings.logout_btn": "Выйти"

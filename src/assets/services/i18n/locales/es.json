@@ -436,6 +436,12 @@
   "settings.allow_encrypted_add_desc": "Permite que otros te añadan a la lista de usuarios autorizados en posts encriptados.",
   "settings.blocked_users": "Usuarios bloqueados",
   "settings.blocked_users_desc": "Gestiona los usuarios que has bloqueado",
+  "settings.cache": "Caché",
+  "settings.cache_desc": "Administra los datos almacenados localmente para liberar espacio.",
+  "settings.cache_size": "Tamaño de caché: {size}",
+  "settings.cache_clear": "Limpiar caché",
+  "settings.cache_clear_confirm": "Esto eliminará todos los datos en caché local (posts, perfiles, imágenes, etc.). Tus ajustes de cuenta no se verán afectados. ¿Continuar?",
+  "settings.cache_cleared": "¡Caché limpiada exitosamente!",
   "settings.logout": "Cerrar sesión",
   "settings.logout_desc": "Cierra tu sesión actual y sal de tu cuenta.",
   "settings.logout_btn": "Cerrar sesión"

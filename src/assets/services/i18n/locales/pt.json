@@ -416,6 +416,12 @@
   "settings.allow_encrypted_add_desc": "Permitir que outros adicionem você às listas de permissão de posts criptografados.",
   "settings.blocked_users": "Usuários bloqueados",
   "settings.blocked_users_desc": "Gerenciar usuários que você bloqueou",
+  "settings.cache": "Cache",
+  "settings.cache_desc": "Gerencie os dados armazenados localmente para liberar espaço.",
+  "settings.cache_size": "Tamanho do cache: {size}",
+  "settings.cache_clear": "Limpar cache",
+  "settings.cache_clear_confirm": "Isso excluirá todos os dados em cache local (posts, perfis, imagens, etc.). Suas configurações de conta não serão afetadas. Continuar?",
+  "settings.cache_cleared": "Cache limpo com sucesso!",
   "settings.logout": "Sair",
   "settings.logout_desc": "Encerre sua sessão atual e saia da sua conta.",
   "settings.logout_btn": "Sair"

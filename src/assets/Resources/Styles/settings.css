@@ -642,6 +642,13 @@
   color: var(--color-text-secondary, #9ca3af);
 }
 
+.settings-cache-size {
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #6b7280);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
 .settings-edit-btn {
   padding: 8px 14px;
   font-size: 0.8rem;
