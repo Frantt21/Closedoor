@@ -404,7 +404,6 @@
   "block.no_blocked_users": "ブロックしたユーザーはいません。",
 
   "profile.share_profile": "プロフィールを共有",
-  "profile.share_text": "FastChangeで@{user}をチェック！",
   "profile.share_copied": "プロフィールリンクをコピーしました！",
   "settings.show_likes": "いいねを表示",
   "settings.show_likes_desc": "あなたのプロフィールの「いいね」タブを他のユーザーに表示します。",

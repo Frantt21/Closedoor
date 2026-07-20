@@ -404,7 +404,6 @@
   "block.no_blocked_users": "Вы еще никого не заблокировали.",
 
   "profile.share_profile": "Поделиться профилем",
-  "profile.share_text": "Посмотрите @{user} на FastChange!",
   "profile.share_copied": "Ссылка на профиль скопирована!",
   "settings.show_likes": "Показывать мои лайки",
   "settings.show_likes_desc": "Показывать вкладку «Лайки» в вашем профиле другим пользователям.",
