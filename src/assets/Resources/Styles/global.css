@@ -231,7 +231,7 @@ body:has(.sidebar--collapsed) .app-layout {
 .fc-dropdown {
     background: var(--color-surface, #1a1a1a);
     border: 1px solid var(--color-border, #2a2a2a);
-    border-radius: var(--radius, 8px);
+    border-radius: var(--radius-sm, 6px);
     overflow: hidden;
     min-width: 160px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
@@ -243,19 +243,19 @@ body:has(.sidebar--collapsed) .app-layout {
     align-items: center;
     gap: 8px;
     width: 100%;
-    padding: 10px 14px;
+    padding: 10px 12px;
     text-align: left;
     background: transparent;
     border: none;
     color: var(--color-text, #ffffff);
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     font-family: inherit;
     cursor: pointer;
-    transition: background 0.1s ease;
+    transition: background 0.12s ease;
 }
 
 .fc-dropdown-btn:hover {
-    background: var(--overlay-bg-subtle);
+    background: var(--overlay-bg);
 }
 
 .fc-dropdown-btn svg {
@@ -265,7 +265,7 @@ body:has(.sidebar--collapsed) .app-layout {
 }
 
 .fc-dropdown-btn:active {
-    background: var(--overlay-bg);
+    background: var(--overlay-bg-active);
 }
 
 .fc-dropdown-btn:disabled {

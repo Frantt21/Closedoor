@@ -104,17 +104,16 @@
 
 .posts-tab-filter-dropdown {
     position: absolute;
-    top: calc(100% + 4px);
+    top: calc(100% + 6px);
     left: 0;
     min-width: 160px;
     background: var(--color-surface, #1a1a1a);
     border: 1px solid var(--color-border, #2a2a2a);
-    border-radius: var(--radius, 10px);
-    padding: 4px;
+    border-radius: var(--radius-sm, 6px);
+    overflow: hidden;
     z-index: 100;
     display: flex;
     flex-direction: column;
-    gap: 2px;
     box-shadow: 0 8px 24px rgba(0,0,0,0.4);
 }
 
@@ -122,22 +121,20 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 8px 12px;
+    padding: 10px 12px;
     border: none;
-    border-radius: var(--radius-sm, 6px);
     background: transparent;
-    color: var(--color-text-secondary, #9ca3af);
-    font-size: 0.85rem;
+    color: var(--color-text, #ffffff);
+    font-size: 0.82rem;
     font-weight: 500;
     font-family: inherit;
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease;
+    transition: background 0.12s ease;
     white-space: nowrap;
 }
 
 .posts-tab-filter-item:hover {
-    background: var(--color-surface-hover, #252525);
-    color: var(--color-text, #ffffff);
+    background: var(--overlay-bg);
 }
 
 .posts-tab-filter-item--active {
@@ -772,7 +769,7 @@
     cursor: pointer;
     font-family: inherit;
     padding: 2px 6px;
-    border-radius: 4px;
+    border-radius: var(--radius-sm, 6px);
     transition: background 0.15s ease;
 }
 

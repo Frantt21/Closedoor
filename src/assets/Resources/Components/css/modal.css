@@ -445,7 +445,7 @@ textarea.fc-modal-input {
     justify-content: center;
     width: 28px;
     height: 28px;
-    border-radius: 8px;
+    border-radius: var(--radius-sm, 6px);
     background: transparent;
     color: #fca5a5;
     border: none;

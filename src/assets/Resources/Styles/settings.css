@@ -257,7 +257,7 @@
 .settings-segmented-btn {
   padding: 5px 14px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-sm, 6px);
   background: transparent;
   color: var(--color-text-muted, #6b7280);
   font-family: inherit;
@@ -407,7 +407,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 6px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm, 6px);
   cursor: pointer;
   transition: background 0.12s ease;
 }
@@ -674,7 +674,7 @@
   font-weight: 600;
   background: rgba(239, 68, 68, 0.1);
   border: none;
-  border-radius: 0;
+  border-radius: var(--radius-sm, 6px);
   color: #ef4444;
   cursor: pointer;
   transition: background 0.15s ease;

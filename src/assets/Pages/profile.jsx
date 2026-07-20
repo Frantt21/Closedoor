@@ -939,38 +939,23 @@ function Profile() {
         }
     };
 
-    // ── Share profile ──
+    // ── Share profile (copia la URL al portapapeles) ──
     const handleShareProfile = async () => {
         const shareUrl = `${window.location.origin}/profile/${activeProfile?.username}`;
-        const followerCount = followCounts?.followers ?? 0;
-        const shareBio = activeProfile?.bio || '';
-        const shareTitle = t('profile.share_text', { user: activeProfile?.username }) || `${activeProfile?.username}`;
-        const shareText = `👤 ${shareTitle}\n📝 ${shareBio || '(no bio)'}\n👥 ${followerCount} followers\n\n${shareUrl}`;
-
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: `@${activeProfile?.username}`,
-                    text: shareText,
-                    url: shareUrl,
-                });
-            } catch (err) {
-                if (err.name !== 'AbortError') {
-                    try {
-                        await navigator.clipboard.writeText(shareUrl);
-                        toast.success(t('profile.share_copied') || 'Profile link copied!');
-                    } catch {
-                        window.prompt('Copy this link:', shareUrl);
-                    }
-                }
-            }
-        } else {
-            try {
-                await navigator.clipboard.writeText(shareUrl);
-                toast.success(t('profile.share_copied') || 'Profile link copied!');
-            } catch {
-                window.prompt('Copy this link:', shareUrl);
-            }
+        try {
+            await navigator.clipboard.writeText(shareUrl);
+            toast.success(t('profile.share_copied') || 'Profile link copied!');
+        } catch {
+            // Fallback: seleccionar la URL manualmente
+            const textarea = document.createElement('textarea');
+            textarea.value = shareUrl;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            toast.success(t('profile.share_copied') || 'Profile link copied!');
         }
         setContextMenuOpen(false);
     };
@@ -1445,7 +1430,7 @@ function Profile() {
 
             {/* ── Context Menu Dropdown (fuera de .profile-card para evitar overflow clipping) ── */}
             {contextMenuOpen && dropdownStyle && createPortal(
-              <div className="fc-dropdown" ref={dropdownRef} style={{ ...dropdownStyle, minWidth: 180, padding: 4, display: 'flex', flexDirection: 'column', gap: 2 }} onClick={(e) => e.stopPropagation()}>
+              <div className="fc-dropdown" ref={dropdownRef} style={dropdownStyle} onClick={(e) => e.stopPropagation()}>
                 <button
                   type="button"
                   className="fc-dropdown-btn"
