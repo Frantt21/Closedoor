@@ -134,7 +134,10 @@ export default function ModalShell({ isOpen, onClose, onEscape, className = '', 
       className={classes}
       onClick={handleBackdropClick}
     >
-      {children}
+      <div className="fc-modal-inner">
+        {children}
+      </div>
+      <div className="fc-modal-overlays" />
     </dialog>
   );
 }

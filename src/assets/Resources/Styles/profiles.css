@@ -760,14 +760,6 @@ dialog.fc-modal.social-links-modal {
         gap: 6px;
     }
 
-    .profile-edit-icon {
-        font-size: 0.8rem;
-    }
-
-    .profile-edit-label {
-        display: none;
-    }
-
     .profile-social-links {
         display: none;
     }

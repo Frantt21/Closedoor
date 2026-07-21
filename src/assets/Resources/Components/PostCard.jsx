@@ -16,7 +16,7 @@ import {
   setCachedPollVotes,
   getCachedPollVotes,
 } from '../../services/postService';
-import { FaHeart, FaRegHeart, FaHeartBroken, FaComment, FaRetweet, FaThumbtack, FaEdit, FaTrash, FaEllipsisV, FaBookmark, FaRegBookmark, FaEye, FaLock, FaCheckCircle, FaRegCheckCircle, FaClock, FaBan, FaUserFriends } from 'react-icons/fa';
+import { FaHeart, FaRegHeart, FaHeartBroken, FaComment, FaRetweet, FaThumbtack, FaEdit, FaTrash, FaEllipsisV, FaBookmark, FaRegBookmark, FaEye, FaLock, FaCheckCircle, FaRegCheckCircle, FaClock, FaBan, FaUserFriends, FaExclamationTriangle } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import Badge from './Badge';
 import SafeImage from './SafeImage';
@@ -66,6 +66,8 @@ const PostCard = React.memo(function PostCard({
   const [galleryIndex, setGalleryIndex] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmExternalLink, setConfirmExternalLink] = useState(null);
+  // ── Sensitive content reveal state ──
+  const [sensitiveRevealed, setSensitiveRevealed] = useState(false);
   // ── Poll state (con caché síncrono en localStorage) ──
   // Nota: no podemos usar hasPoll aquí porque se define más abajo
   const initialPollCache = post.poll_data && typeof post.poll_data === 'object'
@@ -770,8 +772,25 @@ const PostCard = React.memo(function PostCard({
           );
         })()}
 
-          {/* Multiple images from post.image_urls (grid) */}
-          {renderImageGrid(post, openGallery, t)}
+          {/* ── Media sections wrapped for sensitive overlay ── */}
+          <div className="post-card-media-wrapper">
+            {post.is_sensitive && !sensitiveRevealed && (
+              <div className="post-card-sensitive-overlay" onClick={(e) => e.stopPropagation()}>
+                <div className="post-card-sensitive-overlay-content">
+                  <FaExclamationTriangle className="post-card-sensitive-overlay-icon" />
+                  <span className="post-card-sensitive-overlay-label">{t('post.sensitive_warning') || 'Sensitive content'}</span>
+                  <button
+                    type="button"
+                    className="post-card-sensitive-reveal-btn"
+                    onClick={(e) => { e.stopPropagation(); setSensitiveRevealed(true); }}
+                  >
+                    {t('post.sensitive_click') || 'Reveal'}
+                  </button>
+                </div>
+              </div>
+            )}
+            {/* Multiple images from post.image_urls (grid) */}
+            {renderImageGrid(post, openGallery, t)}
 
           {/* Video from post.video_url */}
           {post.video_url && isVideo(post.video_url) && (
@@ -839,6 +858,8 @@ const PostCard = React.memo(function PostCard({
               )}
             </div>
           )}
+
+          </div>{/* ── end post-card-media-wrapper ── */}
 
           {/* Actions */}
           <div className="post-card-actions">

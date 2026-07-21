@@ -17,7 +17,7 @@ export async function resolveMentions(content) {
   return mentions;
 }
 
-export async function createPost({ userId, content, imageUrl, imageUrls, videoUrl, encryptedContent, encryptedIv, allowedUsers, obfuscatedDisplay, pollData, scheduledAt, commentsAllowed }) {
+export async function createPost({ userId, content, imageUrl, imageUrls, videoUrl, encryptedContent, encryptedIv, allowedUsers, obfuscatedDisplay, pollData, scheduledAt, commentsAllowed, isSensitive }) {
   let mentions = {};
   if (content) {
     try {
@@ -49,6 +49,9 @@ export async function createPost({ userId, content, imageUrl, imageUrls, videoUr
   }
   if (commentsAllowed) {
     insertData.comments_allowed = commentsAllowed;
+  }
+  if (isSensitive) {
+    insertData.is_sensitive = true;
   }
 
   const { data, error } = await supabase

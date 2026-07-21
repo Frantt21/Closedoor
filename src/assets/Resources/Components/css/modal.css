@@ -23,27 +23,29 @@ dialog.fc-modal {
     max-height: 90vh;
     overflow-y: auto;
     overscroll-behavior: contain;
-    /* Position (overrides browser default) */
+    /* Centered via auto margins — NO transform!
+       transform on an ancestor breaks position:fixed
+       for descendants (CSS spec). We need fixed
+       descendants (tooltips) to be viewport-relative. */
     position: fixed;
-    top: 50%;
-    left: 50%;
-    margin: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    margin: auto;
     /* Animation — start hidden */
     opacity: 0;
-    transform: translate(-50%, calc(-50% + 16px)) scale(0.97);
-    transition: opacity 0.25s ease, transform 0.25s ease;
+    transition: opacity 0.25s ease;
 }
 
 /* Show state */
 dialog.fc-modal.fc-dialog--open {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
 }
 
 /* Leaving state (reverse animation before close()) */
 dialog.fc-modal.fc-dialog--leaving {
     opacity: 0;
-    transform: translate(-50%, calc(-50% + 16px)) scale(0.97);
 }
 
 /* Ensure the dialog doesn't have display: none issues when closed */
@@ -1117,6 +1119,42 @@ textarea.fc-modal-input {
 
 dialog.fc-modal.fc-modal--confirm {
     max-width: 400px;
+}
+
+/* ── Inner wrapper: animates slide-up + scale on enter/exit ──
+   transform is safe here because .fc-modal-overlays is a sibling,
+   not a child — so position:fixed descendants (tooltips) are
+   NOT affected by this transform (no ancestor with transform).
+
+   Default state = starting position (slightly below + scaled down).
+   .fc-dialog--open triggers the transition to normal position.
+   .fc-dialog--leaving reverses the animation. */
+dialog.fc-modal .fc-modal-inner {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+dialog.fc-modal.fc-dialog--open .fc-modal-inner {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
+
+dialog.fc-modal.fc-dialog--leaving .fc-modal-inner {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+}
+
+/* ── Tooltip overlay container inside dialog ──
+   Portal target for tooltips, inherits dialog's top layer
+   but has no overflow clipping so tooltips at edges don't
+   get cut off or cause scrollbars on the dialog. */
+dialog.fc-modal .fc-modal-overlays {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    overflow: visible;
+    z-index: 2147483647;
 }
 
 /* ==========================================

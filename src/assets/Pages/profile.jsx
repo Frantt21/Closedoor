@@ -48,7 +48,7 @@ import Modal from "../Resources/Components/Modal";
 import Badge from "../Resources/Components/Badge";
 import Tooltip from "../Resources/Components/Tooltip";
 import { getPlatformIcon, getPlatformName } from "../services/socialPlatforms";
-import { FaFeather, FaBookmark, FaLock, FaEllipsisH, FaBan, FaClock, FaHeart, FaRetweet, FaChevronDown, FaShareAlt, FaPen } from 'react-icons/fa';
+import { FaFeather, FaBookmark, FaLock, FaEllipsisH, FaBan, FaClock, FaHeart, FaRetweet, FaChevronDown, FaShareAlt } from 'react-icons/fa';
 import FollowButton from "../Resources/Components/FollowButton";
 import { blockUser, unblockUser, isBlocked, cacheBlockStatus, getCachedBlockStatus, unfollowBothWays } from "../services/blockService";
 import { useI18n } from "../services/i18n/useI18n";
@@ -1367,8 +1367,7 @@ function Profile() {
                                         setShowModal(true);
                                     }}
                                 >
-                                    <FaPen className="profile-edit-icon" />
-                                    {/* <span className="profile-edit-label">{t('profile.edit')}</span> */}
+                                    <span className="profile-edit-label">{t('profile.edit')}</span>
                                 </button>
                             ) : (
                                 <>

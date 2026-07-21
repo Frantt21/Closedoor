@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 
 const TOOLTIP_STYLES = {
@@ -21,9 +21,15 @@ const TOOLTIP_STYLES = {
 };
 
 /**
- * Custom tooltip rendered at the document body level via createPortal,
- * so it's never affected by parent transforms or overflow clipping.
- * Shows a small popup above (default) or below the child element on hover.
+ * Custom tooltip rendered via createPortal.
+ *
+ * Portals to the nearest native <dialog> ancestor when available so the
+ * tooltip inherits the dialog's top-layer stacking context (without it,
+ * showModal() puts the dialog above anything at document.body level).
+ * Falls back to document.body when there is no dialog parent.
+ *
+ * Uses position:fixed for screen-relative positioning, avoiding overflow
+ * or transform clipping on intermediate ancestors.
  */
 export default function Tooltip({ text, children, style, className, placement = 'top', suppress = false }) {
   const [visible, setVisible] = useState(false);
@@ -34,6 +40,21 @@ export default function Tooltip({ text, children, style, className, placement = 
 
   const isBottom = placement === 'bottom';
   const isRight = placement === 'right';
+
+  // ── Portal target: .fc-modal-overlays inside nearest <dialog>, else document.body ──
+  // The overlay container has position:fixed;inset:0;overflow:visible;pointer-events:none
+  // so tooltips at modal edges are not clipped by the dialog's overflow-y:auto.
+  const portalTarget = useMemo(() => {
+    const el = targetRef.current;
+    if (el) {
+      const dialog = el.closest('dialog');
+      if (dialog) {
+        const overlays = dialog.querySelector(':scope > .fc-modal-overlays');
+        return overlays || dialog;
+      }
+    }
+    return document.body;
+  }, [visible]);
 
   const updatePosition = useCallback(() => {
     if (!targetRef.current) return;
@@ -164,7 +185,7 @@ export default function Tooltip({ text, children, style, className, placement = 
           {/* Arrow */}
           <div style={arrowStyle} />
         </div>,
-        document.body
+        portalTarget
       )}
     </>
   );

@@ -562,6 +562,19 @@
     max-height: 180px;
 }
 
+/* ── Auto-detected image in live preview ── */
+.create-post-live-preview .post-card-media {
+    max-height: 220px;
+}
+
+.create-post-live-preview .post-card-media img,
+.create-post-live-preview .post-card-media .safe-image-fallback {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+}
+
 /* ── Live post preview ── */
 .create-post-live-preview {
     margin-bottom: 12px;
@@ -709,10 +722,6 @@
         max-width: calc(100vw - 32px);
         padding: 20px;
         width: 100%;
-    }
-
-    dialog.fc-modal.create-post-modal.fc-dialog--leaving {
-        transform: translate(-50%, calc(-50% + 16px)) scale(0.97);
     }
 
     .create-post-body-right {

@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import ModalShell from './ModalShell';
 import { createPost, updatePost, notifyMentions, notifyEncryptedAdd, extractMentions, getMentionUserIds } from '../../services/postService';
 import { getFollowing } from '../../services/followService';
 import { searchProfiles } from '../../services/userService';
 import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../services/i18n/useI18n';
-import { FaImage, FaTimes, FaPlus, FaMinus, FaLink, FaLock, FaUnlock, FaUserPlus, FaCheck, FaSearch, FaRegHeart, FaComment, FaRetweet, FaEye, FaPoll, FaCalendarAlt, FaClock, FaGlobe, FaUserFriends, FaBan } from 'react-icons/fa';
+import { FaImage, FaTimes, FaPlus, FaMinus, FaLink, FaLock, FaUnlock, FaUserPlus, FaCheck, FaSearch, FaRegHeart, FaHeartBroken, FaComment, FaRetweet, FaEye, FaPoll, FaCalendarAlt, FaClock, FaGlobe, FaUserFriends, FaBan, FaExclamationTriangle, FaBookmark, FaRegBookmark } from 'react-icons/fa';
 import SafeImage from './SafeImage';
 import Avatar from './Avatar';
 import Badge from './Badge';
@@ -67,11 +67,14 @@ export default function CreatePostModal({
   const [showSchedule, setShowSchedule] = useState(false);
   const [scheduledAt, setScheduledAt] = useState('');
 
+  // ── Sensitive content state ──
+  const [isSensitive, setIsSensitive] = useState(false);
+
   // ── Unsaved changes confirmation state ──
   const [pendingClose, setPendingClose] = useState(false);
 
   const hasUnsavedContent = useCallback(() => {
-    return content.trim().length > 0 || getValidImageUrls().length > 0 || allowedUsers.length > 0 || showPoll || showSchedule;
+    return content.trim().length > 0 || getValidImageUrls().length > 0 || allowedUsers.length > 0 || showPoll || showSchedule || isSensitive;
   }, [content, imageUrls, allowedUsers, showPoll, showSchedule]);
 
   const confirmClose = useCallback(() => {
@@ -228,6 +231,7 @@ export default function CreatePostModal({
         setShowImageSection(existingUrls.length > 0);
 
         setCommentsAllowed(editPost.comments_allowed || 'everyone');
+        setIsSensitive(!!editPost.is_sensitive);
 
         // ── Encrypted post: descifrar contenido + mantener estado ──
         const wasEncrypted = editPost.is_encrypted === true;
@@ -279,6 +283,7 @@ export default function CreatePostModal({
         setPollExpiresAt('');
         setShowSchedule(false);
         setScheduledAt('');
+        setIsSensitive(false);
         setCommentsAllowed('everyone');
       }
       setError(null);
@@ -490,6 +495,7 @@ export default function CreatePostModal({
           image_urls: finalImageUrls.length > 0 ? finalImageUrls : null,
           video_url: videoUrl,
           comments_allowed: commentsAllowed,
+          is_sensitive: isSensitive,
         };
 
         // Incluir poll_data si hay encuesta
@@ -559,6 +565,7 @@ export default function CreatePostModal({
           pollData: finalPollData,
           scheduledAt: finalScheduledAt,
           commentsAllowed,
+          isSensitive,
         });
 
         // ── @Mentions: notificar a usuarios mencionados ──
@@ -609,31 +616,44 @@ export default function CreatePostModal({
 
   const getEmbedUrl = getEmbedUrlHelper;
 
+  // ── Whether there's an image to censor ──
+  const hasImage = useMemo(() => {
+    return getValidImageUrls().length > 0 || (previewUrl !== null && previewType === 'image');
+  }, [imageUrls, previewUrl, previewType]);
+
+  // ── Strip detected media URLs from preview text ──
+  const cleanPreviewText = useMemo(() => {
+    const text = content.trim();
+    if (!text || !previewUrl) return text;
+    // Remove the auto-detected image/video URL from the displayed text
+    // (same behavior as PostCard's RichText with skipUrls)
+    return text.replace(previewUrl, '').trim();
+  }, [content, previewUrl]);
+
   return (
     <ModalShell isOpen={isOpen} onClose={onClose} onEscape={() => confirmCloseRef.current()} className="create-post-modal">
         <div className="fc-modal-header">
           <h3 className="fc-modal-title">{isEditing ? t('create_post.edit_title') : t('create_post.title')}</h3>
           <div className="fc-modal-header-actions">
-            <Tooltip text={isEditing ? t('create_post.save_changes') : t('create_post.post')} placement="bottom">
-              <button
-                className="fc-modal-save"
-                onClick={handleSubmit}
-                disabled={saving || (!content.trim() && getValidImageUrls().length === 0 && !showPoll)}
-              >
-                {isEncrypted && <FaLock className="fc-modal-save-lock" />}
-                {saving ? t('create_post.saving') : isEditing ? t('create_post.save_changes') : t('create_post.post')}
-              </button>
-            </Tooltip>
-            <Tooltip text={t('common.close')} placement="bottom">
-              <button
-                type="button"
-                className="create-post-header-close"
-                onClick={confirmClose}
-                aria-label={t('common.close')}
-              >
-                ×
-              </button>
-            </Tooltip>
+            <button
+              className="fc-modal-save"
+              onClick={handleSubmit}
+              disabled={saving || (!content.trim() && getValidImageUrls().length === 0 && !showPoll)}
+            >
+              {isEncrypted && <FaLock className="fc-modal-save-lock" />}
+              {saving ? t('create_post.saving') : isEditing ? t('create_post.save_changes') : t('create_post.post')}
+            </button>
+            <button
+              type="button"
+              className="fc-modal-close"
+              onClick={confirmClose}
+              aria-label={t('common.close')}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -773,6 +793,25 @@ export default function CreatePostModal({
                 }}
               >
                 {commentsAllowed === 'everyone' ? <FaGlobe /> : commentsAllowed === 'followers' ? <FaUserFriends /> : <FaBan />}
+              </button>
+              </Tooltip>
+
+              {/* ── Sensitive content toggle (disabled if no image) ── */}
+              <Tooltip
+                text={
+                  hasImage
+                    ? (isSensitive ? t('create_post.sensitive_on') : t('create_post.sensitive_off'))
+                    : t('create_post.sensitive_no_image')
+                }
+                placement="bottom"
+              >
+              <button
+                type="button"
+                className={`create-post-toolbar-btn ${isSensitive ? 'create-post-toolbar-btn--active' : ''}`}
+                onClick={() => setIsSensitive(s => !s)}
+                disabled={!hasImage}
+              >
+                <FaExclamationTriangle />
               </button>
               </Tooltip>
             </div>
@@ -1041,7 +1080,7 @@ export default function CreatePostModal({
                     <Badge roles={profile?.roles || []} />
                   </div>
                   <p className="create-post-live-preview-text">
-                    {content.trim() || <span className="create-post-live-preview-placeholder">{t('create_post.placeholder')}</span>}
+                    {cleanPreviewText || <span className="create-post-live-preview-placeholder">{t('create_post.placeholder')}</span>}
                   </p>
                   {/* Preview images from image_urls */}
                   {showImageSection && getValidImageUrls().length > 0 && (
@@ -1074,10 +1113,16 @@ export default function CreatePostModal({
                       <FaRegHeart /> <span className="create-post-live-preview-count">0</span>
                     </span>
                     <span className="create-post-live-preview-action">
+                      <FaHeartBroken /> <span className="create-post-live-preview-count">0</span>
+                    </span>
+                    <span className="create-post-live-preview-action">
                       <FaComment /> <span className="create-post-live-preview-count">0</span>
                     </span>
                     <span className="create-post-live-preview-action">
                       <FaRetweet /> <span className="create-post-live-preview-count">0</span>
+                    </span>
+                    <span className="create-post-live-preview-action">
+                      <FaRegBookmark />
                     </span>
                     <span className="create-post-live-preview-action">
                       <FaEye /> <span className="create-post-live-preview-count">0</span>
