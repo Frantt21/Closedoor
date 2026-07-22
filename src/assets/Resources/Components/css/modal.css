@@ -581,6 +581,7 @@ textarea.fc-modal-input {
     z-index: 1100;
     padding: 16px;
     animation: fcFadeIn 0.15s ease;
+    pointer-events: auto;
 }
 
 .fc-modal-sub {

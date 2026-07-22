@@ -263,7 +263,7 @@ function ProfileContent({ path, ownProfile, user, t }) {
     '--accent-surface-text-muted': !surfGlass && surfColor
       ? '#6b7280'
       : (surfGlass && hasBgRight)
-        ? (autoBgContrastColor === '#111111' ? '#6b7280' : 'var(--color-text-muted, #6b7280)')
+        ? (autoBgContrastColor === '#111111' ? '#4b5563' : 'var(--color-text-muted, #6b7280)')
         : 'var(--color-text-muted, #6b7280)',
   } : {};
 

@@ -1194,7 +1194,7 @@ function Profile() {
           '--accent-surface-text-muted': !surfGlass && surfColor
             ? '#6b7280'
             : (surfGlass && hasBg)
-              ? (autoBgContrastColor === '#111111' ? '#6b7280' : 'var(--color-text-muted, #6b7280)')
+              ? (autoBgContrastColor === '#111111' ? '#4b5563' : 'var(--color-text-muted, #6b7280)')
               : 'var(--color-text-muted, #6b7280)',
           ...(surfGlass ? {
             '--accent-surface-rgba': 'rgba(255, 255, 255, 0.04)',

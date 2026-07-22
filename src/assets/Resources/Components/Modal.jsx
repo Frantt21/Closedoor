@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import ModalShell from './ModalShell';
 import './css/modal.css';
 import '../Styles/explore.css';
@@ -511,7 +510,7 @@ export default function Modal({
             </div>
 
             {/* ── URL submodal con posicionador ── */}
-            {showUrlModal && createPortal(
+            {showUrlModal && (
               <div className="fc-modal-sub-overlay" onClick={() => setShowUrlModal(null)}>
                 <div className="fc-modal-sub" tabIndex={-1} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setShowUrlModal(null); } }} onClick={(e) => e.stopPropagation()}>
                   <h4 className="fc-modal-sub-title">
@@ -561,8 +560,7 @@ export default function Modal({
                     </button>
                   </div>
                 </div>
-              </div>,
-              document.body
+              </div>
             )}
 
             {/* Perfil — Username + Bio */}
@@ -1123,7 +1121,7 @@ export default function Modal({
         </div>
 
         {/* ── Profile Background URL submodal ── */}
-        {showProfileBgSubmodal && createPortal(
+        {showProfileBgSubmodal && (
           <div className="fc-modal-sub-overlay" onClick={() => { setShowProfileBgSubmodal(null); setProfileBgUrlInput(''); }}>
             <div className="fc-modal-sub" tabIndex={-1} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setShowProfileBgSubmodal(null); setProfileBgUrlInput(''); } }} onClick={(e) => e.stopPropagation()}>
               <h4 className="fc-modal-sub-title">{t('modal.profile_background')}</h4>
@@ -1155,8 +1153,7 @@ export default function Modal({
                 </button>
               </div>
             </div>
-          </div>,
-          document.body
+          </div>
         )}
 
 
