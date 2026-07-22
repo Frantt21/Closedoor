@@ -2,7 +2,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { useState, useContext, useEffect } from 'react';
 import './css/header.css';
 import { FaHome, FaUser, FaBars, FaBell, FaCompass, FaCog, FaComment, FaUsers } from 'react-icons/fa';
-import { MdLogout } from "react-icons/md";
 import { useAuth } from '../../../hooks/useAuth';
 import { NotificationContext } from '../../../context/NotificationContext';
 import { useI18n } from '../../../assets/services/i18n/useI18n';
@@ -20,7 +19,7 @@ function getInitialCollapsed() {
 }
 
 function Header() {
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated } = useAuth();
   const { unreadCount } = useContext(NotificationContext);
   const { t } = useI18n();
   const [collapsed, setCollapsed] = useState(getInitialCollapsed);
@@ -32,10 +31,6 @@ function Header() {
       localStorage.setItem(SIDEBAR_STORAGE_KEY, JSON.stringify(collapsed));
     } catch { /* ignore */ }
   }, [collapsed]);
-
-  const handleLogout = async () => {
-    await logout();
-  };
 
   return (
     <aside className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}`}>
@@ -121,19 +116,6 @@ function Header() {
       </nav>
 
       <div className="sidebar-footer">
-        {isAuthenticated && (
-          <Tooltip text={collapsed ? t('nav.logout') : ''} placement="right">
-          <button
-            type="button"
-            className="sidebar-link"
-            onClick={handleLogout}
-          >
-            <span className="sidebar-icon"><MdLogout /></span>
-            <span className="sidebar-footer-label">{t('nav.logout')}</span>
-          </button>
-          </Tooltip>
-        )}
-
         <Tooltip text={collapsed ? t('nav.collapse_menu') : ''} placement="right">
         <button
           type="button"

@@ -163,6 +163,11 @@
   "notifications.unread": "Непрочитано",
 
   "chat.title": "Чат",
+  "chat.new": "Новый чат",
+  "chat.search_placeholder": "Поиск пользователей...",
+  "chat.input_placeholder": "Напишите сообщение...",
+  "chat.no_messages": "Сообщений пока нет. Начните разговор!",
+  "chat.encrypted": "Зашифровано",
   "chat.empty": "Чатов пока нет",
   "chat.empty_sub": "Когда вы начнёте разговор с кем-то, он появится здесь.",
 

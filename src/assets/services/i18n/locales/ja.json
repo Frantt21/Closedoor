@@ -163,6 +163,11 @@
   "notifications.unread": "未読",
 
   "chat.title": "チャット",
+  "chat.new": "新しい会話",
+  "chat.search_placeholder": "ユーザーを検索...",
+  "chat.input_placeholder": "メッセージを入力...",
+  "chat.no_messages": "メッセージはまだありません。会話を始めましょう！",
+  "chat.encrypted": "暗号化",
   "chat.empty": "会話がまだありません",
   "chat.empty_sub": "誰かと会話を始めると、ここに表示されます。",
 

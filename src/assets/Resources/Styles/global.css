@@ -138,12 +138,37 @@ body:has(.sidebar--collapsed) .app-layout {
 .settings-page,
 .notifications-page,
 .comunidades-page,
-.chat-page,
 .post-detail-page,
 .auth-page {
   max-width: 800px;
   margin: 0 auto;
   width: 100%;
+}
+
+/* ── Chat layout: ocupa el espacio restante respetando el sidebar ── */
+.app-layout--chat {
+    max-width: 100% !important;
+    gap: 0 !important;
+    padding: 0 !important;
+    padding-left: 240px !important;
+}
+
+body:has(.sidebar--collapsed) .app-layout--chat {
+    padding-left: 106px !important;
+}
+
+.app-content--full {
+    max-width: 100% !important;
+    flex: 1 1 100% !important;
+    width: 100% !important;
+    display: flex;
+    flex-direction: column;
+}
+
+@media (max-width: 1024px) {
+    .app-layout--chat {
+        padding-left: 0 !important;
+    }
 }
 
 /* ── Responsive: <= 1024px (ocultar sidebar, block layout, bottom nav) ── */

@@ -163,6 +163,11 @@
   "notifications.unread": "Não lida",
 
   "chat.title": "Chat",
+  "chat.new": "Nova conversa",
+  "chat.search_placeholder": "Buscar usuários...",
+  "chat.input_placeholder": "Digite uma mensagem...",
+  "chat.no_messages": "Nenhuma mensagem ainda. Comece a conversa!",
+  "chat.encrypted": "Criptografado",
   "chat.empty": "Nenhuma conversa ainda",
   "chat.empty_sub": "Quando você iniciar uma conversa com alguém, ela aparecerá aqui.",
 

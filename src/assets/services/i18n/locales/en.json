@@ -169,6 +169,11 @@
   "notifications.unread": "Unread",
 
   "chat.title": "Chat",
+  "chat.new": "New conversation",
+  "chat.search_placeholder": "Search users...",
+  "chat.input_placeholder": "Type a message...",
+  "chat.no_messages": "No messages yet. Start the conversation!",
+  "chat.encrypted": "Encrypted",
   "chat.empty": "No conversations yet",
   "chat.empty_sub": "When you start a conversation with someone, it will appear here.",
 

@@ -33,18 +33,21 @@ function ScrollToTop() {
 }
 
 function App() {
+  const location = useLocation();
+  const isChatRoute = location.pathname.toLowerCase() === '/chat';
+
   return (
     <I18nProvider>
       <AppLoader>
-        <div className="app-layout">
+        <div className={isChatRoute ? "app-layout app-layout--chat" : "app-layout"}>
           {/* Components */}
           <ScrollToTop />
           <Header />
-          <FollowCountsWatcher />
-          <BlockRealtimeWatcher />
+          {!isChatRoute && <FollowCountsWatcher />}
+          {!isChatRoute && <BlockRealtimeWatcher />}
 
           {/* Pages */}
-          <main className="app-content">
+          <main className={isChatRoute ? "app-content app-content--full" : "app-content"}>
             <Routes>
               <Route path="/" element={<Home />} />
               <Route path="/Login" element={<Login />} />
@@ -62,8 +65,8 @@ function App() {
             </Routes>
           </main>
 
-          <RightPanel />
-          <MobileNav />
+          {!isChatRoute && <RightPanel />}
+          {!isChatRoute && <MobileNav />}
           <ToastContainer
             position="top-right"
             autoClose={3000}
