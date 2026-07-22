@@ -178,6 +178,12 @@
   "chat.encrypted": "Encriptado",
   "chat.empty": "Aún no hay conversaciones",
   "chat.empty_sub": "Cuando inicies una conversación con alguien, aparecerá aquí.",
+  "chat.react": "Reaccionar",
+  "chat.copy": "Copiar",
+  "chat.copied": "Copiado al portapapeles",
+  "chat.delete_message": "Eliminar permanentemente",
+  "chat.delete_for_me": "Eliminar para mí",
+  "chat.edited": "editado",
 
   "comunidades.title": "Comunidades",
   "comunidades.empty": "Aún no hay comunidades",

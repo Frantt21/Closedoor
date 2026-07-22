@@ -10,17 +10,23 @@ import {
   markAsRead,
   getOrCreateConversation,
   deleteConversation,
+  deleteMessage,
+  deleteMessageForMe,
+  editMessage,
+  pinMessage,
+  addReaction,
   subscribeToMessages,
   subscribeToConversations,
 } from '../services/chatService';
 import { searchProfiles } from '../services/userService';
 import { getFollowing } from '../services/followService';
 import ModalShell from '../Resources/Components/ModalShell';
-import { FaComment, FaSearch, FaPaperPlane, FaArrowLeft, FaPlus, FaTimes, FaUserPlus, FaUsers, FaTrash } from 'react-icons/fa';
+import { FaComment, FaSearch, FaPaperPlane, FaArrowLeft, FaPlus, FaTimes, FaUserPlus, FaUsers, FaTrash, FaThumbtack, FaCopy, FaEdit, FaCheck, FaSmile } from 'react-icons/fa';
 import Avatar from '../Resources/Components/Avatar';
 import Badge from '../Resources/Components/Badge';
 import Tooltip from '../Resources/Components/Tooltip';
 import { getTimeAgo } from '../services/helpers';
+import { toast } from 'react-toastify';
 import { supabase } from '../services/supabaseclient';
 import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/chat.css';
@@ -57,16 +63,70 @@ export default function Chat() {
   // Mobile: show conversation list or messages
   const [showList, setShowList] = useState(true);
 
-  // Context menu state
+  // Context menu state (conversation list)
   const [contextMenu, setContextMenu] = useState({ open: false, x: 0, y: 0, convId: null });
   const contextMenuRef = useRef(null);
 
-  // Close context menu on click outside
+  // Message context menu state
+  const [msgMenu, setMsgMenu] = useState({ open: false, x: 0, y: 0, msg: null });
+  const msgMenuRef = useRef(null);
+
+  // Edit message state
+  const [editMsgId, setEditMsgId] = useState(null);
+  const [editText, setEditText] = useState('');
+  const editRef = useRef(null);
+
+  // Emoji picker state
+  const [emojiPickerMsgId, setEmojiPickerMsgId] = useState(null);
+  const emojiPickerRef = useRef(null);
+
+  // Common emojis for reactions
+  const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '😡'];
+
+  // Smart context menu positioning — flips if menu would overflow viewport
+  const getSmartMenuPosition = useCallback((clientX, clientY, menuWidth = 180, menuHeight = 220) => {
+    let x = clientX;
+    let y = clientY;
+
+    // Check right edge
+    if (x + menuWidth > window.innerWidth) {
+      x = clientX - menuWidth;
+    }
+    // Check bottom edge
+    if (y + menuHeight > window.innerHeight) {
+      y = clientY - menuHeight;
+    }
+    // Clamp to viewport
+    x = Math.max(4, Math.min(x, window.innerWidth - menuWidth - 4));
+    y = Math.max(4, Math.min(y, window.innerHeight - menuHeight - 4));
+
+    return { x, y };
+  }, []);
+
+  // Close context menus on click outside
   useEffect(() => {
-    const handleClick = () => setContextMenu({ open: false, x: 0, y: 0, convId: null });
+    const handleClick = (e) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
+        setContextMenu({ open: false, x: 0, y: 0, convId: null });
+      }
+      if (msgMenuRef.current && !msgMenuRef.current.contains(e.target)) {
+        setMsgMenu({ open: false, x: 0, y: 0, msg: null });
+      }
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target)) {
+        setEmojiPickerMsgId(null);
+      }
+    };
     document.addEventListener('click', handleClick);
     return () => document.removeEventListener('click', handleClick);
   }, []);
+
+  // Focus edit input when entering edit mode
+  useEffect(() => {
+    if (editMsgId && editRef.current) {
+      editRef.current.focus();
+      editRef.current.setSelectionRange(editText.length, editText.length);
+    }
+  }, [editMsgId]);
 
   // Refs
   const messagesEndRef = useRef(null);
@@ -106,9 +166,11 @@ export default function Chat() {
 
     getMessages(activeConvId)
       .then(async (msgs) => {
+        // Filter out messages deleted for me
+        const filtered = msgs.filter(m => !m.deleted_for?.includes(user.id));
         // Decrypt each message
         const decrypted = await Promise.all(
-          msgs.map(async (msg) => {
+          filtered.map(async (msg) => {
             const content = await decryptMessage(msg, user.id);
             return { ...msg, decryptedContent: content };
           })
@@ -214,11 +276,12 @@ export default function Chat() {
     }
   };
 
-  // ── Context menu handlers ──
+  // ── Context menu handlers (conversation list) ──
   const handleContextMenu = useCallback((e, convId) => {
     e.preventDefault();
-    setContextMenu({ open: true, x: e.clientX, y: e.clientY, convId });
-  }, []);
+    const pos = getSmartMenuPosition(e.clientX, e.clientY, 160, 80);
+    setContextMenu({ open: true, x: pos.x, y: pos.y, convId });
+  }, [getSmartMenuPosition]);
 
   const handleDeleteConversation = useCallback(async () => {
     const convId = contextMenu.convId;
@@ -235,6 +298,150 @@ export default function Chat() {
     }
   }, [contextMenu.convId, activeConvId]);
 
+  // ── Message context menu handlers ──
+  const handleMsgContextMenu = useCallback((e, msg) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const pos = getSmartMenuPosition(e.clientX, e.clientY, 180, 260);
+    setMsgMenu({ open: true, x: pos.x, y: pos.y, msg });
+  }, [getSmartMenuPosition]);
+
+  const handleCopyMessage = useCallback(async () => {
+    const msg = msgMenu.msg;
+    setMsgMenu({ open: false, x: 0, y: 0, msg: null });
+    if (!msg?.decryptedContent) return;
+    try {
+      await navigator.clipboard.writeText(msg.decryptedContent);
+      toast.success(t('chat.copied'), { className: 'fc-toast' });
+    } catch (err) {
+      console.warn('Copy failed:', err);
+    }
+  }, [msgMenu.msg]);
+
+  const handleDeleteMessage = useCallback(async () => {
+    const msg = msgMenu.msg;
+    setMsgMenu({ open: false, x: 0, y: 0, msg: null });
+    if (!msg) return;
+    try {
+      await deleteMessage(msg.id);
+      setMessages((prev) => prev.filter(m => m.id !== msg.id));
+    } catch (err) {
+      console.error('Error deleting message:', err);
+    }
+  }, [msgMenu.msg]);
+
+  const handleDeleteMessageForMe = useCallback(async () => {
+    const msg = msgMenu.msg;
+    setMsgMenu({ open: false, x: 0, y: 0, msg: null });
+    if (!msg || !user?.id) return;
+    try {
+      await deleteMessageForMe(msg.id, user.id);
+      setMessages((prev) => prev.filter(m => m.id !== msg.id));
+    } catch (err) {
+      console.error('Error hiding message:', err);
+    }
+  }, [msgMenu.msg, user?.id]);
+
+  const handlePinMessage = useCallback(async () => {
+    const msg = msgMenu.msg;
+    setMsgMenu({ open: false, x: 0, y: 0, msg: null });
+    if (!msg) return;
+    const newPinned = !msg.is_pinned;
+    try {
+      await pinMessage(msg.id, newPinned);
+      setMessages((prev) => prev.map(m => m.id === msg.id ? { ...m, is_pinned: newPinned } : m));
+    } catch (err) {
+      console.error('Error pinning message:', err);
+    }
+  }, [msgMenu.msg]);
+
+  const handleStartEdit = useCallback(() => {
+    const msg = msgMenu.msg;
+    setMsgMenu({ open: false, x: 0, y: 0, msg: null });
+    if (!msg?.decryptedContent) return;
+    setEditMsgId(msg.id);
+    setEditText(msg.decryptedContent);
+  }, [msgMenu.msg]);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditMsgId(null);
+    setEditText('');
+  }, []);
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!editMsgId || !editText.trim() || !user?.id) return;
+    try {
+      // Get participant IDs
+      const { data: participants } = await supabase
+        .from('chat_participants')
+        .select('user_id')
+        .eq('conversation_id', activeConvId);
+      const participantIds = (participants || []).map(p => p.user_id).filter(id => id !== user.id);
+
+      await editMessage(editMsgId, user.id, editText.trim(), participantIds);
+      // Update local state with edited content (will be re-decrypted on next load)
+      // For now, just update decryptedContent and edited_at locally
+      setMessages((prev) => prev.map(m =>
+        m.id === editMsgId
+          ? { ...m, decryptedContent: editText.trim(), edited_at: new Date().toISOString() }
+          : m
+      ));
+      setEditMsgId(null);
+      setEditText('');
+    } catch (err) {
+      console.error('Error editing message:', err);
+    }
+  }, [editMsgId, editText, user?.id, activeConvId]);
+
+  const handleEditKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSaveEdit();
+    }
+    if (e.key === 'Escape') {
+      handleCancelEdit();
+    }
+  };
+
+  const handleReact = useCallback(async (emoji, msgIdOverride) => {
+    const msgId = msgIdOverride || emojiPickerMsgId || msgMenu.msg?.id;
+    if (!msgId || !user?.id) return;
+    setEmojiPickerMsgId(null);
+    setMsgMenu({ open: false, x: 0, y: 0, msg: null });
+    try {
+      await addReaction(msgId, user.id, emoji);
+      // Update local state
+      setMessages((prev) => prev.map(m => {
+        if (m.id !== msgId) return m;
+        const reactions = { ...(m.reactions || {}) };
+        if (reactions[user.id] === emoji) {
+          delete reactions[user.id];
+        } else {
+          reactions[user.id] = emoji;
+        }
+        return { ...m, reactions };
+      }));
+    } catch (err) {
+      console.error('Error reacting:', err);
+    }
+  }, [emojiPickerMsgId, msgMenu.msg, user?.id]);
+
+  const toggleEmojiPicker = useCallback((msgId) => {
+    setEmojiPickerMsgId(prev => prev === msgId ? null : msgId);
+    setMsgMenu({ open: false, x: 0, y: 0, msg: null });
+  }, []);
+
+  // ── Get active conversation's other user ──
+  const activeConv = conversations.find((c) => c.id === activeConvId);
+  const otherUser = activeConv?.otherUser;
+
+  // ── Navigate to profile from header ──
+  const goToProfile = useCallback(() => {
+    if (otherUser?.username) {
+      navigate(`/${otherUser.username}`);
+    }
+  }, [otherUser?.username, navigate]);
+
   // ── Open followers modal ──
   const openFollowersModal = useCallback(async () => {
     if (!user?.id) return;
@@ -250,10 +457,6 @@ export default function Chat() {
       setFollowersLoading(false);
     }
   }, [user?.id]);
-
-  // ── Get active conversation's other user ──
-  const activeConv = conversations.find((c) => c.id === activeConvId);
-  const otherUser = activeConv?.otherUser;
 
   // ── Followers modal ──
   const renderFollowersModal = () => (
@@ -404,8 +607,10 @@ export default function Chat() {
           src={otherUser?.avatar_url}
           alt={otherUser?.username || '?'}
           className="chat-messages-header-avatar"
+          style={{ cursor: 'pointer' }}
+          onClick={goToProfile}
         />
-        <div className="chat-messages-header-info">
+        <div className="chat-messages-header-info" style={{ cursor: 'pointer' }} onClick={goToProfile}>
           <span className="chat-messages-header-name">{otherUser?.username || 'Unknown'}</span>
         </div>
       </div>
@@ -422,21 +627,95 @@ export default function Chat() {
         ) : (
           messages.map((msg) => {
             const isOwn = msg.sender_id === user.id;
+            const isEditing = editMsgId === msg.id;
+            const reactions = msg.reactions || {};
+            const reactionEntries = Object.entries(reactions);
+            const ownReaction = reactions[user.id];
+
             return (
               <div
                 key={msg.id}
                 className={`chat-message ${isOwn ? 'chat-message--own' : 'chat-message--other'}`}
+                onContextMenu={(e) => handleMsgContextMenu(e, msg)}
               >
-                <div className="chat-message-bubble">
-                  <p className="chat-message-text">
-                    {msg.decryptedContent || (
-                      <span className="chat-message-encrypted">{t('chat.encrypted') || '🔒 Encrypted'}</span>
-                    )}
-                  </p>
+                {msg.is_pinned && (
+                  <div className="chat-message-pin-badge">
+                    <FaThumbtack />
+                    <span>{t('post.pinned')}</span>
+                  </div>
+                )}
+                <div className="chat-message-row">
+                  {/* Time — at the start of the bubble row, visible on hover */}
                   <span className="chat-message-time">
+                    {msg.edited_at && (
+                      <span className="chat-message-edited">{t('chat.edited')} · </span>
+                    )}
                     {getTimeAgo(t, locale, msg.created_at)}
                   </span>
+                  <div className={`chat-message-bubble ${msg.is_pinned ? 'chat-message-bubble--pinned' : ''}`}>
+                    {isEditing ? (
+                      <div className="chat-message-edit">
+                        <textarea
+                          ref={editRef}
+                          className="chat-message-edit-input"
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          onKeyDown={handleEditKeyDown}
+                          rows={2}
+                          maxLength={2000}
+                        />
+                        <div className="chat-message-edit-actions">
+                          <button className="chat-message-edit-btn chat-message-edit-btn--save" onClick={handleSaveEdit}>
+                            <FaCheck /> {t('common.save')}
+                          </button>
+                          <button className="chat-message-edit-btn" onClick={handleCancelEdit}>
+                            {t('common.cancel')}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="chat-message-text">
+                        {msg.decryptedContent || (
+                          <span className="chat-message-encrypted">{t('chat.encrypted') || '🔒 Encrypted'}</span>
+                        )}
+                      </p>
+                    )}
+                  </div>
                 </div>
+
+                {/* Reactions — floating outside bubble */}
+                {!isEditing && reactionEntries.length > 0 && (
+                  <div className="chat-message-reactions">
+                    {reactionEntries.map(([uid, emoji]) => (
+                      <span
+                        key={uid}
+                        className={`chat-message-reaction ${uid === user.id ? 'chat-message-reaction--own' : ''}`}
+                        onClick={() => {
+                          if (uid === user.id) {
+                            handleReact(emoji, msg.id);
+                          }
+                        }}
+                      >
+                        {emoji}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Emoji picker — floating below */}
+                {emojiPickerMsgId === msg.id && (
+                  <div className="chat-message-emoji-picker" ref={emojiPickerRef} onClick={(e) => e.stopPropagation()}>
+                    {EMOJIS.map(emoji => (
+                      <button
+                        key={emoji}
+                        className={`chat-message-emoji-btn ${ownReaction === emoji ? 'chat-message-emoji-btn--active' : ''}`}
+                        onClick={() => handleReact(emoji)}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })
@@ -491,6 +770,58 @@ export default function Chat() {
             <FaTrash />
             <span>{t('post.delete')}</span>
           </button>
+        </div>
+      )}
+      {msgMenu.open && msgMenu.msg && (
+        <div
+          ref={msgMenuRef}
+          className="chat-context-menu"
+          style={{ left: msgMenu.x, top: msgMenu.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {msgMenu.msg.sender_id === user.id ? (
+            <>
+              <button className="chat-context-menu-btn" onClick={handleCopyMessage}>
+                <FaCopy />
+                <span>{t('chat.copy')}</span>
+              </button>
+              <button className="chat-context-menu-btn" onClick={handleStartEdit}>
+                <FaEdit />
+                <span>{t('post.edit')}</span>
+              </button>
+              <button className="chat-context-menu-btn" onClick={() => { setMsgMenu({...msgMenu, open: false}); toggleEmojiPicker(msgMenu.msg.id); }}>
+                <FaSmile />
+                <span>{t('chat.react') || 'React'}</span>
+              </button>
+              <button className="chat-context-menu-btn" onClick={handlePinMessage}>
+                <FaThumbtack />
+                <span>{msgMenu.msg.is_pinned ? (t('post.unpin') || 'Unpin') : (t('post.pin') || 'Pin')}</span>
+              </button>
+              <button className="chat-context-menu-btn chat-context-menu-btn--danger" onClick={handleDeleteMessage}>
+                <FaTrash />
+                <span>{t('chat.delete_message') || 'Delete permanently'}</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button className="chat-context-menu-btn" onClick={handleCopyMessage}>
+                <FaCopy />
+                <span>{t('chat.copy')}</span>
+              </button>
+              <button className="chat-context-menu-btn" onClick={() => { setMsgMenu({...msgMenu, open: false}); toggleEmojiPicker(msgMenu.msg.id); }}>
+                <FaSmile />
+                <span>{t('chat.react') || 'React'}</span>
+              </button>
+              <button className="chat-context-menu-btn" onClick={handlePinMessage}>
+                <FaThumbtack />
+                <span>{msgMenu.msg.is_pinned ? (t('post.unpin') || 'Unpin') : (t('post.pin') || 'Pin')}</span>
+              </button>
+              <button className="chat-context-menu-btn" onClick={handleDeleteMessageForMe}>
+                <FaTrash />
+                <span>{t('chat.delete_for_me') || 'Delete for me'}</span>
+              </button>
+            </>
+          )}
         </div>
       )}
       {renderFollowersModal()}

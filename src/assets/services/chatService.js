@@ -238,8 +238,14 @@ export async function getMessages(conversationId, limit = 50, before = null) {
   const { data, error } = await query;
   if (error) throw error;
 
+  // Filter out messages where current user is in deleted_for
+  // (we don't know the user here, so this is a pass-through;
+  //  Chat.jsx does the actual filter after fetch)
+  // Note: the caller should filter .filter(m => !m.deleted_for?.includes(userId))
+  if (error) throw error;
+
   // Fetch sender profiles separately
-  const msgs = (data || []).reverse();
+  let msgs = (data || []).reverse();
   if (msgs.length === 0) return [];
 
   const senderIds = [...new Set(msgs.map(m => m.sender_id))];
@@ -312,6 +318,101 @@ export function subscribeToMessages(conversationId, onMessage) {
 /**
  * Subscribe to conversation updates (for unread count sidebar)
  */
+// ── Message Actions ──
+
+/**
+ * Permanently delete a message (own messages only)
+ */
+export async function deleteMessage(messageId) {
+  const { error } = await supabase
+    .from('messages')
+    .delete()
+    .eq('id', messageId);
+  if (error) throw error;
+}
+
+/**
+ * Delete a message "for me" (adds user to deleted_for array)
+ */
+export async function deleteMessageForMe(messageId, userId) {
+  // Fetch current deleted_for
+  const { data: msg } = await supabase
+    .from('messages')
+    .select('deleted_for')
+    .eq('id', messageId)
+    .single();
+  if (!msg) return;
+
+  const current = msg.deleted_for || [];
+  if (current.includes(userId)) return;
+
+  const { error } = await supabase
+    .from('messages')
+    .update({ deleted_for: [...current, userId] })
+    .eq('id', messageId);
+  if (error) throw error;
+}
+
+/**
+ * Edit a message (re-encrypt with new content)
+ */
+export async function editMessage(messageId, senderId, newContent, participantIds) {
+  const allIds = [...new Set([senderId, ...(participantIds || [])])];
+  const { ciphertext, iv } = await encryptForUsers(newContent, senderId, allIds);
+
+  const { error } = await supabase
+    .from('messages')
+    .update({
+      ciphertext,
+      iv,
+      encrypted_for: allIds,
+      edited_at: new Date().toISOString(),
+    })
+    .eq('id', messageId);
+  if (error) throw error;
+}
+
+/**
+ * Toggle pin on a message
+ */
+export async function pinMessage(messageId, pinned) {
+  const { error } = await supabase
+    .from('messages')
+    .update({ is_pinned: pinned })
+    .eq('id', messageId);
+  if (error) throw error;
+}
+
+/**
+ * Toggle emoji reaction on a message
+ * reactions is a JSONB { [user_id]: "emoji" }
+ * If same emoji, remove it; if different emoji, set it
+ */
+export async function addReaction(messageId, userId, emoji) {
+  // Fetch current reactions
+  const { data: msg } = await supabase
+    .from('messages')
+    .select('reactions')
+    .eq('id', messageId)
+    .single();
+  if (!msg) return;
+
+  const reactions = msg.reactions || {};
+  if (reactions[userId] === emoji) {
+    // Remove reaction
+    delete reactions[userId];
+  } else {
+    // Set/change reaction
+    reactions[userId] = emoji;
+  }
+
+  const { error } = await supabase
+    .from('messages')
+    .update({ reactions })
+    .eq('id', messageId);
+  if (error) throw error;
+}
+
 /**
  * Delete a conversation by ID (cascade deletes messages and participants)
  */
