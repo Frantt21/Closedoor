@@ -17,6 +17,9 @@ import {
   likeComment,
   unlikeComment,
   isCommentLiked,
+  dislikeComment,
+  undislikeComment,
+  isCommentDisliked,
   getCachedComments,
   setCachedComments,
   trackPostView,
@@ -24,11 +27,12 @@ import {
   dislikePost,
   undislikePost,
 } from '../services/postService';
-import { FaHeart, FaRegHeart, FaReply, FaTrash, FaRegComment, FaRegSadTear, FaArrowLeft, FaImage, FaEllipsisV } from 'react-icons/fa';
+import { FaHeart, FaRegHeart, FaHeartBroken, FaReply, FaTrash, FaRegComment, FaRegSadTear, FaArrowLeft, FaImage, FaEllipsisV } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import PostCard from '../Resources/Components/PostCard';
 import SafeImage from '../Resources/Components/SafeImage';
 import Avatar from '../Resources/Components/Avatar';
+import GifPicker from '../Resources/Components/GifPicker';
 import RichText from '../Resources/Components/RichText';
 import ConfirmModal from '../Resources/Components/ConfirmModal';
 import Tooltip from '../Resources/Components/Tooltip';
@@ -56,6 +60,10 @@ export default function PostDetail() {
     const cached = getCachedComments(postId);
     return cached?.commentLikes || {};
   });
+  const [commentDislikes, setCommentDislikes] = useState(() => {
+    const cached = getCachedComments(postId);
+    return cached?.commentDislikes || {};
+  });
   const [commentsLoading, setCommentsLoading] = useState(() => {
     return !getCachedComments(postId);
   });
@@ -64,6 +72,7 @@ export default function PostDetail() {
   const [submittingComment, setSubmittingComment] = useState(false);
   const [commentMediaUrl, setCommentMediaUrl] = useState('');
   const [commentShowMedia, setCommentShowMedia] = useState(false);
+  const [showCommentGifPicker, setShowCommentGifPicker] = useState(false);
   const [confirmDeleteComment, setConfirmDeleteComment] = useState(null);
   const [confirmExternalLink, setConfirmExternalLink] = useState(null);
   const handleCancelDeleteComment = useCallback(() => setConfirmDeleteComment(null), []);
@@ -118,6 +127,7 @@ export default function PostDetail() {
   const [replyContent, setReplyContent] = useState('');
   const [replyMediaUrl, setReplyMediaUrl] = useState('');
   const [replyShowMedia, setReplyShowMedia] = useState(false);
+  const [showReplyGifPicker, setShowReplyGifPicker] = useState(false);
   const [submittingReply, setSubmittingReply] = useState(false);
 
   // ── Gallery de imágenes en comentarios ──
@@ -180,20 +190,24 @@ export default function PostDetail() {
       const data = await getComments(postId);
       setComments(data);
 
-      // Check which comments the user has liked
+      // Check which comments the user has liked/disliked
       let likes = {};
+      let dislikes = {};
       if (user?.id && data.length > 0) {
-        const results = await Promise.allSettled(
-          data.map((c) => isCommentLiked(c.id, user.id))
-        );
+        const [likeResults, dislikeResults] = await Promise.all([
+          Promise.allSettled(data.map((c) => isCommentLiked(c.id, user.id))),
+          Promise.allSettled(data.map((c) => isCommentDisliked(c.id, user.id))),
+        ]);
         data.forEach((c, i) => {
-          if (results[i].status === 'fulfilled') likes[c.id] = results[i].value;
+          if (likeResults[i].status === 'fulfilled') likes[c.id] = likeResults[i].value;
+          if (dislikeResults[i].status === 'fulfilled') dislikes[c.id] = dislikeResults[i].value;
         });
         setCommentLikes(likes);
+        setCommentDislikes(dislikes);
       }
 
       // Guardar en cache
-      setCachedComments(postId, data, likes);
+      setCachedComments(postId, data, likes, dislikes);
 
       // All replies start hidden by default
       setExpandedReplies({});
@@ -467,6 +481,11 @@ export default function PostDetail() {
       return;
     }
     try {
+      // Remove dislike if exists
+      if (commentDislikes[commentId]) {
+        await undislikeComment(commentId, user.id);
+        setCommentDislikes((prev) => ({ ...prev, [commentId]: false }));
+      }
       if (commentLikes[commentId]) {
         await unlikeComment(commentId, user.id);
         setCommentLikes((prev) => ({ ...prev, [commentId]: false }));
@@ -476,6 +495,30 @@ export default function PostDetail() {
       }
     } catch (err) {
       console.error('Error toggling comment like:', err);
+    }
+  };
+
+  const handleDislikeComment = async (commentId) => {
+    if (!user?.id) {
+      toast.info(t('auth.login_required'));
+      navigate(`/Login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+      return;
+    }
+    try {
+      // Remove like if exists
+      if (commentLikes[commentId]) {
+        await unlikeComment(commentId, user.id);
+        setCommentLikes((prev) => ({ ...prev, [commentId]: false }));
+      }
+      if (commentDislikes[commentId]) {
+        await undislikeComment(commentId, user.id);
+        setCommentDislikes((prev) => ({ ...prev, [commentId]: false }));
+      } else {
+        await dislikeComment(commentId, user.id);
+        setCommentDislikes((prev) => ({ ...prev, [commentId]: true }));
+      }
+    } catch (err) {
+      console.error('Error toggling comment dislike:', err);
     }
   };
 
@@ -517,6 +560,7 @@ export default function PostDetail() {
   // depth>=2: nested reply, NO Reply button, NO children (terminal)
   const renderReplyCard = (reply, depth = 1) => {
     const isLikedComment = commentLikes[reply.id] || false;
+    const isDislikedComment = commentDislikes[reply.id] || false;
     const isReplying = replyTo?.id === reply.id;
     const childReplies = getReplies(reply.id);
     const hasChildren = childReplies.length > 0;
@@ -602,6 +646,16 @@ export default function PostDetail() {
               </button>
             </Tooltip>
 
+            <Tooltip text={t('post.dislike')} placement="bottom">
+              <button
+                className={`comment-card-btn ${isDislikedComment ? 'comment-card-btn--disliked' : ''}`}
+                onClick={() => handleDislikeComment(reply.id)}
+              >
+                <FaHeartBroken />
+                {reply.comment_dislikes_count > 0 && <span className="comment-card-btn-count">{reply.comment_dislikes_count}</span>}
+              </button>
+            </Tooltip>
+
             {/* Only direct replies (depth=1) can be replied to */}
             {isDirectReply && (
               <Tooltip text={t('post.reply')} placement="bottom">
@@ -681,7 +735,27 @@ export default function PostDetail() {
                     <span className="comment-form-media-badge">{t('post.comment_media_added')}</span>
                   )}
                 </button>
+                <button
+                  type="button"
+                  className={`comment-form-media-btn ${showReplyGifPicker ? 'comment-form-media-btn--active' : ''}`}
+                  onClick={() => setShowReplyGifPicker((s) => !s)}
+                  title={t('create_post.add_gif') || 'GIF'}
+                >
+                  <span style={{ fontWeight: 800, fontSize: '0.72rem', lineHeight: 1 }}>GIF</span>
+                </button>
               </div>
+              {showReplyGifPicker && (
+                <div className="comment-form-gif-picker">
+                  <GifPicker
+                    onSelect={(gifUrl) => {
+                      setReplyMediaUrl(gifUrl);
+                      setReplyShowMedia(true);
+                      setShowReplyGifPicker(false);
+                    }}
+                    onClose={() => setShowReplyGifPicker(false)}
+                  />
+                </div>
+              )}
               {replyShowMedia && (
                 <div className="comment-form-media-inputs">
                   <input className="comment-form-media-input" type="url" value={replyMediaUrl} onChange={(e) => setReplyMediaUrl(e.target.value)} placeholder={t('post.comment_media_url')} />
@@ -715,6 +789,7 @@ export default function PostDetail() {
   // ── Render a single comment (top-level) ──
   const renderComment = (comment) => {
     const isLikedComment = commentLikes[comment.id] || false;
+    const isDislikedComment = commentDislikes[comment.id] || false;
     const directReplies = getReplies(comment.id);
     const isReplying = replyTo?.id === comment.id;
     const canDelete = user?.id && (user.id === comment.user_id || user.id === post?.user_id);
@@ -792,6 +867,17 @@ export default function PostDetail() {
               </button>
             </Tooltip>
 
+            {/* Dislike button */}
+            <Tooltip text={t('post.dislike')} placement="bottom">
+              <button
+                className={`comment-card-btn ${isDislikedComment ? 'comment-card-btn--disliked' : ''}`}
+                onClick={() => handleDislikeComment(comment.id)}
+              >
+                <FaHeartBroken />
+                {comment.comment_dislikes_count > 0 && <span className="comment-card-btn-count">{comment.comment_dislikes_count}</span>}
+              </button>
+            </Tooltip>
+
             {/* Reply button */}
             <Tooltip text={t('post.reply')} placement="bottom">
               <button
@@ -862,8 +948,7 @@ export default function PostDetail() {
                 placeholder={t('post.reply_placeholder', { user: replyTo?.username })}
                 rows={2}
                 maxLength={1000}
-              />
-              <div className="comment-form-media-row">
+              />              <div className="comment-form-media-row">
                 <button
                   type="button"
                   className={`comment-form-media-btn ${replyShowMedia ? 'comment-form-media-btn--active' : ''}`}
@@ -875,7 +960,27 @@ export default function PostDetail() {
                     <span className="comment-form-media-badge">{t('post.comment_media_added')}</span>
                   )}
                 </button>
+                <button
+                  type="button"
+                  className={`comment-form-media-btn ${showReplyGifPicker ? 'comment-form-media-btn--active' : ''}`}
+                  onClick={() => setShowReplyGifPicker((s) => !s)}
+                  title={t('create_post.add_gif') || 'GIF'}
+                >
+                  <span style={{ fontWeight: 800, fontSize: '0.72rem', lineHeight: 1 }}>GIF</span>
+                </button>
               </div>
+              {showReplyGifPicker && (
+                <div className="comment-form-gif-picker">
+                  <GifPicker
+                    onSelect={(gifUrl) => {
+                      setReplyMediaUrl(gifUrl);
+                      setReplyShowMedia(true);
+                      setShowReplyGifPicker(false);
+                    }}
+                    onClose={() => setShowReplyGifPicker(false)}
+                  />
+                </div>
+              )}
               {replyShowMedia && (
                 <div className="comment-form-media-inputs">
                   <input className="comment-form-media-input" type="url" value={replyMediaUrl} onChange={(e) => setReplyMediaUrl(e.target.value)} placeholder={t('post.comment_media_url')} />
@@ -888,11 +993,7 @@ export default function PostDetail() {
                 </div>
               )}
               <div className="comment-form-actions">
-                <button
-                  className="comment-form-submit"
-                  onClick={handleSubmitReply}
-                  disabled={submittingReply || !replyContent.trim()}
-                >
+                <button className="comment-form-submit" onClick={handleSubmitReply} disabled={submittingReply || !replyContent.trim()}>
                   {submittingReply ? t('post.sending') : t('post.comment_post')}
                 </button>
               </div>
@@ -1000,7 +1101,27 @@ export default function PostDetail() {
                     <span className="comment-form-media-badge">{t('post.comment_media_added')}</span>
                   )}
                 </button>
+                <button
+                  type="button"
+                  className={`comment-form-media-btn ${showCommentGifPicker ? 'comment-form-media-btn--active' : ''}`}
+                  onClick={() => setShowCommentGifPicker((s) => !s)}
+                  title={t('create_post.add_gif') || 'GIF'}
+                >
+                  <span style={{ fontWeight: 800, fontSize: '0.72rem', lineHeight: 1 }}>GIF</span>
+                </button>
               </div>
+              {showCommentGifPicker && (
+                <div className="comment-form-gif-picker">
+                  <GifPicker
+                    onSelect={(gifUrl) => {
+                      setCommentMediaUrl(gifUrl);
+                      setCommentShowMedia(true);
+                      setShowCommentGifPicker(false);
+                    }}
+                    onClose={() => setShowCommentGifPicker(false)}
+                  />
+                </div>
+              )}
               {commentShowMedia && (
                 <div className="comment-form-media-inputs">
                   <input

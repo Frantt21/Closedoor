@@ -11,37 +11,47 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
+  -- Fix: usar DISTINCT por post_id para que palabras repetidas en un mismo post
+  -- cuenten solo 1 vez, no por cada ocurrencia.
   RETURN QUERY
   SELECT 
-    LOWER(unnested)::TEXT AS word,
+    w.word,
     COUNT(*)::BIGINT AS frequency
   FROM (
-    SELECT regexp_split_to_table(
-      -- Limpiar: remover URLs, @mentions, #hashtags, caracteres no alfanuméricos
-      regexp_replace(
-        regexp_replace(
+    SELECT DISTINCT
+      id AS post_id,
+      unnested AS word
+    FROM (
+      SELECT 
+        posts.id,
+        regexp_split_to_table(
+          -- Limpiar: remover URLs, @mentions, #hashtags, caracteres no alfanuméricos
           regexp_replace(
-            LOWER(COALESCE(content, '')),
-            'https?://\S+', '', 'g'
+            regexp_replace(
+              regexp_replace(
+                LOWER(COALESCE(posts.content, '')),
+                'https?://\S+', '', 'g'
+              ),
+              '@[a-zA-Z0-9_]+', '', 'g'
+            ),
+            '#[a-zA-Z0-9_\u00C0-\u024F]+', '', 'g'
           ),
-          '@[a-zA-Z0-9_]+', '', 'g'
-        ),
-        '#[a-zA-Z0-9_\u00C0-\u024F]+', '', 'g'
-      ),
-      '[^a-zA-Z0-9\u00C0-\u024F]+'
-    ) AS unnested
-    FROM posts
-    JOIN profiles ON profiles.id = posts.user_id
-    WHERE posts.created_at > NOW() - (hours_back || ' hours')::INTERVAL
-      AND posts.content IS NOT NULL
-      AND posts.content != ''
-      AND (profiles.is_private IS NULL OR profiles.is_private = false)
-      AND (posts.is_encrypted IS NOT TRUE OR posts.is_encrypted IS NULL)  -- ← Excluir encriptados
-  ) words
-  WHERE 
-    LENGTH(unnested) >= 4
-    AND unnested !~ '^\d+$'
-    AND unnested NOT IN (
+          '[^a-zA-Z0-9\u00C0-\u024F]+'
+        ) AS unnested
+      FROM posts
+      JOIN profiles ON profiles.id = posts.user_id
+      WHERE posts.created_at > NOW() - (hours_back || ' hours')::INTERVAL
+        AND posts.content IS NOT NULL
+        AND posts.content != ''
+        AND (profiles.is_private IS NULL OR profiles.is_private = false)
+        AND (posts.is_encrypted IS NOT TRUE OR posts.is_encrypted IS NULL)
+    ) words_per_post
+    WHERE 
+      LENGTH(unnested) >= 4
+      AND unnested !~ '^\d+$'
+  ) w
+  WHERE
+    w.word NOT IN (
       -- English stop words
       'this', 'that', 'with', 'from', 'have', 'been', 'they', 'them', 'their',
       'will', 'would', 'could', 'should', 'about', 'which', 'when', 'where',
@@ -92,7 +102,7 @@ BEGIN
       'dulce', 'amargo', 'salado', 'agrio', 'nuevo', 'viejo', 'joven', 'antiguo',
       'moderno', 'futuro', 'pasado', 'presente', 'saber', 'poder', 'deber',
       'querer', 'poner', 'decir', 'hacer', 'creer', 'pensar', 'encontrar',
-      'entender', 'recordar', 'olvidar', 'perder', 'ganar', 'esperar', 'deseAr',
+      'entender', 'recordar', 'olvidar', 'perder', 'ganar', 'esperar', 'desear',
       'amar', 'odiar', 'preferir', 'elegir', 'decidir', 'aceptar', 'rechazar',
       'permitir', 'prohibir', 'lograr', 'conseguir', 'cambiar', 'mejorar',
       'empeorar', 'crear', 'destruir', 'construir', 'romper', 'abrir', 'cerrar',
@@ -105,11 +115,11 @@ BEGIN
       'vender', 'pagar', 'costar', 'valer'
     )
     AND NOT EXISTS (
-      SELECT 1 FROM hashtags h WHERE h.name = unnested
+      SELECT 1 FROM hashtags h WHERE h.name = w.word
     )
-  GROUP BY LOWER(unnested)
+  GROUP BY w.word
   HAVING COUNT(*) >= 2
-  ORDER BY COUNT(*) DESC, LOWER(unnested) ASC
+  ORDER BY COUNT(*) DESC, w.word ASC
   LIMIT limit_count;
 END;
 $$;

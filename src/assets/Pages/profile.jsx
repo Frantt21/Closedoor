@@ -1225,6 +1225,13 @@ function Profile() {
             ? bgFullStyle.transform
             : 'none',
           '--profile-accent-opacity': hasBg ? '8%' : '18%',
+          // ── When text is dark (light bg detected), use dark overlays so pills/buttons are visible ──
+          ...((!surfGlass && surfColor ? getContrastText(surfColor) : hasBg ? autoBgContrastColor : null) === '#111111' ? {
+            '--overlay-bg-subtle': 'rgba(0, 0, 0, 0.06)',
+            '--overlay-bg-hover': 'rgba(0, 0, 0, 0.12)',
+            '--overlay-bg-active': 'rgba(0, 0, 0, 0.16)',
+            '--overlay-bg': 'rgba(0, 0, 0, 0.08)',
+          } : {}),
         }
       : {};
 

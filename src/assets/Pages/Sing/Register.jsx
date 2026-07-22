@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../services/i18n/useI18n';
 import usePageTitle from '../../../hooks/usePageTitle';
+import { FaEye, FaEyeSlash } from 'react-icons/fa';
 import '../../Resources/Styles/register.css';
 
 function Register() {
@@ -10,6 +11,7 @@ function Register() {
   usePageTitle(t('auth.register_title'));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -71,14 +73,25 @@ function Register() {
             onChange={(e) => setEmail(e.target.value)}
             disabled={loading}
           />
-          <input
-            className="auth-input"
-            type="password"
-            placeholder={t('auth.password')}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            disabled={loading}
-          />
+          <div className="auth-password-wrap">
+            <input
+              className="auth-input auth-input--password"
+              type={showPassword ? 'text' : 'password'}
+              placeholder={t('auth.password')}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              disabled={loading}
+            />
+            <button
+              type="button"
+              className="auth-password-toggle"
+              onClick={() => setShowPassword((s) => !s)}
+              tabIndex={-1}
+              aria-label={showPassword ? t('auth.hide_password') || 'Hide password' : t('auth.show_password') || 'Show password'}
+            >
+              {showPassword ? <FaEyeSlash /> : <FaEye />}
+            </button>
+          </div>
           <button className="auth-submit" type="submit" disabled={loading}>
             {loading ? t('auth.registering') : t('auth.register_btn')}
           </button>

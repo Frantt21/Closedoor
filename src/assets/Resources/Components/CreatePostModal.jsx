@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import ModalShell from './ModalShell';
 import { createPost, updatePost, notifyMentions, notifyEncryptedAdd, extractMentions, getMentionUserIds } from '../../services/postService';
 import { getFollowing } from '../../services/followService';
@@ -9,6 +10,7 @@ import { FaImage, FaTimes, FaPlus, FaMinus, FaLink, FaLock, FaUnlock, FaUserPlus
 import SafeImage from './SafeImage';
 import Avatar from './Avatar';
 import Badge from './Badge';
+import GifPicker from './GifPicker';
 import { IMG_RE, VID_RE, YOUTUBE_PATTERN, VIMEO_PATTERN, extractUrls, detectMediaFromContent, getEmbedUrl as getEmbedUrlHelper } from '../../services/helpers';
 import ConfirmModal from './ConfirmModal';
 import Tooltip from './Tooltip';
@@ -17,6 +19,92 @@ import { supabase } from '../../services/supabaseclient';
 import './css/createPostModal.css';
 
 const IMAGE_EXTENSIONS = IMG_RE;
+
+/**
+ * MentionDropdownPortal — renders the @mention autocomplete dropdown
+ * via portal into .fc-modal-overlays so it's not clipped by the dialog's overflow.
+ * Syncs position on scroll/resize (like Tooltip.jsx).
+ */
+function MentionDropdownPortal({ textareaRef, mentionDropdownRef, mentions, selectedMentionIdx, insertMention }) {
+  const dropdownRef = useRef(null);
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+
+  const updatePosition = useCallback(() => {
+    if (!textareaRef.current) return;
+    const rect = textareaRef.current.getBoundingClientRect();
+    setPos({
+      top: rect.bottom + 4,
+      left: rect.left,
+      width: Math.min(rect.width, 360),
+    });
+  }, [textareaRef]);
+
+  useEffect(() => {
+    updatePosition();
+    let ticking = false;
+    const handleScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          updatePosition();
+          ticking = false;
+        });
+        ticking = true;
+      }
+    };
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleScroll);
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleScroll);
+    };
+  }, [updatePosition]);
+
+  const portalTarget = useMemo(() => {
+    const el = textareaRef.current;
+    if (el) {
+      const dialog = el.closest('dialog');
+      if (dialog) {
+        return dialog.querySelector('.fc-modal-overlays') || dialog;
+      }
+    }
+    return document.body;
+  }, [textareaRef]);
+
+  return createPortal(
+    <div
+      ref={(node) => {
+        dropdownRef.current = node;
+        if (mentionDropdownRef) mentionDropdownRef.current = node;
+      }}
+      className="create-post-mention-dropdown"
+      style={{
+        position: 'fixed',
+        top: pos.top,
+        left: pos.left,
+        width: pos.width,
+        zIndex: 2147483647,
+      }}
+    >
+      {mentions.map((user, idx) => (
+        <button
+          key={user.id}
+          type="button"
+          className={`create-post-mention-item ${idx === selectedMentionIdx ? 'create-post-mention-item--active' : ''}`}
+          onMouseDown={(e) => { e.preventDefault(); insertMention(user); }}
+        >
+          <Avatar
+            className="create-post-mention-avatar"
+            src={user.avatar_url}
+            alt={user.username}
+          />
+          <span className="create-post-mention-username">{user.username}</span>
+        </button>
+      ))}
+    </div>,
+    portalTarget
+  );
+}
+
 
 export default function CreatePostModal({
   isOpen,
@@ -66,6 +154,9 @@ export default function CreatePostModal({
   // ── Scheduling state ──
   const [showSchedule, setShowSchedule] = useState(false);
   const [scheduledAt, setScheduledAt] = useState('');
+
+  // ── GIF picker state ──
+  const [showGifPicker, setShowGifPicker] = useState(false);
 
   // ── Sensitive content state ──
   const [isSensitive, setIsSensitive] = useState(false);
@@ -277,16 +368,17 @@ export default function CreatePostModal({
         setUserSearchQuery('');
         setUserSearchResults([]);
         setShowUserSearch(false);
-        setShowPoll(false);
-        setPollQuestion('');
-        setPollOptions(['', '']);
-        setPollExpiresAt('');
-        setShowSchedule(false);
-        setScheduledAt('');
-        setIsSensitive(false);
-        setCommentsAllowed('everyone');
-      }
-      setError(null);
+      setShowPoll(false);
+      setPollQuestion('');
+      setPollOptions(['', '']);
+      setPollExpiresAt('');
+      setShowSchedule(false);
+      setScheduledAt('');
+      setShowGifPicker(false);
+      setIsSensitive(false);
+      setCommentsAllowed('everyone');
+    }
+    setError(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, editPost]);
@@ -675,24 +767,15 @@ export default function CreatePostModal({
                 maxLength={2000}
               />
               <span className="create-post-charcount">{content.length}/2000</span>
-              {/* ── @mention autocomplete dropdown ── */}
-              {mentionIndex !== -1 && getFilteredMentions().length > 0 && (
-                <div className="create-post-mention-dropdown" ref={mentionDropdownRef}>
-                  {getFilteredMentions().map((user, idx) => (
-                    <button
-                      key={user.id}
-                      type="button"
-                      className={`create-post-mention-item ${idx === selectedMentionIdx ? 'create-post-mention-item--active' : ''}`}
-                      onMouseDown={(e) => { e.preventDefault(); insertMention(user); }}
-                    >                      <Avatar
-                        className="create-post-mention-avatar"
-                        src={user.avatar_url}
-                        alt={user.username}
-                      />
-                      <span className="create-post-mention-username">{user.username}</span>
-                    </button>
-                  ))}
-                </div>
+              {/* ── @mention autocomplete dropdown (portaled to .fc-modal-overlays) ── */}
+              {mentionIndex !== -1 && getFilteredMentions().length > 0 && textareaRef.current && (
+                <MentionDropdownPortal
+                  textareaRef={textareaRef}
+                  mentionDropdownRef={mentionDropdownRef}
+                  mentions={getFilteredMentions()}
+                  selectedMentionIdx={selectedMentionIdx}
+                  insertMention={insertMention}
+                />
               )}
             </div>
 
@@ -799,6 +882,17 @@ export default function CreatePostModal({
               </button>
               </Tooltip>
 
+              {/* ── GIF picker toggle ── */}
+              <Tooltip text={t('create_post.add_gif') || 'GIF'} placement="bottom">
+              <button
+                type="button"
+                className={`create-post-toolbar-btn ${showGifPicker ? 'create-post-toolbar-btn--active' : ''}`}
+                onClick={() => setShowGifPicker(s => !s)}
+              >
+                <span className="create-post-toolbar-btn-gif">GIF</span>
+              </button>
+              </Tooltip>
+
               {/* ── Sensitive content toggle (disabled if no image) ── */}
               <Tooltip
                 text={
@@ -818,6 +912,26 @@ export default function CreatePostModal({
               </button>
               </Tooltip>
             </div>
+
+            {/* ── GIF picker panel ── */}
+            {showGifPicker && (
+              <GifPicker
+                onSelect={(gifUrl) => {
+                  // Add GIF URL to image URLs
+                  setImageUrls(prev => {
+                    const urls = prev.filter(u => u.trim() !== '');
+                    if (urls.length < 4) {
+                      return [...urls, gifUrl];
+                    }
+                    return prev;
+                  });
+                  // Ensure image section is visible
+                  setShowImageSection(true);
+                  setShowGifPicker(false);
+                }}
+                onClose={() => setShowGifPicker(false)}
+              />
+            )}
 
             {/* ── Poll creation section ── */}
             {showPoll && (

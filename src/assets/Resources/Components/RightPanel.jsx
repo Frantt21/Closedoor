@@ -265,6 +265,13 @@ function ProfileContent({ path, ownProfile, user, t }) {
       : hasBgRight
         ? (autoBgContrastColor === '#111111' ? '#4b5563' : 'var(--color-text-muted, #6b7280)')
         : 'var(--color-text-muted, #6b7280)',
+    // ── When text is dark (light bg detected), use dark overlays so pills/buttons are visible ──
+    ...((!surfGlass && surfColor ? getContrastText(surfColor) : hasBgRight ? autoBgContrastColor : null) === '#111111' ? {
+      '--overlay-bg-subtle': 'rgba(0, 0, 0, 0.06)',
+      '--overlay-bg-hover': 'rgba(0, 0, 0, 0.12)',
+      '--overlay-bg-active': 'rgba(0, 0, 0, 0.16)',
+      '--overlay-bg': 'rgba(0, 0, 0, 0.08)',
+    } : {}),
   } : {};
 
   // Derive CSS vars from accent-surface-text-* for the containers

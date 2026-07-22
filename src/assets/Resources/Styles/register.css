@@ -4,6 +4,42 @@
    Consistente con login.css, modal.css
    ========================================== */
 
+/* ── Password toggle wrapper ── */
+.auth-password-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.auth-input--password {
+    padding-right: 44px !important;
+}
+
+.auth-password-toggle {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: var(--radius-sm, 6px);
+    background: transparent;
+    color: var(--color-text-muted, #6b7280);
+    cursor: pointer;
+    padding: 0;
+    font-size: 0.95rem;
+    transition: color 0.15s ease, background 0.15s ease;
+}
+
+.auth-password-toggle:hover {
+    color: var(--color-text, #ffffff);
+    background: var(--color-surface-hover, #252525);
+}
+
 .auth-page {
     max-width: 800px;
     margin: 0 auto;

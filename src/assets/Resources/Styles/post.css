@@ -714,6 +714,16 @@
     color: var(--accent-color, #f472b6);
 }
 
+.comment-card-btn--disliked {
+    background: rgba(248, 113, 113, 0.08);
+    color: #f87171;
+}
+
+.comment-card-btn--disliked:hover {
+    background: rgba(248, 113, 113, 0.15);
+    color: #f87171;
+}
+
 .comment-card-btn--danger {
     color: #fca5a5;
 }
@@ -792,4 +802,22 @@
 
 .comment-card-replies {
     margin-top: 4px;
+}
+
+/* ── GIF picker in comment forms ── */
+.comment-form-gif-picker {
+    margin-top: 4px;
+    margin-bottom: 8px;
+}
+
+.comment-form-gif-picker .gif-picker {
+    max-height: 300px;
+}
+
+.comment-form-gif-picker .gif-picker-results {
+    max-height: 180px;
+}
+
+.comment-form-gif-picker .gif-picker-grid {
+    grid-template-columns: repeat(3, 1fr);
 }

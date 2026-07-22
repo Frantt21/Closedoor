@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FaLock, FaHeart, FaComment, FaRetweet, FaTags, FaFeather, FaBookmark, FaEye, FaUser, FaBan } from 'react-icons/fa';
+import { FaLock, FaHeart, FaHeartBroken, FaComment, FaRetweet, FaTags, FaFeather, FaBookmark, FaEye, FaUser, FaBan } from 'react-icons/fa';
 import { useI18n } from '../../services/i18n/useI18n';
 import { supabase } from '../../services/supabaseclient';
 import { useAuth } from '../../../hooks/useAuth';
@@ -63,8 +63,8 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
     return getCachedStats(profile.id);
   });
   const interests = profile?.interests || [];
-  const visibleInterests = expanded ? interests : interests.slice(0, 20);
-  const hasMore = interests.length > 20;
+  const visibleInterests = expanded ? interests : interests.slice(0, 8);
+  const hasMore = interests.length > 8;
 
   // ── Reset stats cuando cambia el perfil (navegación entre perfiles) ──
   useEffect(() => {
@@ -91,7 +91,7 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
       try {
         const { data: posts } = await supabase
           .from('posts')
-          .select('id, likes_count, comments_count, reposts_count, views_count')
+          .select('id, likes_count, dislikes_count, comments_count, reposts_count, views_count')
           .eq('user_id', profile.id);
 
         if (posts) {
@@ -99,11 +99,12 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
             (acc, p) => ({
               posts: acc.posts + 1,
               likes: acc.likes + (p.likes_count || 0),
+              dislikes: acc.dislikes + (p.dislikes_count || 0),
               comments: acc.comments + (p.comments_count || 0),
               reposts: acc.reposts + (p.reposts_count || 0),
               views: acc.views + (p.views_count || 0),
             }),
-            { posts: 0, likes: 0, comments: 0, reposts: 0, views: 0 }
+            { posts: 0, likes: 0, dislikes: 0, comments: 0, reposts: 0, views: 0 }
           );
 
           // Contar saves totales en los posts de este perfil
@@ -225,7 +226,7 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
                 className="profile-sidebar-expand-btn"
                 onClick={() => setExpanded((prev) => !prev)}
               >
-                {expanded ? t('profile.show_less') : t('profile.show_more', { count: interests.length - 20 })}
+                {expanded ? t('profile.show_less') : t('profile.show_more', { count: interests.length - 8 })}
               </button>
             )}
           </>
@@ -258,6 +259,7 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
           <div className="profile-sidebar-stats">
             {renderStat('posts', FaFeather, 'profile-sidebar-stat-icon--posts', stats.posts, t('profile.posts_tab'))}
             {renderStat('likes', FaHeart, 'profile-sidebar-stat-icon--likes', stats.likes, t('profile.stats_likes'))}
+            {renderStat('dislikes', FaHeartBroken, 'profile-sidebar-stat-icon--dislikes', stats.dislikes, t('profile.stats_dislikes'))}
             {renderStat('comments', FaComment, 'profile-sidebar-stat-icon--comments', stats.comments, t('profile.stats_comments'))}
             {renderStat('reposts', FaRetweet, 'profile-sidebar-stat-icon--reposts', stats.reposts, t('profile.stats_reposts'))}
             {renderStat('views', FaEye, 'profile-sidebar-stat-icon--views', stats.views, t('profile.stats_views'))}

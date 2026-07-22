@@ -187,6 +187,7 @@
 
 .post-card-time {
     font-size: 0.75rem;
+    color: var(--color-text, #ffffff);
     white-space: nowrap;
 }
 

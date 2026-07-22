@@ -616,6 +616,53 @@ export async function isCommentLiked(commentId, userId) {
   return !!data;
 }
 
+// ── COMMENT DISLIKES ──
+
+export async function dislikeComment(commentId, userId) {
+  // Remove any existing like + insert dislike
+  const [, { error }] = await Promise.all([
+    supabase
+      .from('comment_likes')
+      .delete()
+      .eq('user_id', userId)
+      .eq('comment_id', commentId),
+    supabase
+      .from('comment_dislikes')
+      .insert({ user_id: userId, comment_id: commentId }),
+  ]);
+
+  if (error && error.code !== '23505') {
+    console.error('Error disliking comment:', error);
+    throw error;
+  }
+}
+
+export async function undislikeComment(commentId, userId) {
+  const { error } = await supabase
+    .from('comment_dislikes')
+    .delete()
+    .eq('user_id', userId)
+    .eq('comment_id', commentId);
+
+  if (error) {
+    console.error('Error undisliking comment:', error);
+    throw error;
+  }
+}
+
+export async function isCommentDisliked(commentId, userId) {
+  if (!userId || !commentId) return false;
+  const { data, error } = await supabase
+    .from('comment_dislikes')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('comment_id', commentId)
+    .maybeSingle();
+
+  if (error) return false;
+  return !!data;
+}
+
 export async function getCommentLikesCount(commentId) {
   const { count, error } = await supabase
     .from('comment_likes')
@@ -1220,13 +1267,13 @@ export function getCachedPost(postId) {
 const COMMENTS_CACHE_PREFIX = 'fc_comments_';
 const COMMENTS_CACHE_TTL = 1000 * 60 * 5; // 5 min
 
-export function setCachedComments(postId, comments, commentLikes) {
+export function setCachedComments(postId, comments, commentLikes, commentDislikes) {
   if (!postId) return;
   try {
     const payload = {
       ts: Date.now(),
       ttl: COMMENTS_CACHE_TTL,
-      data: { comments, commentLikes: commentLikes || {} },
+      data: { comments, commentLikes: commentLikes || {}, commentDislikes: commentDislikes || {} },
     };
     localStorage.setItem(COMMENTS_CACHE_PREFIX + postId, JSON.stringify(payload));
   } catch (err) {
