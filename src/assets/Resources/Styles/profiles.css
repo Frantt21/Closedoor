@@ -328,7 +328,7 @@
 }
 
 .profile-stat-label {
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--color-text-muted, rgba(255, 255, 255, 0.6));
     font-size: 0.8rem;
 }
 

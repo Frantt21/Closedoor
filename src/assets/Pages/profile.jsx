@@ -87,6 +87,9 @@ function Profile() {
     const [profileError, setProfileError] = useState(null);
 
     const activeProfile = isOwnProfile ? ownProfile : viewedProfile;
+    // ── Extract early for useBgContrast hook (must be before any early returns) ──
+    const bgUrlEarly = activeProfile?.profile_background_url;
+    const autoBgContrastColor = useBgContrast(bgUrlEarly);
     usePageMeta({
         title: activeProfile?.username ? `@${activeProfile.username}` : t('profile.title'),
         description: activeProfile?.bio ? (activeProfile.bio.length > 200 ? activeProfile.bio.slice(0, 200) + '...' : activeProfile.bio) : `Check out ${activeProfile?.username ? `@${activeProfile.username}` : ''} on Closedoor!`,
@@ -1154,8 +1157,6 @@ function Profile() {
     const bgDim = (activeProfile?.profile_background_dim ?? 50) / 100; // 0-1
     const hasBg = !!bgUrl;
     const bgFullStyle = hasBg ? getBgFullStyle(activeProfile?.profile_background_position) : null;
-    // ── Auto-detect contrast from background image ──
-    const autoBgContrastColor = useBgContrast(bgUrl);
 
     // Para perfiles ajenos: usar las preferencias guardadas en la BD del dueño del perfil
     // Para perfil propio: siempre mostrar (el toggle es para controlar qué ven los demás)

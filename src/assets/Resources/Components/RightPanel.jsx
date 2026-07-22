@@ -180,6 +180,10 @@ function ProfileContent({ path, ownProfile, user, t }) {
 
   const { showAccent, accentVisibility, showTrending, showInterests, showProfileStats } = useI18n();
 
+  // ── Extract bg URL early for useBgContrast (must be before any early returns) ──
+  const bgUrlRight = (isOwnProfilePage ? ownProfile : viewedProfile)?.profile_background_url;
+  const autoBgContrastColor = useBgContrast(bgUrlRight);
+
   // ── Home page y otras rutas no-perfil: trending siempre visible ──
   if (isHomePage || (!isOwnProfilePage && !isOtherProfilePage)) {
     return <TrendingHashtags t={t} />;
@@ -209,9 +213,7 @@ function ProfileContent({ path, ownProfile, user, t }) {
 
   const surfColor = activeProfile?.accent_surface_color;
   const surfGlass = activeProfile?.accent_surface_glass === true;
-  const bgUrlRight = activeProfile?.profile_background_url;
-  const hasBgRight = !!bgUrlRight;
-  const autoBgContrastColor = useBgContrast(bgUrlRight);
+  const hasBgRight = !!activeProfile?.profile_background_url;
   const isOwnProfileRight = isOwnProfilePage;
 
   // Para perfiles ajenos: usar las preferencias guardadas en la BD del dueño del perfil
