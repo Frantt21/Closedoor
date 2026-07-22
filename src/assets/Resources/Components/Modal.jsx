@@ -339,8 +339,14 @@ export default function Modal({
   };
 
   // ── Submodal URL editing ──
+  const urlInitialRef = useRef('');
+  const [urlSubPendingClose, setUrlSubPendingClose] = useState(false);
+  const hasUrlChanges = showUrlModal !== null && urlInput.trim() !== urlInitialRef.current;
+
   const handleOpenUrlModal = (type) => {
-    setUrlInput(type === 'avatar' ? avatar : banner);
+    const current = type === 'avatar' ? avatar : banner;
+    urlInitialRef.current = current;
+    setUrlInput(current);
     setShowUrlModal(type);
   };
 
@@ -352,13 +358,31 @@ export default function Modal({
     setUrlInput('');
   };
 
+  const closeUrlSubmodal = () => {
+    if (hasUrlChanges) {
+      setUrlSubPendingClose(true);
+    } else {
+      setShowUrlModal(null);
+    }
+  };
+
+  const confirmUrlDiscard = () => {
+    setUrlSubPendingClose(false);
+    setShowUrlModal(null);
+  };
+
   const handleUrlModalKeyDown = (e) => {
     if (e.key === 'Enter') { e.preventDefault(); handleUrlModalSave(); }
-    else if (e.key === 'Escape') setShowUrlModal(null);
+    else if (e.key === 'Escape') { e.preventDefault(); closeUrlSubmodal(); }
   };
 
   // ── Profile Background submodal ──
+  const bgUrlInitialRef = useRef('');
+  const [bgSubPendingClose, setBgSubPendingClose] = useState(false);
+  const hasBgChanges = showProfileBgSubmodal && profileBgUrlInput.trim() !== bgUrlInitialRef.current;
+
   const handleOpenProfileBgModal = () => {
+    bgUrlInitialRef.current = profileBg;
     setProfileBgUrlInput(profileBg);
     setShowProfileBgSubmodal(true);
   };
@@ -371,9 +395,24 @@ export default function Modal({
     setProfileBgUrlInput('');
   };
 
+  const closeBgSubmodal = () => {
+    if (hasBgChanges) {
+      setBgSubPendingClose(true);
+    } else {
+      setShowProfileBgSubmodal(null);
+      setProfileBgUrlInput('');
+    }
+  };
+
+  const confirmBgDiscard = () => {
+    setBgSubPendingClose(false);
+    setShowProfileBgSubmodal(null);
+    setProfileBgUrlInput('');
+  };
+
   const handleProfileBgUrlKeyDown = (e) => {
     if (e.key === 'Enter') { e.preventDefault(); handleProfileBgModalSave(); }
-    else if (e.key === 'Escape') setShowProfileBgSubmodal(null);
+    else if (e.key === 'Escape') { e.preventDefault(); closeBgSubmodal(); }
   };
 
   const BIO_MAX_LENGTH = 80;
@@ -381,6 +420,7 @@ export default function Modal({
   const previewUsername = username || 'username';
 
   return (
+    <>
     <ModalShell isOpen={isOpen} onClose={onClose} onEscape={() => confirmCloseRef.current()}>
       {/* ── Header bar: title + actions ── */}
       <div className="fc-modal-header">
@@ -509,59 +549,7 @@ export default function Modal({
               </div>
             </div>
 
-            {/* ── URL submodal con posicionador ── */}
-            {showUrlModal && (
-              <div className="fc-modal-sub-overlay" onClick={() => setShowUrlModal(null)}>
-                <div className="fc-modal-sub" tabIndex={-1} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setShowUrlModal(null); } }} onClick={(e) => e.stopPropagation()}>
-                  <h4 className="fc-modal-sub-title">
-                    {showUrlModal === 'avatar' ? t('modal.avatar_url') : t('modal.banner_url')}
-                  </h4>
-                  <input
-                    className="fc-modal-input fc-modal-sub-input"
-                    value={urlInput}
-                    onChange={(e) => setUrlInput(e.target.value)}
-                    onKeyDown={handleUrlModalKeyDown}
-                    placeholder={showUrlModal === 'avatar' ? 'https://.../avatar.jpg' : 'https://.../banner.jpg'}
-                    autoFocus
-                  />
-                  {/* ── Credits input ── */}
-                  <input
-                    className="fc-modal-input fc-modal-sub-input"
-                    value={showUrlModal === 'avatar' ? avatarCredits : bannerCredits}
-                    onChange={(e) => {
-                      if (showUrlModal === 'avatar') setAvatarCredits(e.target.value);
-                      else setBannerCredits(e.target.value);
-                    }}
-                    placeholder={t('modal.credits_placeholder')}
-                    style={{ marginTop: 8 }}
-                  />
-                  {/* ── Image position editor ── */}
-                  {urlInput.trim() && (
-                    <div style={{ marginTop: 10 }}>
-                      <ImagePositionEditor
-                        key={`pos-editor-${showUrlModal}`}
-                        imageUrl={urlInput.trim()}
-                        initialPosition={showUrlModal === 'avatar' ? avatarPosition : bannerPosition}
-                        aspectRatio={showUrlModal === 'avatar' ? 1 : 40 / 11}
-                        circular={showUrlModal === 'avatar'}
-                        onPositionChange={(pos) => {
-                          if (showUrlModal === 'avatar') setAvatarPosition(pos);
-                          else setBannerPosition(pos);
-                        }}
-                      />
-                    </div>
-                  )}
-                  <div className="fc-modal-sub-actions">
-                    <button type="button" className="fc-modal-sub-save" onClick={handleUrlModalSave}>
-                      {t('modal.apply')}
-                    </button>
-                    <button type="button" className="fc-modal-sub-cancel" onClick={() => setShowUrlModal(null)}>
-                      {t('modal.cancel')}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* ── (URL submodal now rendered outside as independent dialog) ── */}
 
             {/* Perfil — Username + Bio */}
             <div className="fc-modal-card">
@@ -1120,43 +1108,6 @@ export default function Modal({
           </div>
         </div>
 
-        {/* ── Profile Background URL submodal ── */}
-        {showProfileBgSubmodal && (
-          <div className="fc-modal-sub-overlay" onClick={() => { setShowProfileBgSubmodal(null); setProfileBgUrlInput(''); }}>
-            <div className="fc-modal-sub" tabIndex={-1} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setShowProfileBgSubmodal(null); setProfileBgUrlInput(''); } }} onClick={(e) => e.stopPropagation()}>
-              <h4 className="fc-modal-sub-title">{t('modal.profile_background')}</h4>
-              <input
-                className="fc-modal-input fc-modal-sub-input"
-                value={profileBgUrlInput}
-                onChange={(e) => setProfileBgUrlInput(e.target.value)}
-                onKeyDown={handleProfileBgUrlKeyDown}
-                placeholder="https://.../background.jpg"
-                autoFocus
-              />
-              {profileBgUrlInput.trim() && (
-                <div style={{ marginTop: 10 }}>
-                  <ImagePositionEditor
-                    key={`bg-pos-${showProfileBgSubmodal}`}
-                    imageUrl={profileBgUrlInput.trim()}
-                    initialPosition={profileBgPosition}
-                    aspectRatio={16 / 9}
-                    onPositionChange={(pos) => setProfileBgPosition(pos)}
-                  />
-                </div>
-              )}
-              <div className="fc-modal-sub-actions">
-                <button type="button" className="fc-modal-sub-save" onClick={handleProfileBgModalSave}>
-                  {t('modal.apply')}
-                </button>
-                <button type="button" className="fc-modal-sub-cancel" onClick={() => { setShowProfileBgSubmodal(null); setProfileBgUrlInput(''); }}>
-                  {t('modal.cancel')}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-
       {/* ── Discard changes confirmation ── */}
       {pendingClose && (
         <ConfirmModal
@@ -1166,5 +1117,112 @@ export default function Modal({
         />
       )}
     </ModalShell>
+
+      {/* ── URL submodal as independent dialog ── */}
+      <ModalShell
+        isOpen={showUrlModal !== null}
+        onClose={closeUrlSubmodal}
+        className="fc-modal--confirm"
+      >
+        <h4 className="fc-modal-sub-title">
+          {showUrlModal === 'avatar' ? t('modal.avatar_url') : t('modal.banner_url')}
+        </h4>
+        <input
+          className="fc-modal-input"
+          value={urlInput}
+          onChange={(e) => setUrlInput(e.target.value)}
+          onKeyDown={handleUrlModalKeyDown}
+          placeholder={showUrlModal === 'avatar' ? 'https://.../avatar.jpg' : 'https://.../banner.jpg'}
+          autoFocus
+        />
+        {/* ── Credits input ── */}
+        <input
+          className="fc-modal-input"
+          value={showUrlModal === 'avatar' ? avatarCredits : bannerCredits}
+          onChange={(e) => {
+            if (showUrlModal === 'avatar') setAvatarCredits(e.target.value);
+            else setBannerCredits(e.target.value);
+          }}
+          placeholder={t('modal.credits_placeholder')}
+          style={{ marginTop: 8 }}
+        />
+        {/* ── Image position editor ── */}
+        {urlInput.trim() && (
+          <div style={{ marginTop: 10 }}>
+            <ImagePositionEditor
+              key={`pos-editor-${showUrlModal}`}
+              imageUrl={urlInput.trim()}
+              initialPosition={showUrlModal === 'avatar' ? avatarPosition : bannerPosition}
+              aspectRatio={showUrlModal === 'avatar' ? 1 : 40 / 11}
+              circular={showUrlModal === 'avatar'}
+              onPositionChange={(pos) => {
+                if (showUrlModal === 'avatar') setAvatarPosition(pos);
+                else setBannerPosition(pos);
+              }}
+            />
+          </div>
+        )}
+        <div className="fc-modal-sub-actions">
+          <button type="button" className="fc-modal-sub-save" onClick={handleUrlModalSave}>
+            {t('modal.apply')}
+          </button>            <button type="button" className="fc-modal-sub-cancel" onClick={closeUrlSubmodal}>
+              {t('modal.cancel')}
+            </button>
+          </div>
+      </ModalShell>
+
+      {/* ── URL submodal confirm discard ── */}
+      {urlSubPendingClose && (
+        <ConfirmModal
+          message={t('modal.discard_changes')}
+          onConfirm={confirmUrlDiscard}
+          onCancel={() => setUrlSubPendingClose(false)}
+        />
+      )}
+
+      {/* ── Profile Background submodal as independent dialog ── */}
+      <ModalShell
+        isOpen={showProfileBgSubmodal}
+        onClose={closeBgSubmodal}
+        className="fc-modal--confirm"
+      >
+        <h4 className="fc-modal-sub-title">{t('modal.profile_background')}</h4>
+        <input
+          className="fc-modal-input"
+          value={profileBgUrlInput}
+          onChange={(e) => setProfileBgUrlInput(e.target.value)}
+          onKeyDown={handleProfileBgUrlKeyDown}
+          placeholder="https://.../background.jpg"
+          autoFocus
+        />
+        {profileBgUrlInput.trim() && (
+          <div style={{ marginTop: 10 }}>
+            <ImagePositionEditor
+              key={`bg-pos-${showProfileBgSubmodal}`}
+              imageUrl={profileBgUrlInput.trim()}
+              initialPosition={profileBgPosition}
+              aspectRatio={16 / 9}
+              onPositionChange={(pos) => setProfileBgPosition(pos)}
+            />
+          </div>
+        )}
+        <div className="fc-modal-sub-actions">
+          <button type="button" className="fc-modal-sub-save" onClick={handleProfileBgModalSave}>
+            {t('modal.apply')}
+          </button>              <button type="button" className="fc-modal-sub-cancel" onClick={closeBgSubmodal}>
+              {t('modal.cancel')}
+            </button>
+          </div>
+      </ModalShell>
+
+      {/* ── Background submodal confirm discard ── */}
+      {bgSubPendingClose && (
+        <ConfirmModal
+          message={t('modal.discard_changes')}
+          onConfirm={confirmBgDiscard}
+          onCancel={() => setBgSubPendingClose(false)}
+        />
+      )}
+    </>
   );
 }
