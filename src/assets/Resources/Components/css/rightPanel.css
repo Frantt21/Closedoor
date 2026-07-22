@@ -111,7 +111,7 @@
 }
 
 .right-panel-trending-item:hover {
-  background: var(--color-surface-hover, #252525);
+  background: var(--accent-surface-rgba-hover, var(--color-surface-hover, #252525));
 }
 
 .right-panel-trending-category {

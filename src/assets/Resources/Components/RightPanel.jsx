@@ -252,17 +252,17 @@ function ProfileContent({ path, ownProfile, user, t }) {
     // ── Glass mode text contrast: auto-detect from background image ──
     '--accent-surface-text-color': !surfGlass && surfColor
       ? getContrastText(surfColor)
-      : (surfGlass && hasBgRight)
+      : hasBgRight
         ? autoBgContrastColor
         : 'var(--color-text, #ffffff)',
     '--accent-surface-text-secondary': !surfGlass && surfColor
       ? '#374151'
-      : (surfGlass && hasBgRight)
+      : hasBgRight
         ? (autoBgContrastColor === '#111111' ? '#374151' : 'var(--color-text-secondary, #9ca3af)')
         : 'var(--color-text-secondary, #9ca3af)',
     '--accent-surface-text-muted': !surfGlass && surfColor
       ? '#6b7280'
-      : (surfGlass && hasBgRight)
+      : hasBgRight
         ? (autoBgContrastColor === '#111111' ? '#4b5563' : 'var(--color-text-muted, #6b7280)')
         : 'var(--color-text-muted, #6b7280)',
   } : {};

@@ -26,7 +26,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
  *  - disableBackdropClose: boolean — if true, clicking outside the dialog won't close it
  *  - children: ReactNode
  */
-export default function ModalShell({ isOpen, onClose, onEscape, className = '', disableBackdropClose = false, children }) {
+export default function ModalShell({ isOpen, onClose, onEscape, className = '', disableBackdropClose = true, children }) {
   const dialogRef = useRef(null);
   const [state, setState] = useState('idle'); // 'idle' | 'entering' | 'open' | 'leaving'
   const prevOpenRef = useRef(isOpen);
@@ -118,14 +118,18 @@ export default function ModalShell({ isOpen, onClose, onEscape, className = '', 
     }
   }, [onClose, onEscape, disableBackdropClose]);
 
-  // Nothing to render when idle
-  if (state === 'idle') return null;
+  // ── Keep dialog always mounted so .fc-modal-overlays stays in the DOM ──
+  // Never return null: portal targets must survive children unmount (prevents
+  // "Failed to execute 'removeChild' on 'Node'" errors from React portal cleanup).
+  // When idle, hide the dialog and children; when active, show everything.
+  const isIdle = state === 'idle';
 
   const classes = [
     'fc-modal',
     className,
     state === 'open' ? 'fc-dialog--open' : '',
     state === 'leaving' ? 'fc-dialog--leaving' : '',
+    isIdle ? 'fc-modal--idle' : '',
   ].filter(Boolean).join(' ');
 
   return (
@@ -133,9 +137,10 @@ export default function ModalShell({ isOpen, onClose, onEscape, className = '', 
       ref={dialogRef}
       className={classes}
       onClick={handleBackdropClick}
+      style={isIdle ? { display: 'none' } : undefined}
     >
       <div className="fc-modal-inner">
-        {children}
+        {!isIdle && children}
       </div>
       <div className="fc-modal-overlays" />
     </dialog>
