@@ -245,8 +245,9 @@ export async function getProfileContent(profileUserId, currentUserId, filterEncr
   merged.sort(sortProfilePosts);
 
   // Filtrar posts encriptados si filterEncrypted está activo
+  // pero siempre mostrar los propios posts encriptados del usuario
   if (filterEncrypted) {
-    return merged.filter((p) => !p.is_encrypted);
+    return merged.filter((p) => !p.is_encrypted || p.user_id === currentUserId);
   }
 
   return merged;
@@ -352,9 +353,8 @@ export async function getFeed({ limit = 20, offset = 0, userId, filterEncrypted 
     .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private)');
 
   // Excluir posts programados del feed
-  if (filterEncrypted) {
-    query = query.neq('is_encrypted', true);
-  }
+  // Filter encrypted posts in JavaScript (not DB) to allow own encrypted posts
+  // through even when filterEncrypted is active
   query = query.or('scheduled_at.is.null,scheduled_at.lte.now');
 
   // Resolver IDs visibles con cache (o fetch si cache miss)
@@ -383,6 +383,11 @@ export async function getFeed({ limit = 20, offset = 0, userId, filterEncrypted 
   // Si vino de cache, refrescar IDs y actualizar cache en background
   if (fromCache && userId) {
     refreshVisibleIds(userId);
+  }
+
+  // Filter encrypted posts in JS: hide others' encrypted posts but keep own
+  if (filterEncrypted) {
+    return posts.filter((p) => !p.is_encrypted || p.user_id === userId);
   }
 
   return posts;

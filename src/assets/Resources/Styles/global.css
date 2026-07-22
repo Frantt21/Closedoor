@@ -68,6 +68,30 @@ html {
     scrollbar-gutter: stable;
 }
 
+/* ── Global scrollbar customization: no track background ── */
+html::-webkit-scrollbar {
+    width: 6px;
+}
+
+html::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+html::-webkit-scrollbar-thumb {
+    background: var(--color-border, #2a2a2a);
+    border-radius: 3px;
+}
+
+html::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-muted, #6b7280);
+}
+
+/* Firefox scrollbar */
+html {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border, #2a2a2a) transparent;
+}
+
 body {
     font-family: 'Poppins', sans-serif;
     background-color: var(--color-bg);

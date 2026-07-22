@@ -316,6 +316,7 @@
   "post.encrypted_visible": "🔒 Conteúdo privado visível para você",
   "post.encrypted_hidden": "🔒 Conteúdo ofuscado",
   "create_post.encrypted_edit_locked": "Post ofuscado — não pode alterar",
+  "create_post.encrypted_disabled_by_filter": "Ofuscação desativada — ocultar posts criptografados está ativo",
   "create_post.obfuscated_preview_label": "Como os outros veem:",
   "create_post.add_poll": "Adicionar enquete",
   "create_post.remove_poll": "Remover enquete",

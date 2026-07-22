@@ -325,6 +325,7 @@
   "create_post.quick_add": "Siguiendo:",
   "create_post.encrypted_no_users": "Selecciona al menos un usuario para ver el contenido ofuscado",
   "create_post.encrypted_edit_locked": "Post ofuscado — no se puede cambiar",
+  "create_post.encrypted_disabled_by_filter": "Ofuscación desactivada — ocultar posts encriptados está activo",
   "create_post.obfuscated_preview_label": "Cómo lo ven los demás:",
   "create_post.add_poll": "Añadir encuesta",
   "create_post.remove_poll": "Quitar encuesta",

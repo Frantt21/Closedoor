@@ -316,6 +316,7 @@
   "post.encrypted_visible": "🔒 Приватный контент, видимый вам",
   "post.encrypted_hidden": "🔒 Скрытый контент",
   "create_post.encrypted_edit_locked": "Пост скрыт — изменить нельзя",
+  "create_post.encrypted_disabled_by_filter": "Скрытие отключено — скрытие зашифрованных постов активно",
   "create_post.obfuscated_preview_label": "Как видят другие:",
   "create_post.add_poll": "Добавить опрос",
   "create_post.remove_poll": "Убрать опрос",

@@ -15,9 +15,17 @@
     background: var(--overlay-bg-subtle);
     color: var(--color-text-muted, #6b7280);
     font-size: 0.65rem;
-    margin-left: auto;
     flex-shrink: 0;
     cursor: default;
+}
+
+/* ── Right side container: encrypted badge + menus ── */
+.post-card-header-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+    margin-left: auto;
 }
 
 .post-card-encrypted-text {
@@ -46,7 +54,7 @@
 }
 
 .post-card:hover {
-    background: var(--color-surface-hover, #252525);
+    background: var(--color-surface-hover-subtle, #202020);
 }
 
 
@@ -65,7 +73,7 @@
 }
 
 .profile-page .post-card:hover {
-    background: var(--accent-surface-rgba-hover, var(--color-surface-hover, #252525));
+    background: var(--accent-surface-rgba-hover, var(--color-surface-hover-subtle, #202020));
     transition: background 0.2s ease;
 }
 
@@ -199,7 +207,7 @@
 /* ---- Media ---- */
 
 .post-card-media {
-    border-radius: var(--radius-sm, 6px);
+    border-radius: var(--radius, 10px);
     overflow: hidden;
     margin-bottom: 10px;
     background: #000;
@@ -418,7 +426,7 @@
 .post-card-image-grid {
     display: grid;
     gap: 3px;
-    border-radius: var(--radius-sm, 6px);
+    border-radius: var(--radius, 10px);
     overflow: hidden;
     margin-bottom: 10px;
     background: var(--color-surface, #1a1a1a);
@@ -508,7 +516,7 @@
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
-    border-radius: var(--radius-sm, 6px);
+    border-radius: var(--radius, 10px);
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
     display: block;
     animation: fcSlideUp 0.25s ease;
@@ -837,7 +845,7 @@
     backdrop-filter: blur(24px);
     -webkit-backdrop-filter: blur(24px);
     pointer-events: auto;
-    border-radius: var(--radius-sm, 6px);
+    border-radius: var(--radius, 10px);
 }
 
 .post-card-sensitive-overlay-content {
@@ -935,7 +943,7 @@
 .post-card-lightbox-content .safe-image-fallback {
   width: 400px;
   height: 300px;
-  border-radius: var(--radius-sm, 6px);
+  border-radius: var(--radius, 10px);
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
   background: rgba(255, 255, 255, 0.05);
 }

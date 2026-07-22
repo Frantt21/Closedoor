@@ -25,7 +25,7 @@ export default function CreatePostModal({
   editPost = null,
   userId,
 }) {
-  const { t } = useI18n();
+  const { t, filterEncrypted } = useI18n();
   const { profile } = useAuth();
   const currentUserId = userId; // alias para usar en callbacks
   const [content, setContent] = useState('');
@@ -713,17 +713,20 @@ export default function CreatePostModal({
 
               <Tooltip
                 text={
-                  isEditing
-                    ? t('create_post.encrypted_edit_locked')
-                    : isEncrypted
-                      ? t('create_post.encrypted_on')
-                      : t('create_post.encrypted_off')
+                  filterEncrypted
+                    ? t('create_post.encrypted_disabled_by_filter')
+                    : isEditing
+                      ? t('create_post.encrypted_edit_locked')
+                      : isEncrypted
+                        ? t('create_post.encrypted_on')
+                        : t('create_post.encrypted_off')
                 }
                 placement="bottom"
               >
               <button
                 type="button"
                 className={`create-post-toolbar-btn ${isEncrypted ? 'create-post-toolbar-btn--encrypted' : ''}`}
+                disabled={filterEncrypted}
                 onClick={() => {
                   if (isEditing) return; // No permitir cambiar en edición
                   if (!isEncrypted) {

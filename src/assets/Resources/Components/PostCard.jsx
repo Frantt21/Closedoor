@@ -331,27 +331,42 @@ const PostCard = React.memo(function PostCard({
       navigate(`/Login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
       return;
     }
+    // ── Optimistic update ──
+    const wasLiked = liked;
+    const wasDisliked = disliked;
+    const prevLikesCount = likesCount;
+    const prevDislikesCount = dislikesCount;
+
+    if (wasLiked) {
+      setLiked(false);
+      setLikesCount((c) => Math.max(c - 1, 0));
+    } else {
+      setLiked(true);
+      setLikesCount((c) => c + 1);
+      if (wasDisliked) {
+        setDisliked(false);
+        setDislikesCount((c) => Math.max(c - 1, 0));
+      }
+    }
+
     try {
-      const nowLiked = !liked;
-      if (liked) {
+      if (wasLiked) {
         await unlikePost(post.id, user.id);
-        setLiked(false);
-        setLikesCount((c) => Math.max(c - 1, 0));
       } else {
         await likePost(post.id, user.id);
-        setLiked(true);
-        setLikesCount((c) => c + 1);
-        // If was disliked, remove dislike state (mutual exclusion)
-        if (disliked) {
-          setDisliked(false);
-          setDislikesCount((c) => Math.max(c - 1, 0));
-        }
       }
-      if (onLikeToggle) onLikeToggle(post.id, nowLiked);
+      if (onLikeToggle) onLikeToggle(post.id, !wasLiked);
     } catch (err) {
+      // Rollback on error
+      setLiked(wasLiked);
+      setLikesCount(prevLikesCount);
+      if (wasDisliked) {
+        setDisliked(true);
+        setDislikesCount(prevDislikesCount);
+      }
       console.error('Like error:', err);
     }
-  }, [user, liked, disliked, post.id, onLikeToggle, navigate, t]);
+  }, [user, liked, disliked, likesCount, dislikesCount, post.id, onLikeToggle, navigate, t]);
 
   const handleDislike = useCallback(async (e) => {
     e.stopPropagation();
@@ -360,27 +375,42 @@ const PostCard = React.memo(function PostCard({
       navigate(`/Login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
       return;
     }
+    // ── Optimistic update ──
+    const wasDisliked = disliked;
+    const wasLiked = liked;
+    const prevDislikesCount = dislikesCount;
+    const prevLikesCount = likesCount;
+
+    if (wasDisliked) {
+      setDisliked(false);
+      setDislikesCount((c) => Math.max(c - 1, 0));
+    } else {
+      setDisliked(true);
+      setDislikesCount((c) => c + 1);
+      if (wasLiked) {
+        setLiked(false);
+        setLikesCount((c) => Math.max(c - 1, 0));
+      }
+    }
+
     try {
-      const nowDisliked = !disliked;
-      if (disliked) {
+      if (wasDisliked) {
         await undislikePost(post.id, user.id);
-        setDisliked(false);
-        setDislikesCount((c) => Math.max(c - 1, 0));
       } else {
         await dislikePost(post.id, user.id);
-        setDisliked(true);
-        setDislikesCount((c) => c + 1);
-        // If was liked, remove like state
-        if (liked) {
-          setLiked(false);
-          setLikesCount((c) => Math.max(c - 1, 0));
-        }
       }
-      if (onDislikeToggle) onDislikeToggle(post.id, nowDisliked);
+      if (onDislikeToggle) onDislikeToggle(post.id, !wasDisliked);
     } catch (err) {
+      // Rollback on error
+      setDisliked(wasDisliked);
+      setDislikesCount(prevDislikesCount);
+      if (wasLiked) {
+        setLiked(true);
+        setLikesCount(prevLikesCount);
+      }
       console.error('Dislike error:', err);
     }
-  }, [user, disliked, liked, post.id, onDislikeToggle, navigate, t]);
+  }, [user, disliked, liked, dislikesCount, likesCount, post.id, onDislikeToggle, navigate, t]);
 
   const handleRepost = useCallback(async (e) => {
     e.stopPropagation();
@@ -389,22 +419,32 @@ const PostCard = React.memo(function PostCard({
       navigate(`/Login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
       return;
     }
+    // ── Optimistic update ──
+    const wasReposted = reposted;
+    const prevRepostsCount = repostsCount;
+
+    if (wasReposted) {
+      setReposted(false);
+      setRepostsCount((c) => Math.max(c - 1, 0));
+    } else {
+      setReposted(true);
+      setRepostsCount((c) => c + 1);
+    }
+
     try {
-      const nowReposted = !reposted;
-      if (reposted) {
+      if (wasReposted) {
         await unrepostPost(post.id, user.id);
-        setReposted(false);
-        setRepostsCount((c) => Math.max(c - 1, 0));
       } else {
         await repostPost(post.id, user.id);
-        setReposted(true);
-        setRepostsCount((c) => c + 1);
       }
-      if (onRepostToggle) onRepostToggle(post.id, nowReposted);
+      if (onRepostToggle) onRepostToggle(post.id, !wasReposted);
     } catch (err) {
+      // Rollback on error
+      setReposted(wasReposted);
+      setRepostsCount(prevRepostsCount);
       console.error('Repost error:', err);
     }
-  }, [user, reposted, post.id, onRepostToggle, navigate, t]);
+  }, [user, reposted, repostsCount, post.id, onRepostToggle, navigate, t]);
 
   const handlePin = async (e) => {
     e.stopPropagation();
@@ -462,17 +502,21 @@ const PostCard = React.memo(function PostCard({
       navigate(`/Login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
       return;
     }
+    // ── Optimistic update ──
+    const wasSaved = saved;
+
+    setSaved(!wasSaved);
+
     try {
-      if (saved) {
+      if (wasSaved) {
         await unsavePost(post.id, user.id);
-        setSaved(false);
-        if (onSaveToggle) onSaveToggle(post.id, false);
       } else {
         await savePost(post.id, user.id);
-        setSaved(true);
-        if (onSaveToggle) onSaveToggle(post.id, true);
       }
+      if (onSaveToggle) onSaveToggle(post.id, !wasSaved);
     } catch (err) {
+      // Rollback on error
+      setSaved(wasSaved);
       console.error('Save error:', err);
     }
   };
@@ -605,78 +649,80 @@ const PostCard = React.memo(function PostCard({
               <span className="post-card-time">{timeAgo}</span>
             </Link>
 
-            {/* ── Encrypted badge (sutil, en el header) ── */}
-            {isEncrypted && (
-              <Tooltip text={t('post.encrypted_hidden')} placement="bottom">
-                <span className="post-card-encrypted-badge">
-                  <FaLock />
-                </span>
-              </Tooltip>
-            )}
+            {/* ── Right-side: encrypted badge + menus ── */}
+            <div className="post-card-header-right">
+              {isEncrypted && (
+                <Tooltip text={t('post.encrypted_hidden')} placement="bottom">
+                  <span className="post-card-encrypted-badge">
+                    <FaLock />
+                  </span>
+                </Tooltip>
+              )}
 
-            {isOwner && (
-              <div className="post-card-menu-wrapper">
-                <button
-                  ref={menuBtnRef}
-                  className="post-card-menu-btn"
-                  onClick={(e) => { e.stopPropagation(); setShowMenu((s) => !s); }}
-                  aria-label="Post options"
-                >
-                  <FaEllipsisV />
-                </button>
-                {/* Dropdown ported a body para evitar clipping */}
-                {showMenu && dropdownStyle && createPortal(
-                  <div
-                    ref={dropdownRef}
-                    className="fc-dropdown"
-                    style={{ ...dropdownStyle, minWidth: 170 }}
-                    onClick={(e) => e.stopPropagation()}
+              {isOwner && (
+                <div className="post-card-menu-wrapper">
+                  <button
+                    ref={menuBtnRef}
+                    className="post-card-menu-btn"
+                    onClick={(e) => { e.stopPropagation(); setShowMenu((s) => !s); }}
+                    aria-label="Post options"
                   >
-                    <button className="fc-dropdown-btn" onClick={handleEdit}><FaEdit /> {t('post.edit')}</button>
-                    <button className="fc-dropdown-btn" onClick={handlePin}><FaThumbtack /> {post.is_pinned ? t('post.unpin') : t('post.pin')}</button>
-                    <button className="fc-dropdown-btn" onClick={async (e) => {
-                      await handleSave(e);
-                      setShowMenu(false);
-                    }}>
-                      {saved ? <FaBookmark /> : <FaRegBookmark />}
-                      {saved ? (t('post.unsave') || 'Quitar guardado') : t('post.save')}
-                    </button>
-                    <button className="fc-dropdown-btn fc-dropdown-btn--danger" onClick={handleDelete}><FaTrash /> {t('post.delete')}</button>
-                  </div>,
-                  document.body
-                )}
-              </div>
-            )}
-            {/* ── Mobile-only: universal menu (save for all users) ── */}
-            {!isOwner && (
-              <div className="post-card-menu-wrapper post-card-menu--non-owner">
-                <button
-                  ref={menuBtnRef}
-                  className="post-card-menu-btn"
-                  onClick={(e) => { e.stopPropagation(); setShowMenu((s) => !s); }}
-                  aria-label="More options"
-                >
-                  <FaEllipsisV />
-                </button>
-                {showMenu && dropdownStyle && createPortal(
-                  <div
-                    ref={dropdownRef}
-                    className="fc-dropdown"
-                    style={{ ...dropdownStyle, minWidth: 170 }}
-                    onClick={(e) => e.stopPropagation()}
+                    <FaEllipsisV />
+                  </button>
+                  {/* Dropdown ported a body para evitar clipping */}
+                  {showMenu && dropdownStyle && createPortal(
+                    <div
+                      ref={dropdownRef}
+                      className="fc-dropdown"
+                      style={{ ...dropdownStyle, minWidth: 170 }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button className="fc-dropdown-btn" onClick={handleEdit}><FaEdit /> {t('post.edit')}</button>
+                      <button className="fc-dropdown-btn" onClick={handlePin}><FaThumbtack /> {post.is_pinned ? t('post.unpin') : t('post.pin')}</button>
+                      <button className="fc-dropdown-btn" onClick={async (e) => {
+                        await handleSave(e);
+                        setShowMenu(false);
+                      }}>
+                        {saved ? <FaBookmark /> : <FaRegBookmark />}
+                        {saved ? (t('post.unsave') || 'Quitar guardado') : t('post.save')}
+                      </button>
+                      <button className="fc-dropdown-btn fc-dropdown-btn--danger" onClick={handleDelete}><FaTrash /> {t('post.delete')}</button>
+                    </div>,
+                    document.body
+                  )}
+                </div>
+              )}
+              {/* ── Mobile-only: universal menu (save for all users) ── */}
+              {!isOwner && (
+                <div className="post-card-menu-wrapper post-card-menu--non-owner">
+                  <button
+                    ref={menuBtnRef}
+                    className="post-card-menu-btn"
+                    onClick={(e) => { e.stopPropagation(); setShowMenu((s) => !s); }}
+                    aria-label="More options"
                   >
-                    <button className="fc-dropdown-btn" onClick={async (e) => {
-                      await handleSave(e);
-                      setShowMenu(false);
-                    }}>
-                      {saved ? <FaBookmark /> : <FaRegBookmark />}
-                      {saved ? (t('post.unsave') || 'Quitar guardado') : t('post.save')}
-                    </button>
-                  </div>,
-                  document.body
-                )}
-              </div>
-            )}
+                    <FaEllipsisV />
+                  </button>
+                  {showMenu && dropdownStyle && createPortal(
+                    <div
+                      ref={dropdownRef}
+                      className="fc-dropdown"
+                      style={{ ...dropdownStyle, minWidth: 170 }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button className="fc-dropdown-btn" onClick={async (e) => {
+                        await handleSave(e);
+                        setShowMenu(false);
+                      }}>
+                        {saved ? <FaBookmark /> : <FaRegBookmark />}
+                        {saved ? (t('post.unsave') || 'Quitar guardado') : t('post.save')}
+                      </button>
+                    </div>,
+                    document.body
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* (badge moved inside header above) */}

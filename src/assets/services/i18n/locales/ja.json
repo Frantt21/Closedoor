@@ -316,6 +316,7 @@
   "post.encrypted_visible": "🔒 あなただけが見られる非公開コンテンツ",
   "post.encrypted_hidden": "🔒 難読化されたコンテンツ",
   "create_post.encrypted_edit_locked": "投稿は難読化されています — 変更できません",
+  "create_post.encrypted_disabled_by_filter": "難読化が無効です — 暗号化投稿の非表示が有効です",
   "create_post.obfuscated_preview_label": "他の人にはこう見えます:",
   "create_post.add_poll": "アンケートを追加",
   "create_post.remove_poll": "アンケートを削除",

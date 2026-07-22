@@ -326,6 +326,7 @@
   "post.encrypted_visible": "🔒 Private content visible to you",
   "post.encrypted_hidden": "🔒 Obfuscated content",
   "create_post.encrypted_edit_locked": "Post is obfuscated — cannot change",
+  "create_post.encrypted_disabled_by_filter": "Obfuscation disabled — hide encrypted posts is active",
   "create_post.obfuscated_preview_label": "How others will see it:",
   "create_post.add_poll": "Add poll",
   "create_post.remove_poll": "Remove poll",
