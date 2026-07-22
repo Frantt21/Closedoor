@@ -60,6 +60,8 @@ export default function Modal({
   initialPronouns = '',
   initialFollowersCount = 0,
   userRoles = ['user'],
+  initialBannerCredits = '',
+  initialAvatarCredits = '',
 }) {
   const { t } = useI18n();
   const [username, setUsername] = useState(initialUsername);
@@ -67,6 +69,8 @@ export default function Modal({
   const [avatar, setAvatar] = useState(initialAvatar);
   const [bio, setBio] = useState(initialBio);
   const [pronouns, setPronouns] = useState(initialPronouns);
+  const [bannerCredits, setBannerCredits] = useState(initialBannerCredits);
+  const [avatarCredits, setAvatarCredits] = useState(initialAvatarCredits);
   const [saving, setSaving] = useState(false);
   const [socialLinks, setSocialLinks] = useState([]);
   const [newSocial, setNewSocial] = useState('');
@@ -143,6 +147,8 @@ export default function Modal({
     setUrlInput('');
     setHasChanges(false);
     setShowSuggested(false);
+    setBannerCredits(initialBannerCredits || '');
+    setAvatarCredits(initialAvatarCredits || '');
     setSelectedAccentSurface(initialAccentSurface || '');
     setProfileBg(initialProfileBg || '');
     setProfileBgPosition(initialProfileBgPosition);
@@ -168,6 +174,8 @@ export default function Modal({
       avatar !== (initialAvatar || '') ||
       bio !== (initialBio || '') ||
       pronouns !== (initialPronouns || '') ||
+      bannerCredits !== (initialBannerCredits || '') ||
+      avatarCredits !== (initialAvatarCredits || '') ||
       JSON.stringify(socialLinks) !== JSON.stringify(initialSocialLinks || []) ||
       selectedAccent !== (initialAccentColor || '') ||
       selectedAccentSecondary !== (initialAccentColorSecondary || '') ||
@@ -182,9 +190,10 @@ export default function Modal({
       avatarPosition !== initialAvatarPosition;
     setHasChanges(changed);
   }, [
-    username, banner, avatar, bio, pronouns, socialLinks,    selectedAccent, selectedAccentSecondary, interests,
+    username, banner, avatar, bio, pronouns, bannerCredits, avatarCredits, socialLinks,    selectedAccent, selectedAccentSecondary, interests,
     bannerPosition, avatarPosition,
     initialUsername, initialBanner, initialAvatar, initialBio, initialPronouns,
+    initialBannerCredits, initialAvatarCredits,
     initialSocialLinks, initialAccentColor, initialAccentColorSecondary, initialAccentSurface, initialAccentSurfaceGlass, initialProfileBg, initialProfileBgPosition, initialProfileBgBlur, initialProfileBgDim, initialInterests,
     initialBannerPosition, initialAvatarPosition
   ]);
@@ -262,6 +271,8 @@ export default function Modal({
         username: username.trim(),
         avatar_url: avatar.trim() || null,
         banner_url: banner.trim() || null,
+        banner_credits: bannerCredits.trim() || null,
+        avatar_credits: avatarCredits.trim() || null,
         bio: bio.trim(),
         pronouns: pronouns.trim() || null,
         social_links: socialLinks,
@@ -500,8 +511,8 @@ export default function Modal({
 
             {/* ── URL submodal con posicionador ── */}
             {showUrlModal && (
-              <div className="fc-modal-sub-overlay">
-                <div className="fc-modal-sub" tabIndex={-1} onKeyDown={(e) => { if (e.key === 'Escape') setShowUrlModal(null); }} onClick={(e) => e.stopPropagation()}>
+              <div className="fc-modal-sub-overlay" onClick={() => setShowUrlModal(null)}>
+                <div className="fc-modal-sub" tabIndex={-1} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setShowUrlModal(null); } }} onClick={(e) => e.stopPropagation()}>
                   <h4 className="fc-modal-sub-title">
                     {showUrlModal === 'avatar' ? t('modal.avatar_url') : t('modal.banner_url')}
                   </h4>
@@ -512,6 +523,17 @@ export default function Modal({
                     onKeyDown={handleUrlModalKeyDown}
                     placeholder={showUrlModal === 'avatar' ? 'https://.../avatar.jpg' : 'https://.../banner.jpg'}
                     autoFocus
+                  />
+                  {/* ── Credits input ── */}
+                  <input
+                    className="fc-modal-input fc-modal-sub-input"
+                    value={showUrlModal === 'avatar' ? avatarCredits : bannerCredits}
+                    onChange={(e) => {
+                      if (showUrlModal === 'avatar') setAvatarCredits(e.target.value);
+                      else setBannerCredits(e.target.value);
+                    }}
+                    placeholder={t('modal.credits_placeholder')}
+                    style={{ marginTop: 8 }}
                   />
                   {/* ── Image position editor ── */}
                   {urlInput.trim() && (
@@ -530,7 +552,7 @@ export default function Modal({
                     </div>
                   )}
                   <div className="fc-modal-sub-actions">
-                    <button type="button" className="fc-modal-sub-save" onClick={handleUrlModalSave} disabled={!urlInput.trim()}>
+                    <button type="button" className="fc-modal-sub-save" onClick={handleUrlModalSave}>
                       {t('modal.apply')}
                     </button>
                     <button type="button" className="fc-modal-sub-cancel" onClick={() => setShowUrlModal(null)}>
@@ -1100,8 +1122,8 @@ export default function Modal({
 
         {/* ── Profile Background URL submodal ── */}
         {showProfileBgSubmodal && (
-          <div className="fc-modal-sub-overlay">
-            <div className="fc-modal-sub" tabIndex={-1} onKeyDown={(e) => { if (e.key === 'Escape') setShowProfileBgSubmodal(null); }} onClick={(e) => e.stopPropagation()}>
+          <div className="fc-modal-sub-overlay" onClick={() => { setShowProfileBgSubmodal(null); setProfileBgUrlInput(''); }}>
+            <div className="fc-modal-sub" tabIndex={-1} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setShowProfileBgSubmodal(null); setProfileBgUrlInput(''); } }} onClick={(e) => e.stopPropagation()}>
               <h4 className="fc-modal-sub-title">{t('modal.profile_background')}</h4>
               <input
                 className="fc-modal-input fc-modal-sub-input"
@@ -1123,7 +1145,7 @@ export default function Modal({
                 </div>
               )}
               <div className="fc-modal-sub-actions">
-                <button type="button" className="fc-modal-sub-save" onClick={handleProfileBgModalSave} disabled={!profileBgUrlInput.trim()}>
+                <button type="button" className="fc-modal-sub-save" onClick={handleProfileBgModalSave}>
                   {t('modal.apply')}
                 </button>
                 <button type="button" className="fc-modal-sub-cancel" onClick={() => { setShowProfileBgSubmodal(null); setProfileBgUrlInput(''); }}>

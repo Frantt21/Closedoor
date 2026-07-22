@@ -396,16 +396,17 @@ export async function getFeed({ limit = 20, offset = 0, userId, filterEncrypted 
 // ── LIKES ──
 
 export async function likePost(postId, userId) {
-  // Remove any existing dislike first (mutual exclusion)
-  await supabase
-    .from('dislikes')
-    .delete()
-    .eq('user_id', userId)
-    .eq('post_id', postId);
-
-  const { error } = await supabase
-    .from('likes')
-    .insert({ user_id: userId, post_id: postId });
+  // Remove any existing dislike + insert like en paralelo (tablas distintas)
+  const [, { error }] = await Promise.all([
+    supabase
+      .from('dislikes')
+      .delete()
+      .eq('user_id', userId)
+      .eq('post_id', postId),
+    supabase
+      .from('likes')
+      .insert({ user_id: userId, post_id: postId }),
+  ]);
 
   if (error && error.code !== '23505') {
     console.error('Error liking post:', error);
@@ -811,7 +812,8 @@ export async function notifyPollVote(actorId, postId, postOwnerId) {
  * Vote on a poll (single choice per user per post)
  */
 export async function votePoll(postId, optionId, userId) {
-  // Upsert: delete existing vote first, then insert new one
+  // Nota: No se puede usar upsert porque poll_votes carece de policy UPDATE en RLS.
+  // Se mantiene delete+insert secuencial por ahora.
   const { error: delError } = await supabase
     .from('poll_votes')
     .delete()
@@ -962,16 +964,17 @@ export async function getLikedPosts(userId, { limit = 50, offset = 0 } = {}) {
 // ── DISLIKES ──
 
 export async function dislikePost(postId, userId) {
-  // First remove any existing like (mutual exclusion)
-  await supabase
-    .from('likes')
-    .delete()
-    .eq('user_id', userId)
-    .eq('post_id', postId);
-
-  const { error } = await supabase
-    .from('dislikes')
-    .insert({ user_id: userId, post_id: postId });
+  // Remove any existing like + insert dislike en paralelo (tablas distintas)
+  const [, { error }] = await Promise.all([
+    supabase
+      .from('likes')
+      .delete()
+      .eq('user_id', userId)
+      .eq('post_id', postId),
+    supabase
+      .from('dislikes')
+      .insert({ user_id: userId, post_id: postId }),
+  ]);
 
   if (error && error.code !== '23505') {
     console.error('Error disliking post:', error);

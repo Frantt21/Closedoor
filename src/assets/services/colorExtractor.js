@@ -153,6 +153,51 @@ export async function extractColors(imageUrl) {
   return colors;
 }
 
+// ── Contrast color for background images ──
+
+/**
+ * Analyze a background image URL and determine if text should be light or dark.
+ * Returns '#000000' for light/bright images, '#ffffff' for dark images.
+ * Uses the cached dominant color from extractColors.
+ */
+export async function getContrastForBg(imageUrl) {
+  if (!imageUrl) return '#ffffff';
+  const colors = await extractColors(imageUrl);
+  if (!colors || colors.length === 0) return '#ffffff';
+  // Use the most dominant color to determine contrast
+  return getContrastFromHex(colors[0]);
+}
+
+/**
+ * Given a hex color, return the ideal text contrast color.
+ * Returns '#000000' for light backgrounds, '#ffffff' for dark backgrounds.
+ * Standalone version so colorExtractor doesn't depend on helpers.js.
+ */
+function getContrastFromHex(hex) {
+  if (!hex) return '#ffffff';
+  let r, g, b;
+  if (hex.startsWith('#')) {
+    const h = hex.slice(1);
+    if (h.length === 3) {
+      r = parseInt(h[0] + h[0], 16);
+      g = parseInt(h[1] + h[1], 16);
+      b = parseInt(h[2] + h[2], 16);
+    } else {
+      r = parseInt(h.slice(0, 2), 16);
+      g = parseInt(h.slice(2, 4), 16);
+      b = parseInt(h.slice(4, 6), 16);
+    }
+  } else {
+    return '#ffffff';
+  }
+  const srgb = (c) => {
+    c /= 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  const luminance = 0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
+  return luminance > 0.179 ? '#000000' : '#ffffff';
+}
+
 /**
  * Try to fetch and extract colors from a URL. Returns null on failure.
  */

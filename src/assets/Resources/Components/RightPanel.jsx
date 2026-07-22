@@ -7,6 +7,7 @@ import { getTrendingHashtags, getTrendingWords, getCachedTrendingWords, getCache
 import { getTrendingCategory } from '../../services/trendingDictionary';
 import ProfileSidebar from './ProfileSidebar';
 import { getContrastText, isUUID } from '../../services/helpers';
+import useBgContrast from '../../../hooks/useBgContrast';
 import { FaFire, FaHashtag } from 'react-icons/fa';
 import './css/rightPanel.css';
 
@@ -208,6 +209,9 @@ function ProfileContent({ path, ownProfile, user, t }) {
 
   const surfColor = activeProfile?.accent_surface_color;
   const surfGlass = activeProfile?.accent_surface_glass === true;
+  const bgUrlRight = activeProfile?.profile_background_url;
+  const hasBgRight = !!bgUrlRight;
+  const autoBgContrastColor = useBgContrast(bgUrlRight);
   const isOwnProfileRight = isOwnProfilePage;
 
   // Para perfiles ajenos: usar las preferencias guardadas en la BD del dueño del perfil
@@ -243,9 +247,22 @@ function ProfileContent({ path, ownProfile, user, t }) {
     '--accent-surface-rgba-hover': surfGlass ? 'rgba(255, 255, 255, 0.07)' : (surfColor ? `color-mix(in srgb, ${surfColor} 85%, #000)` : 'var(--color-surface-hover, #252525)'),
     '--accent-surface-blur': surfGlass ? 'blur(20px)' : 'none',
     '--accent-surface-border': 'none',
-    '--accent-surface-text-color': !surfGlass && surfColor ? getContrastText(surfColor) : 'var(--color-text, #ffffff)',
-    '--accent-surface-text-secondary': !surfGlass && surfColor ? '#374151' : 'var(--color-text-secondary, #9ca3af)',
-    '--accent-surface-text-muted': !surfGlass && surfColor ? '#6b7280' : 'var(--color-text-muted, #6b7280)',
+    // ── Glass mode text contrast: auto-detect from background image ──
+    '--accent-surface-text-color': !surfGlass && surfColor
+      ? getContrastText(surfColor)
+      : (surfGlass && hasBgRight)
+        ? autoBgContrastColor
+        : 'var(--color-text, #ffffff)',
+    '--accent-surface-text-secondary': !surfGlass && surfColor
+      ? '#374151'
+      : (surfGlass && hasBgRight)
+        ? (autoBgContrastColor === '#111111' ? '#374151' : 'var(--color-text-secondary, #9ca3af)')
+        : 'var(--color-text-secondary, #9ca3af)',
+    '--accent-surface-text-muted': !surfGlass && surfColor
+      ? '#6b7280'
+      : (surfGlass && hasBgRight)
+        ? (autoBgContrastColor === '#111111' ? '#6b7280' : 'var(--color-text-muted, #6b7280)')
+        : 'var(--color-text-muted, #6b7280)',
   } : {};
 
   // Derive CSS vars from accent-surface-text-* for the containers

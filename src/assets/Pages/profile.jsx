@@ -54,6 +54,7 @@ import { blockUser, unblockUser, isBlocked, cacheBlockStatus, getCachedBlockStat
 import { useI18n } from "../services/i18n/useI18n";
 import { getContrastText, isUUID, getImgTransformStyle, getBgFullStyle } from "../services/helpers";
 import usePageMeta from "../../hooks/usePageMeta";
+import useBgContrast from "../../hooks/useBgContrast";
 import FollowersModal from "../Resources/Components/FollowersModal";
 import ModalShell from "../Resources/Components/ModalShell";
 import PostCard from "../Resources/Components/PostCard";
@@ -1005,7 +1006,7 @@ function Profile() {
     const roles = activeProfile?.roles || ["user"];
 
     // ── Save profile (own profile only) ──
-    const handleSaveProfile = async ({ username, avatar_url, banner_url, bio, pronouns, social_links, accent_color, accent_color_secondary, accent_surface_color, accent_surface_glass, interests, banner_position, avatar_position, profile_background_url, profile_background_position, profile_background_blur, profile_background_dim }) => {
+    const handleSaveProfile = async ({ username, avatar_url, banner_url, banner_credits, avatar_credits, bio, pronouns, social_links, accent_color, accent_color_secondary, accent_surface_color, accent_surface_glass, interests, banner_position, avatar_position, profile_background_url, profile_background_position, profile_background_blur, profile_background_dim }) => {
         if (!user?.id) return;
 
         const normalizedUsername = (username || "").trim().toLowerCase();
@@ -1026,6 +1027,8 @@ function Profile() {
             const updates = {
                 avatar_url: avatar_url || null,
                 banner_url: banner_url || null,
+                banner_credits: banner_credits || null,
+                avatar_credits: avatar_credits || null,
                 bio: bio || null,
                 pronouns: pronouns || null,
                 social_links: social_links || [],
@@ -1151,6 +1154,8 @@ function Profile() {
     const bgDim = (activeProfile?.profile_background_dim ?? 50) / 100; // 0-1
     const hasBg = !!bgUrl;
     const bgFullStyle = hasBg ? getBgFullStyle(activeProfile?.profile_background_position) : null;
+    // ── Auto-detect contrast from background image ──
+    const autoBgContrastColor = useBgContrast(bgUrl);
 
     // Para perfiles ajenos: usar las preferencias guardadas en la BD del dueño del perfil
     // Para perfil propio: siempre mostrar (el toggle es para controlar qué ven los demás)
@@ -1174,9 +1179,22 @@ function Profile() {
             '--accent-text-color': getContrastText(activeProfile.accent_color),
           } : {}),
           '--accent-surface-color': surfColor || null,
-          '--accent-surface-text-color': !surfGlass && surfColor ? getContrastText(surfColor) : 'var(--color-text, #ffffff)',
-          '--accent-surface-text-secondary': !surfGlass && surfColor ? '#374151' : 'var(--color-text-secondary, #9ca3af)',
-          '--accent-surface-text-muted': !surfGlass && surfColor ? '#6b7280' : 'var(--color-text-muted, #6b7280)',
+          // ── Glass mode text color: auto-detect from background image ──
+          '--accent-surface-text-color': !surfGlass && surfColor
+            ? getContrastText(surfColor)
+            : (surfGlass && hasBg)
+              ? autoBgContrastColor
+              : 'var(--color-text, #ffffff)',
+          '--accent-surface-text-secondary': !surfGlass && surfColor
+            ? '#374151'
+            : (surfGlass && hasBg)
+              ? (autoBgContrastColor === '#111111' ? '#374151' : 'var(--color-text-secondary, #9ca3af)')
+              : 'var(--color-text-secondary, #9ca3af)',
+          '--accent-surface-text-muted': !surfGlass && surfColor
+            ? '#6b7280'
+            : (surfGlass && hasBg)
+              ? (autoBgContrastColor === '#111111' ? '#6b7280' : 'var(--color-text-muted, #6b7280)')
+              : 'var(--color-text-muted, #6b7280)',
           ...(surfGlass ? {
             '--accent-surface-rgba': 'rgba(255, 255, 255, 0.04)',
             '--accent-surface-rgba-hover': 'rgba(255, 255, 255, 0.07)',
@@ -1210,15 +1228,20 @@ function Profile() {
       : {};
 
     return (            <div className="profile-page" style={styleVars}>
-            <div className="profile-card">
-                <div className="profile-banner-container">
+            <div className="profile-card">                        <div className="profile-banner-container">
                     {bannerUrl ? (
+                        <>
                         <img
                             className="profile-banner"
                             src={bannerUrl}
                             alt="Profile Banner"
                             style={getImgTransformStyle(activeProfile?.banner_position)}
                         />
+                        {/* ── Banner credits overlay ── */}
+                        {(activeProfile?.banner_credits) && (
+                          <CreditsOverlay credits={activeProfile.banner_credits} label={t('profile.credits')} />
+                        )}
+                        </>
                     ) : (
                         <div className="profile-banner profile-banner--placeholder">
                             {t('profile.no_banner')}
@@ -1505,6 +1528,9 @@ function Profile() {
                     initialInterests={modalInterests}
                     initialBannerPosition={ownProfile?.banner_position || '50% 50%'}
                     initialAvatarPosition={ownProfile?.avatar_position || '50% 50%'}
+                    initialBannerCredits={ownProfile?.banner_credits || ''}
+                    initialAvatarCredits={ownProfile?.avatar_credits || ''}                      initialBannerCredits={ownProfile?.banner_credits || ''}
+                    initialAvatarCredits={ownProfile?.avatar_credits || ''}
                     initialProfileBg={ownProfile?.profile_background_url || ''}
                     initialProfileBgPosition={ownProfile?.profile_background_position || '50% 50%'}
                     initialProfileBgBlur={ownProfile?.profile_background_blur ?? 0}
@@ -1853,6 +1879,27 @@ function Profile() {
                 />
         </div>
     );
+}
+
+/* ── Credits overlay component (appears on banner hover, click to reveal text) ── */
+function CreditsOverlay({ credits, label }) {
+  const [showText, setShowText] = useState(false);
+  return (
+    <div className="profile-banner-credits">
+      <span
+        className="profile-banner-credits-label"
+        onClick={(e) => { e.stopPropagation(); setShowText((s) => !s); }}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter') setShowText((s) => !s); }}
+      >
+        {label}
+      </span>
+      <span className={`profile-banner-credits-text ${!showText ? 'profile-banner-credits-text--hidden' : ''}`}>
+        {credits}
+      </span>
+    </div>
+  );
 }
 
 export default Profile;
