@@ -1187,12 +1187,12 @@ function Profile() {
               ? autoBgContrastColor
               : 'var(--color-text, #ffffff)',
           '--accent-surface-text-secondary': !surfGlass && surfColor
-            ? '#374151'
+            ? (getContrastText(surfColor) === '#111111' ? '#374151' : 'var(--color-text-secondary, #9ca3af)')
             : hasBg
               ? (autoBgContrastColor === '#111111' ? '#374151' : 'var(--color-text-secondary, #9ca3af)')
               : 'var(--color-text-secondary, #9ca3af)',
           '--accent-surface-text-muted': !surfGlass && surfColor
-            ? '#6b7280'
+            ? (getContrastText(surfColor) === '#111111' ? '#4b5563' : 'var(--color-text-muted, #6b7280)')
             : hasBg
               ? (autoBgContrastColor === '#111111' ? '#4b5563' : 'var(--color-text-muted, #6b7280)')
               : 'var(--color-text-muted, #6b7280)',

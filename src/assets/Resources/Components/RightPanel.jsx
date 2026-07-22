@@ -256,23 +256,32 @@ function ProfileContent({ path, ownProfile, user, t }) {
         ? autoBgContrastColor
         : 'var(--color-text, #ffffff)',
     '--accent-surface-text-secondary': !surfGlass && surfColor
-      ? '#374151'
+      ? (getContrastText(surfColor) === '#111111' ? '#374151' : 'var(--color-text-secondary, #9ca3af)')
       : hasBgRight
         ? (autoBgContrastColor === '#111111' ? '#374151' : 'var(--color-text-secondary, #9ca3af)')
         : 'var(--color-text-secondary, #9ca3af)',
     '--accent-surface-text-muted': !surfGlass && surfColor
-      ? '#6b7280'
+      ? (getContrastText(surfColor) === '#111111' ? '#4b5563' : 'var(--color-text-muted, #6b7280)')
       : hasBgRight
         ? (autoBgContrastColor === '#111111' ? '#4b5563' : 'var(--color-text-muted, #6b7280)')
         : 'var(--color-text-muted, #6b7280)',
   } : {};
 
   // Derive CSS vars from accent-surface-text-* for the containers
+  // IMPORTANT: Only set --color-text-* when the accent value is a CONCRETE color,
+  // NOT a CSS variable reference (starts with 'var('). Setting a var reference
+  // creates a circular dependency: child resolves --color-text-muted → finds it on
+  // parent with value 'var(--color-text-muted, #6b7280)' → tries to resolve it on
+  // same element → circular → fallback to #6b7280. The override never takes effect.
+  const isConcrete = (v) => typeof v === 'string' && !v.startsWith('var(');
   const resolvedSurfaceStyle = Object.keys(surfaceStyle).length > 0 ? {
     ...surfaceStyle,
-    '--color-text': surfaceStyle['--accent-surface-text-color'] || 'var(--color-text, #ffffff)',
-    '--color-text-secondary': surfaceStyle['--accent-surface-text-secondary'] || 'var(--color-text-secondary, #9ca3af)',
-    '--color-text-muted': surfaceStyle['--accent-surface-text-muted'] || 'var(--color-text-muted, #6b7280)',
+    ...(isConcrete(surfaceStyle['--accent-surface-text-color'])
+      ? { '--color-text': surfaceStyle['--accent-surface-text-color'] } : {}),
+    ...(isConcrete(surfaceStyle['--accent-surface-text-secondary'])
+      ? { '--color-text-secondary': surfaceStyle['--accent-surface-text-secondary'] } : {}),
+    ...(isConcrete(surfaceStyle['--accent-surface-text-muted'])
+      ? { '--color-text-muted': surfaceStyle['--accent-surface-text-muted'] } : {}),
   } : {};
 
   return (

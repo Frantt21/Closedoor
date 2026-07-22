@@ -96,7 +96,6 @@
     align-items: center;
     gap: 6px;
     font-size: 0.75rem;
-    color: var(--color-text-muted, #6b7280);
     margin-bottom: 8px;
     padding-bottom: 8px;
 }
@@ -188,7 +187,6 @@
 
 .post-card-time {
     font-size: 0.75rem;
-    color: var(--color-text-muted, #6b7280);
     white-space: nowrap;
 }
 
@@ -255,7 +253,7 @@
     transition: background 0.2s ease, color 0.2s ease;
     user-select: none;
     background: var(--overlay-bg-subtle);
-    color: var(--color-text-secondary, #9ca3af);
+    color: var(--color-text, #ffffff);
     border: none;
 }
 

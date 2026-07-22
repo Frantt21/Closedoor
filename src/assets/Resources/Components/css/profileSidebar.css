@@ -91,7 +91,6 @@
   padding: 4px 10px;
   font-size: 0.8rem;
   font-weight: 500;
-  color: var(--color-text-secondary, #9ca3af);
   background: var(--overlay-bg-subtle);
   border: none;
   border-radius: var(--radius-full, 9999px);
@@ -176,7 +175,6 @@
 }
 
 .profile-sidebar-stat-label {
-  color: var(--color-text-muted, #6b7280);
   font-size: 0.8rem;
 }
 

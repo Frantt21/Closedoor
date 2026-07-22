@@ -117,14 +117,12 @@
 .right-panel-trending-category {
   font-size: 0.65rem;
   font-weight: 400;
-  color: var(--color-text-muted, #6b7280);
   line-height: 1.2;
 }
 
 .right-panel-trending-rank {
   font-size: 0.92rem;
   font-weight: 400;
-  color: var(--color-text-muted, #6b7280);
   min-width: 28px;
   flex-shrink: 0;
 }
