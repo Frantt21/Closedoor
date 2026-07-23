@@ -20,7 +20,7 @@ function getInitialCollapsed() {
 
 function Header() {
   const { isAuthenticated } = useAuth();
-  const { unreadCount } = useContext(NotificationContext);
+  const { unreadCount, unreadChatCount } = useContext(NotificationContext);
   const { t } = useI18n();
   const [collapsed, setCollapsed] = useState(getInitialCollapsed);
   const location = useLocation();
@@ -72,6 +72,9 @@ function Header() {
             <Tooltip text={collapsed ? t('nav.chat') : ''} placement="right">
               <Link to="/Chat" className={`sidebar-link${location.pathname.toLowerCase() === '/chat' ? ' active' : ''}`}>
                 <span className="sidebar-icon"><FaComment /></span>
+                {unreadChatCount > 0 && (
+                  <span className="sidebar-notif-badge">{unreadChatCount > 99 ? '99+' : unreadChatCount}</span>
+                )}
                 <span>{t('nav.chat')}</span>
               </Link>
             </Tooltip>

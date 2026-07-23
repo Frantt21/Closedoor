@@ -11,6 +11,7 @@ import {
   setCachedNotifications,
   getCachedNotifications,
 } from '../assets/services/notificationService';
+import { decryptMessage, getTotalUnreadChatCount } from '../assets/services/chatService';
 import { useAuth } from '../hooks/useAuth';
 
 // ── Helpers para notificaciones en vivo ──
@@ -156,10 +157,21 @@ export function NotificationProvider({ children }) {
     const cached = getCachedNotifications(userId);
     return cached?.unreadCount || 0;
   });
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
   const [loading, setLoading] = useState(() => {
     return !getCachedNotifications(userId);
   });
   const channelRef = useRef(null);
+
+  // ── Helper: unread chat count ──
+  const fetchUnreadChatCount = useCallback(async () => {
+    if (!userId) {
+      setUnreadChatCount(0);
+      return;
+    }
+    const count = await getTotalUnreadChatCount(userId);
+    setUnreadChatCount(count);
+  }, [userId]);
 
   // ── Helper: guardar cache (solo notifications, unreadCount se computa al leer) ──
   const saveToCache = useCallback((notifs) => {
@@ -307,6 +319,99 @@ export function NotificationProvider({ children }) {
     };
   }, [userId]);
 
+  // ── Realtime subscription for incoming chat messages (Push + Toast notifications) ──
+  useEffect(() => {
+    if (!userId) return;
+
+    const chatChannel = supabase
+      .channel(`chat-notifications-${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+        },
+        async (payload) => {
+          const newMsg = payload.new;
+          if (!newMsg || newMsg.sender_id === userId) return;
+          if (!newMsg.encrypted_for?.includes(userId)) return;
+
+          // Fetch sender profile
+          const { data: senderProfile } = await supabase
+            .from('profiles')
+            .select('id, username, avatar_url')
+            .eq('id', newMsg.sender_id)
+            .maybeSingle();
+
+          const username = senderProfile?.username || 'Usuario';
+          const avatarUrl = senderProfile?.avatar_url;
+          let messagePreview = 'Mensaje nuevo';
+          try {
+            const decrypted = await decryptMessage(newMsg, userId);
+            if (decrypted) messagePreview = decrypted;
+          } catch (err) {
+            console.warn('Could not decrypt message for notification:', err);
+          }
+
+          const messageText = `@${username}: ${messagePreview}`;
+
+          // Tab hidden or unfocused → OS Push Notification
+          if (document.visibilityState === 'hidden' || !document.hasFocus()) {
+            try {
+              if (localStorage.getItem('fc_show_push_notifications') !== 'false') {
+                tryShowOsNotification(messageText, avatarUrl, '/Chat', `chat-msg-${newMsg.id}`);
+              }
+            } catch (e) {
+              console.warn('Error displaying OS push notification:', e);
+            }
+            return;
+          }
+
+          // Tab visible → Toast Notification (if not disabled)
+          try {
+            if (localStorage.getItem('fc_show_toast_notifications') === 'false') return;
+          } catch (e) {}
+
+          toast(
+            <Link to="/Chat" className="fc-notif-toast" onClick={(e) => e.stopPropagation()}>
+              {avatarUrl && (
+                <img
+                  className="fc-notif-toast-avatar"
+                  src={avatarUrl}
+                  alt=""
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+              )}
+              <div className="fc-notif-toast-body">
+                <span className="fc-notif-toast-text">{messageText}</span>
+              </div>
+            </Link>,
+            { autoClose: 4000 }
+          );
+          // Update unread chat count
+          fetchUnreadChatCount();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'chat_participants',
+          filter: `user_id=eq.${userId}`,
+        },
+        () => fetchUnreadChatCount()
+      )
+      .subscribe();
+
+    fetchUnreadChatCount();
+
+    return () => {
+      supabase.removeChannel(chatChannel);
+    };
+  }, [userId, fetchUnreadChatCount]);
+
   const handleMarkAsRead = useCallback(async (notificationId) => {
     try {
       await markAsRead(notificationId);
@@ -372,12 +477,14 @@ export function NotificationProvider({ children }) {
       value={{
         notifications,
         unreadCount,
+        unreadChatCount,
         loading,
         markAsRead: handleMarkAsRead,
         markAllAsRead: handleMarkAllAsRead,
         deleteNotification: handleDeleteNotification,
         deleteSelected: handleDeleteSelected,
         refresh: fetchData,
+        refreshChatUnread: fetchUnreadChatCount,
       }}
     >
       {children}

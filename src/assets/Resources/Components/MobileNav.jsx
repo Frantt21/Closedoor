@@ -11,7 +11,7 @@ import './css/mobileNav.css';
 
 export default function MobileNav() {
   const { isAuthenticated, logout } = useAuth();
-  const { unreadCount } = useContext(NotificationContext);
+  const { unreadCount, unreadChatCount } = useContext(NotificationContext);
   const { t } = useI18n();
   const location = useLocation();
   const [suppressTooltips, setSuppressTooltips] = useState(false);
@@ -61,7 +61,12 @@ export default function MobileNav() {
             </Tooltip>
             <Tooltip text={t('nav.chat')} placement="top" suppress={suppressTooltips}>
               <Link to="/Chat" className={`mobile-nav-link${isActive('/chat') ? ' active' : ''}`} onClick={handleNavClick}>
-                <span className="mobile-nav-icon"><FaComment /></span>
+                <span className="mobile-nav-icon">
+                  <FaComment />
+                  {unreadChatCount > 0 && (
+                    <span className="mobile-nav-badge">{unreadChatCount > 99 ? '99+' : unreadChatCount}</span>
+                  )}
+                </span>
               </Link>
             </Tooltip>
             <Tooltip text={t('nav.comunidades')} placement="top" suppress={suppressTooltips}>

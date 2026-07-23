@@ -187,8 +187,8 @@
 }
 
 .chat-search-result-avatar {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
@@ -228,8 +228,8 @@
 }
 
 .chat-list-item-avatar {
-    width: 44px;
-    height: 44px;
+    width: 48px;
+    height: 48px;
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
@@ -289,8 +289,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--accent-color, #f472b6);
-    color: #fff;
+    background: #111111;
+    border: 1px solid var(--color-border, #2a2a2a);
+    color: var(--color-text, #ffffff);
     font-size: 0.6rem;
     font-weight: 700;
     border-radius: 999px;
@@ -385,8 +386,8 @@
 }
 
 .chat-messages-header-avatar {
-    width: 34px;
-    height: 34px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
@@ -476,8 +477,8 @@
 }
 
 .chat-message-avatar {
-    width: 28px;
-    height: 28px;
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
@@ -644,7 +645,8 @@
     align-items: center;
     gap: 3px;
     position: relative;
-    top: -10px;
+    top: -6px;
+    margin-bottom: -6px;
     flex-wrap: wrap;
     padding: 0 4px;
     z-index: 1;
@@ -652,31 +654,43 @@
 
 .chat-message--own .chat-message-reactions {
     justify-content: flex-end;
+    margin-right: 38px;
 }
 
 .chat-message--other .chat-message-reactions {
     justify-content: flex-start;
+    margin-left: 38px;
 }
 
 .chat-message-reaction {
     font-size: 0.82rem;
-    padding: 2px 5px;
+    padding: 2px 6px;
     border-radius: 999px;
     background: var(--color-surface, #1a1a1a);
     border: 1px solid var(--color-border, #2a2a2a);
     cursor: default;
     line-height: 1;
     transition: background 0.12s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.chat-message-reaction-count {
+    font-size: 0.68rem;
+    font-weight: 600;
+    opacity: 0.7;
+    margin-left: 1px;
 }
 
 .chat-message-reaction--own {
-    background: var(--accent-color, #f472b6);
-    border-color: var(--accent-color, #f472b6);
+    background: #111111;
+    border-color: rgba(255, 255, 255, 0.15);
     cursor: pointer;
 }
 
 .chat-message-reaction--own:hover {
-    opacity: 0.8;
+    border-color: rgba(255, 255, 255, 0.3);
 }
 
 /* ── Emoji picker: floating below bubble ── */
@@ -689,8 +703,16 @@
     border: 1px solid var(--color-border, #2a2a2a);
     border-radius: var(--radius, 10px);
     margin-top: 4px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
     z-index: 2;
+}
+
+.chat-message--own .chat-message-emoji-picker {
+    margin-right: 38px;
+}
+
+.chat-message--other .chat-message-emoji-picker {
+    margin-left: 38px;
 }
 
 .chat-message-emoji-btn {
@@ -714,6 +736,29 @@
 
 .chat-message-emoji-btn--active {
     background: var(--accent-color, #f472b6);
+}
+
+.chat-message-emoji-input {
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    font-size: 1.1rem;
+    text-align: center;
+    outline: none;
+    color: var(--color-text, #ffffff);
+    caret-color: transparent;
+    transition: background 0.12s ease;
+}
+
+.chat-message-emoji-input:focus {
+    background: var(--overlay-bg);
+}
+
+.chat-message-emoji-input::placeholder {
+    color: var(--color-text-muted, #6b7280);
+    font-size: 0.7rem;
 }
 
 /* ── Edit message ── */
@@ -1151,6 +1196,7 @@ dialog.fc-modal.chat-followers-modal {
 
 /* Desktop: always show both */
 @media (min-width: 1025px) {
+
     .chat-list--hide-mobile,
     .chat-messages--hide-mobile {
         display: flex;

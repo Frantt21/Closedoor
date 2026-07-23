@@ -163,6 +163,48 @@ export async function getUnreadCount(conversationId, userId) {
 }
 
 /**
+ * Get total unread chat message count across all conversations for a user
+ */
+export async function getTotalUnreadChatCount(userId) {
+  if (!userId) return 0;
+  try {
+    const { data: participantRows } = await supabase
+      .from('chat_participants')
+      .select('conversation_id, last_read_at')
+      .eq('user_id', userId);
+
+    if (!participantRows || participantRows.length === 0) return 0;
+
+    const unreadCounts = await Promise.all(
+      participantRows.map(async (p) => {
+        if (!p.last_read_at) {
+          const { count } = await supabase
+            .from('messages')
+            .select('id', { count: 'exact', head: true })
+            .eq('conversation_id', p.conversation_id)
+            .neq('sender_id', userId);
+          return count || 0;
+        }
+
+        const { count } = await supabase
+          .from('messages')
+          .select('id', { count: 'exact', head: true })
+          .eq('conversation_id', p.conversation_id)
+          .neq('sender_id', userId)
+          .gt('created_at', p.last_read_at);
+
+        return count || 0;
+      })
+    );
+
+    return unreadCounts.reduce((acc, c) => acc + c, 0);
+  } catch (err) {
+    console.warn('Error computing total unread chat count:', err);
+    return 0;
+  }
+}
+
+/**
  * Mark conversation as read
  */
 export async function markAsRead(conversationId, userId) {

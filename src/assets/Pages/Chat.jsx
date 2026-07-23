@@ -76,6 +76,8 @@ export default function Chat() {
   const [editText, setEditText] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
   const editRef = useRef(null);
+  // Preserve content during modal close animation (ref survives state clears)
+  const editContentRef = useRef('');
 
   // Emoji picker state
   const [emojiPickerMsgId, setEmojiPickerMsgId] = useState(null);
@@ -125,14 +127,16 @@ export default function Chat() {
   useEffect(() => {
     if (showEditModal && editMsgId && editRef.current) {
       editRef.current.focus();
-      editRef.current.setSelectionRange(editText.length, editText.length);
+      const len = editRef.current.value.length;
+      editRef.current.setSelectionRange(len, len);
     }
-  }, [showEditModal, editMsgId, editText.length]);
+  }, [showEditModal, editMsgId]);
 
   // Refs
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const inputRef = useRef(null);
+  const messagesCacheRef = useRef({});
 
   // ── Load conversations ──
   const loadConvs = useCallback(async () => {
@@ -161,8 +165,17 @@ export default function Chat() {
   // ── Load messages when active conversation changes ──
   useEffect(() => {
     if (!activeConvId) return;
-    setMsgsLoading(true);
-    setMessages([]);
+
+    // Check cache first — show immediately, no loading
+    const cached = messagesCacheRef.current[activeConvId];
+    if (cached) {
+      setMessages(cached);
+      setMsgsLoading(false);
+    } else {
+      setMsgsLoading(true);
+      setMessages([]);
+    }
+
     markAsRead(activeConvId, user.id);
 
     getMessages(activeConvId)
@@ -176,6 +189,8 @@ export default function Chat() {
             return { ...msg, decryptedContent: content };
           })
         );
+        // Update cache
+        messagesCacheRef.current[activeConvId] = decrypted;
         setMessages(decrypted);
       })
       .catch((err) => console.warn('Error loading messages:', err))
@@ -202,6 +217,12 @@ export default function Chat() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Sync messages cache on every update (realtime, delete, edit, etc.)
+  useEffect(() => {
+    if (!activeConvId) return;
+    messagesCacheRef.current[activeConvId] = messages;
+  }, [messages, activeConvId]);
 
   // ── Select conversation ──
   const selectConversation = (convId) => {
@@ -363,6 +384,7 @@ export default function Chat() {
     const msg = msgMenu.msg;
     setMsgMenu({ open: false, x: 0, y: 0, msg: null });
     if (!msg?.decryptedContent) return;
+    editContentRef.current = msg.decryptedContent;
     setEditMsgId(msg.id);
     setEditText(msg.decryptedContent);
     setShowEditModal(true);
@@ -415,23 +437,29 @@ export default function Chat() {
     if (!msgId || !user?.id) return;
     setEmojiPickerMsgId(null);
     setMsgMenu({ open: false, x: 0, y: 0, msg: null });
+
+    // Optimistic update: apply to local state immediately, no waiting for API
+    const prevMessages = messages;
+    const toggleReaction = (prev) => prev.map(m => {
+      if (m.id !== msgId) return m;
+      const reactions = { ...(m.reactions || {}) };
+      if (reactions[user.id] === emoji) {
+        delete reactions[user.id];
+      } else {
+        reactions[user.id] = emoji;
+      }
+      return { ...m, reactions };
+    });
+    setMessages(toggleReaction);
+
     try {
       await addReaction(msgId, user.id, emoji);
-      // Update local state
-      setMessages((prev) => prev.map(m => {
-        if (m.id !== msgId) return m;
-        const reactions = { ...(m.reactions || {}) };
-        if (reactions[user.id] === emoji) {
-          delete reactions[user.id];
-        } else {
-          reactions[user.id] = emoji;
-        }
-        return { ...m, reactions };
-      }));
     } catch (err) {
+      // Revert on error
+      setMessages(prevMessages);
       console.error('Error reacting:', err);
     }
-  }, [emojiPickerMsgId, msgMenu.msg, user?.id]);
+  }, [emojiPickerMsgId, msgMenu.msg, user?.id, messages]);
 
   const toggleEmojiPicker = useCallback((msgId) => {
     setEmojiPickerMsgId(prev => prev === msgId ? null : msgId);
@@ -441,12 +469,10 @@ export default function Chat() {
   // ── Get active conversation's other user ──
   const activeConv = conversations.find((c) => c.id === activeConvId);
   const otherUser = activeConv?.otherUser;
-  const editingMessage = messages.find((m) => m.id === editMsgId);
-
   // ── Navigate to profile from header ──
   const goToProfile = useCallback(() => {
     if (otherUser?.username) {
-      navigate(`/${otherUser.username}`);
+      navigate(`/profile/${otherUser.username}`);
     }
   }, [otherUser?.username, navigate]);
 
@@ -637,7 +663,15 @@ export default function Chat() {
             const isOwn = msg.sender_id === user.id;
             const isEditing = editMsgId === msg.id;
             const reactions = msg.reactions || {};
-            const reactionEntries = Object.entries(reactions);
+            // Group reactions by emoji for stacking
+            const groupedReactions = {};
+            Object.entries(reactions).forEach(([uid, em]) => {
+              if (!groupedReactions[em]) {
+                groupedReactions[em] = { count: 0, isOwn: false };
+              }
+              groupedReactions[em].count++;
+              if (uid === user.id) groupedReactions[em].isOwn = true;
+            });
             const ownReaction = reactions[user.id];
 
             return (
@@ -692,20 +726,21 @@ export default function Chat() {
                   )}
                 </div>
 
-                {/* Reactions — floating outside bubble */}
-                {!isEditing && reactionEntries.length > 0 && (
+                {/* Reactions — floating outside bubble, stacked by emoji */}
+                {!isEditing && Object.keys(reactions).length > 0 && (
                   <div className="chat-message-reactions">
-                    {reactionEntries.map(([uid, emoji]) => (
+                    {Object.entries(groupedReactions).map(([emoji, { count, isOwn }]) => (
                       <span
-                        key={uid}
-                        className={`chat-message-reaction ${uid === user.id ? 'chat-message-reaction--own' : ''}`}
+                        key={emoji}
+                        className={`chat-message-reaction ${isOwn ? 'chat-message-reaction--own' : ''}`}
                         onClick={() => {
-                          if (uid === user.id) {
+                          if (isOwn) {
                             handleReact(emoji, msg.id);
                           }
                         }}
                       >
                         {emoji}
+                        {count > 1 && <span className="chat-message-reaction-count">{count}</span>}
                       </span>
                     ))}
                   </div>
@@ -723,6 +758,21 @@ export default function Chat() {
                         {emoji}
                       </button>
                     ))}
+                    <input
+                      type="text"
+                      className="chat-message-emoji-input"
+                      inputMode="emoji"
+                      placeholder="+"
+                      maxLength={1}
+                      autoComplete="off"
+                      onInput={(e) => {
+                        const val = e.target.value.trim();
+                        if (val) {
+                          handleReact(val);
+                          e.target.value = '';
+                        }
+                      }}
+                    />
                   </div>
                 )}
               </div>
@@ -798,7 +848,7 @@ export default function Chat() {
                 <FaEdit />
                 <span>{t('post.edit')}</span>
               </button>
-              <button className="chat-context-menu-btn" onClick={() => { setMsgMenu({...msgMenu, open: false}); toggleEmojiPicker(msgMenu.msg.id); }}>
+              <button className="chat-context-menu-btn" onClick={() => { setMsgMenu({ ...msgMenu, open: false }); toggleEmojiPicker(msgMenu.msg.id); }}>
                 <FaSmile />
                 <span>{t('chat.react')}</span>
               </button>
@@ -817,7 +867,7 @@ export default function Chat() {
                 <FaCopy />
                 <span>{t('chat.copy')}</span>
               </button>
-              <button className="chat-context-menu-btn" onClick={() => { setMsgMenu({...msgMenu, open: false}); toggleEmojiPicker(msgMenu.msg.id); }}>
+              <button className="chat-context-menu-btn" onClick={() => { setMsgMenu({ ...msgMenu, open: false }); toggleEmojiPicker(msgMenu.msg.id); }}>
                 <FaSmile />
                 <span>{t('chat.react')}</span>
               </button>
@@ -877,7 +927,7 @@ export default function Chat() {
               <div className="chat-edit-modal-preview-card">
                 <div className="chat-edit-modal-preview-content">
                   <p className="chat-edit-modal-preview-text">
-                    {editingMessage?.decryptedContent || t('chat.encrypted')}
+                    {editText || editContentRef.current || t('chat.encrypted')}
                   </p>
                 </div>
               </div>

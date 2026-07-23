@@ -6,10 +6,11 @@ import { updateUserProfile } from '../services/userService';
 import { clearAllAppCaches } from '../services/postService';
 import { getBlockedUsers, getCachedBlockedUsers, unblockUser, cacheBlockStatus, subscribeBlockChanges } from '../services/blockService';
 import { useNavigate } from 'react-router-dom';
-import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaFire, FaChartBar, FaBell, FaBrush, FaBan, FaClock, FaAt, FaTrashAlt } from 'react-icons/fa';
+import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaFire, FaChartBar, FaBell, FaBrush, FaBan, FaClock, FaAt, FaTrashAlt, FaTimes } from 'react-icons/fa';
 import { MdLogout } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import ConfirmModal from '../Resources/Components/ConfirmModal';
+import ModalShell from '../Resources/Components/ModalShell';
 import '../Resources/Styles/settings.css';
 
 /* ── SVG Flag Icons ── */
@@ -995,54 +996,56 @@ export default function Settings() {
       )}
 
       {/* ── Blocked Users Modal ── */}
-      {showBlockedModal && (
-        <div className="fc-modal-overlay" role="dialog" aria-modal="true" onClick={(e) => { if (e.target === e.currentTarget) setShowBlockedModal(false); }}>
-          <div className="fc-modal settings-blocked-modal">
-            <div className="followers-modal-header">
-              <h3 className="fc-modal-title">{t('settings.blocked_users')}</h3>
-              <button
-                type="button"
-                className="followers-modal-close"
-                onClick={() => setShowBlockedModal(false)}
-                aria-label={t('common.close')}
-              >
-                ×
-              </button>
-            </div>
-            <div className="settings-blocked-list">
-              {blockedUsersLoading ? (
-                <div className="settings-blocked-loading">{t('common.loading')}</div>
-              ) : blockedUsers.length === 0 ? (
-                <div className="settings-blocked-empty">
-                  <FaBan className="settings-blocked-empty-icon" />
-                  <p>{t('block.no_blocked_users')}</p>
-                </div>
-              ) : (
-                blockedUsers.map((u) => (
-                  <div key={u.id} className="settings-blocked-item">
-                    <img
-                      className="settings-blocked-avatar"
-                      src={u.avatar_url || 'https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg'}
-                      alt={u.username}
-                    />
-                    <div className="settings-blocked-info">
-                      <span className="settings-blocked-username">@{u.username}</span>
-                    </div>
-                    <button
-                      type="button"
-                      className="settings-blocked-unblock-btn"
-                      onClick={() => handleUnblock(u.id)}
-                      disabled={unblockingId === u.id}
-                    >
-                      {unblockingId === u.id ? '...' : t('block.unblock')}
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+      <ModalShell
+        isOpen={showBlockedModal}
+        onClose={() => setShowBlockedModal(false)}
+        onEscape={() => setShowBlockedModal(false)}
+        disableBackdropClose={false}
+        className="settings-blocked-modal"
+      >
+        <div className="followers-modal-header">
+          <h3 className="fc-modal-title">{t('settings.blocked_users')}</h3>
+          <button
+            type="button"
+            className="followers-modal-close"
+            onClick={() => setShowBlockedModal(false)}
+            aria-label={t('common.close')}
+          >
+            <FaTimes />
+          </button>
         </div>
-      )}
+        <div className="settings-blocked-list">
+          {blockedUsersLoading ? (
+            <div className="settings-blocked-loading">{t('common.loading')}</div>
+          ) : blockedUsers.length === 0 ? (
+            <div className="settings-blocked-empty">
+              <FaBan className="settings-blocked-empty-icon" />
+              <p>{t('block.no_blocked_users')}</p>
+            </div>
+          ) : (
+            blockedUsers.map((u) => (
+              <div key={u.id} className="settings-blocked-item">
+                <img
+                  className="settings-blocked-avatar"
+                  src={u.avatar_url || 'https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg'}
+                  alt={u.username}
+                />
+                <div className="settings-blocked-info">
+                  <span className="settings-blocked-username">@{u.username}</span>
+                </div>
+                <button
+                  type="button"
+                  className="settings-blocked-unblock-btn"
+                  onClick={() => handleUnblock(u.id)}
+                  disabled={unblockingId === u.id}
+                >
+                  {unblockingId === u.id ? '...' : t('block.unblock')}
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      </ModalShell>
     </div>
   );
 }
