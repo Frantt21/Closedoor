@@ -316,6 +316,8 @@
   "modal.profile_background": "Fondo del perfil",
   "modal.profile_bg_edit": "Cambiar fondo",
   "modal.profile_bg_blur": "Desenfoque",
+  "modal.profile_text_color": "Color de texto",
+  "modal.profile_text_color_default": "Automático",
   "modal.profile_bg_dim": "Opacidad",
   "modal.saving": "Guardando...",
 
@@ -377,6 +379,11 @@
   "create_post.schedule_past": "La fecha de programación debe ser futura",
 
   "profile.scheduled_tab": "Programados",
+  "profile.replies_tab": "Respuestas",
+  "profile.no_replies": "Aún no hay respuestas.",
+  "profile.no_replies_sub": "Cuando respondas a la publicación de alguien, aparecerá aquí.",
+  "profile.no_replies_other": "Este usuario no ha respondido a ninguna publicación todavía.",
+  "profile.no_replies_sub_other": "Sus respuestas a las publicaciones de otros aparecerán aquí.",
   "profile.no_scheduled": "No tienes posts programados todavía.",
   "profile.no_scheduled_sub": "Programa un post para que se publique automáticamente más tarde.",
 

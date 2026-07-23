@@ -62,6 +62,7 @@ export default function Modal({
   userRoles = ['user'],
   initialBannerCredits = '',
   initialAvatarCredits = '',
+  initialProfileTextColor = '',
 }) {
   const { t } = useI18n();
   const [username, setUsername] = useState(initialUsername);
@@ -109,6 +110,7 @@ export default function Modal({
   const [profileBgPosition, setProfileBgPosition] = useState(initialProfileBgPosition);
   const [profileBgBlur, setProfileBgBlur] = useState(initialProfileBgBlur);
   const [profileBgDim, setProfileBgDim] = useState(initialProfileBgDim);
+  const [selectedProfileTextColor, setSelectedProfileTextColor] = useState(initialProfileTextColor);
   const [interests, setInterests] = useState(initialInterests);
   const [interestInput, setInterestInput] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
@@ -139,6 +141,7 @@ export default function Modal({
     setSelectedAccentSecondary(initialAccentColorSecondary || '');
     setSelectedAccentSurface(initialAccentSurface || '');
     setUseGlassSurface(initialAccentSurfaceGlass);
+    setSelectedProfileTextColor(initialProfileTextColor || '');
     setInterests(Array.isArray(initialInterests) ? initialInterests : []);
     setInterestInput('');
     setNewSocial('');
@@ -150,6 +153,7 @@ export default function Modal({
     setBannerCredits(initialBannerCredits || '');
     setAvatarCredits(initialAvatarCredits || '');
     setSelectedAccentSurface(initialAccentSurface || '');
+    setSelectedProfileTextColor(initialProfileTextColor || '');
     setProfileBg(initialProfileBg || '');
     setProfileBgPosition(initialProfileBgPosition);
     setProfileBgBlur(initialProfileBgBlur);
@@ -185,6 +189,7 @@ export default function Modal({
       profileBgPosition !== initialProfileBgPosition ||
       profileBgBlur !== initialProfileBgBlur ||
       profileBgDim !== initialProfileBgDim ||
+      selectedProfileTextColor !== (initialProfileTextColor || '') ||
       JSON.stringify(interests) !== JSON.stringify(initialInterests || []) ||
       bannerPosition !== initialBannerPosition ||
       avatarPosition !== initialAvatarPosition;
@@ -280,6 +285,7 @@ export default function Modal({
         accent_color_secondary: selectedAccentSecondary || null,
         accent_surface_color: selectedAccentSurface || null,
         accent_surface_glass: useGlassSurface,
+        profile_text_color: selectedProfileTextColor || null,
         interests: interests,
         banner_position: bannerPosition,
         avatar_position: avatarPosition,
@@ -1023,19 +1029,70 @@ export default function Modal({
                     </button>
                   )}
                 </div>
-                {/* ── Glass mode toggle ── */}
-                <div className="fc-modal-glass-toggle">
-                  <span className="fc-modal-glass-toggle-label">{t('modal.accent_surface_glass')}</span>
-                  <button
-                    type="button"
-                    className={`fc-modal-glass-switch ${useGlassSurface ? 'fc-modal-glass-switch--on' : ''}`}
-                    onClick={() => setUseGlassSurface((prev) => !prev)}
-                    role="switch"
-                    aria-checked={useGlassSurface}
-                  >
-                    <div className="fc-modal-glass-switch-knob" />
-                  </button>
+              </div>
+
+              {/* ── Profile text color ── */}
+              <div className="fc-modal-color-section">
+                <span className="fc-modal-color-subtitle">{t('modal.profile_text_color')}</span>
+                <div className="fc-modal-color-picker">
+                  <div
+                    onClick={() => document.getElementById('profile-text-color-input')?.click()}
+                    className="fc-modal-color-swatch"
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: '50%',
+                      background: selectedProfileTextColor || 'var(--color-text, #ffffff)',
+                      border: selectedProfileTextColor ? '2px solid var(--color-border, #2a2a2a)' : '2px dashed var(--color-text-muted, #6b7280)',
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                      transition: 'transform 0.15s ease',
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
+                    onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+                    title={`${t('modal.profile_text_color')}: ${selectedProfileTextColor || '#ffffff'}`}
+                  />
+                  <input
+                    id="profile-text-color-input"
+                    type="color"
+                    value={selectedProfileTextColor || '#ffffff'}
+                    onChange={(e) => setSelectedProfileTextColor(e.target.value)}
+                    style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
+                  />
+                  <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted, #6b7280)' }}>
+                    {selectedProfileTextColor || t('modal.profile_text_color_default')}
+                  </span>
+                  {selectedProfileTextColor && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedProfileTextColor('')}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--color-text-muted, #6b7280)',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        padding: '2px 6px',
+                      }}
+                    >
+                      {t('common.clear')}
+                    </button>
+                  )}
                 </div>
+              </div>
+
+              {/* ── Glass mode toggle ── */}
+              <div className="fc-modal-glass-toggle">
+                <span className="fc-modal-glass-toggle-label">{t('modal.accent_surface_glass')}</span>
+                <button
+                  type="button"
+                  className={`fc-modal-glass-switch ${useGlassSurface ? 'fc-modal-glass-switch--on' : ''}`}
+                  onClick={() => setUseGlassSurface((prev) => !prev)}
+                  role="switch"
+                  aria-checked={useGlassSurface}
+                >
+                  <div className="fc-modal-glass-switch-knob" />
+                </button>
               </div>
             </div>
 

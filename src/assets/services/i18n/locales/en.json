@@ -315,6 +315,8 @@
   "modal.profile_background": "Profile background",
   "modal.profile_bg_edit": "Change background",
   "modal.profile_bg_blur": "Blur",
+  "modal.profile_text_color": "Text color",
+  "modal.profile_text_color_default": "Auto",
   "modal.profile_bg_dim": "Dim",
   "modal.saving": "Saving...",
 
@@ -378,6 +380,11 @@
   "create_post.schedule_past": "The schedule date must be in the future",
 
   "profile.scheduled_tab": "Scheduled",
+  "profile.replies_tab": "Replies",
+  "profile.no_replies": "No replies yet.",
+  "profile.no_replies_sub": "When you reply to someone's post, it will appear here.",
+  "profile.no_replies_other": "This user hasn't replied to any posts yet.",
+  "profile.no_replies_sub_other": "Their replies to others' posts will appear here.",
   "profile.no_scheduled": "You don't have any scheduled posts yet.",
   "profile.no_scheduled_sub": "Schedule a post to be automatically published later.",
 

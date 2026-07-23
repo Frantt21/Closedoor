@@ -35,6 +35,7 @@ import {
     getLikedPosts,
     getScheduledPosts,
     getDislikedPostIds,
+    getUserComments,
     setCachedFeed,
     getCachedFeed,
     clearFeedCache,
@@ -48,11 +49,11 @@ import Modal from "../Resources/Components/Modal";
 import Badge from "../Resources/Components/Badge";
 import Tooltip from "../Resources/Components/Tooltip";
 import { getPlatformIcon, getPlatformName } from "../services/socialPlatforms";
-import { FaFeather, FaBookmark, FaLock, FaEllipsisH, FaBan, FaClock, FaHeart, FaRetweet, FaChevronDown, FaShareAlt } from 'react-icons/fa';
+import { FaFeather, FaBookmark, FaLock, FaEllipsisH, FaBan, FaClock, FaHeart, FaRetweet, FaChevronDown, FaShareAlt, FaComment } from 'react-icons/fa';
 import FollowButton from "../Resources/Components/FollowButton";
 import { blockUser, unblockUser, isBlocked, cacheBlockStatus, getCachedBlockStatus, unfollowBothWays } from "../services/blockService";
 import { useI18n } from "../services/i18n/useI18n";
-import { getContrastText, isUUID, getImgTransformStyle, getBgFullStyle } from "../services/helpers";
+import { getContrastText, isUUID, getImgTransformStyle, getBgFullStyle, getTimeAgo } from "../services/helpers";
 import usePageMeta from "../../hooks/usePageMeta";
 import useBgContrast from "../../hooks/useBgContrast";
 import FollowersModal from "../Resources/Components/FollowersModal";
@@ -368,7 +369,7 @@ function Profile() {
     const [postsLoading, setPostsLoading] = useState(() => !getCachedPosts());
     const [showCreatePost, setShowCreatePost] = useState(false);
     const [editingPost, setEditingPost] = useState(null);
-    const [tab, setTab] = useState('posts'); // 'posts' | 'likes' | 'saved' | 'scheduled'
+    const [tab, setTab] = useState('posts'); // 'posts' | 'likes' | 'saved' | 'scheduled' | 'replies'
     const [postSubFilter, setPostSubFilter] = useState('all'); // 'all' | 'reposts'
     const [postFilterOpen, setPostFilterOpen] = useState(false);
     const [postFilterDropdownStyle, setPostFilterDropdownStyle] = useState(null);
@@ -398,6 +399,8 @@ function Profile() {
     const savesUserId = isOwnProfile ? user?.id : activeProfile?.id;
     const [scheduledPosts, setScheduledPosts] = useState([]);
     const [scheduledPostsLoading, setScheduledPostsLoading] = useState(true);
+    const [replies, setReplies] = useState([]);
+    const [repliesLoading, setRepliesLoading] = useState(false);
     const savedCacheKey = savesUserId ? `saved_posts_${savesUserId}` : null;
     const [savedPosts, setSavedPosts] = useState(() => {
         const cached = savedCacheKey ? getCachedFeed(savedCacheKey) : null;
@@ -717,6 +720,23 @@ function Profile() {
         loadSaved();
     }, [savesUserId]);
 
+    // ── Load replies (comments by this user) ──
+    useEffect(() => {
+        const userId = activeProfile?.id;
+        if (!userId || tab !== 'replies') return;
+        setRepliesLoading(true);
+        getUserComments(userId)
+            .then((items) => {
+                setReplies(items);
+            })
+            .catch((err) => {
+                console.error('Error loading replies:', err);
+            })
+            .finally(() => {
+                setRepliesLoading(false);
+            });
+    }, [tab, activeProfile?.id]);
+
     // ── Load liked posts (con cache + background refresh) ──
     useEffect(() => {
         if (!likesUserId) return;
@@ -998,6 +1018,7 @@ function Profile() {
     const    [modalAccentColorSecondary, setModalAccentColorSecondary] = useState('');
     const [modalAccentSurface, setModalAccentSurface] = useState('');
     const [modalAccentSurfaceGlass, setModalAccentSurfaceGlass] = useState(false);
+    const [modalProfileTextColor, setModalProfileTextColor] = useState('');
     const [usernameInput, setUsernameInput] = useState("");
     const [avatarInput, setAvatarInput] = useState("");
     const [bannerInput, setBannerInput] = useState("");
@@ -1015,6 +1036,7 @@ function Profile() {
             setModalAccentColorSecondary(ownProfile?.accent_color_secondary || '');
             setModalAccentSurface(ownProfile?.accent_surface_color || '');
             setModalAccentSurfaceGlass(ownProfile?.accent_surface_glass === true);
+            setModalProfileTextColor(ownProfile?.profile_text_color || '');
         }
     }, [ownProfile, user, isOwnProfile]);
 
@@ -1031,7 +1053,7 @@ function Profile() {
     const roles = activeProfile?.roles || ["user"];
 
     // ── Save profile (own profile only) ──
-    const handleSaveProfile = async ({ username, avatar_url, banner_url, banner_credits, avatar_credits, bio, pronouns, social_links, accent_color, accent_color_secondary, accent_surface_color, accent_surface_glass, interests, banner_position, avatar_position, profile_background_url, profile_background_position, profile_background_blur, profile_background_dim }) => {
+    const handleSaveProfile = async ({ username, avatar_url, banner_url, banner_credits, avatar_credits, bio, pronouns, social_links, accent_color, accent_color_secondary, accent_surface_color, accent_surface_glass, interests, banner_position, avatar_position, profile_background_url, profile_background_position, profile_background_blur, profile_background_dim, profile_text_color }) => {
         if (!user?.id) return;
 
         const normalizedUsername = (username || "").trim().toLowerCase();
@@ -1068,6 +1090,7 @@ function Profile() {
                 profile_background_position: profile_background_position || '50% 50%',
                 profile_background_blur: profile_background_blur ?? 0,
                 profile_background_dim: profile_background_dim ?? 50,
+                profile_text_color: profile_text_color || null,
             };
 
             if (normalizedUsername !== ownProfile?.username) {
@@ -1199,25 +1222,19 @@ function Profile() {
           ...(activeProfile?.accent_color ? {
             '--accent-color': activeProfile.accent_color,
             '--accent-color-2': activeProfile?.accent_color_secondary || activeProfile.accent_color,
-            '--accent-text-color': getContrastText(activeProfile.accent_color),
+            '--accent-text-color': activeProfile?.profile_text_color || 'var(--color-text, #ffffff)',
           } : {}),
           '--accent-surface-color': surfColor || null,
-          // ── Glass mode text color: auto-detect from background image ──
-          '--accent-surface-text-color': !surfGlass && surfColor
-            ? getContrastText(surfColor)
-            : hasBg
-              ? autoBgContrastColor
-              : 'var(--color-text, #ffffff)',
-          '--accent-surface-text-secondary': !surfGlass && surfColor
-            ? (getContrastText(surfColor) === '#111111' ? '#374151' : 'var(--color-text-secondary, #9ca3af)')
-            : hasBg
-              ? (autoBgContrastColor === '#111111' ? '#374151' : 'var(--color-text-secondary, #9ca3af)')
-              : 'var(--color-text-secondary, #9ca3af)',
-          '--accent-surface-text-muted': !surfGlass && surfColor
-            ? (getContrastText(surfColor) === '#111111' ? '#4b5563' : 'var(--color-text-muted, #6b7280)')
-            : hasBg
-              ? (autoBgContrastColor === '#111111' ? '#4b5563' : 'var(--color-text-muted, #6b7280)')
-              : 'var(--color-text-muted, #6b7280)',
+          // ── Text colors — controlled by profile_text_color when set ──
+          '--accent-surface-text-color': activeProfile?.profile_text_color
+            ? activeProfile.profile_text_color
+            : 'var(--color-text, #ffffff)',
+          '--accent-surface-text-secondary': activeProfile?.profile_text_color
+            ? activeProfile.profile_text_color
+            : 'var(--color-text-secondary, #9ca3af)',
+          '--accent-surface-text-muted': activeProfile?.profile_text_color
+            ? activeProfile.profile_text_color
+            : 'var(--color-text-muted, #6b7280)',
           ...(surfGlass ? {
             '--accent-surface-rgba': 'rgba(255, 255, 255, 0.04)',
             '--accent-surface-rgba-hover': 'rgba(255, 255, 255, 0.07)',
@@ -1247,6 +1264,10 @@ function Profile() {
             ? bgFullStyle.transform
             : 'none',
           '--profile-accent-opacity': hasBg ? '8%' : '18%',
+          // ── Profile text color (user-configurable) ──
+          ...(activeProfile?.profile_text_color ? {
+            '--profile-text-color': activeProfile.profile_text_color,
+          } : {}),
           // ── When text is dark (light bg detected), use dark overlays so pills/buttons are visible ──
           ...((!surfGlass && surfColor ? getContrastText(surfColor) : hasBg ? autoBgContrastColor : null) === '#111111' ? {
             '--overlay-bg-subtle': 'rgba(0, 0, 0, 0.06)',
@@ -1417,6 +1438,7 @@ function Profile() {
                                         setModalAccentSurface(ownProfile?.accent_surface_color || '');
                                         setModalAccentSurfaceGlass(ownProfile?.accent_surface_glass === true);
                                         setModalInterests(ownProfile?.interests || []);
+                                        setModalProfileTextColor(ownProfile?.profile_text_color || '');
                                         setShowModal(true);
                                     }}
                                 >
@@ -1566,6 +1588,7 @@ function Profile() {
                     initialProfileBgBlur={ownProfile?.profile_background_blur ?? 0}
                     initialProfileBgDim={ownProfile?.profile_background_dim ?? 50}
                     initialPronouns={ownProfile?.pronouns || ''}
+                    initialProfileTextColor={modalProfileTextColor}
                     initialFollowersCount={followCounts?.followers || 0}
                     userRoles={roles}
                 />
@@ -1628,25 +1651,27 @@ function Profile() {
                         <div className="posts-section-tab-with-dropdown" ref={postFilterRef}>
                             <button
                                 className={`posts-section-tab ${tab === 'posts' ? 'posts-section-tab--active' : ''}`}
-                                onClick={() => setTab('posts')}
+                                onClick={(e) => {
+                                    setTab('posts');
+                                    if (tab === 'posts') {
+                                        e.stopPropagation();
+                                        const parentRect = postFilterRef.current?.getBoundingClientRect();
+                                        if (parentRect) {
+                                            setPostFilterDropdownStyle({
+                                                position: 'fixed',
+                                                top: `${parentRect.bottom + 4}px`,
+                                                left: `${parentRect.left}px`,
+                                                zIndex: 9999,
+                                            });
+                                        }
+                                        setPostFilterOpen(prev => !prev);
+                                    }
+                                }}
                             >
                                 {postSubFilter === 'reposts' ? t('profile.filter_reposts') : t('profile.posts_tab')}
                                 {tab === 'posts' && (
                                     <span
                                         className={`posts-tab-filter-toggle ${postFilterOpen ? 'posts-tab-filter-toggle--open' : ''}`}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            const parentRect = postFilterRef.current?.getBoundingClientRect();
-                                            if (parentRect) {
-                                                setPostFilterDropdownStyle({
-                                                    position: 'fixed',
-                                                    top: `${parentRect.bottom + 4}px`,
-                                                    left: `${parentRect.left}px`,
-                                                    zIndex: 9999,
-                                                });
-                                            }
-                                            setPostFilterOpen(prev => !prev);
-                                        }}
                                     >
                                         <FaChevronDown />
                                     </span>
@@ -1699,6 +1724,12 @@ function Profile() {
                                 {t('profile.scheduled_tab') || 'Programados'}
                             </button>
                         )}
+                        <button
+                            className={`posts-section-tab ${tab === 'replies' ? 'posts-section-tab--active' : ''}`}
+                            onClick={() => setTab('replies')}
+                        >
+                            {t('profile.replies_tab')}
+                        </button>
                     </div>
                     {isOwnProfile && (
                         <button
@@ -1884,6 +1915,66 @@ function Profile() {
                                 onRepostToggle={handleRepostToggle}
                             />
                         ))
+                ) : tab === 'replies' ? (
+                    repliesLoading ? (
+                        <div className="posts-skeleton">
+                            {[1, 2, 3].map((i) => (
+                                <div key={i} className="posts-skeleton-card">
+                                    <div className="skeleton posts-skeleton-avatar" />
+                                    <div className="posts-skeleton-lines">
+                                        <div className="skeleton posts-skeleton-line posts-skeleton-line--short" />
+                                        <div className="skeleton posts-skeleton-line" />
+                                        <div className="skeleton posts-skeleton-line posts-skeleton-line--medium" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : replies.length === 0 ? (
+                        <div className="posts-empty">
+                            <span className="posts-empty-icon"><FaComment /></span>
+                            <p className="posts-empty-text">
+                                {isOwnProfile
+                                    ? t('profile.no_replies')
+                                    : t('profile.no_replies_other')}
+                            </p>
+                            <p className="posts-empty-subtext">
+                                {isOwnProfile
+                                    ? t('profile.no_replies_sub')
+                                    : t('profile.no_replies_sub_other')}
+                            </p>
+                        </div>
+                    ) : (
+                        replies.map((reply) => (
+                            <div key={reply.id} className="comment-card">
+                                <div className="comment-card-header">
+                                    <Avatar
+                                        src={reply.profiles?.avatar_url}
+                                        alt={reply.profiles?.username || '?'}
+                                        size={28}
+                                    />
+                                    <span className="comment-card-author">
+                                        {reply.profiles?.username || t('common.unknown')}
+                                    </span>
+                                    <span className="comment-card-time">
+                                        {getTimeAgo(t, locale, reply.created_at)}
+                                    </span>
+                                </div>
+                                <p className="comment-card-content">{reply.content}</p>
+                                {reply.posts && (
+                                    <a
+                                        className="comment-card-post-link"
+                                        href={`/post/${reply.post_id}`}
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            navigate(`/post/${reply.post_id}`);
+                                        }}
+                                    >
+                                        {t('post.reply_to', { user: reply.posts?.profiles?.username || t('common.unknown') })}
+                                    </a>
+                                )}
+                            </div>
+                        ))
+                    )
                 ) : null}
             </div>
             )}

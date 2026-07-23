@@ -34,7 +34,7 @@
 .right-panel-card-title {
   font-size: 0.85rem;
   font-weight: 700;
-  color: var(--color-text, #ffffff);
+  color: var(--accent-surface-text-color, var(--color-text, #ffffff));
   margin: 0 0 12px 0;
   display: flex;
   align-items: center;
@@ -78,7 +78,7 @@
 .right-panel-trending-subtitle {
   font-size: 1.1rem;
   font-weight: 700;
-  color: var(--color-text, #ffffff);
+  color: var(--accent-surface-text-color, var(--color-text, #ffffff));
   margin: 0 0 4px 10px;
   display: flex;
   align-items: center;
@@ -130,7 +130,7 @@
 .right-panel-trending-name {
   font-size: 0.92rem;
   font-weight: 400;
-  color: var(--color-text, #ffffff);
+  color: var(--accent-surface-text-color, var(--color-text, #ffffff));
   flex: 1;
   min-width: 0;
   overflow: hidden;

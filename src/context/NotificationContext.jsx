@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useCallback, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { supabase } from '../assets/services/supabaseclient';
 import {
@@ -101,8 +101,15 @@ async function tryShowOsNotification(message, avatarUrl, link, tag) {
   }
 }
 
+function isChatRoute() {
+  return window.location.pathname.startsWith('/Chat') || window.location.pathname.startsWith('/chat');
+}
+
 function showLiveNotification(data) {
   if (!data?.actor) return;
+
+  // No mostrar toasts si el usuario está en el chat
+  if (isChatRoute()) return;
 
   const username = data.actor.username || 'Alguien';
   const message = getNotifMessage(data.type, username);
@@ -147,6 +154,7 @@ export const NotificationContext = createContext();
 export function NotificationProvider({ children }) {
   const { user } = useAuth();
   const userId = user?.id;
+  const location = useLocation();
 
   // ── Lazy initializers: arrancan con cache si existe, sin skeleton ──
   const [notifications, setNotifications] = useState(() => {
@@ -368,28 +376,31 @@ export function NotificationProvider({ children }) {
             return;
           }
 
-          // Tab visible → Toast Notification (if not disabled)
-          try {
-            if (localStorage.getItem('fc_show_toast_notifications') === 'false') return;
-          } catch (e) {}
+          // No mostrar toast si ya estamos en la ruta de chat
+          if (!isChatRoute()) {
+            // Tab visible → Toast Notification (if not disabled)
+            try {
+              if (localStorage.getItem('fc_show_toast_notifications') === 'false') return;
+            } catch (e) {}
 
-          toast(
-            <Link to="/Chat" className="fc-notif-toast" onClick={(e) => e.stopPropagation()}>
-              {avatarUrl && (
-                <img
-                  className="fc-notif-toast-avatar"
-                  src={avatarUrl}
-                  alt=""
-                  onError={(e) => { e.target.style.display = 'none'; }}
-                />
-              )}
-              <div className="fc-notif-toast-body">
-                <span className="fc-notif-toast-text">{messageText}</span>
-              </div>
-            </Link>,
-            { autoClose: 4000 }
-          );
-          // Update unread chat count
+            toast(
+              <Link to="/Chat" className="fc-notif-toast" onClick={(e) => e.stopPropagation()}>
+                {avatarUrl && (
+                  <img
+                    className="fc-notif-toast-avatar"
+                    src={avatarUrl}
+                    alt=""
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
+                )}
+                <div className="fc-notif-toast-body">
+                  <span className="fc-notif-toast-text">{messageText}</span>
+                </div>
+              </Link>,
+              { autoClose: 4000 }
+            );
+          }
+          // Update unread chat count (siempre, aunque estemos en chat)
           fetchUnreadChatCount();
         }
       )
@@ -411,6 +422,12 @@ export function NotificationProvider({ children }) {
       supabase.removeChannel(chatChannel);
     };
   }, [userId, fetchUnreadChatCount]);
+
+  // ── Refresh unread chat count on navigation (enter/leave chat) ──
+  useEffect(() => {
+    if (!userId) return;
+    fetchUnreadChatCount();
+  }, [userId, fetchUnreadChatCount, location.pathname]);
 
   const handleMarkAsRead = useCallback(async (notificationId) => {
     try {

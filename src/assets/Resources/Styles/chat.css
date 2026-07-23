@@ -26,9 +26,10 @@
 .chat-list-header {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     padding: 16px 16px 12px;
     border-bottom: 1px solid var(--color-border, #2a2a2a);
+    background: var(--color-bg, #000000);
 }
 
 .chat-list-title {
@@ -36,27 +37,6 @@
     margin: 0;
     font-size: 1.1rem;
     font-weight: 700;
-    color: var(--color-text, #ffffff);
-}
-
-.chat-list-back-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border: none;
-    border-radius: var(--radius, 10px);
-    background: var(--overlay-bg-subtle);
-    color: var(--color-text-secondary, #9ca3af);
-    cursor: pointer;
-    font-size: 0.85rem;
-    flex-shrink: 0;
-    transition: background 0.15s ease, color 0.15s ease;
-}
-
-.chat-list-back-btn:hover {
-    background: var(--color-surface-hover, #252525);
     color: var(--color-text, #ffffff);
 }
 
@@ -325,6 +305,12 @@
 .chat-list-empty-sub {
     font-size: 0.78rem;
     margin-top: 4px;
+}
+
+/* ── Ensure both headers have identical height for border-bottom alignment ── */
+.chat-list-header,
+.chat-messages-header {
+    min-height: 69px;
 }
 
 /* ── Message area (right side) ── */

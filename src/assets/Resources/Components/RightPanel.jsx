@@ -250,21 +250,15 @@ function ProfileContent({ path, ownProfile, user, t }) {
     '--accent-surface-blur': surfGlass ? 'blur(20px)' : 'none',
     '--accent-surface-border': 'none',
     // ── Glass mode text contrast: auto-detect from background image ──
-    '--accent-surface-text-color': !surfGlass && surfColor
-      ? getContrastText(surfColor)
-      : hasBgRight
-        ? autoBgContrastColor
-        : 'var(--color-text, #ffffff)',
-    '--accent-surface-text-secondary': !surfGlass && surfColor
-      ? (getContrastText(surfColor) === '#111111' ? '#374151' : 'var(--color-text-secondary, #9ca3af)')
-      : hasBgRight
-        ? (autoBgContrastColor === '#111111' ? '#374151' : 'var(--color-text-secondary, #9ca3af)')
-        : 'var(--color-text-secondary, #9ca3af)',
-    '--accent-surface-text-muted': !surfGlass && surfColor
-      ? (getContrastText(surfColor) === '#111111' ? '#4b5563' : 'var(--color-text-muted, #6b7280)')
-      : hasBgRight
-        ? (autoBgContrastColor === '#111111' ? '#4b5563' : 'var(--color-text-muted, #6b7280)')
-        : 'var(--color-text-muted, #6b7280)',
+    '--accent-surface-text-color': activeProfile?.profile_text_color
+      ? activeProfile.profile_text_color
+      : 'var(--color-text, #ffffff)',
+    '--accent-surface-text-secondary': activeProfile?.profile_text_color
+      ? activeProfile.profile_text_color
+      : 'var(--color-text-secondary, #9ca3af)',
+    '--accent-surface-text-muted': activeProfile?.profile_text_color
+      ? activeProfile.profile_text_color
+      : 'var(--color-text-muted, #6b7280)',
     // ── When text is dark (light bg detected), use dark overlays so pills/buttons are visible ──
     ...((!surfGlass && surfColor ? getContrastText(surfColor) : hasBgRight ? autoBgContrastColor : null) === '#111111' ? {
       '--overlay-bg-subtle': 'rgba(0, 0, 0, 0.06)',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useI18n } from '../services/i18n/useI18n';
@@ -137,6 +137,24 @@ export default function Chat() {
   const messagesContainerRef = useRef(null);
   const inputRef = useRef(null);
   const messagesCacheRef = useRef({});
+  const prevConvIdRef = useRef(null);
+
+  // ── useLayoutEffect: runs BEFORE browser paint — garantiza que no haya flash de mensajes viejos ──
+  useLayoutEffect(() => {
+    if (!activeConvId) return;
+    if (prevConvIdRef.current === activeConvId) return; // misma conversación, no hacer nada
+
+    // Limpiar/restaurar mensajes inmediatamente ANTES del paint
+    const cached = messagesCacheRef.current[activeConvId];
+    if (cached) {
+      setMessages(cached);
+      setMsgsLoading(false);
+    } else {
+      setMessages([]);
+      setMsgsLoading(true);
+    }
+    prevConvIdRef.current = activeConvId;
+  }, [activeConvId]);
 
   // ── Load conversations ──
   const loadConvs = useCallback(async () => {
@@ -166,20 +184,13 @@ export default function Chat() {
   useEffect(() => {
     if (!activeConvId) return;
 
-    // Check cache first — show immediately, no loading
-    const cached = messagesCacheRef.current[activeConvId];
-    if (cached) {
-      setMessages(cached);
-      setMsgsLoading(false);
-    } else {
-      setMsgsLoading(true);
-      setMessages([]);
-    }
-
     markAsRead(activeConvId, user.id);
 
+    const currentConv = activeConvId;
     getMessages(activeConvId)
       .then(async (msgs) => {
+        // Guard: if the user switched conversation while loading, discard stale data
+        if (currentConv !== activeConvId) return;
         // Filter out messages deleted for me
         const filtered = msgs.filter(m => !m.deleted_for?.includes(user.id));
         // Decrypt each message
@@ -220,6 +231,50 @@ export default function Chat() {
     };
   }, [activeConvId, user?.id]);
 
+  // ── Debug: log header heights to diagnose border-bottom alignment ──
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const listHeader = document.querySelector('.chat-list-header');
+      const msgHeader = document.querySelector('.chat-messages-header');
+      if (listHeader) {
+        const rect = listHeader.getBoundingClientRect();
+        console.log('[CHAT DEBUG] .chat-list-header:', {
+          height: rect.height,
+          paddingTop: getComputedStyle(listHeader).paddingTop,
+          paddingBottom: getComputedStyle(listHeader).paddingBottom,
+          minHeight: getComputedStyle(listHeader).minHeight,
+        });
+      }
+      if (msgHeader) {
+        const rect = msgHeader.getBoundingClientRect();
+        console.log('[CHAT DEBUG] .chat-messages-header:', {
+          height: rect.height,
+          paddingTop: getComputedStyle(msgHeader).paddingTop,
+          paddingBottom: getComputedStyle(msgHeader).paddingBottom,
+          minHeight: getComputedStyle(msgHeader).minHeight,
+          avatarHeight: msgHeader.querySelector('.chat-messages-header-avatar')?.getBoundingClientRect().height,
+          backBtnDisplay: getComputedStyle(msgHeader.querySelector('.chat-messages-back') || msgHeader).display,
+        });
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Log also on conversation change
+  useEffect(() => {
+    if (!activeConvId) return;
+    setTimeout(() => {
+      const listHeader = document.querySelector('.chat-list-header');
+      const msgHeader = document.querySelector('.chat-messages-header');
+      if (listHeader) {
+        console.log('[CHAT DEBUG] (conv changed) .chat-list-header height:', listHeader.getBoundingClientRect().height);
+      }
+      if (msgHeader) {
+        console.log('[CHAT DEBUG] (conv changed) .chat-messages-header height:', msgHeader.getBoundingClientRect().height);
+      }
+    }, 300);
+  }, [activeConvId]);
+
   // Sync messages cache on every update (realtime, delete, edit, etc.)
   useEffect(() => {
     if (!activeConvId) return;
@@ -229,15 +284,6 @@ export default function Chat() {
   // ── Select conversation ──
   const selectConversation = (convId) => {
     setActiveConvId(convId);
-    // Limpiar mensajes inmediatamente para evitar mostrar datos del chat anterior
-    const cached = messagesCacheRef.current[convId];
-    if (cached) {
-      setMessages(cached);
-      setMsgsLoading(false);
-    } else {
-      setMessages([]);
-      setMsgsLoading(true);
-    }
     setShowList(false);
     setTimeout(() => inputRef.current?.focus(), 100);
   };
@@ -656,11 +702,6 @@ export default function Chat() {
   const renderConversationListContent = () => (
     <div className="chat-list">
       <div className="chat-list-header">
-        <Tooltip text={t('nav.home')} placement="bottom">
-          <button className="chat-list-back-btn" onClick={() => navigate('/')}>
-            <FaArrowLeft />
-          </button>
-        </Tooltip>
         <h2 className="chat-list-title">{t('chat.title')}</h2>
         <Tooltip text={t('chat.new')} placement="bottom">
           <button className="chat-list-new-btn" onClick={openFollowersModal}>
@@ -772,7 +813,7 @@ export default function Chat() {
         </div>
       </div>
 
-      {/* Messages */}
+      {/* Messages — key=activeConvId fuerza remount completo al cambiar de chat */}
       <div className="chat-messages-body" ref={messagesContainerRef}>
         {msgsLoading ? (
           <div className="chat-messages-loading">{t('common.loading')}</div>

@@ -554,6 +554,29 @@ export async function getComments(postId) {
   return data || [];
 }
 
+/**
+ * Get all comments made by a specific user (for the Replies tab in profile)
+ */
+export async function getUserComments(userId, { limit = 50, offset = 0 } = {}) {
+  if (!userId) return [];
+  const { data, error } = await supabase
+    .from('comments')
+    .select(`
+      id, content, image_url, video_url, created_at, post_id,
+      profiles!comments_user_id_fkey (id, username, avatar_url, roles),
+      posts!comments_post_id_fkey (id, user_id, content, image_url, profiles!posts_user_id_fkey (id, username, avatar_url, roles))
+    `)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (error) {
+    console.error('Error fetching user comments:', error);
+    throw error;
+  }
+  return data || [];
+}
+
 export async function deleteComment(commentId) {
   const { error } = await supabase.from('comments').delete().eq('id', commentId);
   if (error) {
