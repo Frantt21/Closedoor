@@ -90,7 +90,8 @@ function MentionDropdownPortal({ textareaRef, mentionDropdownRef, mentions, sele
           key={user.id}
           type="button"
           className={`create-post-mention-item ${idx === selectedMentionIdx ? 'create-post-mention-item--active' : ''}`}
-          onMouseDown={(e) => { e.preventDefault(); insertMention(user); }}
+          onMouseDown={(e) => { e.preventDefault(); }}
+          onClick={(e) => { e.stopPropagation(); insertMention(user); }}
         >
           <Avatar
             className="create-post-mention-avatar"

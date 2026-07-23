@@ -402,10 +402,22 @@ function Profile() {
     const savesUserId = isOwnProfile ? user?.id : activeProfile?.id;
     const [scheduledPosts, setScheduledPosts] = useState([]);
     const [scheduledPostsLoading, setScheduledPostsLoading] = useState(true);
-    const [replies, setReplies] = useState([]);
-    const [repliesLoading, setRepliesLoading] = useState(false);
-    const [repliesLikedIds, setRepliesLikedIds] = useState([]);
-    const [repliesDislikedIds, setRepliesDislikedIds] = useState([]);
+    const repliesCacheKey = activeProfile?.id ? `replies_${activeProfile.id}` : null;
+    const [replies, setReplies] = useState(() => {
+        const cached = repliesCacheKey ? getCachedFeed(repliesCacheKey) : null;
+        return cached?.items || [];
+    });
+    const [repliesLoading, setRepliesLoading] = useState(() => {
+        return repliesCacheKey ? !getCachedFeed(repliesCacheKey) : false;
+    });
+    const [repliesLikedIds, setRepliesLikedIds] = useState(() => {
+        const cached = repliesCacheKey ? getCachedFeed(repliesCacheKey) : null;
+        return cached?.likedIds || [];
+    });
+    const [repliesDislikedIds, setRepliesDislikedIds] = useState(() => {
+        const cached = repliesCacheKey ? getCachedFeed(repliesCacheKey) : null;
+        return cached?.dislikedIds || [];
+    });
     const savedCacheKey = savesUserId ? `saved_posts_${savesUserId}` : null;
     const [savedPosts, setSavedPosts] = useState(() => {
         const cached = savedCacheKey ? getCachedFeed(savedCacheKey) : null;
@@ -725,22 +737,34 @@ function Profile() {
         loadSaved();
     }, [savesUserId]);
 
-    // ── Load replies (comments by this user) ──
+    // ── Load replies (comments by this user, con cache) ──
     useEffect(() => {
         const userId = activeProfile?.id;
         if (!userId || tab !== 'replies') return;
-        setRepliesLoading(true);
+        const cacheKey = `replies_${userId}`;
+
+        // Restaurar cache inmediatamente (síncrono)
+        const cached = getCachedFeed(cacheKey);
+        if (cached) {
+            setReplies(cached.items || []);
+            setRepliesLikedIds(cached.likedIds || []);
+            setRepliesDislikedIds(cached.dislikedIds || []);
+            setRepliesLoading(false);
+        } else {
+            setRepliesLoading(true);
+        }
+
+        // Fetch en segundo plano
         getUserComments(userId)
             .then(async (items) => {
                 setReplies(items);
+                let likedIds = [], dislikedIds = [];
                 if (user?.id && items.length > 0) {
                     const commentIds = items.map(c => c.id);
                     const [likedResults, dislikedResults] = await Promise.all([
                         Promise.allSettled(commentIds.map(id => isCommentLiked(id, user.id))),
                         Promise.allSettled(commentIds.map(id => isCommentDisliked(id, user.id))),
                     ]);
-                    const likedIds = [];
-                    const dislikedIds = [];
                     commentIds.forEach((id, idx) => {
                         if (likedResults[idx].status === 'fulfilled' && likedResults[idx].value) likedIds.push(id);
                         if (dislikedResults[idx].status === 'fulfilled' && dislikedResults[idx].value) dislikedIds.push(id);
@@ -748,6 +772,7 @@ function Profile() {
                     setRepliesLikedIds(likedIds);
                     setRepliesDislikedIds(dislikedIds);
                 }
+                setCachedFeed(cacheKey, items, likedIds, dislikedIds, [], []);
             })
             .catch((err) => {
                 console.error('Error loading replies:', err);
