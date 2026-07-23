@@ -294,7 +294,6 @@ export function subscribeToMessages(conversationId, onMessage) {
         filter: `conversation_id=eq.${conversationId}`,
       },
       async (payload) => {
-        // Fetch the full message
         const { data: msg } = await supabase
           .from('messages')
           .select()
@@ -302,14 +301,38 @@ export function subscribeToMessages(conversationId, onMessage) {
           .single();
         if (!msg) return;
 
-        // Fetch sender profile separately
         const { data: profile } = await supabase
           .from('profiles')
           .select('id, username, avatar_url')
           .eq('id', msg.sender_id)
           .maybeSingle();
 
-        onMessage({ ...msg, profiles: profile });
+        onMessage({ ...msg, profiles: profile }, 'INSERT');
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'messages',
+        filter: `conversation_id=eq.${conversationId}`,
+      },
+      async (payload) => {
+        const { data: msg } = await supabase
+          .from('messages')
+          .select()
+          .eq('id', payload.new.id)
+          .single();
+        if (!msg) return;
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url')
+          .eq('id', msg.sender_id)
+          .maybeSingle();
+
+        onMessage({ ...msg, profiles: profile }, 'UPDATE');
       }
     )
     .subscribe();

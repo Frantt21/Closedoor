@@ -33,7 +33,7 @@ import '../Resources/Styles/chat.css';
 
 export default function Chat() {
   const { t, locale } = useI18n();
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   usePageTitle(t('chat.title'));
 
@@ -74,6 +74,7 @@ export default function Chat() {
   // Edit message state
   const [editMsgId, setEditMsgId] = useState(null);
   const [editText, setEditText] = useState('');
+  const [showEditModal, setShowEditModal] = useState(false);
   const editRef = useRef(null);
 
   // Emoji picker state
@@ -122,11 +123,11 @@ export default function Chat() {
 
   // Focus edit input when entering edit mode
   useEffect(() => {
-    if (editMsgId && editRef.current) {
+    if (showEditModal && editMsgId && editRef.current) {
       editRef.current.focus();
       editRef.current.setSelectionRange(editText.length, editText.length);
     }
-  }, [editMsgId]);
+  }, [showEditModal, editMsgId, editText.length]);
 
   // Refs
   const messagesEndRef = useRef(null);
@@ -181,11 +182,14 @@ export default function Chat() {
       .finally(() => setMsgsLoading(false));
 
     // Real-time subscription
-    const unsub = subscribeToMessages(activeConvId, async (newMsg) => {
+    const unsub = subscribeToMessages(activeConvId, async (newMsg, eventType) => {
       const content = await decryptMessage(newMsg, user.id);
-      setMessages((prev) => [...prev, { ...newMsg, decryptedContent: content }]);
-      // Auto-scroll
-      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+      if (eventType === 'UPDATE') {
+        setMessages((prev) => prev.map((msg) => msg.id === newMsg.id ? { ...msg, ...newMsg, decryptedContent: content } : msg));
+      } else {
+        setMessages((prev) => [...prev, { ...newMsg, decryptedContent: content }]);
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+      }
       markAsRead(activeConvId, user.id);
     });
 
@@ -361,11 +365,13 @@ export default function Chat() {
     if (!msg?.decryptedContent) return;
     setEditMsgId(msg.id);
     setEditText(msg.decryptedContent);
+    setShowEditModal(true);
   }, [msgMenu.msg]);
 
   const handleCancelEdit = useCallback(() => {
     setEditMsgId(null);
     setEditText('');
+    setShowEditModal(false);
   }, []);
 
   const handleSaveEdit = useCallback(async () => {
@@ -388,6 +394,7 @@ export default function Chat() {
       ));
       setEditMsgId(null);
       setEditText('');
+      setShowEditModal(false);
     } catch (err) {
       console.error('Error editing message:', err);
     }
@@ -434,6 +441,7 @@ export default function Chat() {
   // ── Get active conversation's other user ──
   const activeConv = conversations.find((c) => c.id === activeConvId);
   const otherUser = activeConv?.otherUser;
+  const editingMessage = messages.find((m) => m.id === editMsgId);
 
   // ── Navigate to profile from header ──
   const goToProfile = useCallback(() => {
@@ -505,7 +513,7 @@ export default function Chat() {
           </button>
         </Tooltip>
         <h2 className="chat-list-title">{t('chat.title')}</h2>
-        <Tooltip text={t('chat.new') || 'New chat'} placement="bottom">
+        <Tooltip text={t('chat.new')} placement="bottom">
           <button className="chat-list-new-btn" onClick={openFollowersModal}>
             <FaPlus />
           </button>
@@ -521,7 +529,7 @@ export default function Chat() {
             type="text"
             value={searchQuery}
             onChange={handleSearchChange}
-            placeholder={t('chat.search_placeholder') || 'Search users...'}
+            placeholder={t('chat.search_placeholder')}
           />
           {searchQuery && (
             <button className="chat-search-bar-clear" onClick={() => { setSearchQuery(''); setSearchResults([]); }}>
@@ -570,7 +578,7 @@ export default function Chat() {
               />
               <div className="chat-list-item-info">
                 <div className="chat-list-item-top">
-                  <span className="chat-list-item-name">{conv.otherUser?.username || 'Unknown'}</span>
+                  <span className="chat-list-item-name">{conv.otherUser?.username || t('common.unknown')}</span>
                   {conv.last_message_at && (
                     <span className="chat-list-item-time">
                       {getTimeAgo(t, locale, conv.last_message_at)}
@@ -611,7 +619,7 @@ export default function Chat() {
           onClick={goToProfile}
         />
         <div className="chat-messages-header-info" style={{ cursor: 'pointer' }} onClick={goToProfile}>
-          <span className="chat-messages-header-name">{otherUser?.username || 'Unknown'}</span>
+          <span className="chat-messages-header-name">{otherUser?.username || t('common.unknown')}</span>
         </div>
       </div>
 
@@ -622,7 +630,7 @@ export default function Chat() {
         ) : messages.length === 0 ? (
           <div className="chat-messages-empty">
             <FaComment className="chat-messages-empty-icon" />
-            <p>{t('chat.no_messages') || 'No messages yet. Start the conversation!'}</p>
+            <p>{t('chat.no_messages')}</p>
           </div>
         ) : (
           messages.map((msg) => {
@@ -644,43 +652,44 @@ export default function Chat() {
                     <span>{t('post.pinned')}</span>
                   </div>
                 )}
-                <div className="chat-message-row">
-                  {/* Time — at the start of the bubble row, visible on hover */}
-                  <span className="chat-message-time">
-                    {msg.edited_at && (
-                      <span className="chat-message-edited">{t('chat.edited')} · </span>
-                    )}
-                    {getTimeAgo(t, locale, msg.created_at)}
-                  </span>
+                <div className={`chat-message-row ${isOwn ? 'chat-message-row--own' : 'chat-message-row--other'}`}>
+                  {!isOwn && (
+                    <Avatar
+                      src={otherUser?.avatar_url}
+                      alt={otherUser?.username || '?'}
+                      className="chat-message-avatar"
+                    />
+                  )}
                   <div className={`chat-message-bubble ${msg.is_pinned ? 'chat-message-bubble--pinned' : ''}`}>
-                    {isEditing ? (
-                      <div className="chat-message-edit">
-                        <textarea
-                          ref={editRef}
-                          className="chat-message-edit-input"
-                          value={editText}
-                          onChange={(e) => setEditText(e.target.value)}
-                          onKeyDown={handleEditKeyDown}
-                          rows={2}
-                          maxLength={2000}
-                        />
-                        <div className="chat-message-edit-actions">
-                          <button className="chat-message-edit-btn chat-message-edit-btn--save" onClick={handleSaveEdit}>
-                            <FaCheck /> {t('common.save')}
-                          </button>
-                          <button className="chat-message-edit-btn" onClick={handleCancelEdit}>
-                            {t('common.cancel')}
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="chat-message-text">
-                        {msg.decryptedContent || (
-                          <span className="chat-message-encrypted">{t('chat.encrypted') || '🔒 Encrypted'}</span>
-                        )}
-                      </p>
-                    )}
+                    <p className="chat-message-text">
+                      {msg.decryptedContent || (
+                        <span className="chat-message-encrypted">{t('chat.encrypted')}</span>
+                      )}
+                    </p>
                   </div>
+                  {isOwn && (
+                    <span className="chat-message-time">
+                      {msg.edited_at && (
+                        <span className="chat-message-edited">{t('chat.edited')} · </span>
+                      )}
+                      {getTimeAgo(t, locale, msg.created_at)}
+                    </span>
+                  )}
+                  {isOwn && (
+                    <Avatar
+                      src={profile?.avatar_url || user?.user_metadata?.avatar_url || user?.avatar_url}
+                      alt={profile?.username || user?.username || '?'}
+                      className="chat-message-avatar chat-message-avatar--own"
+                    />
+                  )}
+                  {!isOwn && (
+                    <span className="chat-message-time">
+                      {msg.edited_at && (
+                        <span className="chat-message-edited">{t('chat.edited')} · </span>
+                      )}
+                      {getTimeAgo(t, locale, msg.created_at)}
+                    </span>
+                  )}
                 </div>
 
                 {/* Reactions — floating outside bubble */}
@@ -731,7 +740,7 @@ export default function Chat() {
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={t('chat.input_placeholder') || 'Type a message...'}
+          placeholder={t('chat.input_placeholder')}
           rows={1}
           maxLength={2000}
         />
@@ -755,7 +764,7 @@ export default function Chat() {
         {activeConvId ? renderMessageAreaContent() : (
           <div className="chat-messages-welcome">
             <FaComment className="chat-messages-welcome-icon" />
-            <p>{t('chat.select_chat') || 'Select a conversation to start chatting'}</p>
+            <p>{t('chat.select_chat')}</p>
           </div>
         )}
       </div>
@@ -791,15 +800,15 @@ export default function Chat() {
               </button>
               <button className="chat-context-menu-btn" onClick={() => { setMsgMenu({...msgMenu, open: false}); toggleEmojiPicker(msgMenu.msg.id); }}>
                 <FaSmile />
-                <span>{t('chat.react') || 'React'}</span>
+                <span>{t('chat.react')}</span>
               </button>
               <button className="chat-context-menu-btn" onClick={handlePinMessage}>
                 <FaThumbtack />
-                <span>{msgMenu.msg.is_pinned ? (t('post.unpin') || 'Unpin') : (t('post.pin') || 'Pin')}</span>
+                <span>{msgMenu.msg.is_pinned ? t('post.unpin') : t('post.pin')}</span>
               </button>
               <button className="chat-context-menu-btn chat-context-menu-btn--danger" onClick={handleDeleteMessage}>
                 <FaTrash />
-                <span>{t('chat.delete_message') || 'Delete permanently'}</span>
+                <span>{t('chat.delete_message')}</span>
               </button>
             </>
           ) : (
@@ -810,20 +819,72 @@ export default function Chat() {
               </button>
               <button className="chat-context-menu-btn" onClick={() => { setMsgMenu({...msgMenu, open: false}); toggleEmojiPicker(msgMenu.msg.id); }}>
                 <FaSmile />
-                <span>{t('chat.react') || 'React'}</span>
+                <span>{t('chat.react')}</span>
               </button>
               <button className="chat-context-menu-btn" onClick={handlePinMessage}>
                 <FaThumbtack />
-                <span>{msgMenu.msg.is_pinned ? (t('post.unpin') || 'Unpin') : (t('post.pin') || 'Pin')}</span>
+                <span>{msgMenu.msg.is_pinned ? t('post.unpin') : t('post.pin')}</span>
               </button>
               <button className="chat-context-menu-btn" onClick={handleDeleteMessageForMe}>
                 <FaTrash />
-                <span>{t('chat.delete_for_me') || 'Delete for me'}</span>
+                <span>{t('chat.delete_for_me')}</span>
               </button>
             </>
           )}
         </div>
       )}
+      <ModalShell
+        isOpen={showEditModal && Boolean(editMsgId)}
+        onClose={handleCancelEdit}
+        onEscape={handleCancelEdit}
+        disableBackdropClose={false}
+        className="chat-edit-modal"
+      >
+        <div className="fc-modal-header">
+          <div>
+            <h3 className="fc-modal-title">{t('chat.edit_title')}</h3>
+          </div>
+          <div className="fc-modal-header-actions">
+            <button type="button" className="fc-modal-save" onClick={handleSaveEdit}>
+              {t('common.save')}
+            </button>
+            <button type="button" className="fc-modal-close" onClick={handleCancelEdit} title={t('common.cancel')}>
+              <FaTimes />
+            </button>
+          </div>
+        </div>
+        <div className="chat-edit-modal-body">
+          <div className="chat-edit-modal-layout">
+            <div className="chat-edit-modal-editor">
+              <label className="fc-modal-label">
+                <span>{t('chat.edit_title')}</span>
+                <textarea
+                  ref={editRef}
+                  className="fc-modal-input chat-message-edit-input"
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onKeyDown={handleEditKeyDown}
+                  rows={8}
+                  maxLength={2000}
+                  placeholder={t('chat.edit_placeholder')}
+                />
+              </label>
+            </div>
+            <div className="chat-edit-modal-preview">
+              <div className="chat-edit-modal-preview-header">
+                <span className="chat-edit-modal-preview-label">{t('chat.edit_preview')}</span>
+              </div>
+              <div className="chat-edit-modal-preview-card">
+                <div className="chat-edit-modal-preview-content">
+                  <p className="chat-edit-modal-preview-text">
+                    {editingMessage?.decryptedContent || t('chat.encrypted')}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ModalShell>
       {renderFollowersModal()}
     </div>
   );

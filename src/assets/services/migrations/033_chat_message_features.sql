@@ -22,3 +22,10 @@ CREATE POLICY "Update own messages"
   ON messages FOR UPDATE
   USING (sender_id = auth.uid())
   WITH CHECK (sender_id = auth.uid());
+
+-- ── RLS: permitir a los participantes reaccionar o fijar mensajes ──
+DROP POLICY IF EXISTS "Update conversation messages" ON messages;
+CREATE POLICY "Update conversation messages"
+  ON messages FOR UPDATE
+  USING (public.is_conversation_participant(conversation_id))
+  WITH CHECK (public.is_conversation_participant(conversation_id));

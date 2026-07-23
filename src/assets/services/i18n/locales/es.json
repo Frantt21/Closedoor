@@ -184,6 +184,12 @@
   "chat.delete_message": "Eliminar permanentemente",
   "chat.delete_for_me": "Eliminar para mí",
   "chat.edited": "editado",
+  "chat.edit_title": "Editar mensaje",
+  "chat.edit_hint": "Modifica tu mensaje y guarda los cambios.",
+  "chat.edit_preview": "Mensaje actual",
+  "chat.edit_placeholder": "Escribe el nuevo mensaje...",
+  "chat.select_chat": "Selecciona una conversación para empezar a chatear",
+  "common.unknown": "Desconocido",
 
   "comunidades.title": "Comunidades",
   "comunidades.empty": "Aún no hay comunidades",
@@ -427,6 +433,7 @@
   "common.confirm": "Confirmar",
   "common.search": "Buscar",
   "common.username": "Usuario",
+  "common.you": "Tú",
   "common.password": "Contraseña",
 
   "post_modal.edit_avatar": "Cambiar avatar",
