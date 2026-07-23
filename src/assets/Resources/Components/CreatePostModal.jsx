@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom';
 import ModalShell from './ModalShell';
 import { createPost, updatePost, notifyMentions, notifyEncryptedAdd, extractMentions, getMentionUserIds } from '../../services/postService';
-import { getFollowing } from '../../services/followService';
 import { searchProfiles } from '../../services/userService';
 import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../services/i18n/useI18n';
@@ -16,96 +15,10 @@ import ConfirmModal from './ConfirmModal';
 import Tooltip from './Tooltip';
 import { encode as encryptEncode, encryptForUsers, decryptForUser } from '../../services/alphabetEncryption';
 import { supabase } from '../../services/supabaseclient';
+import useMentionAutocomplete from '../../hooks/useMentionAutocomplete';
 import './css/createPostModal.css';
 
 const IMAGE_EXTENSIONS = IMG_RE;
-
-/**
- * MentionDropdownPortal — renders the @mention autocomplete dropdown
- * via portal into .fc-modal-overlays so it's not clipped by the dialog's overflow.
- * Syncs position on scroll/resize (like Tooltip.jsx).
- */
-function MentionDropdownPortal({ textareaRef, mentionDropdownRef, mentions, selectedMentionIdx, insertMention }) {
-  const dropdownRef = useRef(null);
-  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
-
-  const updatePosition = useCallback(() => {
-    if (!textareaRef.current) return;
-    const rect = textareaRef.current.getBoundingClientRect();
-    setPos({
-      top: rect.bottom + 4,
-      left: rect.left,
-      width: Math.min(rect.width, 360),
-    });
-  }, [textareaRef]);
-
-  useEffect(() => {
-    updatePosition();
-    let ticking = false;
-    const handleScroll = () => {
-      if (!ticking) {
-        requestAnimationFrame(() => {
-          updatePosition();
-          ticking = false;
-        });
-        ticking = true;
-      }
-    };
-    window.addEventListener('scroll', handleScroll, true);
-    window.addEventListener('resize', handleScroll);
-    return () => {
-      window.removeEventListener('scroll', handleScroll, true);
-      window.removeEventListener('resize', handleScroll);
-    };
-  }, [updatePosition]);
-
-  const portalTarget = useMemo(() => {
-    const el = textareaRef.current;
-    if (el) {
-      const dialog = el.closest('dialog');
-      if (dialog) {
-        return dialog.querySelector('.fc-modal-overlays') || dialog;
-      }
-    }
-    return document.body;
-  }, [textareaRef]);
-
-  return createPortal(
-    <div
-      ref={(node) => {
-        dropdownRef.current = node;
-        if (mentionDropdownRef) mentionDropdownRef.current = node;
-      }}
-      className="create-post-mention-dropdown"
-      style={{
-        position: 'fixed',
-        top: pos.top,
-        left: pos.left,
-        width: pos.width,
-        zIndex: 2147483647,
-      }}
-    >
-      {mentions.map((user, idx) => (
-        <button
-          key={user.id}
-          type="button"
-          className={`create-post-mention-item ${idx === selectedMentionIdx ? 'create-post-mention-item--active' : ''}`}
-          onMouseDown={(e) => { e.preventDefault(); }}
-          onClick={(e) => { e.stopPropagation(); insertMention(user); }}
-        >
-          <Avatar
-            className="create-post-mention-avatar"
-            src={user.avatar_url}
-            alt={user.username}
-          />
-          <span className="create-post-mention-username">{user.username}</span>
-        </button>
-      ))}
-    </div>,
-    portalTarget
-  );
-}
-
 
 export default function CreatePostModal({
   isOpen,
@@ -126,13 +39,15 @@ export default function CreatePostModal({
   const [showImageSection, setShowImageSection] = useState(false);
   const [mediaLimitWarning, setMediaLimitWarning] = useState(null);
 
-  // ── @ Mention autocomplete ──
-  const [followedUsers, setFollowedUsers] = useState([]);
-  const [mentionQuery, setMentionQuery] = useState('');
-  const [mentionIndex, setMentionIndex] = useState(-1); // cursor position where @ was typed
-  const [selectedMentionIdx, setSelectedMentionIdx] = useState(0);
-  const textareaRef = useRef(null);
-  const mentionDropdownRef = useRef(null);
+  // ── @ Mention autocomplete (shared hook) ──
+  const {
+    textareaRef,
+    mentionDropdownRef,
+    handleContentChange: mentionHandleChange,
+    handleTextareaKeyDown,
+    mentionDropdown,
+    followedUsers,
+  } = useMentionAutocomplete(isOpen ? userId : null, content, setContent);
 
   // ── Encrypted post state ──
   const [isEncrypted, setIsEncrypted] = useState(false);
@@ -223,26 +138,8 @@ export default function CreatePostModal({
     }
   }, [t, imageUrls]);
 
-  // ── Detectar @ y actualizar query de mención ──
-  const updateMentionState = useCallback((text, cursorPos) => {
-    if (cursorPos === undefined || cursorPos === null) {
-      setMentionIndex(-1);
-      return;
-    }
-    const beforeCursor = text.slice(0, cursorPos);
-    const mentionMatch = beforeCursor.match(/(?<![\w@])@([a-zA-Z0-9_]*)$/);
-    if (mentionMatch) {
-      const query = mentionMatch[1].toLowerCase();
-      setMentionQuery(query);
-      setMentionIndex(mentionMatch.index);
-      setSelectedMentionIdx(0);
-    } else {
-      setMentionIndex(-1);
-      setMentionQuery('');
-    }
-  }, []);
 
-  // ── Fetch followed users when modal opens ──
+
   // ── User search with debounce ──
   const handleUserSearchChange = useCallback((e) => {
     const query = e.target.value;
@@ -286,32 +183,6 @@ export default function CreatePostModal({
   const removeAllowedUser = useCallback((userId) => {
     setAllowedUsers(prev => prev.filter(u => u.id !== userId));
   }, []);
-
-  // ── Reset all state when modal opens ──
-  useEffect(() => {
-    if (isOpen && userId) {
-      getFollowing(userId)
-        .then(async (users) => {
-          // Filtrar usuarios que no permiten ser añadidos a posts encriptados
-          if (users.length > 0) {
-            const { data: prefs } = await supabase
-              .from('profiles')
-              .select('id, allow_encrypted_add')
-              .in('id', users.map(u => u.id));
-            const disabledAdd = new Set(
-              (prefs || []).filter(p => p.allow_encrypted_add === false).map(p => p.id)
-            );
-            setFollowedUsers(users.filter(u => !disabledAdd.has(u.id)));
-          } else {
-            setFollowedUsers([]);
-          }
-        })
-        .catch((err) => console.warn('Error fetching followed users:', err));
-      setMentionIndex(-1);
-      setMentionQuery('');
-      setSelectedMentionIdx(0);
-    }
-  }, [isOpen, userId]);
 
   useEffect(() => {
     if (isOpen) {
@@ -408,61 +279,11 @@ export default function CreatePostModal({
 
   // Scroll locking, Escape: manejado por ModalShell (<dialog> nativo)
 
+  // ── Combined content change handler (mention + preview) ──
   const handleContentChange = (e) => {
     const text = e.target.value;
-    const cursorPos = e.target.selectionStart;
-    setContent(text);
+    mentionHandleChange(e);
     updatePreview(text);
-    updateMentionState(text, cursorPos);
-  };
-
-  // ── Manejar teclas en el textarea ──
-  const handleTextareaKeyDown = (e) => {
-    const filtered = getFilteredMentions();
-    if (mentionIndex === -1 || filtered.length === 0) return;
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setSelectedMentionIdx((prev) => (prev + 1) % filtered.length);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setSelectedMentionIdx((prev) => (prev - 1 + filtered.length) % filtered.length);
-    } else if (e.key === 'Enter' || e.key === 'Tab') {
-      e.preventDefault();
-      insertMention(filtered[selectedMentionIdx]);
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      setMentionIndex(-1);
-    }
-  };
-
-  // ── Obtener usuarios filtrados por query ──
-  const getFilteredMentions = () => {
-    if (mentionIndex === -1 || !followedUsers.length) return [];
-    return followedUsers.filter(
-      (u) => u.username && u.username.toLowerCase().includes(mentionQuery)
-    ).slice(0, 8);
-  };
-
-  // ── Insertar mención en el texto ──
-  const insertMention = (user) => {
-    const before = content.slice(0, mentionIndex);
-    const after = content.slice(mentionIndex);
-    // Reemplazar @query con @username + espacio
-    const restOfMention = after.match(/^@[a-zA-Z0-9_]*/);
-    const afterMention = restOfMention ? after.slice(restOfMention[0].length) : after;
-    const newContent = before + `@${user.username} ` + afterMention;
-    setContent(newContent);
-    setMentionIndex(-1);
-    updatePreview(newContent);
-    // Focus en textarea
-    setTimeout(() => {
-      if (textareaRef.current) {
-        const newCursor = before.length + user.username.length + 2;
-        textareaRef.current.focus();
-        textareaRef.current.setSelectionRange(newCursor, newCursor);
-      }
-    }, 0);
   };
 
   // ── Image URL management ──
@@ -768,16 +589,8 @@ export default function CreatePostModal({
                 maxLength={2000}
               />
               <span className="create-post-charcount">{content.length}/2000</span>
-              {/* ── @mention autocomplete dropdown (portaled to .fc-modal-overlays) ── */}
-              {mentionIndex !== -1 && getFilteredMentions().length > 0 && textareaRef.current && (
-                <MentionDropdownPortal
-                  textareaRef={textareaRef}
-                  mentionDropdownRef={mentionDropdownRef}
-                  mentions={getFilteredMentions()}
-                  selectedMentionIdx={selectedMentionIdx}
-                  insertMention={insertMention}
-                />
-              )}
+              {/* ── @mention autocomplete dropdown (portaled) ── */}
+              {mentionDropdown}
             </div>
 
             {/* ── Toolbar: icons + tooltips ── */}

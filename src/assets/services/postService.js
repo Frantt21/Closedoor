@@ -540,6 +540,13 @@ export async function createComment({ postId, userId, content, parentId = null, 
   // Notificar al dueño del post (en background)
   notifyComment(userId, postId);
 
+  // Notificar a usuarios @mencionados en el comentario (en background)
+  if (content) {
+    notifyCommentMentions(userId, postId, content).catch((err) =>
+      console.warn('Error notifying comment mentions:', err)
+    );
+  }
+
   return data;
 }
 
@@ -902,6 +909,53 @@ export async function notifyComment(actorId, postId) {
     }
   } catch (err) {
     console.warn('Error sending comment notification:', err);
+  }
+}
+
+/**
+ * Notify users when they are @mentioned in a comment
+ */
+export async function notifyCommentMentions(actorId, postId, content) {
+  const usernames = extractMentions(content);
+  if (!usernames.length) return;
+
+  const mentionedUsers = await getMentionUserIds(usernames);
+  if (!mentionedUsers.length) return;
+
+  // Build notifications for each mentioned user (excluding the commenter)
+  const notifications = [];
+  for (const u of mentionedUsers) {
+    if (u.id === actorId) continue;
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('allow_mention')
+        .eq('id', u.id)
+        .single();
+      if (profile && profile.allow_mention !== false) {
+        notifications.push({
+          actor_id: actorId,
+          user_id: u.id,
+          type: 'comment_mention',
+          reference_id: postId,
+        });
+      }
+    } catch {
+      // On error, notify by default
+      notifications.push({
+        actor_id: actorId,
+        user_id: u.id,
+        type: 'comment_mention',
+        reference_id: postId,
+      });
+    }
+  }
+
+  if (!notifications.length) return;
+
+  const { error } = await supabase.from('notifications').insert(notifications);
+  if (error) {
+    console.error('Error creating comment_mention notifications:', error);
   }
 }
 

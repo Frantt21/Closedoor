@@ -551,3 +551,86 @@ export function subscribeToConversations(userId, onUpdate) {
     .subscribe();
 }
 
+// ── Typing indicator (Realtime Broadcast, no DB table needed) ──
+
+const typingChannels = {};
+const typingTimeouts = {};
+let typingBroadcastId = 0;
+
+/**
+ * Broadcast that the current user is typing in a conversation.
+ * Sends a broadcast message via Supabase Realtime Broadcast.
+ * Call this on every keystroke — it will throttle to 1 broadcast per 2 seconds.
+ */
+export function broadcastTyping(conversationId, userId) {
+  if (!conversationId || !userId) return;
+
+  // Get or create the broadcast channel
+  const channelKey = `chat-typing-${conversationId}`;
+  if (!typingChannels[channelKey]) {
+    const channel = supabase.channel(channelKey, {
+      broadcast: { self: true }, // Don't echo our own broadcasts
+    });
+    channel.subscribe();
+    typingChannels[channelKey] = channel;
+  }
+
+  // Throttle: only broadcast every 2 seconds
+  const now = Date.now();
+  if (typingTimeouts[channelKey] && now - typingTimeouts[channelKey] < 1700) return;
+  typingTimeouts[channelKey] = now;
+
+  typingChannels[channelKey].send({
+    type: 'broadcast',
+    event: 'typing',
+    payload: { userId, conversationId, timestamp: now },
+  });
+}
+
+/**
+ * Subscribe to typing events from other users in a conversation.
+ * Returns an unsubscribe function.
+ *
+ * @param {string} conversationId
+ * @param {string} currentUserId — to filter out our own typing events
+ * @param {function} onTyping — called with { userId, conversationId } when someone starts typing
+ * @param {function} onStopTyping — called with { userId } when someone stops typing (2s timeout)
+ */
+export function subscribeToTyping(conversationId, currentUserId, onTyping, onStopTyping) {
+  if (!conversationId) return () => {};
+
+  const channelKey = `chat-typing-${conversationId}`;
+  const stopTimers = {};
+
+  const channel = supabase.channel(channelKey, {
+    broadcast: { self: true },
+  });
+
+  channel.on('broadcast', { event: 'typing' }, (payload) => {
+    const { userId } = payload;
+    if (userId === currentUserId) return; // Ignore our own typing
+
+    onTyping({ userId });
+
+    // Clear any existing stop timer for this user
+    if (stopTimers[userId]) {
+      clearTimeout(stopTimers[userId]);
+    }
+
+    // After 3 seconds of no broadcast, consider typing stopped
+    stopTimers[userId] = setTimeout(() => {
+      onStopTyping({ userId });
+      delete stopTimers[userId];
+    }, 3000);
+  });
+
+  channel.subscribe();
+
+  // Return unsubscribe function that cleans up timers and the channel
+  return () => {
+    Object.values(stopTimers).forEach(clearTimeout);
+    supabase.removeChannel(channel);
+    delete typingChannels[channelKey];
+  };
+}
+

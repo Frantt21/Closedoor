@@ -37,6 +37,7 @@ import RichText from '../Resources/Components/RichText';
 import ConfirmModal from '../Resources/Components/ConfirmModal';
 import Tooltip from '../Resources/Components/Tooltip';
 import CreatePostModal from '../Resources/Components/CreatePostModal';
+import useMentionAutocomplete from '../hooks/useMentionAutocomplete';
 import { getTimeAgo, IMG_RE, VID_RE } from '../services/helpers';
 import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/post.css';
@@ -132,6 +133,10 @@ export default function PostDetail() {
   const [replyShowMedia, setReplyShowMedia] = useState(false);
   const [showReplyGifPicker, setShowReplyGifPicker] = useState(false);
   const [submittingReply, setSubmittingReply] = useState(false);
+
+  // ── @Mention autocomplete hooks (main comment + reply) ──
+  const mainMention = useMentionAutocomplete(user?.id || null, commentInput, setCommentInput);
+  const replyMention = useMentionAutocomplete(user?.id || null, replyContent, setReplyContent);
 
   // ── Gallery de imágenes en comentarios ──
   const [commentGalleryUrls, setCommentGalleryUrls] = useState(null);
@@ -736,13 +741,16 @@ export default function PostDetail() {
                 <button className="comment-form-cancel-reply" onClick={cancelReply}>{t('post.cancel_reply')}</button>
               </div>
               <textarea
+                ref={replyMention.textareaRef}
                 className="comment-form-input"
                 value={replyContent}
-                onChange={(e) => setReplyContent(e.target.value)}
+                onChange={replyMention.handleContentChange}
+                onKeyDown={replyMention.handleTextareaKeyDown}
                 placeholder={t('post.reply_placeholder', { user: replyTo?.username })}
                 rows={2}
                 maxLength={1000}
               />
+              {replyMention.mentionDropdown}
               <div className="comment-form-media-row">
                 <button
                   type="button"
@@ -963,9 +971,11 @@ export default function PostDetail() {
                 {t('post.reply_to', { user: `@${replyTo?.username}` })}
                 <button className="comment-form-cancel-reply" onClick={cancelReply}>{t('post.cancel_reply')}</button>
               </div>              <textarea
+                ref={replyMention.textareaRef}
                 className="comment-form-input"
                 value={replyContent}
-                onChange={(e) => setReplyContent(e.target.value)}
+                onChange={replyMention.handleContentChange}
+                onKeyDown={replyMention.handleTextareaKeyDown}
                 placeholder={t('post.reply_placeholder', { user: replyTo?.username })}
                 rows={2}
                 maxLength={1000}
@@ -1103,13 +1113,16 @@ export default function PostDetail() {
             />
             <div className="comment-form-input-wrapper">
               <textarea
+                ref={mainMention.textareaRef}
                 className="comment-form-input"
                 value={commentInput}
-                onChange={(e) => setCommentInput(e.target.value)}
+                onChange={mainMention.handleContentChange}
+                onKeyDown={mainMention.handleTextareaKeyDown}
                 placeholder={t('post.comment_placeholder')}
                 rows={2}
                 maxLength={1000}
               />
+              {mainMention.mentionDropdown}
               <div className="comment-form-media-row">
                 <button
                   type="button"

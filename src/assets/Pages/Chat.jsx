@@ -18,6 +18,8 @@ import {
   addReaction,
   subscribeToMessages,
   subscribeToConversations,
+  broadcastTyping,
+  subscribeToTyping,
 } from '../services/chatService';
 import { searchProfiles } from '../services/userService';
 import { getFollowing } from '../services/followService';
@@ -190,6 +192,7 @@ export default function Chat() {
   const draftsRef = useRef({}); // borradores del input por conversation ID
   const prevConvIdRef = useRef(null);
   const messagesOwnerRef = useRef(null); // tracks which conversation the current `messages` state belongs to
+  const [otherUserTyping, setOtherUserTyping] = useState(false);
 
   // ── useLayoutEffect: runs BEFORE browser paint — garantiza que no haya flash de mensajes viejos ──
   useLayoutEffect(() => {
@@ -295,6 +298,24 @@ export default function Chat() {
     };
   }, [activeConvId, user?.id]);
 
+  // ── Typing indicator: subscribe to other user's typing events ──
+  useEffect(() => {
+    if (!activeConvId || !user?.id) return;
+    setOtherUserTyping(false);
+
+    const unsub = subscribeToTyping(
+      activeConvId,
+      user.id,
+      () => setOtherUserTyping(true),
+      () => setOtherUserTyping(false)
+    );
+
+    return () => {
+      unsub();
+      setOtherUserTyping(false);
+    };
+  }, [activeConvId, user?.id]);
+
   // ── Persist recent emojis to localStorage ──
   useEffect(() => {
     localStorage.setItem('chatRecentEmojis', JSON.stringify(recentEmojis));
@@ -307,6 +328,12 @@ export default function Chat() {
     if (messagesOwnerRef.current !== activeConvId) return; // don't write stale data
     messagesCacheRef.current[activeConvId] = messages;
   }, [messages, activeConvId]);
+
+  // ── Broadcast typing when input changes (throttled inside broadcastTyping) ──
+  useEffect(() => {
+    if (!activeConvId || !user?.id || !inputValue) return;
+    broadcastTyping(activeConvId, user.id);
+  }, [inputValue, activeConvId, user?.id]);
 
   // ── Select conversation (con borradores por chat) ──
   const selectConversation = (convId) => {
@@ -1291,6 +1318,18 @@ export default function Chat() {
           })
         )}
       </div>
+
+      {/* ── Typing indicator ── */}
+      {otherUserTyping && (
+        <div className="chat-typing-indicator">
+          <div className="chat-typing-dots">
+            <span className="chat-typing-dot"></span>
+            <span className="chat-typing-dot"></span>
+            <span className="chat-typing-dot"></span>
+          </div>
+          <span className="chat-typing-label">{otherUser?.username || t('common.unknown')} {t('chat.typing') || 'typing...'}</span>
+        </div>
+      )}
 
       {/* Reply bar */}
       {replyingTo && (

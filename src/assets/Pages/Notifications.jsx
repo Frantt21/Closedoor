@@ -29,6 +29,7 @@ function getIcon(type) {
     case 'comment_like':
       return <FaHeart />;
     case 'mention':
+    case 'comment_mention':
       return <FaBullhorn />;
     case 'encrypted_add':
       return <FaLock />;
@@ -61,6 +62,8 @@ function getNotificationMessage(t, type, username) {
       return <><strong>{username}</strong> {t('notifications.comment_liked')}</>;
     case 'mention':
       return <><strong>{username}</strong> {t('notifications.mentioned')}</>;
+    case 'comment_mention':
+      return <><strong>{username}</strong> {t('notifications.comment_mentioned')}</>;
     case 'encrypted_add':
       return <><strong>{username}</strong> {t('notifications.encrypted_add')}</>;
     case 'poll_vote':
@@ -75,7 +78,7 @@ function getNotificationLink(notification) {
   const username = actor.username || '';
 
   // Notificaciones relacionadas a un post → link al post
-  if (['like', 'dislike', 'comment', 'repost', 'comment_like', 'mention', 'encrypted_add', 'poll_vote'].includes(notification.type) && notification.reference_id) {
+  if (['like', 'dislike', 'comment', 'repost', 'comment_like', 'mention', 'comment_mention', 'encrypted_add', 'poll_vote'].includes(notification.type) && notification.reference_id) {
     return `/post/${notification.reference_id}`;
   }
   // Seguidores → link al perfil del actor
