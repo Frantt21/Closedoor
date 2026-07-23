@@ -36,6 +36,8 @@ import {
     getScheduledPosts,
     getDislikedPostIds,
     getUserComments,
+    isCommentLiked,
+    isCommentDisliked,
     setCachedFeed,
     getCachedFeed,
     clearFeedCache,
@@ -402,6 +404,8 @@ function Profile() {
     const [scheduledPostsLoading, setScheduledPostsLoading] = useState(true);
     const [replies, setReplies] = useState([]);
     const [repliesLoading, setRepliesLoading] = useState(false);
+    const [repliesLikedIds, setRepliesLikedIds] = useState([]);
+    const [repliesDislikedIds, setRepliesDislikedIds] = useState([]);
     const savedCacheKey = savesUserId ? `saved_posts_${savesUserId}` : null;
     const [savedPosts, setSavedPosts] = useState(() => {
         const cached = savedCacheKey ? getCachedFeed(savedCacheKey) : null;
@@ -727,8 +731,23 @@ function Profile() {
         if (!userId || tab !== 'replies') return;
         setRepliesLoading(true);
         getUserComments(userId)
-            .then((items) => {
+            .then(async (items) => {
                 setReplies(items);
+                if (user?.id && items.length > 0) {
+                    const commentIds = items.map(c => c.id);
+                    const [likedResults, dislikedResults] = await Promise.all([
+                        Promise.allSettled(commentIds.map(id => isCommentLiked(id, user.id))),
+                        Promise.allSettled(commentIds.map(id => isCommentDisliked(id, user.id))),
+                    ]);
+                    const likedIds = [];
+                    const dislikedIds = [];
+                    commentIds.forEach((id, idx) => {
+                        if (likedResults[idx].status === 'fulfilled' && likedResults[idx].value) likedIds.push(id);
+                        if (dislikedResults[idx].status === 'fulfilled' && dislikedResults[idx].value) dislikedIds.push(id);
+                    });
+                    setRepliesLikedIds(likedIds);
+                    setRepliesDislikedIds(dislikedIds);
+                }
             })
             .catch((err) => {
                 console.error('Error loading replies:', err);
@@ -736,7 +755,7 @@ function Profile() {
             .finally(() => {
                 setRepliesLoading(false);
             });
-    }, [tab, activeProfile?.id]);
+    }, [tab, activeProfile?.id, user?.id]);
 
     // ── Load liked posts (con cache + background refresh) ──
     useEffect(() => {
@@ -1945,36 +1964,30 @@ function Profile() {
                             </p>
                         </div>
                     ) : (
-                        replies.map((reply) => (
-                            <div key={reply.id} className="comment-card">
-                                <div className="comment-card-header">
-                                    <Avatar
-                                        src={reply.profiles?.avatar_url}
-                                        alt={reply.profiles?.username || '?'}
-                                        size={28}
-                                    />
-                                    <span className="comment-card-author">
-                                        {reply.profiles?.username || t('common.unknown')}
-                                    </span>
-                                    <span className="comment-card-time">
-                                        {getTimeAgo(t, locale, reply.created_at)}
-                                    </span>
-                                </div>
-                                <p className="comment-card-content">{reply.content}</p>
-                                {reply.posts && (
-                                    <a
-                                        className="comment-card-post-link"
-                                        href={`/post/${reply.post_id}`}
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            navigate(`/post/${reply.post_id}`);
-                                        }}
-                                    >
-                                        {t('post.reply_to', { user: reply.posts?.profiles?.username || t('common.unknown') })}
-                                    </a>
-                                )}
-                            </div>
-                        ))
+                        replies.map((reply) => {
+                            const replyPost = {
+                                id: reply.post_id,
+                                commentId: reply.id,
+                                content: reply.content,
+                                image_url: reply.image_url,
+                                video_url: reply.video_url,
+                                created_at: reply.created_at,
+                                user_id: reply.profiles?.id || reply.user_id,
+                                profiles: reply.profiles,
+                            };
+                            return (
+                                <PostCard
+                                    key={reply.id}
+                                    post={replyPost}
+                                    liked={repliesLikedIds.includes(reply.id)}
+                                    disliked={repliesDislikedIds.includes(reply.id)}
+                                    replyInfo={{
+                                        commentId: reply.id,
+                                        replyTo: reply.posts?.profiles?.username || t('common.unknown'),
+                                    }}
+                                />
+                            );
+                        })
                     )
                 ) : null}
             </div>
