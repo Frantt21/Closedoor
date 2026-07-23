@@ -1972,6 +1972,8 @@ function Profile() {
                                 image_urls: reply.image_url ? [reply.image_url] : [],
                                 image_url: null,
                                 video_url: reply.video_url,
+                                likes_count: reply.comment_likes_count || 0,
+                                dislikes_count: reply.comment_dislikes_count || 0,
                                 created_at: reply.created_at,
                                 user_id: reply.profiles?.id || reply.user_id,
                                 profiles: reply.profiles,

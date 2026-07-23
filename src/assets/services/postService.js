@@ -565,7 +565,7 @@ export async function getUserComments(userId, { limit = 50, offset = 0 } = {}) {
   const { data, error } = await supabase
     .from('comments')
     .select(`
-      id, content, image_url, video_url, created_at, post_id,
+      id, content, image_url, video_url, created_at, post_id, comment_likes_count, comment_dislikes_count,
       profiles!comments_user_id_fkey (id, username, avatar_url, roles),
       posts!comments_post_id_fkey (id, user_id, content, image_url, profiles!posts_user_id_fkey (id, username, avatar_url, roles))
     `)

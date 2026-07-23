@@ -36,6 +36,7 @@ import GifPicker from '../Resources/Components/GifPicker';
 import RichText from '../Resources/Components/RichText';
 import ConfirmModal from '../Resources/Components/ConfirmModal';
 import Tooltip from '../Resources/Components/Tooltip';
+import CreatePostModal from '../Resources/Components/CreatePostModal';
 import { getTimeAgo, IMG_RE, VID_RE } from '../services/helpers';
 import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/post.css';
@@ -75,6 +76,8 @@ export default function PostDetail() {
   const [showCommentGifPicker, setShowCommentGifPicker] = useState(false);
   const [confirmDeleteComment, setConfirmDeleteComment] = useState(null);
   const [confirmExternalLink, setConfirmExternalLink] = useState(null);
+  const [showCreatePost, setShowCreatePost] = useState(false);
+  const [editingPost, setEditingPost] = useState(null);
   const handleCancelDeleteComment = useCallback(() => setConfirmDeleteComment(null), []);
   const handleCancelExternalLink = useCallback(() => setConfirmExternalLink(null), []);
 
@@ -539,8 +542,24 @@ export default function PostDetail() {
   };
 
   const handlePostUpdate = (updatedPost) => {
+    if (updatedPost._editing) {
+      setEditingPost(updatedPost);
+      setShowCreatePost(true);
+      return;
+    }
     setPost(updatedPost);
     setCachedPost(updatedPost);
+  };
+
+  const handlePostCreated = async () => {
+    // Refresh the post to get updated data
+    try {
+      const data = await getPost(postId);
+      setPost(data);
+      setCachedPost(data);
+    } catch (err) {
+      console.warn('Error refreshing post after edit:', err);
+    }
   };
 
   const handlePostDelete = () => {
@@ -1204,6 +1223,18 @@ export default function PostDetail() {
           onCancel={handleCancelExternalLink}
         />
       )}
+
+      {/* ── Create/Edit Post modal ── */}
+      <CreatePostModal
+        isOpen={showCreatePost}
+        onClose={() => {
+          setShowCreatePost(false);
+          setEditingPost(null);
+        }}
+        onSuccess={handlePostCreated}
+        editPost={editingPost}
+        userId={user?.id}
+      />
 
       {commentGalleryUrls && createPortal(
         <div className="post-card-lightbox" onClick={(e) => { e.stopPropagation(); closeCommentGallery(); }}>
