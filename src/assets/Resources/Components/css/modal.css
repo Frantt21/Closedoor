@@ -602,6 +602,43 @@ textarea.fc-modal-input {
     color: var(--color-text, #ffffff);
 }
 
+/* ── Drag & drop zone ── */
+
+.fc-modal-drag-zone {
+    position: relative;
+    transition: all 0.2s ease;
+    border-radius: var(--radius-sm, 6px);
+}
+
+.fc-modal-drag-zone--active {
+    outline: 2px dashed var(--color-text, #ffffff);
+    outline-offset: 2px;
+}
+
+.fc-modal-drag-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(6px);
+    border-radius: var(--radius-sm, 6px);
+    color: #ffffff;
+    font-size: 0.85rem;
+    font-weight: 600;
+    pointer-events: none;
+    z-index: 10;
+    animation: fc-modal-drag-fadeIn 0.15s ease;
+}
+
+@keyframes fc-modal-drag-fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
 .fc-modal-sub-input {
     margin-bottom: 16px;
 }

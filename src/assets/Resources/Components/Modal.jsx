@@ -126,6 +126,62 @@ export default function Modal({
   const [showProfileBgSubmodal, setShowProfileBgSubmodal] = useState(null);
   const [profileBgUrlInput, setProfileBgUrlInput] = useState('');
   const [pendingClose, setPendingClose] = useState(false);
+  // ── Drag & drop state ──
+  const [isDragOver, setIsDragOver] = useState(false);
+  const dragCounterRef = useRef(0);
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current += 1;
+    if (e.dataTransfer?.types?.includes('Files')) {
+      setIsDragOver(true);
+    }
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setIsDragOver(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+    dragCounterRef.current = 0;
+
+    const files = e.dataTransfer?.files;
+    if (!files || files.length === 0) return;
+    const file = files[0];
+    if (!file.type.startsWith('image/')) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result;
+      if (typeof dataUrl === 'string') {
+        // Determine which input is active and set it
+        if (showUrlModal) {
+          setUrlInput(dataUrl);
+        } else if (showProfileBgSubmodal) {
+          setProfileBgUrlInput(dataUrl);
+        }
+      }
+    };
+    reader.onerror = () => {
+      // Silently fail
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Resetear todos los campos solo al ABRIR el modal (isOpen → true), no cuando cambian los initial* props
   // Esto evita que Supabase Realtime (que actualiza ownProfile al reconectar) borre las ediciones del usuario
@@ -1184,14 +1240,32 @@ export default function Modal({
         <h4 className="fc-modal-sub-title">
           {showUrlModal === 'avatar' ? t('modal.avatar_url') : t('modal.banner_url')}
         </h4>
-        <input
-          className="fc-modal-input"
-          value={urlInput}
-          onChange={(e) => setUrlInput(e.target.value)}
-          onKeyDown={handleUrlModalKeyDown}
-          placeholder={showUrlModal === 'avatar' ? 'https://.../avatar.jpg' : 'https://.../banner.jpg'}
-          autoFocus
-        />
+        <div
+          className={`fc-modal-drag-zone ${isDragOver ? 'fc-modal-drag-zone--active' : ''}`}
+          onDragOver={handleDragOver}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          <input
+            className="fc-modal-input"
+            value={urlInput}
+            onChange={(e) => setUrlInput(e.target.value)}
+            onKeyDown={handleUrlModalKeyDown}
+            placeholder={showUrlModal === 'avatar' ? 'https://.../avatar.jpg' : 'https://.../banner.jpg'}
+            autoFocus
+          />
+          {isDragOver && (
+            <div className="fc-modal-drag-overlay">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              <span>{t('modal.drop_image') || 'Drop image here'}</span>
+            </div>
+          )}
+        </div>
         {/* ── Credits input ── */}
         <input
           className="fc-modal-input"
@@ -1244,14 +1318,32 @@ export default function Modal({
         className="fc-modal--confirm"
       >
         <h4 className="fc-modal-sub-title">{t('modal.profile_background')}</h4>
-        <input
-          className="fc-modal-input"
-          value={profileBgUrlInput}
-          onChange={(e) => setProfileBgUrlInput(e.target.value)}
-          onKeyDown={handleProfileBgUrlKeyDown}
-          placeholder="https://.../background.jpg"
-          autoFocus
-        />
+        <div
+          className={`fc-modal-drag-zone ${isDragOver ? 'fc-modal-drag-zone--active' : ''}`}
+          onDragOver={handleDragOver}
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          <input
+            className="fc-modal-input"
+            value={profileBgUrlInput}
+            onChange={(e) => setProfileBgUrlInput(e.target.value)}
+            onKeyDown={handleProfileBgUrlKeyDown}
+            placeholder="https://.../background.jpg"
+            autoFocus
+          />
+          {isDragOver && (
+            <div className="fc-modal-drag-overlay">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              <span>{t('modal.drop_image') || 'Drop image here'}</span>
+            </div>
+          )}
+        </div>
         {profileBgUrlInput.trim() && (
           <div style={{ marginTop: 10 }}>
             <ImagePositionEditor

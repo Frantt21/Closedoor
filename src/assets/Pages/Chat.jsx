@@ -22,18 +22,20 @@ import {
 import { searchProfiles } from '../services/userService';
 import { getFollowing } from '../services/followService';
 import { isBlocked, getCachedBlockStatus, cacheBlockStatus } from '../services/blockService';
+import FollowButton from '../Resources/Components/FollowButton';
 import ModalShell from '../Resources/Components/ModalShell';
-import { FaComment, FaSearch, FaArrowLeft, FaPlus, FaTimes, FaUserPlus, FaUsers, FaTrash, FaThumbtack, FaCopy, FaEdit, FaCheck, FaSmile, FaReply, FaImage, FaMusic } from 'react-icons/fa';
+import { FaComment, FaSearch, FaArrowLeft, FaPlus, FaTimes, FaUserPlus, FaUsers, FaTrash, FaThumbtack, FaCopy, FaEdit, FaCheck, FaSmile, FaReply, FaImage, FaMusic, FaUser, FaPhone, FaLock } from 'react-icons/fa';
 import Avatar from '../Resources/Components/Avatar';
 import Badge from '../Resources/Components/Badge';
 import Tooltip from '../Resources/Components/Tooltip';
 import GifPicker from '../Resources/Components/GifPicker';
-import { getTimeAgo, IMG_RE, detectMediaFromContent } from '../services/helpers';
+import { getTimeAgo, IMG_RE, detectMediaFromContent, getImgTransformStyle } from '../services/helpers';
 import SafeImage from '../Resources/Components/SafeImage';
 import { toast } from 'react-toastify';
 import { supabase } from '../services/supabaseclient';
 import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/chat.css';
+import '../Resources/Styles/explore.css';
 
 export default function Chat() {
   const { t, locale } = useI18n();
@@ -318,6 +320,11 @@ export default function Chat() {
 
     setActiveConvId(convId);
     setShowList(false);
+    // Cerrar paneles flotantes al cambiar de chat
+    setShowMsgSearch(false);
+    setShowMediaGallery(false);
+    setShowPinnedPanel(false);
+    setShowProfileCard(false);
     setTimeout(() => {
       if (inputRef.current) {
         inputRef.current.focus();
@@ -334,6 +341,11 @@ export default function Chat() {
     }
     setActiveConvId(null);
     setShowList(true);
+    // Cerrar paneles flotantes al volver a la lista
+    setShowMsgSearch(false);
+    setShowMediaGallery(false);
+    setShowPinnedPanel(false);
+    setShowProfileCard(false);
   };
 
   // ── Send message (optimistic — no delay, includes media preview) ──
@@ -657,6 +669,13 @@ export default function Chat() {
     });
   }, []);
 
+  // ── Panel states for header actions ──
+  const [showMsgSearch, setShowMsgSearch] = useState(false);
+  const [msgSearchQuery, setMsgSearchQuery] = useState('');
+  const [showMediaGallery, setShowMediaGallery] = useState(false);
+  const [showPinnedPanel, setShowPinnedPanel] = useState(false);
+  const [showProfileCard, setShowProfileCard] = useState(false);
+
   // ── Gallery state for chat images ──
   const [chatGalleryUrls, setChatGalleryUrls] = useState(null);
   const [chatGalleryIndex, setChatGalleryIndex] = useState(0);
@@ -676,6 +695,20 @@ export default function Chat() {
   const goChatGalleryNext = useCallback(() => {
     setChatGalleryIndex((prev) => (prev < chatGalleryUrls.length - 1 ? prev + 1 : 0));
   }, [chatGalleryUrls]);
+
+  // ── Close floating panels (media, pinned, profile) on outside click ──
+  useEffect(() => {
+    if (!showMediaGallery && !showPinnedPanel && !showProfileCard) return;
+    const handleClick = (e) => {
+      if (!e.target.closest('.chat-float-panel') && !e.target.closest('.chat-header-action-btn')) {
+        setShowMediaGallery(false);
+        setShowPinnedPanel(false);
+        setShowProfileCard(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showMediaGallery, showPinnedPanel, showProfileCard]);
 
   // ── Keyboard nav for gallery ──
   useEffect(() => {
@@ -1020,18 +1053,64 @@ export default function Chat() {
     <div className="chat-messages">
       {/* Header */}
       <div className="chat-messages-header">
-        <button className="chat-messages-back" onClick={goBackToList}>
-          <FaArrowLeft />
-        </button>
-        <Avatar
-          src={otherUser?.avatar_url}
-          alt={otherUser?.username || '?'}
-          className="chat-messages-header-avatar"
-          style={{ cursor: 'pointer' }}
-          onClick={goToProfile}
-        />
-        <div className="chat-messages-header-info" style={{ cursor: 'pointer' }} onClick={goToProfile}>
-          <span className="chat-messages-header-name">{otherUser?.username || t('common.unknown')}</span>
+        <div className="chat-messages-header-left">
+          <button className="chat-messages-back" onClick={goBackToList}>
+            <FaArrowLeft />
+          </button>
+          <Avatar
+            src={otherUser?.avatar_url}
+            alt={otherUser?.username || '?'}
+            className="chat-messages-header-avatar"
+            style={{ cursor: 'pointer' }}
+            onClick={goToProfile}
+          />
+          <div className="chat-messages-header-info" style={{ cursor: 'pointer' }} onClick={goToProfile}>
+            <span className="chat-messages-header-name">{otherUser?.username || t('common.unknown')}</span>
+          </div>
+        </div>
+        <div className="chat-messages-header-actions">
+          <Tooltip text={t('chat.search_messages') || 'Search'} placement="bottom">
+            <button
+              className={`chat-header-action-btn ${showMsgSearch ? 'chat-header-action-btn--active' : ''}`}
+              onClick={() => { setShowMsgSearch(s => !s); setShowMediaGallery(false); setShowPinnedPanel(false); setShowProfileCard(false); }}
+            >
+              <FaSearch />
+            </button>
+          </Tooltip>
+          <Tooltip text={t('chat.media_gallery') || 'Media'} placement="bottom">
+            <button
+              className={`chat-header-action-btn ${showMediaGallery ? 'chat-header-action-btn--active' : ''}`}
+              onClick={() => {
+                setShowMediaGallery(s => !s);
+                setShowMsgSearch(false);
+                setShowPinnedPanel(false);
+                setShowProfileCard(false);
+              }}
+            >
+              <FaImage />
+            </button>
+          </Tooltip>
+          <Tooltip text={t('post.pinned') || 'Pinned'} placement="bottom">
+            <button
+              className={`chat-header-action-btn ${showPinnedPanel ? 'chat-header-action-btn--active' : ''}`}
+              onClick={() => { setShowPinnedPanel(s => !s); setShowMsgSearch(false); setShowMediaGallery(false); setShowProfileCard(false); }}
+            >
+              <FaThumbtack />
+            </button>
+          </Tooltip>
+          <Tooltip text={t('chat.view_profile') || 'Profile'} placement="bottom">
+            <button
+              className={`chat-header-action-btn ${showProfileCard ? 'chat-header-action-btn--active' : ''}`}
+              onClick={() => { setShowProfileCard(s => !s); setShowMsgSearch(false); setShowMediaGallery(false); setShowPinnedPanel(false); }}
+            >
+              <FaUser />
+            </button>
+          </Tooltip>
+          <Tooltip text={t('chat.call') || 'Call'} placement="bottom">
+            <button className="chat-header-action-btn" disabled>
+              <FaPhone />
+            </button>
+          </Tooltip>
         </div>
       </div>
 
@@ -1070,12 +1149,6 @@ export default function Chat() {
                 className={`chat-message ${isOwn ? 'chat-message--own' : 'chat-message--other'}`}
                 onContextMenu={(e) => handleMsgContextMenu(e, msg)}
               >
-                {msg.is_pinned && (
-                  <div className="chat-message-pin-badge">
-                    <FaThumbtack />
-                    <span>{t('post.pinned')}</span>
-                  </div>
-                )}
                 <div className={`chat-message-row ${isOwn ? 'chat-message-row--own' : 'chat-message-row--other'}`}>
                   {!isOwn && showAvatar && (
                     <Avatar
@@ -1086,6 +1159,12 @@ export default function Chat() {
                   )}
                   {!isOwn && !showAvatar && <div className="chat-message-avatar-spacer" />}
                   <div className={`chat-message-bubble ${groupClass} ${msg.is_pinned ? 'chat-message-bubble--pinned' : ''}`}>
+                    {msg.is_pinned && (
+                      <div className="chat-message-pin-badge">
+                        <FaThumbtack />
+                        <span>{t('post.pinned')}</span>
+                      </div>
+                    )}
                     {msg.reply_to && (() => {
                       const replied = messages.find(m => m.id === msg.reply_to);
                       if (!replied) return null;
@@ -1109,8 +1188,14 @@ export default function Chat() {
                                     : t('common.unknown'))}
                               </span>
                               <span className="chat-message-reply-preview-text">
-                                {replied.decryptedContent?.slice(0, 60) || t('chat.encrypted')}
-                                {replied.decryptedContent?.length > 60 ? '...' : ''}
+                                {(() => {
+                                  const txt = replied.decryptedContent || '';
+                                  if (!txt) return <span>{t('chat.encrypted')}</span>;
+                                  if (IMG_RE.test(txt) || /(giphy|tenor|klipy)\.com|(\.|\/)gif/i.test(txt)) {
+                                    return <><FaImage className="chat-list-item-preview-icon" /> {/(giphy|tenor|klipy)\.com/i.test(txt) ? 'GIF' : 'Image'}</>;
+                                  }
+                                  return <>{txt.slice(0, 60)}{txt.length > 60 ? '...' : ''}</>;
+                                })()}
                               </span>
                             </div>
                           </div>
@@ -1412,6 +1497,223 @@ export default function Chat() {
                 </button>
               ));
             })()}
+          </div>
+        </div>
+      )}
+
+      {/* ── Message Search floating panel ── */}
+      {showMsgSearch && (
+        <div className="chat-float-panel chat-float-panel--search" onClick={(e) => e.stopPropagation()}>
+          <div className="chat-float-panel-header">
+            <span className="chat-float-panel-title">{t('chat.search_messages') || 'Search'}</span>
+            <button className="chat-float-panel-close" onClick={() => setShowMsgSearch(false)}>
+              <FaTimes />
+            </button>
+          </div>
+          <div className="chat-msg-search-content">
+            <div className="chat-msg-search-bar">
+              <FaSearch className="chat-msg-search-bar-icon" />
+              <input
+                className="chat-msg-search-bar-input"
+                type="text"
+                value={msgSearchQuery}
+                onChange={(e) => setMsgSearchQuery(e.target.value)}
+                placeholder={t('chat.search_messages_placeholder') || 'Search messages...'}
+                autoFocus
+              />
+              {msgSearchQuery && (
+                <button className="chat-msg-search-bar-clear" onClick={() => setMsgSearchQuery('')}>
+                  <FaTimes />
+                </button>
+              )}
+            </div>
+            <div className="chat-msg-search-results">
+              {(() => {
+                const q = msgSearchQuery.toLowerCase();
+                const filtered = msgSearchQuery
+                  ? messages.filter(m => (m.decryptedContent || '').toLowerCase().includes(q))
+                  : [];
+                if (filtered.length === 0) {
+                  return <div className="chat-msg-search-empty">{msgSearchQuery ? t('explore.no_results') : t('chat.search_messages_placeholder') || 'Search messages...'}</div>;
+                }
+                return filtered.slice(0, 20).map(msg => {
+                  const isOwn = msg.sender_id === user?.id;
+                  const senderName = isOwn ? t('chat.replying_self') : (otherUser?.username || t('common.unknown'));
+                  const senderAvatar = isOwn
+                    ? (profile?.avatar_url || user?.user_metadata?.avatar_url)
+                    : otherUser?.avatar_url;
+                  return (
+                    <button
+                      key={msg.id}
+                      className="chat-msg-search-result"
+                      onClick={() => { handleGoToMessage(msg.id); setShowMsgSearch(false); }}
+                    >
+                      <Avatar src={senderAvatar} alt={senderName} className="chat-msg-search-result-avatar" />
+                      <div className="chat-msg-search-result-info">
+                        <span className="chat-msg-search-result-sender">{senderName}</span>
+                        <span className="chat-msg-search-result-text">
+                          {(() => {
+                            const txt = msg.decryptedContent || '';
+                            if (!txt) return <span>{t('chat.encrypted')}</span>;
+                            if (IMG_RE.test(txt) || /(giphy|tenor|klipy)\.com|(\.|\/)gif/i.test(txt)) {
+                              return <><FaImage className="chat-list-item-preview-icon" /> {/(giphy|tenor|klipy)\.com/i.test(txt) ? 'GIF' : 'Image'}</>;
+                            }
+                            return <>{txt.slice(0, 60)}{txt.length > 60 ? '...' : ''}</>;
+                          })()}
+                        </span>
+                      </div>
+                      <span className="chat-msg-search-result-time">
+                        {getTimeAgo(t, locale, msg.created_at)}
+                      </span>
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Media Gallery floating panel ── */}
+      {showMediaGallery && (
+        <div className="chat-float-panel">
+          <div className="chat-float-panel-header">
+            <span className="chat-float-panel-title">{t('chat.media_gallery') || 'Media'}</span>
+            <button className="chat-float-panel-close" onClick={() => setShowMediaGallery(false)}>
+              <FaTimes />
+            </button>
+          </div>
+          <div className="chat-media-gallery-grid">
+            {(() => {
+              const allImages = messages
+                .map(m => {
+                  const c = m.decryptedContent || '';
+                  const { imageUrl } = detectMediaFromContent(c);
+                  return imageUrl && IMG_RE.test(imageUrl) ? imageUrl : null;
+                })
+                .filter(Boolean);
+              if (allImages.length === 0) {
+                return <p className="chat-float-panel-empty">{t('chat.no_messages')}</p>;
+              }
+              return allImages.map((url, i) => (
+                <SafeImage
+                  key={i}
+                  src={url}
+                  alt=""
+                  className="chat-media-gallery-img"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openChatGallery(e, allImages, i);
+                  }}
+                />
+              ));
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* ── Pinned Messages floating panel ── */}
+      {showPinnedPanel && (
+        <div className="chat-float-panel">
+          <div className="chat-float-panel-header">
+            <span className="chat-float-panel-title">{t('post.pinned')}</span>
+            <button className="chat-float-panel-close" onClick={() => setShowPinnedPanel(false)}>
+              <FaTimes />
+            </button>
+          </div>
+          <div className="chat-pinned-list">
+            {(() => {
+              const pinned = messages.filter(m => m.is_pinned);
+              if (pinned.length === 0) {
+                return <p className="chat-float-panel-empty">{t('chat.no_messages')}</p>;
+              }
+              return [...pinned].reverse().map(msg => {
+                const sender = msg.sender_id === user?.id
+                  ? { name: t('chat.replying_self'), avatar: profile?.avatar_url }
+                  : { name: otherUser?.username || '?', avatar: otherUser?.avatar_url };
+                return (
+                  <button key={msg.id} className="chat-pinned-item" onClick={() => { handleGoToMessage(msg.id); setShowPinnedPanel(false); }}>
+                    <FaThumbtack className="chat-pinned-item-icon" />
+                    <Avatar src={sender.avatar} alt={sender.name} className="chat-pinned-item-avatar" />
+                    <div className="chat-pinned-item-info">
+                      <span className="chat-pinned-item-sender">{sender.name}</span>
+                      <span className="chat-pinned-item-text">
+                        {msg.decryptedContent || t('chat.encrypted')}
+                      </span>
+                    </div>
+                  </button>
+                );
+              });
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* ── Profile Card floating panel ── */}
+      {showProfileCard && otherUser && (
+        <div className="chat-float-panel" style={{ background: 'transparent', border: 'none', boxShadow: 'none', padding: '0' }}>
+          <div className={`explore-card${otherUser.accent_color ? ' explore-card--accent' : ''}`}
+            style={{
+              '--accent-color': otherUser.accent_color || 'transparent',
+              '--accent-color-2': otherUser.accent_color_secondary || otherUser.accent_color || 'transparent',
+            }}
+            onClick={() => { navigate(`/profile/${otherUser.username}`); setShowProfileCard(false); }}
+          >
+            <div className="explore-card-banner">
+              {otherUser.banner_url && (
+                <SafeImage
+                  className="explore-card-banner-img"
+                  src={otherUser.banner_url}
+                  alt=""
+                  style={getImgTransformStyle(otherUser.banner_position)}
+                />
+              )}
+              <div className="explore-card-overlay" />
+            </div>
+            <div className="explore-card-body">
+              <Avatar
+                className="explore-card-avatar"
+                src={otherUser.avatar_url}
+                alt={otherUser.username || '?'}
+                style={getImgTransformStyle(otherUser.avatar_position)}
+              />
+              <div className="explore-card-info">
+                <div className="explore-card-name-row">
+                  <span className="explore-card-name">{otherUser.username || t('common.unknown')}</span>
+                  {otherUser.is_private === true && (
+                    <span className="explore-card-private-icon" title={t('profile.private_profile')}>
+                      <FaLock />
+                    </span>
+                  )}
+                  {Array.isArray(otherUser.roles) && otherUser.roles.some(r => r !== 'user') && (
+                    <Badge roles={otherUser.roles} />
+                  )}
+                </div>
+                <span className="explore-card-followers">
+                  {otherUser.followerCount || 0} {otherUser.followerCount === 1 ? t('explore.followers_singular') : t('explore.followers_plural')}
+                </span>
+                {(otherUser.bio || otherUser.pronouns) && (
+                  <p className="explore-card-bio">
+                    {otherUser.bio || ''}
+                    {otherUser.bio && otherUser.pronouns && <span style={{ fontSize: '0.7rem', fontWeight: 400, opacity: 0.5 }}> · {otherUser.pronouns}</span>}
+                    {!otherUser.bio && otherUser.pronouns && <span style={{ fontSize: '0.7rem', fontWeight: 400, opacity: 0.5 }}>{otherUser.pronouns}</span>}
+                  </p>
+                )}
+                {Array.isArray(otherUser.interests) && otherUser.interests.length > 0 && (
+                  <div className="explore-card-interests">
+                    {otherUser.interests.slice(0, 3).map((interest, i) => (
+                      <span key={i} className="explore-card-interest-pill">{interest}</span>
+                    ))}
+                    {otherUser.interests.length > 3 && (
+                      <span className="explore-card-interest-more">+{otherUser.interests.length - 3}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="explore-card-action">
+                <FollowButton targetUserId={otherUser.id} />
+              </div>
+            </div>
           </div>
         </div>
       )}

@@ -108,27 +108,52 @@ export async function getConversations(userId) {
   if (uniqueUserIds.length > 0) {
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, username, avatar_url, roles')
+      .select('id, username, avatar_url, banner_url, bio, pronouns, roles, is_private, interests, accent_color, accent_color_secondary, banner_position, avatar_position')
       .in('id', uniqueUserIds);
     for (const p of profiles || []) {
       profilesMap[p.id] = p;
     }
   }
 
-  // 5. Build results
-  const convResults = await Promise.all(convs.map(async (conv) => {
+  // 5. Fetch follower counts for all other users in one batch
+  let followerCounts = {};
+  if (uniqueUserIds.length > 0) {
+    const countPromises = uniqueUserIds.map(async (uid) => {
+      const { count } = await supabase
+        .from('follows')
+        .select('follower_id', { count: 'exact', head: true })
+        .eq('following_id', uid)
+        .eq('status', 'accepted');
+      return { id: uid, followers: count || 0 };
+    });
+    const countResults = await Promise.all(countPromises);
+    for (const r of countResults) {
+      followerCounts[r.id] = r.followers;
+    }
+  }
+
+  // 6. Build results
+  const convResults = convs.map((conv) => {
     const otherUserId = otherUserIds[conv.id];
     const otherProfile = otherUserId ? (profilesMap[otherUserId] || null) : null;
-    const unread = await getUnreadCount(conv.id, userId);
+    const unread = getUnreadCount(conv.id, userId);
 
     return {
       ...conv,
-      otherUser: otherProfile,
+      otherUser: otherProfile ? {
+        ...otherProfile,
+        followerCount: followerCounts[otherUserId] || 0,
+      } : null,
       unreadCount: unread,
     };
-  }));
+  });
 
-  return convResults;
+  // Resolve unread counts (which are async)
+  const resolved = await Promise.all(convResults.map(async (c) => ({
+    ...c,
+    unreadCount: await c.unreadCount,
+  })));
+  return resolved;
 }
 
 /**
