@@ -6,7 +6,7 @@ import { updateUserProfile } from '../services/userService';
 import { clearAllAppCaches } from '../services/postService';
 import { getBlockedUsers, getCachedBlockedUsers, unblockUser, cacheBlockStatus, subscribeBlockChanges } from '../services/blockService';
 import { useNavigate } from 'react-router-dom';
-import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaFire, FaChartBar, FaBell, FaBrush, FaBan, FaClock, FaAt, FaTrashAlt, FaTimes } from 'react-icons/fa';
+import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaHeartBroken, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaFire, FaChartBar, FaBell, FaBrush, FaBan, FaClock, FaAt, FaTrashAlt, FaTimes } from 'react-icons/fa';
 import { MdLogout } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import ConfirmModal from '../Resources/Components/ConfirmModal';
@@ -202,7 +202,7 @@ export default function Settings() {
     try {
       // El toggle general sincroniza todas las stats individuales:
       // Public (false) → todas visibles, Private (true) → todas ocultas
-      const allStats = { posts: true, likes: true, comments: true, reposts: true, views: true, profileViews: true, saves: true };
+      const allStats = { posts: true, likes: true, dislikes: true, comments: true, reposts: true, views: true, profileViews: true, saves: true };
       const newVisibility = value ? {} : allStats; // {} = todas ocultas, allStats = todas visibles
       await updateUserProfile(user.id, {
         stats_private: value,
@@ -220,6 +220,7 @@ export default function Settings() {
   const STAT_ITEMS = [
     { key: 'posts', icon: FaFeather, labelKey: 'profile.posts_tab' },
     { key: 'likes', icon: FaHeart, labelKey: 'profile.stats_likes' },
+    { key: 'dislikes', icon: FaHeartBroken, labelKey: 'profile.stats_dislikes' },
     { key: 'comments', icon: FaComment, labelKey: 'profile.stats_comments' },
     { key: 'reposts', icon: FaRetweet, labelKey: 'profile.stats_reposts' },
     { key: 'views', icon: FaEye, labelKey: 'profile.stats_views' },
@@ -822,7 +823,8 @@ export default function Settings() {
                       // null = legacy: mostrar según statsPrivate
                       // {} = todas ocultas (seteado por toggle general Privado)
                       // {likes: true} = solo likes visibles
-                      const isVisible = statsVisibility == null ? !statsPrivate : statsVisibility[key] === true;
+                      // undefined = stat agregada después, visible por defecto
+                      const isVisible = statsVisibility == null ? !statsPrivate : statsVisibility[key] !== false;
                       return (
                         <label key={key} className="settings-stat-toggle">
                           <span className="settings-stat-toggle-label">

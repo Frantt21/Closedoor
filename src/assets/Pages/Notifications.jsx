@@ -4,7 +4,7 @@ import { NotificationContext } from '../../context/NotificationContext';
 import { useAuth } from '../../hooks/useAuth';
 import { useI18n } from '../services/i18n/useI18n';
 import { acceptFollowRequest, rejectFollowRequest } from '../services/followService';
-import { FaUserPlus, FaHeart, FaComment, FaRetweet, FaBullhorn, FaBell, FaLock, FaPoll, FaCheck, FaTimes } from 'react-icons/fa';
+import { FaUserPlus, FaHeart, FaHeartBroken, FaComment, FaRetweet, FaBullhorn, FaBell, FaLock, FaPoll, FaCheck, FaTimes } from 'react-icons/fa';
 import Avatar from '../Resources/Components/Avatar';
 import Tooltip from '../Resources/Components/Tooltip';
 import '../Resources/Styles/notifications.css';
@@ -20,6 +20,8 @@ function getIcon(type) {
       return <FaUserPlus />;
     case 'like':
       return <FaHeart />;
+    case 'dislike':
+      return <FaHeartBroken />;
     case 'comment':
       return <FaComment />;
     case 'repost':
@@ -49,6 +51,8 @@ function getNotificationMessage(t, type, username) {
       return <><strong>{username}</strong> {t('notifications.follow_request_rejected')}</>;
     case 'like':
       return <><strong>{username}</strong> {t('notifications.liked')}</>;
+    case 'dislike':
+      return <><strong>{username}</strong> {t('notifications.disliked')}</>;
     case 'comment':
       return <><strong>{username}</strong> {t('notifications.commented')}</>;
     case 'repost':
@@ -71,7 +75,7 @@ function getNotificationLink(notification) {
   const username = actor.username || '';
 
   // Notificaciones relacionadas a un post → link al post
-  if (['like', 'comment', 'repost', 'comment_like', 'mention', 'encrypted_add', 'poll_vote'].includes(notification.type) && notification.reference_id) {
+  if (['like', 'dislike', 'comment', 'repost', 'comment_like', 'mention', 'encrypted_add', 'poll_vote'].includes(notification.type) && notification.reference_id) {
     return `/post/${notification.reference_id}`;
   }
   // Seguidores → link al perfil del actor
@@ -306,7 +310,7 @@ function NotificationItem({
     }
   };
 
-  const isPostNotification = ['like', 'comment', 'repost', 'comment_like'].includes(notification.type);
+  const isPostNotification = ['like', 'dislike', 'comment', 'repost', 'comment_like'].includes(notification.type);
 
   return (
     <div

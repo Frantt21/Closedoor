@@ -246,6 +246,7 @@
   "notifications.follow_request_rejected": "отклонил(а) ваш запрос на подписку",
   "notifications.followed": "подписался(ась) на вас",
   "notifications.liked": "оценил(а) ваш пост",
+  "notifications.disliked": "не оценил(а) ваш пост",
   "notifications.login_prompt": "Войдите, чтобы увидеть уведомления.",
   "notifications.mark_all_read": "Отметить все как прочитанные",
   "notifications.mentioned": "упомянул(а) вас в посте",

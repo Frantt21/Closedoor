@@ -246,6 +246,7 @@
   "notifications.follow_request_rejected": "rechazó tu solicitud de seguimiento",
   "notifications.followed": "te siguió",
   "notifications.liked": "le gustó tu publicación",
+  "notifications.disliked": "no le gustó tu publicación",
   "notifications.login_prompt": "Inicia sesión para ver tus notificaciones.",
   "notifications.mark_all_read": "Marcar todas como leídas",
   "notifications.mentioned": "te mencionó en una publicación",

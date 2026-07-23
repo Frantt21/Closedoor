@@ -537,6 +537,9 @@ export async function createComment({ postId, userId, content, parentId = null, 
     throw error;
   }
 
+  // Notificar al dueño del post (en background)
+  notifyComment(userId, postId);
+
   return data;
 }
 
@@ -879,6 +882,54 @@ export async function notifyPollVote(actorId, postId, postOwnerId) {
 }
 
 /**
+ * Notify the post owner when someone comments on their post (JS fallback for DB trigger)
+ */
+export async function notifyComment(actorId, postId) {
+  if (!actorId || !postId) return;
+  try {
+    const { data: post } = await supabase
+      .from('posts')
+      .select('user_id')
+      .eq('id', postId)
+      .single();
+    if (post && post.user_id !== actorId) {
+      await supabase.from('notifications').insert({
+        user_id: post.user_id,
+        actor_id: actorId,
+        type: 'comment',
+        reference_id: postId,
+      });
+    }
+  } catch (err) {
+    console.warn('Error sending comment notification:', err);
+  }
+}
+
+/**
+ * Notify the post owner when someone dislikes their post (JS fallback for DB trigger)
+ */
+export async function notifyDislike(actorId, postId) {
+  if (!actorId || !postId) return;
+  try {
+    const { data: post } = await supabase
+      .from('posts')
+      .select('user_id')
+      .eq('id', postId)
+      .single();
+    if (post && post.user_id !== actorId) {
+      await supabase.from('notifications').insert({
+        user_id: post.user_id,
+        actor_id: actorId,
+        type: 'dislike',
+        reference_id: postId,
+      });
+    }
+  } catch (err) {
+    console.warn('Error sending dislike notification:', err);
+  }
+}
+
+/**
  * Vote on a poll (single choice per user per post)
  */
 export async function votePoll(postId, optionId, userId) {
@@ -1050,6 +1101,9 @@ export async function dislikePost(postId, userId) {
     console.error('Error disliking post:', error);
     throw error;
   }
+
+  // Notificar al dueño del post (en background)
+  notifyDislike(userId, postId);
 }
 
 export async function undislikePost(postId, userId) {

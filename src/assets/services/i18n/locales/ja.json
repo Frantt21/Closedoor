@@ -246,6 +246,7 @@
   "notifications.follow_request_rejected": "があなたのフォローリクエストを拒否しました",
   "notifications.followed": "があなたをフォローしました",
   "notifications.liked": "があなたの投稿にいいねしました",
+  "notifications.disliked": "があなたの投稿に低評価しました",
   "notifications.login_prompt": "ログインして通知を確認してください。",
   "notifications.mark_all_read": "すべて既読にする",
   "notifications.mentioned": "が投稿であなたに言及しました",

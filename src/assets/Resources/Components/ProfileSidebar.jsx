@@ -167,12 +167,16 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
 
   // Determinar si una estadística es visible
   function isStatVisible(statKey) {
-    // Perfil propio: siempre visible
-    if (isOwnProfile) return true;
     // statsVisibility = null: legacy (stats_private controlaba), mostrar todas
     if (statsVisibility == null) return true;
     // statsVisibility = {}: todas ocultas
     // statsVisibility = {likes: true}: solo likes visible
+    // Si la key no está definida (stats agregadas después), mostrar por defecto
+    if (statsVisibility[statKey] === undefined) return true;
+    // Si el usuario explícitamente ocultó esta stat, ocultarla incluso en su propio perfil
+    if (statsVisibility[statKey] === false) return false;
+    // Perfil propio: visible si no se ocultó explícitamente
+    if (isOwnProfile) return true;
     return statsVisibility[statKey] === true;
   }
 

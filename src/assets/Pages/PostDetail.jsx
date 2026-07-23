@@ -576,6 +576,7 @@ export default function PostDetail() {
         <a
           href={`/profile/${reply.profiles?.username}`}
           onClick={(e) => { e.preventDefault(); navigate(`/profile/${reply.profiles?.username}`); }}
+          style={{ alignSelf: 'flex-start' }}
         >
           <Avatar
             className="comment-card-avatar"
@@ -799,6 +800,7 @@ export default function PostDetail() {
         <a
           href={`/profile/${comment.profiles?.username}`}
           onClick={(e) => { e.preventDefault(); navigate(`/profile/${comment.profiles?.username}`); }}
+          style={{ alignSelf: 'flex-start' }}
         >
           <Avatar
             className="comment-card-avatar"

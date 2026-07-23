@@ -246,6 +246,7 @@
   "notifications.follow_request_rejected": "rejected your follow request",
   "notifications.followed": "followed you",
   "notifications.liked": "liked your post",
+  "notifications.disliked": "disliked your post",
   "notifications.login_prompt": "Log in to see your notifications.",
   "notifications.mark_all_read": "Mark all as read",
   "notifications.mentioned": "mentioned you in a post",
