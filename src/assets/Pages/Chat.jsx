@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useI18n } from '../services/i18n/useI18n';
@@ -656,6 +657,38 @@ export default function Chat() {
     });
   }, []);
 
+  // ── Gallery state for chat images ──
+  const [chatGalleryUrls, setChatGalleryUrls] = useState(null);
+  const [chatGalleryIndex, setChatGalleryIndex] = useState(0);
+
+  const openChatGallery = useCallback((e, urls, index) => {
+    if (e) e.stopPropagation();
+    setChatGalleryUrls(urls);
+    setChatGalleryIndex(index);
+  }, []);
+
+  const closeChatGallery = useCallback(() => setChatGalleryUrls(null), []);
+
+  const goChatGalleryPrev = useCallback(() => {
+    setChatGalleryIndex((prev) => (prev > 0 ? prev - 1 : chatGalleryUrls.length - 1));
+  }, [chatGalleryUrls]);
+
+  const goChatGalleryNext = useCallback(() => {
+    setChatGalleryIndex((prev) => (prev < chatGalleryUrls.length - 1 ? prev + 1 : 0));
+  }, [chatGalleryUrls]);
+
+  // ── Keyboard nav for gallery ──
+  useEffect(() => {
+    if (!chatGalleryUrls) return;
+    const handleKey = (e) => {
+      if (e.key === 'Escape') { closeChatGallery(); return; }
+      if (e.key === 'ArrowLeft') goChatGalleryPrev();
+      if (e.key === 'ArrowRight') goChatGalleryNext();
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [chatGalleryUrls, chatGalleryIndex, closeChatGallery, goChatGalleryPrev, goChatGalleryNext]);
+
   const highlightTimeoutRef = useRef(null);
   // ── Navigate to a message by ID (scroll + highlight) ──
   const handleGoToMessage = useCallback((msgId) => {
@@ -963,7 +996,10 @@ export default function Chat() {
                 </div>
                 <div className="chat-list-item-bottom">
                   <span className="chat-list-item-preview">
-                    {conv.last_message_text || ''}
+                    {conv.last_message_text && (IMG_RE.test(conv.last_message_text) || /(giphy|tenor|klipy)\.com|(\.|\/)gif/i.test(conv.last_message_text))
+                      ? <><FaImage className="chat-list-item-preview-icon" /> {/(giphy|tenor|klipy)\.com/i.test(conv.last_message_text) ? 'GIF' : 'Image'}</>
+                      : (conv.last_message_text || '')
+                    }
                   </span>
                   {conv.unreadCount > 0 && (
                     <span className="chat-list-item-badge">
@@ -1095,7 +1131,24 @@ export default function Chat() {
                       return (
                         <>
                           {imageUrl && IMG_RE.test(imageUrl) && (
-                            <SafeImage src={imageUrl} alt="Media" className="chat-message-media-img" />
+                            <SafeImage
+                              src={imageUrl}
+                              alt="Media"
+                              className="chat-message-media-img"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // Collect all image URLs from all messages for gallery navigation
+                                const allImages = messages
+                                  .map(m => {
+                                    const c = m.decryptedContent || '';
+                                    const { imageUrl: u } = detectMediaFromContent(c);
+                                    return u && IMG_RE.test(u) ? u : null;
+                                  })
+                                  .filter(Boolean);
+                                const idx = allImages.indexOf(imageUrl);
+                                openChatGallery(e, allImages.length > 0 ? allImages : [imageUrl], idx >= 0 ? idx : 0);
+                              }}
+                            />
                           )}
                           {textOnly && <p className="chat-message-text">{textOnly}</p>}
                         </>
@@ -1476,6 +1529,113 @@ export default function Chat() {
         </div>
       </ModalShell>
       {renderFollowersModal()}
+
+      {/* ── Chat image gallery lightbox ── */}
+      {chatGalleryUrls && createPortal(
+        <div className="post-card-lightbox" onClick={(e) => { e.stopPropagation(); closeChatGallery(); }}>
+          {chatGalleryUrls.length > 1 && (
+            <button
+              className="post-card-gallery-nav post-card-gallery-nav--prev"
+              onClick={(e) => { e.stopPropagation(); goChatGalleryPrev(); }}
+              aria-label="Previous"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+          )}
+
+          <div className="post-card-lightbox-content" onClick={(e) => e.stopPropagation()}>
+            <div className="post-card-gallery-image-area">
+              <SafeImage
+                src={chatGalleryUrls[chatGalleryIndex]}
+                alt={t('post.full_media')}
+                className="post-card-gallery-image"
+                key={chatGalleryIndex}
+                fallbackText={t('post.image_failed')}
+              />
+            </div>
+            <div className="post-card-lightbox-actions">
+              {chatGalleryUrls.length > 1 && (
+                <span className="post-card-gallery-counter">
+                  {chatGalleryIndex + 1} / {chatGalleryUrls.length}
+                </span>
+              )}
+              <Tooltip text={t('post.open_new_tab')} placement="bottom">
+                <a
+                  href={chatGalleryUrls[chatGalleryIndex]}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="post-card-lightbox-btn"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
+                </a>
+              </Tooltip>
+              <Tooltip text={t('post.download')} placement="bottom">
+                <a
+                  href={chatGalleryUrls[chatGalleryIndex]}
+                  download
+                  className="post-card-lightbox-btn"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                </a>
+              </Tooltip>
+              <Tooltip text={t('post.close')} placement="bottom">
+                <button
+                  className="post-card-lightbox-btn post-card-lightbox-close"
+                  onClick={closeChatGallery}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </Tooltip>
+            </div>
+
+            {/* ── Thumbnail strip ── */}
+            {chatGalleryUrls.length > 1 && (
+              <div className="post-card-gallery-thumbnails">
+                {chatGalleryUrls.map((url, i) => (
+                  <button
+                    key={i}
+                    className={`post-card-gallery-thumb ${i === chatGalleryIndex ? 'post-card-gallery-thumb--active' : ''}`}
+                    onClick={(e) => { e.stopPropagation(); setChatGalleryIndex(i); }}
+                    aria-label={`Go to image ${i + 1}`}
+                  >
+                    <div className="post-card-gallery-thumb-inner">
+                      <SafeImage src={url} alt={`Thumbnail ${i + 1}`} />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {chatGalleryUrls.length > 1 && (
+            <button
+              className="post-card-gallery-nav post-card-gallery-nav--next"
+              onClick={(e) => { e.stopPropagation(); goChatGalleryNext(); }}
+              aria-label="Next"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          )}
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
