@@ -151,6 +151,15 @@
     border-color: var(--color-text-muted, #6b7280);
 }
 
+/* ── Profile page: avatar border usa accent-color ── */
+.profile-page .post-card-avatar {
+    border-color: var(--accent-color, var(--color-border, #2a2a2a));
+}
+
+.profile-page .post-card-avatar-link:hover .post-card-avatar {
+    border-color: var(--accent-color, var(--color-text-muted, #6b7280));
+}
+
 /* ---- Content area ---- */
 
 .post-card-content {
