@@ -47,6 +47,7 @@ import "../Resources/Styles/skeleton.css";
 import "../Resources/Styles/post.css";
 import Modal from "../Resources/Components/Modal";
 import Badge from "../Resources/Components/Badge";
+import Avatar from "../Resources/Components/Avatar";
 import Tooltip from "../Resources/Components/Tooltip";
 import { getPlatformIcon, getPlatformName } from "../services/socialPlatforms";
 import { FaFeather, FaBookmark, FaLock, FaEllipsisH, FaBan, FaClock, FaHeart, FaRetweet, FaChevronDown, FaShareAlt, FaComment } from 'react-icons/fa';
@@ -64,7 +65,7 @@ import FloatingActionButton from "../Resources/Components/FloatingActionButton";
 import { toast } from 'react-toastify';
 
 function Profile() {
-    const { t, showAccent, accentVisibility, showLikes, filterEncrypted } = useI18n();
+    const { t, showAccent, accentVisibility, showLikes, filterEncrypted, locale } = useI18n();
     const { username: profileUsername } = useParams();
     const navigate = useNavigate();
     const { user, profile: ownProfile, refreshProfile, isAuthenticated, loading } = useAuth();
