@@ -22,11 +22,13 @@ import { searchProfiles } from '../services/userService';
 import { getFollowing } from '../services/followService';
 import { isBlocked, getCachedBlockStatus, cacheBlockStatus } from '../services/blockService';
 import ModalShell from '../Resources/Components/ModalShell';
-import { FaComment, FaSearch, FaPaperPlane, FaArrowLeft, FaPlus, FaTimes, FaUserPlus, FaUsers, FaTrash, FaThumbtack, FaCopy, FaEdit, FaCheck, FaSmile } from 'react-icons/fa';
+import { FaComment, FaSearch, FaArrowLeft, FaPlus, FaTimes, FaUserPlus, FaUsers, FaTrash, FaThumbtack, FaCopy, FaEdit, FaCheck, FaSmile, FaReply, FaImage, FaMusic } from 'react-icons/fa';
 import Avatar from '../Resources/Components/Avatar';
 import Badge from '../Resources/Components/Badge';
 import Tooltip from '../Resources/Components/Tooltip';
-import { getTimeAgo } from '../services/helpers';
+import GifPicker from '../Resources/Components/GifPicker';
+import { getTimeAgo, IMG_RE, detectMediaFromContent } from '../services/helpers';
+import SafeImage from '../Resources/Components/SafeImage';
 import { toast } from 'react-toastify';
 import { supabase } from '../services/supabaseclient';
 import usePageTitle from '../../hooks/usePageTitle';
@@ -52,6 +54,10 @@ export default function Chat() {
   const [msgsLoading, setMsgsLoading] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [sending, setSending] = useState(false);
+  // Refs to avoid `sending` and `replyingTo` in callback dependency arrays
+  const sendingRef = useRef(false);
+  // Keep sendingRef in sync
+  useEffect(() => { sendingRef.current = sending; }, [sending]);
 
   // New conversation
   const [searchQuery, setSearchQuery] = useState('');
@@ -76,16 +82,57 @@ export default function Chat() {
   const [editMsgId, setEditMsgId] = useState(null);
   const [editText, setEditText] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
+  const [replyingTo, setReplyingTo] = useState(null); // mensaje al que se está respondiendo
+  const [showGifPicker, setShowGifPicker] = useState(false);
+  const [showMediaInput, setShowMediaInput] = useState(false);
+  const [mediaUrl, setMediaUrl] = useState('');
+  const [showInputEmojiPicker, setShowInputEmojiPicker] = useState(false);
+  const [inputEmojiTab, setInputEmojiTab] = useState(0);
+  const [mediaPreviewUrl, setMediaPreviewUrl] = useState('');
   const editRef = useRef(null);
   // Preserve content during modal close animation (ref survives state clears)
   const editContentRef = useRef('');
 
   // Emoji picker state
   const [emojiPickerMsgId, setEmojiPickerMsgId] = useState(null);
+  const [emojiPickerPos, setEmojiPickerPos] = useState({ x: 0, y: 0 });
+  const [emojiTab, setEmojiTab] = useState(0);
+  const [recentEmojis, setRecentEmojis] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('chatRecentEmojis') || '[]');
+    } catch { return []; }
+  });
   const emojiPickerRef = useRef(null);
 
-  // Common emojis for reactions
-  const EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '😡'];
+  // Categorized emojis for reactions
+  const MAX_RECENT = 30;
+
+  const EMOJI_CATEGORIES = [
+    {
+      name: '😀', emojis: ['😀','😃','😄','😁','😅','😂','🤣','😊','😇','🙂','😉','😌','😍','🥰','😘','😗','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🤐','🤨','😐','😑','😶','😏','😒','🙄','😬','😮','😯','😲','😳','🥺','😢','😭','😤','😠','😡','🤬','💀','☠️','👻','👽','🤡','💩']
+    },
+    {
+      name: '👋', emojis: ['👍','👎','👊','✊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','✌️','🤟','🤘','👌','👉','👈','👆','👇','☝️','✋','🤚','🖐','🖖','👋','🤙','💪','🦵','🦶','👂','👃','🧠','👀','👅','👄']
+    },
+    {
+      name: '❤️', emojis: ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💕','💞','💗','💖','💘','💝','💟','❤️‍🔥','❤️‍🩹','💔','❣️','💑','💏','👨‍❤️‍👨','👩‍❤️‍👩','💋','💌']
+    },
+    {
+      name: '🔥', emojis: ['🔥','⭐','🌟','✨','💫','⚡','🌈','🌊','☀️','🌙','🌍','🌎','🌏','🌸','🌺','🌻','🌹','🌷','🌿','🍀','🌵','🎄','🌲','🌴','🍁','🍂']
+    },
+    {
+      name: '🎉', emojis: ['🎉','🎊','🎈','🎁','🎀','🎃','🎄','🎆','🎇','✨','🎶','🎵','🎸','🎹','🎺','🎻','🥁','🎯','🎱','🎲','🎮','🕹️','🎭','🎨','🎪','🎤','🎧']
+    },
+  ];
+
+  // Compute categories with "Recent" tab prepended when there are recent emojis
+  const categoriesWithRecent = React.useMemo(() => {
+    const cats = [...EMOJI_CATEGORIES];
+    if (recentEmojis.length > 0) {
+      cats.unshift({ name: '🕐', emojis: recentEmojis });
+    }
+    return cats;
+  }, [recentEmojis]);
 
   // Smart context menu positioning — flips if menu would overflow viewport
   const getSmartMenuPosition = useCallback((clientX, clientY, menuWidth = 180, menuHeight = 220) => {
@@ -137,6 +184,7 @@ export default function Chat() {
   const messagesContainerRef = useRef(null);
   const inputRef = useRef(null);
   const messagesCacheRef = useRef({});
+  const draftsRef = useRef({}); // borradores del input por conversation ID
   const prevConvIdRef = useRef(null);
   const messagesOwnerRef = useRef(null); // tracks which conversation the current `messages` state belongs to
 
@@ -244,6 +292,11 @@ export default function Chat() {
     };
   }, [activeConvId, user?.id]);
 
+  // ── Persist recent emojis to localStorage ──
+  useEffect(() => {
+    localStorage.setItem('chatRecentEmojis', JSON.stringify(recentEmojis));
+  }, [recentEmojis]);
+
   // Sync messages cache on every update (realtime, delete, edit, etc.)
   // Only writes to cache if the messages actually belong to activeConvId
   useEffect(() => {
@@ -252,95 +305,46 @@ export default function Chat() {
     messagesCacheRef.current[activeConvId] = messages;
   }, [messages, activeConvId]);
 
-  // ── Select conversation ──
+  // ── Select conversation (con borradores por chat) ──
   const selectConversation = (convId) => {
+    // Guardar borrador del chat actual antes de cambiar
+    if (activeConvId) {
+      draftsRef.current[activeConvId] = inputValue;
+    }
+    // Cargar borrador del nuevo chat
+    const draft = draftsRef.current[convId] || '';
+    setInputValue(draft);
+
     setActiveConvId(convId);
     setShowList(false);
-    setTimeout(() => inputRef.current?.focus(), 100);
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+        const len = inputRef.current.value.length;
+        inputRef.current.setSelectionRange(len, len);
+      }
+    }, 100);
   };
 
   const goBackToList = () => {
+    // Guardar borrador antes de ir a la lista
+    if (activeConvId) {
+      draftsRef.current[activeConvId] = inputValue;
+    }
     setActiveConvId(null);
     setShowList(true);
   };
 
-  // ── Send message (optimistic — no delay) ──
+  // ── Send message (optimistic — no delay, includes media preview) ──
   const handleSend = async () => {
     const trimmed = inputValue.trim();
-    if (!trimmed || !activeConvId || !user?.id || sending) return;
-
-    // ── Block check: verificar que el otro usuario no esté bloqueado ──
-    if (otherUser) {
-      const cachedBlocked = getCachedBlockStatus(user.id, otherUser.id);
-      if (cachedBlocked === true) {
-        toast.error(t('chat.blocked_cannot_send'), { className: 'fc-toast' });
-        return;
-      }
-      const cachedBlockedByThem = getCachedBlockStatus(otherUser.id, user.id);
-      if (cachedBlockedByThem === true) {
-        toast.error(t('chat.blocked_by_them'), { className: 'fc-toast' });
-        return;
-      }
-    }
-
-    // Optimistic message: create a temp message and show immediately
-    const tempId = crypto.randomUUID();
-    const optimisticMsg = {
-      id: tempId,
-      conversation_id: activeConvId,
-      sender_id: user.id,
-      decryptedContent: trimmed,
-      created_at: new Date().toISOString(),
-      edited_at: null,
-      is_pinned: false,
-      reactions: {},
-      deleted_for: null,
-      // Mark as optimistic so it can be removed on error
-      _optimistic: true,
-    };
-
-    setMessages((prev) => [...prev, optimisticMsg]);
-    setInputValue('');
-    setSending(true);
-    // column-reverse: scroll to top (visual bottom) to show new message
-    setTimeout(() => messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' }), 10);
-
-    try {
-      const { data: participants } = await supabase
-        .from('chat_participants')
-        .select('user_id')
-        .eq('conversation_id', activeConvId);
-
-      const participantIds = (participants || []).map(p => p.user_id).filter(id => id !== user.id);
-
-      const sentMsg = await sendMessage(activeConvId, user.id, trimmed, participantIds);
-
-      // Replace optimistic message with real one (real-time will also update it)
-      setMessages((prev) => {
-        // Step 1: Replace optimistic message with real one
-        const replaced = prev.map(m =>
-          m.id === tempId
-            ? { ...sentMsg, decryptedContent: trimmed, _optimistic: false }
-            : m
-        );
-        // Step 2: Deduplicate by ID (previene duplicado si real-time llegó antes que la respuesta HTTP)
-        const seen = new Set();
-        return replaced.filter(m => {
-          if (seen.has(m.id)) return false;
-          seen.add(m.id);
-          return true;
-        });
-      });
-
-      loadConvs();
-    } catch (err) {
-      // Remove optimistic message on error
-      setMessages((prev) => prev.filter(m => m.id !== tempId));
-      console.error('Error sending message:', err);
-      toast.error(t('chat.send_error'), { className: 'fc-toast' });
-    } finally {
-      setSending(false);
-    }
+    const hasPreview = !!mediaPreviewUrl;
+    if (!trimmed && !hasPreview) return;
+    const content = hasPreview
+      ? (trimmed ? `${trimmed}\n${mediaPreviewUrl}` : mediaPreviewUrl)
+      : trimmed;
+    await sendContent(content, { clearInput: true });
+    if (hasPreview) setMediaPreviewUrl('');
   };
 
   const handleKeyDown = (e) => {
@@ -437,9 +441,35 @@ export default function Chat() {
   const handleMsgContextMenu = useCallback((e, msg) => {
     e.preventDefault();
     e.stopPropagation();
-    const pos = getSmartMenuPosition(e.clientX, e.clientY, 180, 260);
-    setMsgMenu({ open: true, x: pos.x, y: pos.y, msg });
-  }, [getSmartMenuPosition]);
+
+    const menuWidth = 180;
+    const menuHeight = 260;
+
+    // Posicionar relativo a la burbuja del mensaje, no al cursor
+    const bubbleEl = e.currentTarget.querySelector('.chat-message-bubble');
+    const rect = bubbleEl ? bubbleEl.getBoundingClientRect() : e.currentTarget.getBoundingClientRect();
+    const isOwn = msg.sender_id === user?.id;
+
+    let x, y;
+    const gap = 6; // separación visual de la burbuja
+    if (isOwn) {
+      // Mensaje propio (derecha) → menú a la IZQUIERDA de la burbuja
+      x = rect.left - menuWidth - gap;
+    } else {
+      // Mensaje ajeno (izquierda) → menú a la DERECHA de la burbuja
+      x = rect.right + gap;
+    }
+    // Vertical: alinear con el top de la burbuja
+    y = rect.top;
+
+    // Ajustar si se sale del viewport
+    if (x < 4) x = 4;
+    if (x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 4;
+    if (y < 4) y = 4;
+    if (y + menuHeight > window.innerHeight) y = window.innerHeight - menuHeight - 4;
+
+    setMsgMenu({ open: true, x, y, msg });
+  }, [user?.id]);
 
   const handleCopyMessage = useCallback(async () => {
     const msg = msgMenu.msg;
@@ -548,6 +578,13 @@ export default function Chat() {
     setEmojiPickerMsgId(null);
     setMsgMenu({ open: false, x: 0, y: 0, msg: null });
 
+    // Track emoji as recently used (move to front, no duplicates, max limit)
+    setRecentEmojis((prev) => {
+      const next = prev.filter(e => e !== emoji);
+      next.unshift(emoji);
+      return next.slice(0, MAX_RECENT);
+    });
+
     // Optimistic update: apply to local state immediately, no waiting for API
     const prevMessages = messages;
     const toggleReaction = (prev) => prev.map(m => {
@@ -571,14 +608,192 @@ export default function Chat() {
     }
   }, [emojiPickerMsgId, msgMenu.msg, user?.id, messages]);
 
-  const toggleEmojiPicker = useCallback((msgId) => {
-    setEmojiPickerMsgId(prev => prev === msgId ? null : msgId);
+  // ── Reply to message ──
+  const handleStartReply = useCallback((msg) => {
+    setReplyingTo(msg);
     setMsgMenu({ open: false, x: 0, y: 0, msg: null });
+    setTimeout(() => inputRef.current?.focus(), 50);
   }, []);
+
+  const cancelReply = useCallback(() => {
+    setReplyingTo(null);
+  }, []);
+
+  // ── Add media URL as preview above input (not pasted into textarea) ──
+  const handleMediaSend = useCallback(() => {
+    const url = mediaUrl.trim();
+    if (!url) return;
+    setMediaPreviewUrl(url);
+    setShowMediaInput(false);
+    setMediaUrl('');
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }, [mediaUrl]);
+
+  // ── Insert emoji at cursor position in the input ──
+  const handleInputEmojiSelect = useCallback((emoji) => {
+    const el = inputRef.current;
+    if (!el) {
+      setInputValue((prev) => prev + emoji);
+    } else {
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      const before = el.value.slice(0, start);
+      const after = el.value.slice(end);
+      const newVal = before + emoji + after;
+      setInputValue(newVal);
+      // Restore cursor position after the inserted emoji
+      requestAnimationFrame(() => {
+        const pos = start + emoji.length;
+        el.setSelectionRange(pos, pos);
+        el.focus();
+      });
+    }
+    // Track as recent
+    setRecentEmojis((prev) => {
+      const next = prev.filter(e => e !== emoji);
+      next.unshift(emoji);
+      return next.slice(0, MAX_RECENT);
+    });
+  }, []);
+
+  const highlightTimeoutRef = useRef(null);
+  // ── Navigate to a message by ID (scroll + highlight) ──
+  const handleGoToMessage = useCallback((msgId) => {
+    if (!msgId || !messagesContainerRef.current) return;
+    // Clear any previous highlight
+    if (highlightTimeoutRef.current) {
+      clearTimeout(highlightTimeoutRef.current);
+      document.querySelectorAll('.chat-message--highlighted').forEach(el => el.classList.remove('chat-message--highlighted'));
+    }
+    const el = document.querySelector(`[data-msg-id="${CSS.escape(msgId)}"]`);
+    if (el) {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      el.classList.add('chat-message--highlighted');
+      highlightTimeoutRef.current = setTimeout(() => el.classList.remove('chat-message--highlighted'), 2000);
+    }
+  }, []);
+
+  const toggleEmojiPicker = useCallback((msgId) => {
+    if (!msgId) return;
+    setEmojiPickerMsgId(prev => {
+      if (prev === msgId) return null; // close
+
+      // Calcular posición relativa a la burbuja del mensaje
+      const PICKER_W = 300, PICKER_H = 280;
+      const msgEl = document.querySelector(`[data-msg-id="${CSS.escape(msgId)}"]`);
+      if (msgEl) {
+        const bubbleEl = msgEl.querySelector('.chat-message-bubble');
+        const rect = bubbleEl ? bubbleEl.getBoundingClientRect() : msgEl.getBoundingClientRect();
+        const targetMsg = messages.find(m => m.id === msgId);
+        const isOwn = targetMsg?.sender_id === user?.id;
+        const gap = 6;
+
+        let x, y;
+        if (isOwn) {
+          x = rect.left - PICKER_W - gap;
+        } else {
+          x = rect.right + gap;
+        }
+        y = rect.top;
+
+        // Clamp to viewport
+        if (x < 4) x = 4;
+        if (x + PICKER_W > window.innerWidth) x = window.innerWidth - PICKER_W - 4;
+        if (y < 4) y = 4;
+        if (y + PICKER_H > window.innerHeight) y = window.innerHeight - PICKER_H - 4;
+
+        setEmojiPickerPos({ x, y });
+      }
+
+      setEmojiTab(0);
+      return msgId;
+    });
+    setMsgMenu({ open: false, x: 0, y: 0, msg: null });
+  }, [messages, user?.id]);
 
   // ── Get active conversation's other user ──
   const activeConv = conversations.find((c) => c.id === activeConvId);
   const otherUser = activeConv?.otherUser;
+
+  // ── Shared send logic (optimistic + API + dedup) ──
+  const sendContent = useCallback(async (content, { clearInput = false } = {}) => {
+    if (!content || !activeConvId || !user?.id || sendingRef.current) return null;
+
+    if (otherUser) {
+      const cachedBlocked = getCachedBlockStatus(user.id, otherUser.id);
+      if (cachedBlocked === true) {
+        toast.error(t('chat.blocked_cannot_send'), { className: 'fc-toast' });
+        return null;
+      }
+      const cachedBlockedByThem = getCachedBlockStatus(otherUser.id, user.id);
+      if (cachedBlockedByThem === true) {
+        toast.error(t('chat.blocked_by_them'), { className: 'fc-toast' });
+        return null;
+      }
+    }
+
+    const replyToId = replyingTo?.id || null;
+    const tempId = crypto.randomUUID();
+    const optimisticMsg = {
+      id: tempId,
+      conversation_id: activeConvId,
+      sender_id: user.id,
+      decryptedContent: content,
+      reply_to: replyToId,
+      created_at: new Date().toISOString(),
+      edited_at: null,
+      is_pinned: false,
+      reactions: {},
+      deleted_for: null,
+      _optimistic: true,
+    };
+
+    setMessages((prev) => [...prev, optimisticMsg]);
+    if (clearInput) {
+      setInputValue('');
+      if (activeConvId) draftsRef.current[activeConvId] = '';
+    }
+    setReplyingTo(null);
+    setSending(true);
+    setTimeout(() => messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' }), 10);
+
+    try {
+      const { data: participants } = await supabase
+        .from('chat_participants')
+        .select('user_id')
+        .eq('conversation_id', activeConvId);
+      const participantIds = (participants || []).map(p => p.user_id).filter(id => id !== user.id);
+      const sentMsg = await sendMessage(activeConvId, user.id, content, participantIds, replyToId);
+
+      setMessages((prev) => {
+        const replaced = prev.map(m =>
+          m.id === tempId ? { ...sentMsg, decryptedContent: content, _optimistic: false } : m
+        );
+        const seen = new Set();
+        return replaced.filter(m => {
+          if (seen.has(m.id)) return false;
+          seen.add(m.id);
+          return true;
+        });
+      });
+      loadConvs();
+      return sentMsg;
+    } catch (err) {
+      setMessages((prev) => prev.filter(m => m.id !== tempId));
+      console.error('Error sending message:', err);
+      toast.error(t('chat.send_error'), { className: 'fc-toast' });
+      return null;
+    } finally {
+      setSending(false);
+    }
+  }, [activeConvId, otherUser, user?.id, replyingTo, loadConvs, t]);
+
+  // ── Send GIF ──
+  const handleGifSelect = useCallback(async (gifUrl) => {
+    setShowGifPicker(false);
+    if (!gifUrl) return;
+    await sendContent(gifUrl);
+  }, [sendContent]);
 
   // ── Compute message grouping (based on chronological order) ──
   const messageGroupMap = React.useMemo(() => {
@@ -815,6 +1030,7 @@ export default function Chat() {
             return (
               <div
                 key={msg.id}
+                data-msg-id={msg.id}
                 className={`chat-message ${isOwn ? 'chat-message--own' : 'chat-message--other'}`}
                 onContextMenu={(e) => handleMsgContextMenu(e, msg)}
               >
@@ -834,11 +1050,57 @@ export default function Chat() {
                   )}
                   {!isOwn && !showAvatar && <div className="chat-message-avatar-spacer" />}
                   <div className={`chat-message-bubble ${groupClass} ${msg.is_pinned ? 'chat-message-bubble--pinned' : ''}`}>
-                    <p className="chat-message-text">
-                      {msg.decryptedContent || (
-                        <span className="chat-message-encrypted">{t('chat.encrypted')}</span>
-                      )}
-                    </p>
+                    {msg.reply_to && (() => {
+                      const replied = messages.find(m => m.id === msg.reply_to);
+                      if (!replied) return null;
+                      return (
+                        <div className="chat-message-reply-preview" onClick={() => handleGoToMessage(msg.reply_to)}>
+                          <div className="chat-message-reply-preview-top">
+                            <FaReply className="chat-message-reply-preview-icon" />
+                            <Avatar
+                              src={replied.sender_id === user.id
+                                ? (profile?.avatar_url || user?.user_metadata?.avatar_url)
+                                : otherUser?.avatar_url}
+                              alt={replied.sender_id === user.id ? t('chat.replying_self') : (otherUser?.username || '?')}
+                              className="chat-message-reply-preview-avatar"
+                            />
+                            <div className="chat-message-reply-preview-info">
+                              <span className="chat-message-reply-preview-author">
+                                {replied.sender_id === user.id
+                                  ? t('chat.replying_self')
+                                  : (replied.sender_id === otherUser?.id
+                                    ? otherUser?.username
+                                    : t('common.unknown'))}
+                              </span>
+                              <span className="chat-message-reply-preview-text">
+                                {replied.decryptedContent?.slice(0, 60) || t('chat.encrypted')}
+                                {replied.decryptedContent?.length > 60 ? '...' : ''}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    {(() => {
+                      const content = msg.decryptedContent || '';
+                      const { imageUrl } = detectMediaFromContent(content);
+                      const textOnly = imageUrl ? content.replace(imageUrl, '').trim() : content;
+                      if (!textOnly && !imageUrl) {
+                        return (
+                          <p className="chat-message-text">
+                            {content || <span className="chat-message-encrypted">{t('chat.encrypted')}</span>}
+                          </p>
+                        );
+                      }
+                      return (
+                        <>
+                          {imageUrl && IMG_RE.test(imageUrl) && (
+                            <SafeImage src={imageUrl} alt="Media" className="chat-message-media-img" />
+                          )}
+                          {textOnly && <p className="chat-message-text">{textOnly}</p>}
+                        </>
+                      );
+                    })()}
                   </div>
                   {isOwn && (
                     <span className="chat-message-time">
@@ -886,60 +1148,153 @@ export default function Chat() {
                   </div>
                 )}
 
-                {/* Emoji picker — floating below */}
-                {emojiPickerMsgId === msg.id && (
-                  <div className="chat-message-emoji-picker" ref={emojiPickerRef} onClick={(e) => e.stopPropagation()}>
-                    {EMOJIS.map(emoji => (
-                      <button
-                        key={emoji}
-                        className={`chat-message-emoji-btn ${ownReaction === emoji ? 'chat-message-emoji-btn--active' : ''}`}
-                        onClick={() => handleReact(emoji)}
-                      >
-                        {emoji}
-                      </button>
-                    ))}
-                    <input
-                      type="text"
-                      className="chat-message-emoji-input"
-                      inputMode="emoji"
-                      placeholder="+"
-                      maxLength={1}
-                      autoComplete="off"
-                      onInput={(e) => {
-                        const val = e.target.value.trim();
-                        if (val) {
-                          handleReact(val);
-                          e.target.value = '';
-                        }
-                      }}
-                    />
-                  </div>
-                )}
               </div>
             );
           })
         )}
       </div>
 
-      {/* Input */}
+      {/* Reply bar */}
+      {replyingTo && (
+        <div className="chat-reply-bar">
+          <div className="chat-reply-bar-content">
+            <FaReply className="chat-reply-bar-icon" />
+            <div className="chat-reply-bar-text">
+              <span className="chat-reply-bar-author">
+                {replyingTo.sender_id === user.id
+                  ? t('chat.replying_self')
+                  : otherUser?.username || t('common.unknown')}
+              </span>
+              <span className="chat-reply-bar-preview">
+                {replyingTo.decryptedContent?.slice(0, 80) || t('chat.encrypted')}
+                {replyingTo.decryptedContent?.length > 80 ? '...' : ''}
+              </span>
+            </div>
+          </div>
+          <button className="chat-reply-bar-close" onClick={cancelReply} title={t('common.cancel')}>
+            <FaTimes />
+          </button>
+        </div>
+      )}
+
+      {/* Input + actions */}
       <div className="chat-messages-input">
-        <textarea
-          ref={inputRef}
-          className="chat-input"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={t('chat.input_placeholder')}
-          rows={1}
-          maxLength={2000}
-        />
-        <button
-          className="chat-send-btn"
-          onClick={handleSend}
-          disabled={!inputValue.trim() || sending}
-        >
-          <FaPaperPlane />
-        </button>
+        {/* Media preview */}
+        {mediaPreviewUrl && (
+          <div className="chat-media-preview">
+            {IMG_RE.test(mediaPreviewUrl) ? (
+              <SafeImage src={mediaPreviewUrl} alt="Preview" className="chat-media-preview-img" />
+            ) : (
+              <span className="chat-media-preview-text">{mediaPreviewUrl}</span>
+            )}
+            <button className="chat-media-preview-remove" onClick={() => setMediaPreviewUrl('')} title="Remove">
+              <FaTimes />
+            </button>
+          </div>
+        )}
+        {/* GIF picker */}
+        {showGifPicker && (
+          <GifPicker
+            onSelect={handleGifSelect}
+            onClose={() => setShowGifPicker(false)}
+          />
+        )}
+        {/* Input emoji picker */}
+        {showInputEmojiPicker && (
+          <div className="chat-input-emoji-picker">
+            <div className="emoji-picker-tabs">
+              {categoriesWithRecent.map((cat, idx) => (
+                <button
+                  key={idx}
+                  className={`emoji-picker-tab ${inputEmojiTab === idx ? 'emoji-picker-tab--active' : ''}`}
+                  onClick={() => setInputEmojiTab(idx)}
+                  title={cat.name}
+                >
+                  {cat.name}
+                </button>
+              ))}
+            </div>
+            <div className="emoji-picker-grid">
+              {categoriesWithRecent[inputEmojiTab]?.emojis.map(emoji => (
+                <button
+                  key={emoji}
+                  className="emoji-picker-btn"
+                  onClick={() => handleInputEmojiSelect(emoji)}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {/* Media URL input */}
+        {showMediaInput && (
+          <div className="chat-media-input-bar">
+            <input
+              className="chat-media-input"
+              type="url"
+              value={mediaUrl}
+              onChange={(e) => setMediaUrl(e.target.value)}
+              placeholder={t('chat.media_placeholder')}
+              autoFocus
+            />
+            <button
+              className="chat-media-input-btn"
+              onClick={handleMediaSend}
+              disabled={!mediaUrl.trim()}
+            >
+              Add
+            </button>
+            <button
+              className="chat-media-input-close"
+              onClick={() => { setShowMediaInput(false); setMediaUrl(''); }}
+            >
+              <FaTimes />
+            </button>
+          </div>
+        )}
+        <div className="chat-input-inner">
+          <textarea
+            ref={inputRef}
+            className="chat-input"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={t('chat.input_placeholder')}
+            rows={1}
+            maxLength={2000}
+          />
+          <div className="chat-input-actions">
+            <button
+              className={`chat-input-action-btn ${showInputEmojiPicker ? 'chat-input-action-btn--active' : ''}`}
+              onClick={() => { setShowInputEmojiPicker(s => !s); setShowGifPicker(false); }}
+              title="Emoji"
+            >
+              <FaSmile />
+            </button>
+            <button
+              className={`chat-input-action-btn ${showGifPicker ? 'chat-input-action-btn--active' : ''}`}
+              onClick={() => { setShowGifPicker(s => !s); setShowInputEmojiPicker(false); }}
+              title="GIF"
+            >
+              <span className="chat-input-action-btn-gif">GIF</span>
+            </button>
+            <button
+              className={`chat-input-action-btn ${showMediaInput ? 'chat-input-action-btn--active' : ''}`}
+              onClick={() => setShowMediaInput(s => !s)}
+              title="Media"
+            >
+              <FaImage />
+            </button>
+            <button
+              className="chat-input-action-btn"
+              disabled
+              title="Audio"
+            >
+              <FaMusic />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -970,6 +1325,44 @@ export default function Chat() {
           </button>
         </div>
       )}
+      {/* ── Floating emoji picker (positioned like context menu) ── */}
+      {emojiPickerMsgId && (
+        <div
+          ref={emojiPickerRef}
+          className="chat-message-emoji-picker"
+          style={{ left: emojiPickerPos.x, top: emojiPickerPos.y }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="emoji-picker-tabs">
+            {categoriesWithRecent.map((cat, idx) => (
+              <button
+                key={idx}
+                className={`emoji-picker-tab ${emojiTab === idx ? 'emoji-picker-tab--active' : ''}`}
+                onClick={() => setEmojiTab(idx)}
+                title={cat.name}
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
+          <div className="emoji-picker-grid">
+            {(() => {
+              const targetMsg = messages.find(m => m.id === emojiPickerMsgId);
+              const currentOwnReaction = targetMsg?.reactions?.[user?.id];
+              return categoriesWithRecent[emojiTab]?.emojis.map(emoji => (
+                <button
+                  key={emoji}
+                  className={`emoji-picker-btn ${currentOwnReaction === emoji ? 'emoji-picker-btn--active' : ''}`}
+                  onClick={() => handleReact(emoji)}
+                >
+                  {emoji}
+                </button>
+              ));
+            })()}
+          </div>
+        </div>
+      )}
+
       {msgMenu.open && msgMenu.msg && (
         <div
           ref={msgMenuRef}
@@ -979,6 +1372,10 @@ export default function Chat() {
         >
           {msgMenu.msg.sender_id === user.id ? (
             <>
+              <button className="chat-context-menu-btn" onClick={() => handleStartReply(msgMenu.msg)}>
+                <FaReply />
+                <span>{t('chat.reply')}</span>
+              </button>
               <button className="chat-context-menu-btn" onClick={handleCopyMessage}>
                 <FaCopy />
                 <span>{t('chat.copy')}</span>
@@ -1002,6 +1399,10 @@ export default function Chat() {
             </>
           ) : (
             <>
+              <button className="chat-context-menu-btn" onClick={() => handleStartReply(msgMenu.msg)}>
+                <FaReply />
+                <span>{t('chat.reply')}</span>
+              </button>
               <button className="chat-context-menu-btn" onClick={handleCopyMessage}>
                 <FaCopy />
                 <span>{t('chat.copy')}</span>

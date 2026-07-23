@@ -222,22 +222,28 @@ export async function markAsRead(conversationId, userId) {
 /**
  * Send an encrypted message
  */
-export async function sendMessage(conversationId, senderId, content, participantIds) {
+export async function sendMessage(conversationId, senderId, content, participantIds, replyTo = null) {
   const allIds = [...new Set([senderId, ...participantIds])];
 
   // Encrypt content for all participants
   const { ciphertext, iv } = await encryptForUsers(content, senderId, allIds);
 
+  // Build insert payload
+  const insertPayload = {
+    conversation_id: conversationId,
+    sender_id: senderId,
+    ciphertext,
+    iv,
+    encrypted_for: allIds,
+  };
+  if (replyTo) {
+    insertPayload.reply_to = replyTo;
+  }
+
   // Insert message with sender_id, then fetch profile separately
   const { data: msg, error } = await supabase
     .from('messages')
-    .insert({
-      conversation_id: conversationId,
-      sender_id: senderId,
-      ciphertext,
-      iv,
-      encrypted_for: allIds,
-    })
+    .insert(insertPayload)
     .select()
     .single();
 

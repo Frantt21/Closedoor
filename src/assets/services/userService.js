@@ -306,10 +306,12 @@ export function clearCachedProfileByUsername(username) {
 export function setCachedProfile(profile, ttlMs = PROFILE_CACHE_TTL) {
   if (!profile || !profile.id) return;
   try {
+    // Strip sensitive fields (email) before caching in localStorage
+    const { email, ...safeProfile } = profile;
     const payload = {
       ts: Date.now(),
       ttl: ttlMs,
-      profile,
+      profile: safeProfile,
     };
     localStorage.setItem(PROFILE_CACHE_PREFIX + profile.id, JSON.stringify(payload));
   } catch (err) {

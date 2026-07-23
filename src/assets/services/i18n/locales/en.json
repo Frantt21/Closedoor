@@ -189,7 +189,10 @@
   "chat.select_chat": "Select a conversation to start chatting",
   "chat.blocked_cannot_send": "You cannot send messages to this user",
   "chat.blocked_by_them": "This user cannot receive messages from you right now",
+  "chat.reply": "Reply",
+  "chat.replying_self": "You",
   "chat.send_error": "Failed to send message",
+  "chat.media_placeholder": "Paste image or video URL...",
   "common.unknown": "Unknown",
 
   "comunidades.title": "Communities",
