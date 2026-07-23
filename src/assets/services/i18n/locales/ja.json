@@ -181,6 +181,9 @@
   "chat.edit_preview": "現在のメッセージ",
   "chat.edit_placeholder": "新しいメッセージを入力...",
   "chat.select_chat": "会話を選択してチャットを始めましょう",
+  "chat.blocked_cannot_send": "このユーザーにメッセージを送信できません",
+  "chat.blocked_by_them": "このユーザーは現在あなたのメッセージを受信できません",
+  "chat.send_error": "メッセージの送信に失敗しました",
   "common.unknown": "不明",
 
   "comunidades.title": "コミュニティ",

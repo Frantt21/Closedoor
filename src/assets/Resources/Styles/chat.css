@@ -410,7 +410,7 @@
     overflow-y: auto;
     padding: 16px 20px;
     display: flex;
-    flex-direction: column;
+    flex-direction: column-reverse;
     gap: 4px;
     background: var(--color-bg, #000000);
 }
@@ -446,7 +446,6 @@
     display: flex;
     flex-direction: column;
     max-width: 70%;
-    margin-bottom: 6px;
     position: relative;
 }
 
@@ -525,13 +524,72 @@
 .chat-message--own .chat-message-bubble {
     background: #111111;
     color: #fff;
-    border-bottom-right-radius: 4px;
 }
 
 .chat-message--other .chat-message-bubble {
     background: var(--color-surface, #1a1a1a);
     color: var(--color-text, #ffffff);
+}
+
+/* ── Bubble corner variants ── */
+/* ── In column-reverse, visual order is inverted from DOM order ── */
+/* isFirstInGroup = chronologically first = visual TOP of group (has avatar) */
+/* isLastInGroup = chronologically last = visual BOTTOM of group (no avatar) */
+
+/* First visual (top): flat BOTTOM (connects to next message) */
+.chat-message--own .chat-message-bubble--first {
+    border-bottom-right-radius: 4px;
+}
+
+.chat-message--other .chat-message-bubble--first {
     border-bottom-left-radius: 4px;
+}
+
+/* Solo: no connections → fully round */
+.chat-message--own .chat-message-bubble--solo {
+    border-top-right-radius: 18px;
+    border-bottom-right-radius: 18px;
+}
+
+.chat-message--other .chat-message-bubble--solo {
+    border-top-left-radius: 18px;
+    border-bottom-left-radius: 18px;
+}
+
+/* Middle messages: no avatar, flat both sides (connects up AND down) */
+.chat-message--own .chat-message-bubble--middle {
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+
+.chat-message--other .chat-message-bubble--middle {
+    border-top-left-radius: 4px;
+    border-bottom-left-radius: 4px;
+}
+
+/* Last visual (bottom): flat TOP (connects to previous message) */
+.chat-message--own .chat-message-bubble--last {
+    border-top-right-radius: 4px;
+}
+
+.chat-message--other .chat-message-bubble--last {
+    border-top-left-radius: 4px;
+}
+
+
+
+/* Avatar spacer (keeps alignment when no avatar) */
+.chat-message-avatar-spacer {
+    width: 38px;
+    flex-shrink: 0;
+}
+
+.chat-message-row--own .chat-message-avatar-spacer {
+    order: 3;
+}
+
+.chat-message-row--other .chat-message-avatar-spacer {
+    order: 1;
 }
 
 .chat-message-text {
@@ -605,16 +663,17 @@
     height: 42px;
     border: none;
     border-radius: 50%;
-    background: var(--accent-color, #f472b6);
-    color: #fff;
+    background: var(--overlay-bg-subtle);
+    color: var(--color-text-secondary, #9ca3af);
     cursor: pointer;
     font-size: 0.95rem;
     flex-shrink: 0;
-    transition: opacity 0.2s ease, transform 0.15s ease;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 
 .chat-send-btn:hover:not(:disabled) {
-    opacity: 0.85;
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
     transform: scale(1.05);
 }
 

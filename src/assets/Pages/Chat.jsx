@@ -20,6 +20,7 @@ import {
 } from '../services/chatService';
 import { searchProfiles } from '../services/userService';
 import { getFollowing } from '../services/followService';
+import { isBlocked, getCachedBlockStatus, cacheBlockStatus } from '../services/blockService';
 import ModalShell from '../Resources/Components/ModalShell';
 import { FaComment, FaSearch, FaPaperPlane, FaArrowLeft, FaPlus, FaTimes, FaUserPlus, FaUsers, FaTrash, FaThumbtack, FaCopy, FaEdit, FaCheck, FaSmile } from 'react-icons/fa';
 import Avatar from '../Resources/Components/Avatar';
@@ -133,7 +134,6 @@ export default function Chat() {
   }, [showEditModal, editMsgId]);
 
   // Refs
-  const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const inputRef = useRef(null);
   const messagesCacheRef = useRef({});
@@ -200,10 +200,17 @@ export default function Chat() {
     const unsub = subscribeToMessages(activeConvId, async (newMsg, eventType) => {
       const content = await decryptMessage(newMsg, user.id);
       if (eventType === 'UPDATE') {
-        setMessages((prev) => prev.map((msg) => msg.id === newMsg.id ? { ...msg, ...newMsg, decryptedContent: content } : msg));
-      } else {
-        setMessages((prev) => [...prev, { ...newMsg, decryptedContent: content }]);
-        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+        setMessages((prev) => prev.map((msg) => msg.id === newMsg.id ? { ...msg, ...newMsg, decryptedContent: content } : msg));        } else {
+        setMessages((prev) => {
+          // Evitar duplicados: si el mensaje ya fue agregado por el optimistic send
+          const exists = prev.some(m => m.id === newMsg.id);
+          if (exists) {
+            return prev.map(m => m.id === newMsg.id ? { ...m, ...newMsg, decryptedContent: content } : m);
+          }
+          return [...prev, { ...newMsg, decryptedContent: content }];
+        });
+        // column-reverse: scroll to top (visual bottom) to show new message
+        setTimeout(() => messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' }), 50);
       }
       markAsRead(activeConvId, user.id);
     });
@@ -212,11 +219,6 @@ export default function Chat() {
       unsub?.unsubscribe();
     };
   }, [activeConvId, user?.id]);
-
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
 
   // Sync messages cache on every update (realtime, delete, edit, etc.)
   useEffect(() => {
@@ -227,6 +229,15 @@ export default function Chat() {
   // ── Select conversation ──
   const selectConversation = (convId) => {
     setActiveConvId(convId);
+    // Limpiar mensajes inmediatamente para evitar mostrar datos del chat anterior
+    const cached = messagesCacheRef.current[convId];
+    if (cached) {
+      setMessages(cached);
+      setMsgsLoading(false);
+    } else {
+      setMessages([]);
+      setMsgsLoading(true);
+    }
     setShowList(false);
     setTimeout(() => inputRef.current?.focus(), 100);
   };
@@ -236,14 +247,48 @@ export default function Chat() {
     setShowList(true);
   };
 
-  // ── Send message ──
+  // ── Send message (optimistic — no delay) ──
   const handleSend = async () => {
     const trimmed = inputValue.trim();
     if (!trimmed || !activeConvId || !user?.id || sending) return;
 
+    // ── Block check: verificar que el otro usuario no esté bloqueado ──
+    if (otherUser) {
+      const cachedBlocked = getCachedBlockStatus(user.id, otherUser.id);
+      if (cachedBlocked === true) {
+        toast.error(t('chat.blocked_cannot_send'), { className: 'fc-toast' });
+        return;
+      }
+      const cachedBlockedByThem = getCachedBlockStatus(otherUser.id, user.id);
+      if (cachedBlockedByThem === true) {
+        toast.error(t('chat.blocked_by_them'), { className: 'fc-toast' });
+        return;
+      }
+    }
+
+    // Optimistic message: create a temp message and show immediately
+    const tempId = crypto.randomUUID();
+    const optimisticMsg = {
+      id: tempId,
+      conversation_id: activeConvId,
+      sender_id: user.id,
+      decryptedContent: trimmed,
+      created_at: new Date().toISOString(),
+      edited_at: null,
+      is_pinned: false,
+      reactions: {},
+      deleted_for: null,
+      // Mark as optimistic so it can be removed on error
+      _optimistic: true,
+    };
+
+    setMessages((prev) => [...prev, optimisticMsg]);
+    setInputValue('');
     setSending(true);
+    // column-reverse: scroll to top (visual bottom) to show new message
+    setTimeout(() => messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' }), 10);
+
     try {
-      // Get other participant IDs
       const { data: participants } = await supabase
         .from('chat_participants')
         .select('user_id')
@@ -251,12 +296,31 @@ export default function Chat() {
 
       const participantIds = (participants || []).map(p => p.user_id).filter(id => id !== user.id);
 
-      await sendMessage(activeConvId, user.id, trimmed, participantIds);
-      setInputValue('');
-      // Reload conversations to update last message preview
+      const sentMsg = await sendMessage(activeConvId, user.id, trimmed, participantIds);
+
+      // Replace optimistic message with real one (real-time will also update it)
+      setMessages((prev) => {
+        // Step 1: Replace optimistic message with real one
+        const replaced = prev.map(m =>
+          m.id === tempId
+            ? { ...sentMsg, decryptedContent: trimmed, _optimistic: false }
+            : m
+        );
+        // Step 2: Deduplicate by ID (previene duplicado si real-time llegó antes que la respuesta HTTP)
+        const seen = new Set();
+        return replaced.filter(m => {
+          if (seen.has(m.id)) return false;
+          seen.add(m.id);
+          return true;
+        });
+      });
+
       loadConvs();
     } catch (err) {
+      // Remove optimistic message on error
+      setMessages((prev) => prev.filter(m => m.id !== tempId));
       console.error('Error sending message:', err);
+      toast.error(t('chat.send_error'), { className: 'fc-toast' });
     } finally {
       setSending(false);
     }
@@ -289,7 +353,36 @@ export default function Chat() {
   }, [user?.id]);
 
   const startConversation = async (otherUser) => {
-    if (!user?.id) return;
+    if (!user?.id || !otherUser?.id) return;
+
+    // ── Block check: both directions ──
+    const cachedBlocked = getCachedBlockStatus(user.id, otherUser.id);
+    if (cachedBlocked === true) {
+      toast.error(t('chat.blocked_cannot_send'), { className: 'fc-toast' });
+      return;
+    }
+    const cachedBlockedByThem = getCachedBlockStatus(otherUser.id, user.id);
+    if (cachedBlockedByThem === true) {
+      toast.error(t('chat.blocked_by_them'), { className: 'fc-toast' });
+      return;
+    }
+
+    // Double-check with server (cache might be stale)
+    try {
+      const blockedByMe = await isBlocked(user.id, otherUser.id);
+      if (blockedByMe) {
+        cacheBlockStatus(user.id, otherUser.id, true);
+        toast.error(t('chat.blocked_cannot_send'), { className: 'fc-toast' });
+        return;
+      }
+      const blockedByThem = await isBlocked(otherUser.id, user.id);
+      if (blockedByThem) {
+        cacheBlockStatus(otherUser.id, user.id, true);
+        toast.error(t('chat.blocked_by_them'), { className: 'fc-toast' });
+        return;
+      }
+    } catch {}
+
     try {
       const convId = await getOrCreateConversation(user.id, otherUser.id);
       setSearchQuery('');
@@ -469,6 +562,30 @@ export default function Chat() {
   // ── Get active conversation's other user ──
   const activeConv = conversations.find((c) => c.id === activeConvId);
   const otherUser = activeConv?.otherUser;
+
+  // ── Compute message grouping (based on chronological order) ──
+  const messageGroupMap = React.useMemo(() => {
+    const map = {};
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
+      const prev = i > 0 ? messages[i - 1] : null;
+      const next = i < messages.length - 1 ? messages[i + 1] : null;
+      const isFirst = !prev || prev.sender_id !== msg.sender_id || (new Date(msg.created_at) - new Date(prev.created_at)) > 300000;
+      const isLast = !next || next.sender_id !== msg.sender_id || (new Date(next.created_at) - new Date(msg.created_at)) > 300000;
+      const isSolo = isFirst && isLast;
+      let groupClass;
+      let isGrouped = false;
+      if (isSolo) groupClass = 'chat-message-bubble--solo';
+      else if (isFirst) { groupClass = 'chat-message-bubble--first'; isGrouped = true; }
+      else if (isLast) { groupClass = 'chat-message-bubble--last'; isGrouped = true; }
+      else { groupClass = 'chat-message-bubble--middle'; isGrouped = true; }
+      map[msg.id] = { groupClass, showAvatar: isFirst, isGrouped };
+    }
+    return map;
+  }, [messages]);
+
+  // ── Reversed messages for column-reverse render (newest first in DOM) ──
+  const reversedMessages = React.useMemo(() => [...messages].reverse(), [messages]);
   // ── Navigate to profile from header ──
   const goToProfile = useCallback(() => {
     if (otherUser?.username) {
@@ -483,7 +600,13 @@ export default function Chat() {
     setFollowersLoading(true);
     try {
       const data = await getFollowing(user.id);
-      setFollowers(data || []);
+      // Filter out users who have blocked the current user or are blocked by the current user
+      const filtered = (data || []).filter(u => {
+        const blockedByMe = getCachedBlockStatus(user.id, u.id);
+        const blockedByThem = getCachedBlockStatus(u.id, user.id);
+        return blockedByMe !== true && blockedByThem !== true;
+      });
+      setFollowers(filtered);
     } catch (err) {
       console.warn('Error fetching following:', err);
       setFollowers([]);
@@ -659,9 +782,12 @@ export default function Chat() {
             <p>{t('chat.no_messages')}</p>
           </div>
         ) : (
-          messages.map((msg) => {
+          reversedMessages.map((msg) => {
             const isOwn = msg.sender_id === user.id;
             const isEditing = editMsgId === msg.id;
+            const groupInfo = messageGroupMap[msg.id] || {};
+            const groupClass = groupInfo.groupClass || 'chat-message-bubble--solo';
+            const showAvatar = groupInfo.showAvatar !== false;
             const reactions = msg.reactions || {};
             // Group reactions by emoji for stacking
             const groupedReactions = {};
@@ -687,14 +813,15 @@ export default function Chat() {
                   </div>
                 )}
                 <div className={`chat-message-row ${isOwn ? 'chat-message-row--own' : 'chat-message-row--other'}`}>
-                  {!isOwn && (
+                  {!isOwn && showAvatar && (
                     <Avatar
                       src={otherUser?.avatar_url}
                       alt={otherUser?.username || '?'}
                       className="chat-message-avatar"
                     />
                   )}
-                  <div className={`chat-message-bubble ${msg.is_pinned ? 'chat-message-bubble--pinned' : ''}`}>
+                  {!isOwn && !showAvatar && <div className="chat-message-avatar-spacer" />}
+                  <div className={`chat-message-bubble ${groupClass} ${msg.is_pinned ? 'chat-message-bubble--pinned' : ''}`}>
                     <p className="chat-message-text">
                       {msg.decryptedContent || (
                         <span className="chat-message-encrypted">{t('chat.encrypted')}</span>
@@ -709,13 +836,14 @@ export default function Chat() {
                       {getTimeAgo(t, locale, msg.created_at)}
                     </span>
                   )}
-                  {isOwn && (
+                  {isOwn && showAvatar && (
                     <Avatar
                       src={profile?.avatar_url || user?.user_metadata?.avatar_url || user?.avatar_url}
                       alt={profile?.username || user?.username || '?'}
                       className="chat-message-avatar chat-message-avatar--own"
                     />
                   )}
+                  {isOwn && !showAvatar && <div className="chat-message-avatar-spacer" />}
                   {!isOwn && (
                     <span className="chat-message-time">
                       {msg.edited_at && (
@@ -779,7 +907,6 @@ export default function Chat() {
             );
           })
         )}
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}

@@ -181,6 +181,9 @@
   "chat.edit_preview": "Mensagem atual",
   "chat.edit_placeholder": "Digite a nova mensagem...",
   "chat.select_chat": "Selecione uma conversa para começar a conversar",
+  "chat.blocked_cannot_send": "Você não pode enviar mensagens para este usuário",
+  "chat.blocked_by_them": "Este usuário não pode receber suas mensagens no momento",
+  "chat.send_error": "Erro ao enviar a mensagem",
   "common.unknown": "Desconhecido",
 
   "comunidades.title": "Comunidades",

@@ -54,7 +54,7 @@
 }
 
 .post-card:hover {
-    background: var(--color-surface-hover-subtle, #202020);
+    background: var(--color-surface-hover, #252525);
 }
 
 
@@ -73,7 +73,7 @@
 }
 
 .profile-page .post-card:hover {
-    background: var(--accent-surface-rgba-hover, var(--color-surface-hover-subtle, #202020));
+    background: var(--accent-surface-rgba-hover, var(--color-surface-hover, #252525));
     transition: background 0.2s ease;
 }
 
@@ -1026,8 +1026,8 @@
 }
 
 .post-card-poll-option:hover:not(:disabled) {
-    border-color: rgba(167, 139, 250, 0.3);
-    background: rgba(167, 139, 250, 0.06);
+    border-color: var(--color-text-muted, #6b7280);
+    background: var(--overlay-bg-hover);
 }
 
 .post-card-poll-option:disabled {
@@ -1113,8 +1113,8 @@
 }
 
 .profile-page .post-card-poll-option:hover:not(:disabled) {
-    border-color: var(--color-border, #555555);
-    background: var(--overlay-bg-subtle);
+    border-color: var(--color-text-muted, #6b7280);
+    background: var(--overlay-bg-hover);
 }
 
 .post-card-poll-option-row {
@@ -1164,7 +1164,7 @@
 
 .post-card-poll-bar-fill {
     height: 100%;
-    background: rgba(167, 139, 250, 0.08);
+    background: var(--overlay-bg-subtle);
     border-radius: inherit;
     transition: width 0.4s ease;
     min-width: 0;

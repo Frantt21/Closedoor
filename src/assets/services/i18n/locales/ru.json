@@ -181,6 +181,9 @@
   "chat.edit_preview": "Текущее сообщение",
   "chat.edit_placeholder": "Введите новое сообщение...",
   "chat.select_chat": "Выберите диалог, чтобы начать переписку",
+  "chat.blocked_cannot_send": "Вы не можете отправлять сообщения этому пользователю",
+  "chat.blocked_by_them": "Этот пользователь не может получать ваши сообщения",
+  "chat.send_error": "Ошибка отправки сообщения",
   "common.unknown": "Неизвестно",
 
   "comunidades.title": "Сообщества",

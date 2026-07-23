@@ -563,6 +563,28 @@ function Profile() {
                     console.warn('Error in follow status Realtime handler:', err);
                 }
             })
+            // ── Reverse follow status (profile follows/unfollows current user → "Follows you") ──
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'follows', filter: `following_id=eq.${user.id}` }, async (payload) => {
+                const affectedId = payload.new?.follower_id || payload.old?.follower_id;
+                if (affectedId !== profileId) return;
+                try {
+                    const { data, error } = await supabase
+                        .from('follows')
+                        .select('follower_id')
+                        .eq('follower_id', profileId)
+                        .eq('following_id', user.id)
+                        .eq('status', 'accepted')
+                        .maybeSingle();
+                    if (!error) {
+                        const isNowFollowingYou = !!data;
+                        setIsFollowedBy(isNowFollowingYou);
+                        setCachedFollowStatus(profileId, user.id, isNowFollowingYou);
+                        refreshCounts();
+                    }
+                } catch (err) {
+                    console.warn('Error in reverse follow Realtime handler:', err);
+                }
+            })
             // ── Block status (current user blocks/unblocks profile) ──
             // Con REPLICA IDENTITY FULL, payload.old en DELETE tiene todos los campos
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'blocks', filter: `blocker_id=eq.${user.id}` }, (payload) => {
