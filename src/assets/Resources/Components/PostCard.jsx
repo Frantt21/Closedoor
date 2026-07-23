@@ -13,6 +13,10 @@ import {
   unsavePost,
   dislikePost,
   undislikePost,
+  likeComment,
+  unlikeComment,
+  dislikeComment,
+  undislikeComment,
   setCachedPollVotes,
   getCachedPollVotes,
 } from '../../services/postService';
@@ -49,6 +53,7 @@ const PostCard = React.memo(function PostCard({
   onRepostToggle,
   compact = false,
   repostInfo = null,
+  replyInfo = null,
 }) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -350,10 +355,19 @@ const PostCard = React.memo(function PostCard({
     }
 
     try {
-      if (wasLiked) {
-        await unlikePost(post.id, user.id);
+      if (replyInfo) {
+        const commentTargetId = replyInfo.commentId || post.commentId || post.id;
+        if (wasLiked) {
+          await unlikeComment(commentTargetId, user.id);
+        } else {
+          await likeComment(commentTargetId, user.id);
+        }
       } else {
-        await likePost(post.id, user.id);
+        if (wasLiked) {
+          await unlikePost(post.id, user.id);
+        } else {
+          await likePost(post.id, user.id);
+        }
       }
       if (onLikeToggle) onLikeToggle(post.id, !wasLiked);
     } catch (err) {
@@ -366,7 +380,7 @@ const PostCard = React.memo(function PostCard({
       }
       console.error('Like error:', err);
     }
-  }, [user, liked, disliked, likesCount, dislikesCount, post.id, onLikeToggle, navigate, t]);
+  }, [user, liked, disliked, likesCount, dislikesCount, post.id, post.commentId, replyInfo, onLikeToggle, navigate, t]);
 
   const handleDislike = useCallback(async (e) => {
     e.stopPropagation();
@@ -394,10 +408,19 @@ const PostCard = React.memo(function PostCard({
     }
 
     try {
-      if (wasDisliked) {
-        await undislikePost(post.id, user.id);
+      if (replyInfo) {
+        const commentTargetId = replyInfo.commentId || post.commentId || post.id;
+        if (wasDisliked) {
+          await undislikeComment(commentTargetId, user.id);
+        } else {
+          await dislikeComment(commentTargetId, user.id);
+        }
       } else {
-        await dislikePost(post.id, user.id);
+        if (wasDisliked) {
+          await undislikePost(post.id, user.id);
+        } else {
+          await dislikePost(post.id, user.id);
+        }
       }
       if (onDislikeToggle) onDislikeToggle(post.id, !wasDisliked);
     } catch (err) {
@@ -410,7 +433,7 @@ const PostCard = React.memo(function PostCard({
       }
       console.error('Dislike error:', err);
     }
-  }, [user, disliked, liked, dislikesCount, likesCount, post.id, onDislikeToggle, navigate, t]);
+  }, [user, disliked, liked, dislikesCount, likesCount, post.id, post.commentId, replyInfo, onDislikeToggle, navigate, t]);
 
   const handleRepost = useCallback(async (e) => {
     e.stopPropagation();
@@ -605,13 +628,18 @@ const PostCard = React.memo(function PostCard({
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter') handleCardClick(); }}
     >
-      {/* Repost banner */}
-      {repostInfo && (
+      {/* Repost / Reply banner */}
+      {repostInfo ? (
         <div className="post-card-repost-banner">
           <FaRetweet className="post-card-repost-icon" />
           <span>{t('post.reposted_by', { user: repostInfo.repostedBy })}</span>
         </div>
-      )}
+      ) : replyInfo ? (
+        <div className="post-card-repost-banner">
+          <FaComment className="post-card-repost-icon" />
+          <span>{t('post.reply_to', { user: replyInfo.replyTo })}</span>
+        </div>
+      ) : null}
 
       {/* Pin badge */}
       {post.is_pinned && (
@@ -929,56 +957,60 @@ const PostCard = React.memo(function PostCard({
               </button>
             </Tooltip>
 
-            <Tooltip
-              text={
-                post.comments_allowed === 'nobody'
-                  ? t('post.comments_disabled')
-                  : post.comments_allowed === 'followers'
-                    ? t('post.comments_followers_only')
-                    : t('post.comment')
-              }
-              placement="bottom"
-            >
-              <button
-                className={`post-card-action ${post.comments_allowed && post.comments_allowed !== 'everyone' ? 'post-card-action--restricted' : ''}`}
-                onClick={(e) => { e.stopPropagation(); navigate(`/post/${post.id}`); }}
-              >
-                <span className="post-card-action-icon">
-                  {post.comments_allowed === 'nobody' ? <FaBan /> : post.comments_allowed === 'followers' ? <FaUserFriends /> : <FaComment />}
-                </span>
-                <span className="post-card-action-count">{post.comments_count || 0}</span>
-              </button>
-            </Tooltip>
+            {!replyInfo && (
+              <>
+                <Tooltip
+                  text={
+                    post.comments_allowed === 'nobody'
+                      ? t('post.comments_disabled')
+                      : post.comments_allowed === 'followers'
+                        ? t('post.comments_followers_only')
+                        : t('post.comment')
+                  }
+                  placement="bottom"
+                >
+                  <button
+                    className={`post-card-action ${post.comments_allowed && post.comments_allowed !== 'everyone' ? 'post-card-action--restricted' : ''}`}
+                    onClick={(e) => { e.stopPropagation(); navigate(`/post/${post.id}`); }}
+                  >
+                    <span className="post-card-action-icon">
+                      {post.comments_allowed === 'nobody' ? <FaBan /> : post.comments_allowed === 'followers' ? <FaUserFriends /> : <FaComment />}
+                    </span>
+                    <span className="post-card-action-count">{post.comments_count || 0}</span>
+                  </button>
+                </Tooltip>
 
-            <Tooltip
-              text={repostDisabled ? t('post.repost_private_forbidden') : t('post.repost')}
-              placement="bottom"
-            >
-              <button
-                className={`post-card-action ${reposted ? 'post-card-action--reposted' : ''} ${repostDisabled ? 'post-card-action--disabled' : ''}`}
-                onClick={repostDisabled ? undefined : handleRepost}
-                disabled={repostDisabled}
-              >
-                <span className="post-card-action-icon"><FaRetweet /></span>
-                <span className="post-card-action-count">{repostsCount}</span>
-              </button>
-            </Tooltip>
+                <Tooltip
+                  text={repostDisabled ? t('post.repost_private_forbidden') : t('post.repost')}
+                  placement="bottom"
+                >
+                  <button
+                    className={`post-card-action ${reposted ? 'post-card-action--reposted' : ''} ${repostDisabled ? 'post-card-action--disabled' : ''}`}
+                    onClick={repostDisabled ? undefined : handleRepost}
+                    disabled={repostDisabled}
+                  >
+                    <span className="post-card-action-icon"><FaRetweet /></span>
+                    <span className="post-card-action-count">{repostsCount}</span>
+                  </button>
+                </Tooltip>
 
-            <Tooltip text={saved ? t('post.saved') : t('post.save')} placement="bottom">
-              <button
-                className={`post-card-action post-card-action--save ${saved ? 'post-card-action--saved' : ''}`}
-                onClick={handleSave}
-              >
-                <span className="post-card-action-icon">{saved ? <FaBookmark /> : <FaRegBookmark />}</span>
-              </button>
-            </Tooltip>
+                <Tooltip text={saved ? t('post.saved') : t('post.save')} placement="bottom">
+                  <button
+                    className={`post-card-action post-card-action--save ${saved ? 'post-card-action--saved' : ''}`}
+                    onClick={handleSave}
+                  >
+                    <span className="post-card-action-icon">{saved ? <FaBookmark /> : <FaRegBookmark />}</span>
+                  </button>
+                </Tooltip>
 
-            <Tooltip text={t('post.views_count') || 'Views'} placement="bottom">
-              <button type="button" className="post-card-action post-card-action--view">
-                <span className="post-card-action-icon"><FaEye /></span>
-                <span className="post-card-action-count">{post.views_count || 0}</span>
-              </button>
-            </Tooltip>
+                <Tooltip text={t('post.views_count') || 'Views'} placement="bottom">
+                  <button type="button" className="post-card-action post-card-action--view">
+                    <span className="post-card-action-icon"><FaEye /></span>
+                    <span className="post-card-action-count">{post.views_count || 0}</span>
+                  </button>
+                </Tooltip>
+              </>
+            )}
           </div>
         </div>
       </div>
