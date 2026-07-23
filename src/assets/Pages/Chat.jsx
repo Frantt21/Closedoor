@@ -138,11 +138,17 @@ export default function Chat() {
   const inputRef = useRef(null);
   const messagesCacheRef = useRef({});
   const prevConvIdRef = useRef(null);
+  const messagesOwnerRef = useRef(null); // tracks which conversation the current `messages` state belongs to
 
   // ── useLayoutEffect: runs BEFORE browser paint — garantiza que no haya flash de mensajes viejos ──
   useLayoutEffect(() => {
     if (!activeConvId) return;
     if (prevConvIdRef.current === activeConvId) return; // misma conversación, no hacer nada
+
+    // Save current messages to the OLD conversation's cache before switching
+    if (prevConvIdRef.current && messagesOwnerRef.current === prevConvIdRef.current) {
+      // Don't overwrite — the cache is already up-to-date from the sync effect
+    }
 
     // Limpiar/restaurar mensajes inmediatamente ANTES del paint
     const cached = messagesCacheRef.current[activeConvId];
@@ -153,6 +159,7 @@ export default function Chat() {
       setMessages([]);
       setMsgsLoading(true);
     }
+    messagesOwnerRef.current = activeConvId;
     prevConvIdRef.current = activeConvId;
   }, [activeConvId]);
 
@@ -183,14 +190,14 @@ export default function Chat() {
   // ── Load messages when active conversation changes ──
   useEffect(() => {
     if (!activeConvId) return;
+    let aborted = false;
 
     markAsRead(activeConvId, user.id);
 
-    const currentConv = activeConvId;
-    getMessages(activeConvId)
+    const convForThisEffect = activeConvId;
+    getMessages(convForThisEffect)
       .then(async (msgs) => {
-        // Guard: if the user switched conversation while loading, discard stale data
-        if (currentConv !== activeConvId) return;
+        if (aborted) return; // user switched conversation while loading — discard
         // Filter out messages deleted for me
         const filtered = msgs.filter(m => !m.deleted_for?.includes(user.id));
         // Decrypt each message
@@ -200,18 +207,23 @@ export default function Chat() {
             return { ...msg, decryptedContent: content };
           })
         );
-        // Update cache
-        messagesCacheRef.current[activeConvId] = decrypted;
+        if (aborted) return; // check again after async work
+        // Update cache for THIS conversation only
+        messagesCacheRef.current[convForThisEffect] = decrypted;
+        messagesOwnerRef.current = convForThisEffect;
         setMessages(decrypted);
       })
-      .catch((err) => console.warn('Error loading messages:', err))
-      .finally(() => setMsgsLoading(false));
+      .catch((err) => { if (!aborted) console.warn('Error loading messages:', err); })
+      .finally(() => { if (!aborted) setMsgsLoading(false); });
 
     // Real-time subscription
-    const unsub = subscribeToMessages(activeConvId, async (newMsg, eventType) => {
+    const unsub = subscribeToMessages(convForThisEffect, async (newMsg, eventType) => {
+      if (aborted) return;
       const content = await decryptMessage(newMsg, user.id);
+      if (aborted) return;
       if (eventType === 'UPDATE') {
-        setMessages((prev) => prev.map((msg) => msg.id === newMsg.id ? { ...msg, ...newMsg, decryptedContent: content } : msg));        } else {
+        setMessages((prev) => prev.map((msg) => msg.id === newMsg.id ? { ...msg, ...newMsg, decryptedContent: content } : msg));
+      } else {
         setMessages((prev) => {
           // Evitar duplicados: si el mensaje ya fue agregado por el optimistic send
           const exists = prev.some(m => m.id === newMsg.id);
@@ -223,46 +235,20 @@ export default function Chat() {
         // column-reverse: scroll to top (visual bottom) to show new message
         setTimeout(() => messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' }), 50);
       }
-      markAsRead(activeConvId, user.id);
+      markAsRead(convForThisEffect, user.id);
     });
 
     return () => {
+      aborted = true;
       unsub?.unsubscribe();
     };
   }, [activeConvId, user?.id]);
 
-  // ── Debug: log flash when switching conversations ──
-  useLayoutEffect(() => {
-    if (!activeConvId) return;
-    console.log('[CHAT FLASH DEBUG] useLayoutEffect fired for conv:', activeConvId, 'prevConvRef:', prevConvIdRef.current);
-    const cached = messagesCacheRef.current[activeConvId];
-    console.log('[CHAT FLASH DEBUG] Cache hit:', !!cached, '| cached msgs count:', cached?.length || 0);
-    if (cached) {
-      console.log('[CHAT FLASH DEBUG] Setting messages from cache:', cached.map(m => ({ id: m.id, text: (m.decryptedContent || '').slice(0, 20), sender: m.sender_id })));
-    } else {
-      console.log('[CHAT FLASH DEBUG] Setting messages to [] (no cache)');
-    }
-  });
-
-  // Log on main message loading effect
-  useEffect(() => {
-    if (!activeConvId) return;
-    console.log('[CHAT FLASH DEBUG] Main messages useEffect fired for conv:', activeConvId);
-    console.trace('[CHAT FLASH DEBUG] Trace for main messages useEffect');
-    const currentConv = activeConvId;
-    const checkId = setInterval(() => {
-      if (currentConv !== activeConvId) {
-        console.log('[CHAT FLASH DEBUG] ⚠️ User switched conversation while messages were loading! currentConv:', currentConv, 'activeConvId:', activeConvId);
-        clearInterval(checkId);
-      }
-    }, 50);
-    // Clear after 2 seconds
-    setTimeout(() => clearInterval(checkId), 2000);
-  }, [activeConvId]);
-
   // Sync messages cache on every update (realtime, delete, edit, etc.)
+  // Only writes to cache if the messages actually belong to activeConvId
   useEffect(() => {
     if (!activeConvId) return;
+    if (messagesOwnerRef.current !== activeConvId) return; // don't write stale data
     messagesCacheRef.current[activeConvId] = messages;
   }, [messages, activeConvId]);
 
