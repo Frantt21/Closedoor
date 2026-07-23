@@ -231,48 +231,33 @@ export default function Chat() {
     };
   }, [activeConvId, user?.id]);
 
-  // ── Debug: log header heights to diagnose border-bottom alignment ──
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const listHeader = document.querySelector('.chat-list-header');
-      const msgHeader = document.querySelector('.chat-messages-header');
-      if (listHeader) {
-        const rect = listHeader.getBoundingClientRect();
-        console.log('[CHAT DEBUG] .chat-list-header:', {
-          height: rect.height,
-          paddingTop: getComputedStyle(listHeader).paddingTop,
-          paddingBottom: getComputedStyle(listHeader).paddingBottom,
-          minHeight: getComputedStyle(listHeader).minHeight,
-        });
-      }
-      if (msgHeader) {
-        const rect = msgHeader.getBoundingClientRect();
-        console.log('[CHAT DEBUG] .chat-messages-header:', {
-          height: rect.height,
-          paddingTop: getComputedStyle(msgHeader).paddingTop,
-          paddingBottom: getComputedStyle(msgHeader).paddingBottom,
-          minHeight: getComputedStyle(msgHeader).minHeight,
-          avatarHeight: msgHeader.querySelector('.chat-messages-header-avatar')?.getBoundingClientRect().height,
-          backBtnDisplay: getComputedStyle(msgHeader.querySelector('.chat-messages-back') || msgHeader).display,
-        });
-      }
-    }, 600);
-    return () => clearTimeout(timer);
-  }, []);
+  // ── Debug: log flash when switching conversations ──
+  useLayoutEffect(() => {
+    if (!activeConvId) return;
+    console.log('[CHAT FLASH DEBUG] useLayoutEffect fired for conv:', activeConvId, 'prevConvRef:', prevConvIdRef.current);
+    const cached = messagesCacheRef.current[activeConvId];
+    console.log('[CHAT FLASH DEBUG] Cache hit:', !!cached, '| cached msgs count:', cached?.length || 0);
+    if (cached) {
+      console.log('[CHAT FLASH DEBUG] Setting messages from cache:', cached.map(m => ({ id: m.id, text: (m.decryptedContent || '').slice(0, 20), sender: m.sender_id })));
+    } else {
+      console.log('[CHAT FLASH DEBUG] Setting messages to [] (no cache)');
+    }
+  });
 
-  // Log also on conversation change
+  // Log on main message loading effect
   useEffect(() => {
     if (!activeConvId) return;
-    setTimeout(() => {
-      const listHeader = document.querySelector('.chat-list-header');
-      const msgHeader = document.querySelector('.chat-messages-header');
-      if (listHeader) {
-        console.log('[CHAT DEBUG] (conv changed) .chat-list-header height:', listHeader.getBoundingClientRect().height);
+    console.log('[CHAT FLASH DEBUG] Main messages useEffect fired for conv:', activeConvId);
+    console.trace('[CHAT FLASH DEBUG] Trace for main messages useEffect');
+    const currentConv = activeConvId;
+    const checkId = setInterval(() => {
+      if (currentConv !== activeConvId) {
+        console.log('[CHAT FLASH DEBUG] ⚠️ User switched conversation while messages were loading! currentConv:', currentConv, 'activeConvId:', activeConvId);
+        clearInterval(checkId);
       }
-      if (msgHeader) {
-        console.log('[CHAT DEBUG] (conv changed) .chat-messages-header height:', msgHeader.getBoundingClientRect().height);
-      }
-    }, 300);
+    }, 50);
+    // Clear after 2 seconds
+    setTimeout(() => clearInterval(checkId), 2000);
   }, [activeConvId]);
 
   // Sync messages cache on every update (realtime, delete, edit, etc.)
