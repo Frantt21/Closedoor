@@ -482,5 +482,7 @@
   "post.shared_to_chat": "Пост опубликован! Открывается чат...",
   "post.share_error": "Ошибка при публикации поста",
   "post.share_no_following": "Нет пользователей для публикации",
-  "settings.title": "Настройки"
+  "settings.title": "Настройки",
+  "post.poll_voters_title": "Голосовавшие",
+  "post.poll_voted_for": "Вы проголосовали за"
 }

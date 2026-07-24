@@ -482,5 +482,7 @@
   "post.shared_to_chat": "Post compartilhado! Abrindo chat...",
   "post.share_error": "Erro ao compartilhar post",
   "post.share_no_following": "Você não segue ninguém para compartilhar",
-  "settings.title": "Configurações"
+  "settings.title": "Configurações",
+  "post.poll_voters_title": "Votantes da enquete",
+  "post.poll_voted_for": "Votou em"
 }

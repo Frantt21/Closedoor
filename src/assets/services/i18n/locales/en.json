@@ -483,5 +483,7 @@
   "settings.time_format_12h": "12h",
   "settings.time_format_24h": "24h",
   "settings.time_format_desc": "Choose between 12-hour and 24-hour format for dates.",
-  "settings.title": "Settings"
+  "settings.title": "Settings",
+  "post.poll_voters_title": "Voters",
+  "post.poll_voted_for": "Has voted for"
 }
