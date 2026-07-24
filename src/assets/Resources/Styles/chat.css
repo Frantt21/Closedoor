@@ -910,6 +910,156 @@
     color: var(--color-text, #ffffff);
 }
 
+/* ── Shared post card inside chat message bubble (mini PostCard style) ── */
+.chat-message-shared-post {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+    border-radius: var(--radius, 10px);
+    background: var(--color-surface, #1a1a1a);
+    border: 1px solid var(--color-border, #2a2a2a);
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.chat-message-shared-post:hover {
+    border-color: var(--color-text-muted, #6b7280);
+    background: var(--color-surface-hover, #252525);
+}
+
+.chat-message--own .chat-message-shared-post {
+    background: #1a1a1a;
+}
+
+.chat-message--own .chat-message-shared-post:hover {
+    background: #252525;
+}
+
+.chat-message-shared-post--loading {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.78rem;
+    color: var(--color-text-muted, #6b7280);
+}
+
+.chat-message-shared-post-spinner {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--color-border, #2a2a2a);
+    border-top-color: var(--color-text-muted, #6b7280);
+    border-radius: 50%;
+    animation: chatSharedSpin 0.6s linear infinite;
+    flex-shrink: 0;
+}
+
+@keyframes chatSharedSpin {
+    to { transform: rotate(360deg); }
+}
+
+.chat-message-shared-post-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 2px;
+}
+
+.chat-message-shared-post-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--color-bg, #000000);
+    border: 1.5px solid var(--color-border, #2a2a2a);
+}
+
+.chat-message-shared-post-author {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+
+.chat-message-shared-post-username {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--color-text, #ffffff);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chat-message-shared-post-text {
+    margin: 0;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    color: var(--color-text-secondary, #9ca3af);
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    word-break: break-word;
+}
+
+.chat-message-shared-post-text .rich-text {
+    margin: 0;
+}
+
+.chat-message-shared-post-media {
+    border-radius: var(--radius-sm, 6px);
+    overflow: hidden;
+    margin-top: 2px;
+    border: 1px solid var(--color-border, #2a2a2a);
+    aspect-ratio: 16 / 9;
+    max-height: 130px;
+}
+
+.chat-message-shared-post-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+/* ── Load earlier messages button (fallback when scroll doesn't trigger) ── */
+.chat-load-earlier-wrap {
+    display: flex;
+    justify-content: center;
+    padding: 8px 0;
+    flex-shrink: 0;
+}
+
+.chat-load-earlier-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--color-text-secondary, #9ca3af);
+    background: var(--overlay-bg-subtle);
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius-full, 9999px);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    user-select: none;
+}
+
+.chat-load-earlier-btn:hover {
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+    border-color: var(--color-text-muted, #6b7280);
+}
+
+.chat-load-earlier-btn:active {
+    transform: scale(0.97);
+}
+
 /* ── Highlight animation for replied-to message ── */
 .chat-message--highlighted .chat-message-bubble {
     box-shadow: 0 0 0 2px var(--color-text-muted, #6b7280);

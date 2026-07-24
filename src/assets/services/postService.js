@@ -922,10 +922,24 @@ export async function notifyCommentMentions(actorId, postId, content) {
   const mentionedUsers = await getMentionUserIds(usernames);
   if (!mentionedUsers.length) return;
 
-  // Build notifications for each mentioned user (excluding the commenter)
+  // Fetch post owner so we don't double-notify them (they already get a 'comment' notification)
+  let postOwnerId = null;
+  try {
+    const { data: post } = await supabase
+      .from('posts')
+      .select('user_id')
+      .eq('id', postId)
+      .single();
+    if (post) postOwnerId = post.user_id;
+  } catch {
+    // If we can't fetch the post, proceed anyway
+  }
+
+  // Build notifications for each mentioned user (excluding the commenter and the post owner)
   const notifications = [];
   for (const u of mentionedUsers) {
     if (u.id === actorId) continue;
+    if (postOwnerId && u.id === postOwnerId) continue; // Already notified via 'comment'
     try {
       const { data: profile } = await supabase
         .from('profiles')
@@ -1051,6 +1065,19 @@ export async function getPollVotes(postId) {
 
   if (error) {
     console.error('Error fetching poll votes:', error);
+    return [];
+  }
+  return data || [];
+}
+
+export async function getPollVotersWithProfiles(postId) {
+  const { data, error } = await supabase
+    .from('poll_votes')
+    .select('option_id, user_id, profiles!poll_votes_user_id_fkey (id, username, avatar_url)')
+    .eq('post_id', postId);
+
+  if (error) {
+    console.error('Error fetching poll voters with profiles:', error);
     return [];
   }
   return data || [];

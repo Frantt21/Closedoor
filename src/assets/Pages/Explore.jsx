@@ -427,7 +427,7 @@ function ExploreCard({ profile, counts, isOwnProfile, showAccent }) {
           {profile.interests?.length > 0 && (
             <div className="explore-card-interests">
               {profile.interests.slice(0, 3).map((interest, i) => (
-                <span key={i} className="explore-card-interest">{interest}</span>
+                <span key={interest} className="explore-card-interest">{interest}</span>
               ))}
               {profile.interests.length > 3 && (
                 <button

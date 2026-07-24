@@ -1323,7 +1323,7 @@ export default function PostDetail() {
               <div className="post-card-gallery-thumbnails">
                 {commentGalleryUrls.map((url, i) => (
                   <button
-                    key={i}
+                    key={url}
                     className={`post-card-gallery-thumb ${i === commentGalleryIndex ? 'post-card-gallery-thumb--active' : ''}`}
                     onClick={(e) => { e.stopPropagation(); setCommentGalleryIndex(i); }}
                     aria-label={`Go to image ${i + 1}`}

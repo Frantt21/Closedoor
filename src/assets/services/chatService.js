@@ -75,11 +75,12 @@ export async function getConversations(userId) {
 
   const convIds = myParts.map(p => p.conversation_id);
 
-  // 2. Get conversation details
+  // 2. Get conversation details — only show conversations that have at least one message
   const { data: convs, error: convError } = await supabase
     .from('conversations')
     .select('*')
     .in('id', convIds)
+    .not('last_message_text', 'is', null)
     .order('updated_at', { ascending: false });
 
   if (convError) {
@@ -200,29 +201,33 @@ export async function getTotalUnreadChatCount(userId) {
 
     if (!participantRows || participantRows.length === 0) return 0;
 
-    const unreadCounts = await Promise.all(
-      participantRows.map(async (p) => {
-        if (!p.last_read_at) {
-          const { count } = await supabase
-            .from('messages')
-            .select('id', { count: 'exact', head: true })
-            .eq('conversation_id', p.conversation_id)
-            .neq('sender_id', userId);
-          return count || 0;
-        }
+    // Batch: conversations without last_read_at → single query
+    const noReadAt = participantRows.filter(p => !p.last_read_at).map(p => p.conversation_id);
+    const hasReadAt = participantRows.filter(p => p.last_read_at);
 
-        const { count } = await supabase
-          .from('messages')
-          .select('id', { count: 'exact', head: true })
-          .eq('conversation_id', p.conversation_id)
-          .neq('sender_id', userId)
-          .gt('created_at', p.last_read_at);
+    let total = 0;
 
-        return count || 0;
-      })
-    );
+    if (noReadAt.length > 0) {
+      const { count } = await supabase
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+        .in('conversation_id', noReadAt)
+        .neq('sender_id', userId);
+      total += count || 0;
+    }
 
-    return unreadCounts.reduce((acc, c) => acc + c, 0);
+    // Conversations with last_read_at still need individual queries (different timestamps)
+    for (const p of hasReadAt) {
+      const { count } = await supabase
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('conversation_id', p.conversation_id)
+        .neq('sender_id', userId)
+        .gt('created_at', p.last_read_at);
+      total += count || 0;
+    }
+
+    return total;
   } catch (err) {
     console.warn('Error computing total unread chat count:', err);
     return 0;
@@ -247,7 +252,7 @@ export async function markAsRead(conversationId, userId) {
 /**
  * Send an encrypted message
  */
-export async function sendMessage(conversationId, senderId, content, participantIds, replyTo = null) {
+export async function sendMessage(conversationId, senderId, content, participantIds, replyTo = null, sharedPostId = null) {
   const allIds = [...new Set([senderId, ...participantIds])];
 
   // Encrypt content for all participants
@@ -263,6 +268,9 @@ export async function sendMessage(conversationId, senderId, content, participant
   };
   if (replyTo) {
     insertPayload.reply_to = replyTo;
+  }
+  if (sharedPostId) {
+    insertPayload.shared_post_id = sharedPostId;
   }
 
   // Insert message with sender_id, then fetch profile separately
@@ -284,7 +292,9 @@ export async function sendMessage(conversationId, senderId, content, participant
   const data = { ...msg, profiles: senderProfile };
 
   // Update conversation last_message_text with obfuscated preview
-  const obfuscatedPreview = content.length > 80 ? content.slice(0, 80) + '...' : content;
+  const obfuscatedPreview = sharedPostId
+    ? '📌 Shared a post'
+    : (content.length > 80 ? content.slice(0, 80) + '...' : content);
   await supabase
     .from('conversations')
     .update({ last_message_text: obfuscatedPreview })
@@ -525,7 +535,13 @@ export async function deleteConversation(conversationId) {
 }
 
 /**
- * Subscribe to conversation updates (for unread count sidebar)
+ * Subscribe to conversation list updates.
+ * Watches both chat_participants (for new conversations) and messages INSERT
+ * (for new messages in existing conversations) to keep the conversation list
+ * updated in real-time.
+ *
+ * The messages INSERT handler uses encrypted_for to filter only conversations
+ * the user participates in, avoiding unnecessary loadConvs() calls.
  */
 export function subscribeToConversations(userId, onUpdate) {
   return supabase
@@ -535,7 +551,8 @@ export function subscribeToConversations(userId, onUpdate) {
       {
         event: '*',
         schema: 'public',
-        table: 'conversations',
+        table: 'chat_participants',
+        filter: `user_id=eq.${userId}`,
       },
       () => onUpdate()
     )
@@ -546,7 +563,12 @@ export function subscribeToConversations(userId, onUpdate) {
         schema: 'public',
         table: 'messages',
       },
-      () => onUpdate()
+      async (payload) => {
+        // Only trigger if this message is from a conversation the user participates in
+        if (payload.new.encrypted_for?.includes(userId)) {
+          onUpdate();
+        }
+      }
     )
     .subscribe();
 }

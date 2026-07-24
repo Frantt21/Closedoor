@@ -586,7 +586,7 @@ export default function Modal({
                   {socialLinks.length > 0 && (
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 1 }}>
                       {socialLinks.slice(0, 3).map((link, i) => (
-                        <span key={i} style={{
+                        <span key={link.url} style={{
                           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                           width: 22, height: 22, borderRadius: '50%',
                           background: 'rgba(255,255,255,0.07)', backdropFilter: 'blur(6px)',
@@ -696,7 +696,7 @@ export default function Modal({
               {interests.length > 0 && (
                 <div className="fc-modal-interests-pills">
                   {interests.map((interest, i) => (
-                    <span key={i} className="fc-modal-interest-pill">
+                    <span key={interest} className="fc-modal-interest-pill">
                       {interest}
                       <button
                         type="button"
@@ -819,7 +819,7 @@ export default function Modal({
                 <div className={`fc-modal-suggested-collapse ${socialLinksExpanded ? 'fc-modal-suggested-collapse--open' : ''}`}>
                 <div className="fc-modal-social-list">
                   {socialLinks.map((link, i) => (
-                    <div key={i} className="fc-modal-social-item">
+                    <div key={link.url} className="fc-modal-social-item">
                       <span className="fc-modal-social-icon">{React.createElement(getPlatformIcon(link.platform))}</span>
                       <span className="fc-modal-social-username">@{link.username}</span>
                       <button
@@ -894,7 +894,7 @@ export default function Modal({
                   {interests?.length > 0 && (
                     <div className="explore-card-interests">
                       {interests.slice(0, 3).map((interest, i) => (
-                        <span key={i} className="explore-card-interest">{interest}</span>
+                        <span key={interest} className="explore-card-interest">{interest}</span>
                       ))}
                       {interests.length > 3 && (
                         <button
@@ -934,7 +934,7 @@ export default function Modal({
                 <div className="fc-modal-color-picker">
                   {banner.trim() && !extracting && extractedColors.length >= 4 && extractedColors.map((color, i) => (
                     <button
-                      key={i}
+                      key={color}
                       type="button"
                       className={`fc-modal-color-swatch ${selectedAccent === color ? 'fc-modal-color-swatch--selected' : ''}`}
                       style={{ '--swatch-color': color }}

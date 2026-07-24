@@ -943,7 +943,7 @@ export default function CreatePostModal({
                   <span className="create-post-image-section-label">{t('create_post.image_urls_title')}</span>
                 </div>
                 {imageUrls.map((url, index) => (
-                  <div key={index} className="create-post-image-input-row">
+                  <div key={url} className="create-post-image-input-row">
                     <input
                       className="fc-modal-input create-post-image-input"
                       type="url"
@@ -1017,7 +1017,7 @@ export default function CreatePostModal({
                   {showImageSection && getValidImageUrls().length > 0 && (
                     <div className={`post-card-image-grid post-card-image-grid--${Math.min(getValidImageUrls().length, 4)}`}>
                       {getValidImageUrls().slice(0, 4).map((url, i) => (
-                        <div key={i} className="post-card-image-grid-item">
+                        <div key={url} className="post-card-image-grid-item">
                           <SafeImage src={url} alt={`Preview ${i + 1}`} />
                         </div>
                       ))}

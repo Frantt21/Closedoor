@@ -947,6 +947,146 @@
   min-height: 120px;
 }
 
+/* ── Share modal ── */
+.post-card-share-modal-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.6);
+    animation: fcFadeIn 0.12s ease;
+}
+
+.post-card-share-modal {
+    background: var(--color-surface, #1a1a1a);
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius-lg, 14px);
+    width: 380px;
+    max-width: calc(100vw - 32px);
+    max-height: 520px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+}
+
+.post-card-share-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px 12px;
+    border-bottom: 1px solid var(--color-border, #2a2a2a);
+    flex-shrink: 0;
+}
+
+.post-card-share-modal-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-text, #ffffff);
+}
+
+.post-card-share-modal-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--color-text-secondary, #9ca3af);
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+
+.post-card-share-modal-close:hover {
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+}
+
+.post-card-share-modal-status {
+    padding: 40px 20px;
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--color-text-muted, #6b7280);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.post-card-share-modal-empty-icon {
+    font-size: 1.6rem;
+    opacity: 0.5;
+}
+
+.post-card-share-modal-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 8px;
+    padding: 16px 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.post-card-share-modal-user {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 8px;
+    border: none;
+    border-radius: var(--radius, 10px);
+    background: var(--overlay-bg-subtle);
+    color: var(--color-text, #ffffff);
+    cursor: pointer;
+    transition: background 0.12s ease, transform 0.12s ease;
+    font-family: inherit;
+    text-align: center;
+    position: relative;
+}
+
+.post-card-share-modal-user:hover:not(:disabled) {
+    background: var(--color-surface-hover, #252525);
+    transform: translateY(-1px);
+}
+
+.post-card-share-modal-user:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+.post-card-share-modal-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--color-bg, #000000);
+}
+
+.post-card-share-modal-username {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--color-text, #ffffff);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+}
+
+.post-card-share-modal-sent {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    font-size: 0.7rem;
+    color: #22c55e;
+}
+
 /* Lightbox fallback */
 .post-card-lightbox-content .safe-image-fallback {
   width: 400px;
@@ -1210,4 +1350,140 @@
 
 .post-card-poll-expired {
     color: #f87171;
+}
+
+/* ── Poll voters modal ── */
+.post-card-poll-voters-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.6);
+    animation: fcFadeIn 0.12s ease;
+}
+
+.post-card-poll-voters {
+    background: var(--color-surface, #1a1a1a);
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius-lg, 14px);
+    width: 360px;
+    max-width: calc(100vw - 32px);
+    max-height: 480px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+}
+
+.post-card-poll-voters-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px 10px;
+    border-bottom: 1px solid var(--color-border, #2a2a2a);
+    flex-shrink: 0;
+}
+
+.post-card-poll-voters-title {
+    margin: 0;
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--color-text, #ffffff);
+}
+
+.post-card-poll-voters-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--color-text-secondary, #9ca3af);
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+
+.post-card-poll-voters-close:hover {
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+}
+
+.post-card-poll-voters-loading,
+.post-card-poll-voters-empty {
+    padding: 32px 18px;
+    text-align: center;
+    font-size: 0.82rem;
+    color: var(--color-text-muted, #6b7280);
+}
+
+.post-card-poll-voters-list {
+    overflow-y: auto;
+    flex: 1;
+    padding: 8px 0;
+}
+
+.post-card-poll-voter {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 18px;
+    text-decoration: none;
+    color: var(--color-text, #ffffff);
+    transition: background 0.1s ease;
+}
+
+.post-card-poll-voter:hover {
+    background: var(--color-surface-hover, #252525);
+}
+
+.post-card-poll-voter-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    background: var(--color-bg, #000000);
+}
+
+.post-card-poll-voter-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.post-card-poll-voter-username {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text, #ffffff);
+}
+
+.post-card-poll-voter-option {
+    font-size: 0.72rem;
+    color: var(--color-text-muted, #6b7280);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Poll count clickable ── */
+.post-card-poll-count--clickable {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: inherit;
+    font-family: inherit;
+    color: var(--color-text-muted, #6b7280);
+    cursor: pointer;
+    transition: color 0.15s ease;
+}
+
+.post-card-poll-count--clickable:hover {
+    color: var(--color-text, #ffffff);
+    text-decoration: underline;
 }

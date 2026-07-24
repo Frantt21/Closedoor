@@ -474,5 +474,9 @@
   "settings.time_format_12h": "12ч",
   "settings.time_format_24h": "24ч",
   "settings.time_format_desc": "Выберите между 12-часовым и 24-часовым форматом для дат.",
+  "post.share": "Поделиться в чате",
+  "post.shared_to_chat": "Пост опубликован! Открывается чат...",
+  "post.share_error": "Ошибка при публикации поста",
+  "post.share_no_following": "Нет пользователей для публикации",
   "settings.title": "Настройки"
 }

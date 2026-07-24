@@ -1437,7 +1437,7 @@ function Profile() {
                         {activeProfile?.social_links?.length > 0 && (
                             <div className="profile-social-links">
                                 {activeProfile.social_links.slice(0, 3).map((link, i) => (
-                                    <Tooltip key={i} text={getPlatformName(link.platform)}>
+                                    <Tooltip key={link.url} text={getPlatformName(link.platform)}>
                                     <a
                                         href={link.url}
                                         target="_blank"
@@ -1662,7 +1662,7 @@ function Profile() {
                     <div className="social-links-modal-list">
                         {activeProfile.social_links.map((link, i) => (
                             <a
-                                key={i}
+                                key={link.url}
                                 href={link.url}
                                 target="_blank"
                                 rel="noopener noreferrer"

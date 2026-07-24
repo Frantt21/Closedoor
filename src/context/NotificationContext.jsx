@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useCallback, useRef } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { supabase } from '../assets/services/supabaseclient';
 import {
@@ -105,7 +105,7 @@ function isChatRoute() {
   return window.location.pathname.startsWith('/Chat') || window.location.pathname.startsWith('/chat');
 }
 
-function showLiveNotification(data) {
+function showLiveNotification(data, navigate) {
   if (!data?.actor) return;
 
   // No mostrar toasts si el usuario está en el chat
@@ -117,22 +117,23 @@ function showLiveNotification(data) {
   const avatarUrl = data.actor.avatar_url;
 
   // ── Tab oculto o sin foco → OS Notification (si habilitada) ──
-  if (document.visibilityState === 'hidden' || !document.hasFocus()) {
+  // NOTA: No hacemos return para que el toast también se muestre como fallback
+  const isHidden = document.visibilityState === 'hidden' || !document.hasFocus();
+  if (isHidden) {
     try {
       if (localStorage.getItem('fc_show_push_notifications') === 'true') {
         tryShowOsNotification(message, avatarUrl, link, data.id);
       }
     } catch {}
-    return;
   }
 
-  // ── Tab visible → Toast (si habilitada) ──
+  // ── Tab visible (o hidden con push deshabilitada) → Toast (si habilitada) ──
   try {
     if (localStorage.getItem('fc_show_toast_notifications') === 'false') return;
   } catch {}
 
   toast(
-    <Link to={link} className="fc-notif-toast" onClick={(e) => e.stopPropagation()}>
+    <div className="fc-notif-toast" onClick={(e) => { e.stopPropagation(); navigate(link); }}>
       {avatarUrl && (
         <img
           className="fc-notif-toast-avatar"
@@ -144,7 +145,7 @@ function showLiveNotification(data) {
       <div className="fc-notif-toast-body">
         <span className="fc-notif-toast-text">{message}</span>
       </div>
-    </Link>,
+    </div>,
     { autoClose: 4000 }
   );
 }
@@ -155,6 +156,7 @@ export function NotificationProvider({ children }) {
   const { user } = useAuth();
   const userId = user?.id;
   const location = useLocation();
+  const navigate = useNavigate();
 
   // ── Lazy initializers: arrancan con cache si existe, sin skeleton ──
   const [notifications, setNotifications] = useState(() => {
@@ -171,12 +173,18 @@ export function NotificationProvider({ children }) {
   });
   const channelRef = useRef(null);
 
-  // ── Helper: unread chat count ──
+  // ── Throttled helper: unread chat count (max 1 call per 2s) ──
+  const fetchUnreadChatCountThrottledRef = useRef(0);
   const fetchUnreadChatCount = useCallback(async () => {
     if (!userId) {
       setUnreadChatCount(0);
       return;
     }
+    // Throttle: skip if called within last 2 seconds
+    const now = Date.now();
+    if (now - fetchUnreadChatCountThrottledRef.current < 2000) return;
+    fetchUnreadChatCountThrottledRef.current = now;
+
     const count = await getTotalUnreadChatCount(userId);
     setUnreadChatCount(count);
   }, [userId]);
@@ -255,7 +263,7 @@ export function NotificationProvider({ children }) {
               return updated;
             });
             // Mostrar notificación en vivo (toast u OS según visibilidad del tab)
-            showLiveNotification(data);
+            showLiveNotification(data, navigate);
           }
         }
       )
@@ -342,15 +350,22 @@ export function NotificationProvider({ children }) {
         },
         async (payload) => {
           const newMsg = payload.new;
-          if (!newMsg || newMsg.sender_id === userId) return;
+          if (!newMsg) return;
+          if (newMsg.sender_id === userId) return;
           if (!newMsg.encrypted_for?.includes(userId)) return;
 
           // Fetch sender profile
-          const { data: senderProfile } = await supabase
-            .from('profiles')
-            .select('id, username, avatar_url')
-            .eq('id', newMsg.sender_id)
-            .maybeSingle();
+          let senderProfile = null;
+          try {
+            const { data } = await supabase
+              .from('profiles')
+              .select('id, username, avatar_url')
+              .eq('id', newMsg.sender_id)
+              .maybeSingle();
+            senderProfile = data;
+          } catch (err) {
+            console.warn('Error fetching profile for chat notification:', err);
+          }
 
           const username = senderProfile?.username || 'Usuario';
           const avatarUrl = senderProfile?.avatar_url;
@@ -359,32 +374,34 @@ export function NotificationProvider({ children }) {
             const decrypted = await decryptMessage(newMsg, userId);
             if (decrypted) messagePreview = decrypted;
           } catch (err) {
-            console.warn('Could not decrypt message for notification:', err);
+            console.warn('Error decrypting message for notification:', err);
           }
 
           const messageText = `@${username}: ${messagePreview}`;
 
-          // Tab hidden or unfocused → OS Push Notification
-          if (document.visibilityState === 'hidden' || !document.hasFocus()) {
+          // Update unread chat count FIRST
+          fetchUnreadChatCount();
+
+          // Tab hidden or unfocused → try OS Push Notification (fall through to toast)
+          const isHidden = document.visibilityState === 'hidden' || !document.hasFocus();
+          if (isHidden) {
             try {
-              if (localStorage.getItem('fc_show_push_notifications') !== 'false') {
+              if (localStorage.getItem('fc_show_push_notifications') === 'true') {
                 tryShowOsNotification(messageText, avatarUrl, '/Chat', `chat-msg-${newMsg.id}`);
               }
             } catch (e) {
-              console.warn('Error displaying OS push notification:', e);
+              console.warn('Error showing OS notification:', e);
             }
-            return;
           }
 
           // No mostrar toast si ya estamos en la ruta de chat
           if (!isChatRoute()) {
-            // Tab visible → Toast Notification (if not disabled)
             try {
               if (localStorage.getItem('fc_show_toast_notifications') === 'false') return;
             } catch (e) {}
 
             toast(
-              <Link to="/Chat" className="fc-notif-toast" onClick={(e) => e.stopPropagation()}>
+              <div className="fc-notif-toast" onClick={(e) => { e.stopPropagation(); navigate('/Chat'); }}>
                 {avatarUrl && (
                   <img
                     className="fc-notif-toast-avatar"
@@ -396,12 +413,10 @@ export function NotificationProvider({ children }) {
                 <div className="fc-notif-toast-body">
                   <span className="fc-notif-toast-text">{messageText}</span>
                 </div>
-              </Link>,
+              </div>,
               { autoClose: 4000 }
             );
           }
-          // Update unread chat count (siempre, aunque estemos en chat)
-          fetchUnreadChatCount();
         }
       )
       .on(
@@ -428,6 +443,14 @@ export function NotificationProvider({ children }) {
     if (!userId) return;
     fetchUnreadChatCount();
   }, [userId, fetchUnreadChatCount, location.pathname]);
+
+  // ── Update browser tab title with combined unread count (notif + chat) ──
+  useEffect(() => {
+    const total = unreadCount + unreadChatCount;
+    // Strip existing badge prefix if any
+    const clean = document.title.replace(/^\(\d+\)\s*/, '');
+    document.title = total > 0 ? `(${total}) ${clean}` : clean;
+  }, [unreadCount, unreadChatCount, location.pathname]);
 
   const handleMarkAsRead = useCallback(async (notificationId) => {
     try {

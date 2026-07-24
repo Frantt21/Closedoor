@@ -20,21 +20,22 @@ import {
   setCachedPollVotes,
   getCachedPollVotes,
 } from '../../services/postService';
-import { FaHeart, FaRegHeart, FaHeartBroken, FaComment, FaRetweet, FaThumbtack, FaEdit, FaTrash, FaEllipsisV, FaBookmark, FaRegBookmark, FaEye, FaLock, FaCheckCircle, FaRegCheckCircle, FaClock, FaBan, FaUserFriends, FaExclamationTriangle } from 'react-icons/fa';
+import { FaHeart, FaRegHeart, FaHeartBroken, FaComment, FaRetweet, FaThumbtack, FaEdit, FaTrash, FaEllipsisV, FaBookmark, FaRegBookmark, FaEye, FaLock, FaCheckCircle, FaRegCheckCircle, FaClock, FaBan, FaUserFriends, FaExclamationTriangle, FaShareAlt, FaCheck, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import Badge from './Badge';
 import SafeImage from './SafeImage';
 import Avatar from './Avatar';
 import RichText from './RichText';
 import { useI18n } from '../../services/i18n/useI18n';
-import { DEFAULT_AVATAR, getTimeAgo, getEmbedUrl as getEmbedUrlHelper, isVideoUrl as isVideoUrlHelper, IMG_RE, VID_RE, VID_RE_EXTENDED } from '../../services/helpers';
-import {
-  decode as encryptDecode,
+import { DEFAULT_AVATAR, getTimeAgo, getEmbedUrl as getEmbedUrlHelper, isVideoUrl as isVideoUrlHelper, IMG_RE, VID_RE, VID_RE_EXTENDED } from '../../services/helpers';import { decode as encryptDecode,
   decryptForUser,
   getCachedDecryptedContent,
   setCachedDecryptedContent,
 } from '../../services/alphabetEncryption';
 import { supabase } from '../../services/supabaseclient';
+import { getOrCreateConversation, sendMessage } from '../../services/chatService';
+import { getFollowing } from '../../services/followService';
+import { isBlocked, getCachedBlockStatus } from '../../services/blockService';
 import ConfirmModal from './ConfirmModal';
 import Tooltip from './Tooltip';
 import './css/postCard.css';
@@ -81,6 +82,10 @@ const PostCard = React.memo(function PostCard({
   const [pollVotes, setPollVotes] = useState(() => initialPollCache?.votes || null); // [{ option_id, user_id }]
   const [pollUserVote, setPollUserVote] = useState(() => initialPollCache?.userVote || null); // option_id or null
   const [pollVotingLoading, setPollVotingLoading] = useState(false);
+  const [showPollVoters, setShowPollVoters] = useState(false);
+  const [pollVoters, setPollVoters] = useState([]);
+  const [pollVotersLoading, setPollVotersLoading] = useState(false);
+  const pollVotersRef = useRef(null);
   const menuRef = useRef(null);
   const menuBtnRef = useRef(null);
   const dropdownRef = useRef(null);
@@ -553,8 +558,102 @@ const PostCard = React.memo(function PostCard({
       if (e.key === 'ArrowRight') goGalleryNext();
     };
     document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [galleryUrls, galleryIndex]);
+    return () => document.removeEventListener('keydown', handleKey);    },
+    [galleryUrls, galleryIndex]
+  );
+
+  // ── Share to chat ──
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareFollowing, setShareFollowing] = useState([]);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareSending, setShareSending] = useState(false);
+  const shareModalRef = useRef(null);
+
+  const openShareModal = useCallback(async (e) => {
+    e.stopPropagation();
+    setShowMenu(false);
+    if (!user) {
+      toast.info(t('auth.login_required'));
+      navigate(`/Login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+      return;
+    }
+    setShowShareModal(true);
+    setShareLoading(true);
+    try {
+      const data = await getFollowing(user.id);
+      // Filter out blocked users
+      const filtered = (data || []).filter(u => {
+        const blockedByMe = getCachedBlockStatus(user.id, u.id);
+        const blockedByThem = getCachedBlockStatus(u.id, user.id);
+        return blockedByMe !== true && blockedByThem !== true;
+      });
+      setShareFollowing(filtered);
+    } catch (err) {
+      console.warn('Error loading following for share:', err);
+      setShareFollowing([]);
+    } finally {
+      setShareLoading(false);
+    }
+  }, [user, navigate, t]);
+
+  const handleShareToUser = useCallback(async (targetUser) => {
+    if (!user?.id || !targetUser?.id || shareSending) return;
+
+    // ── Block check ──
+    const cachedBlocked = getCachedBlockStatus(user.id, targetUser.id);
+    if (cachedBlocked === true) {
+      toast.error(t('chat.blocked_cannot_send') || 'You cannot send messages to this user');
+      return;
+    }
+    const cachedBlockedByThem = getCachedBlockStatus(targetUser.id, user.id);
+    if (cachedBlockedByThem === true) {
+      toast.error(t('chat.blocked_by_them') || 'This user cannot receive messages from you right now');
+      return;
+    }
+
+    setShareSending(true);
+    try {
+      const convId = await getOrCreateConversation(user.id, targetUser.id);
+      const { data: participants } = await supabase
+        .from('chat_participants')
+        .select('user_id')
+        .eq('conversation_id', convId);
+      const participantIds = (participants || []).map(p => p.user_id).filter(id => id !== user.id);
+      await sendMessage(convId, user.id, '', participantIds, null, post.id);
+      setShowShareModal(false);
+      setShareFollowing([]);
+      toast.success(t('post.shared_to_chat') || 'Post shared!');
+    } catch (err) {
+      console.error('Error sharing post:', err);
+      toast.error(t('post.share_error') || 'Error sharing post');
+    } finally {
+      setShareSending(false);
+    }
+  }, [user?.id, post.id, shareSending, navigate, t]);
+
+  // Close share modal on outside click
+  useEffect(() => {
+    if (!showShareModal) return;
+    const handleClick = (e) => {
+      if (shareModalRef.current && !shareModalRef.current.contains(e.target)) {
+        setShowShareModal(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showShareModal]);
+
+  // Close poll voters modal on outside click
+  useEffect(() => {
+    if (!showPollVoters) return;
+    const handleClick = (e) => {
+      if (pollVotersRef.current && !pollVotersRef.current.contains(e.target)) {
+        setShowPollVoters(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showPollVoters]);
 
   const handleCardClick = () => {
     navigate(`/post/${post.id}`);
@@ -705,6 +804,7 @@ const PostCard = React.memo(function PostCard({
                       style={{ ...dropdownStyle, minWidth: 170 }}
                       onClick={(e) => e.stopPropagation()}
                     >
+                      <button className="fc-dropdown-btn" onClick={openShareModal}><FaShareAlt /> {t('post.share')}</button>
                       <button className="fc-dropdown-btn" onClick={handleEdit}><FaEdit /> {t('post.edit')}</button>
                       <button className="fc-dropdown-btn" onClick={handlePin}><FaThumbtack /> {post.is_pinned ? t('post.unpin') : t('post.pin')}</button>
                       <button className="fc-dropdown-btn" onClick={async (e) => {
@@ -792,7 +892,8 @@ const PostCard = React.memo(function PostCard({
               <div className="post-card-poll-options">
                 {(() => {
                   const hasVoted = !!pollUserVote;
-                  const showAllResults = isPollExpired || !user || hasVoted || totalVotes > 0;
+                  const isPostOwner = user?.id === post.user_id;
+                  const showAllResults = isPollExpired || isPostOwner;
                   return post.poll_data.options.map((option) => {
                     const votesCount = pollVotes ? pollVotes.filter(v => v.option_id === option.id).length : 0;
                     const percentage = totalVotes > 0 ? Math.round((votesCount / totalVotes) * 100) : 0;
@@ -831,9 +932,30 @@ const PostCard = React.memo(function PostCard({
               })()}
               </div>
               <div className="post-card-poll-footer">
-                <span className="post-card-poll-count">
-                  {totalVotes} {totalVotes === 1 ? t('post.poll_vote_singular') || 'voto' : t('post.poll_vote_plural') || 'votos'}
-                </span>
+                {totalVotes > 0 ? (
+                  <button className="post-card-poll-count post-card-poll-count--clickable" onClick={async (e) => {
+                    e.stopPropagation();
+                    if (pollVotersLoading) return;
+                    setPollVotersLoading(true);
+                    setShowPollVoters(true);
+                    try {
+                      const { getPollVotersWithProfiles } = await import('../../services/postService');
+                      const voters = await getPollVotersWithProfiles(post.id);
+                      setPollVoters(voters);
+                    } catch (err) {
+                      console.warn('Error loading poll voters:', err);
+                      setPollVoters([]);
+                    } finally {
+                      setPollVotersLoading(false);
+                    }
+                  }}>
+                    {totalVotes} {totalVotes === 1 ? t('post.poll_vote_singular') || 'voto' : t('post.poll_vote_plural') || 'votos'}
+                  </button>
+                ) : (
+                  <span className="post-card-poll-count">
+                    0 {t('post.poll_vote_plural') || 'votos'}
+                  </span>
+                )}
                 {isPollExpired ? (
                   <span className="post-card-poll-expired">{t('post.poll_ended') || 'Finalizada'}</span>
                 ) : post.poll_data.expires_at ? (
@@ -1035,6 +1157,111 @@ const PostCard = React.memo(function PostCard({
         document.body
       )}
 
+      {/* ── Share to chat modal ── */}
+      {showShareModal && createPortal(
+        <div className="post-card-share-modal-overlay" onClick={() => setShowShareModal(false)}>
+          <div className="post-card-share-modal" ref={shareModalRef} onClick={(e) => e.stopPropagation()}>
+            <div className="post-card-share-modal-header">
+              <h3 className="post-card-share-modal-title">{t('post.share') || 'Share'}</h3>
+              <button className="post-card-share-modal-close" onClick={() => setShowShareModal(false)}>
+                <FaTimes />
+              </button>
+            </div>
+            {shareLoading ? (
+              <div className="post-card-share-modal-status">{t('common.loading')}</div>
+            ) : shareFollowing.length === 0 ? (
+              <div className="post-card-share-modal-status">
+                <FaUserFriends className="post-card-share-modal-empty-icon" />
+                <p>{t('post.share_no_following') || 'No users to share with'}</p>
+              </div>
+            ) : (
+              <div className="post-card-share-modal-grid">
+                {shareFollowing.map((u) => (
+                  <button
+                    key={u.id}
+                    className="post-card-share-modal-user"
+                    onClick={() => handleShareToUser(u)}
+                    disabled={shareSending}
+                  >
+                    <Avatar
+                      src={u.avatar_url}
+                      alt={u.username}
+                      className="post-card-share-modal-avatar"
+                    />
+                    <span className="post-card-share-modal-username">{u.username}</span>
+                    {shareSending && <FaCheck className="post-card-share-modal-sent" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── Poll voters modal ── */}
+      {showPollVoters && createPortal(
+        <div className="post-card-poll-voters-overlay" onClick={() => setShowPollVoters(false)}>
+          <div className="post-card-poll-voters" ref={pollVotersRef} onClick={(e) => e.stopPropagation()}>
+            <div className="post-card-poll-voters-header">
+              <h4 className="post-card-poll-voters-title">{t('post.poll_voters_title') || 'Votantes'}</h4>
+              <button className="post-card-poll-voters-close" onClick={() => setShowPollVoters(false)}>
+                <FaTimes />
+              </button>
+            </div>
+            {pollVotersLoading ? (
+              <div className="post-card-poll-voters-loading">{t('common.loading') || 'Cargando...'}</div>
+            ) : pollVoters.length === 0 ? (
+              <div className="post-card-poll-voters-empty">{t('post.poll_voters_empty') || 'No hay votantes'}</div>
+            ) : (
+              <div className="post-card-poll-voters-list">
+                {(() => {
+                  // Agrupar votantes por opción
+                  const options = post.poll_data?.options || [];
+                  const optionMap = {};
+                  options.forEach(o => { optionMap[o.id] = o.text; });
+
+                  // Deduplicar votantes por user_id
+                  const seenUsers = new Set();
+                  const uniqueVoters = [];
+                  pollVoters.forEach(v => {
+                    if (!seenUsers.has(v.user_id)) {
+                      seenUsers.add(v.user_id);
+                      uniqueVoters.push(v);
+                    }
+                  });
+
+                  return uniqueVoters.map((voter) => {
+                    const profile = voter.profiles || {};
+                    return (
+                      <Link
+                        key={voter.user_id}
+                        to={`/profile/${profile.username}`}
+                        className="post-card-poll-voter"
+                        onClick={() => setShowPollVoters(false)}
+                      >
+                        <Avatar
+                          src={profile.avatar_url}
+                          alt={profile.username || 'user'}
+                          className="post-card-poll-voter-avatar"
+                        />
+                        <div className="post-card-poll-voter-info">
+                          <span className="post-card-poll-voter-username">{profile.username || 'Unknown'}</span>
+                          <span className="post-card-poll-voter-option">
+                            {t('post.poll_voted_for') || 'Votó por'}: {optionMap[voter.option_id] || '?'}
+                          </span>
+                        </div>
+                      </Link>
+                    );
+                  });
+                })()}
+              </div>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* ── Galería de imágenes (portal a body para evitar backdrop-filter issue) ── */}
       {galleryUrls && createPortal(
         <div className="post-card-lightbox" onClick={(e) => { e.stopPropagation(); closeGallery(); }}>
@@ -1114,7 +1341,7 @@ const PostCard = React.memo(function PostCard({
               <div className="post-card-gallery-thumbnails">
                 {galleryUrls.map((url, i) => (
                   <button
-                    key={i}
+                    key={url}
                     className={`post-card-gallery-thumb ${i === galleryIndex ? 'post-card-gallery-thumb--active' : ''}`}
                     onClick={(e) => { e.stopPropagation(); setGalleryIndex(i); }}
                     aria-label={`Go to image ${i + 1}`}
@@ -1178,7 +1405,7 @@ function renderImageGrid(post, onImageClick, t) {
   return (
     <div className={gridClass}>
       {urls.slice(0, 4).map((url, i) => (
-        <div key={i} className="post-card-image-grid-item">
+        <div key={url} className="post-card-image-grid-item">
           <SafeImage
             src={url}
             alt={t('post.media_alt', { n: i + 1 })}
