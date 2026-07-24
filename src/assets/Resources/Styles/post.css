@@ -418,6 +418,40 @@
     gap: 6px;
 }
 
+/* ── CDN upload button in comment/reply media forms ── */
+.comment-form-media-url-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.comment-form-media-url-row .comment-form-media-input {
+  flex: 1;
+}
+
+.comment-form-cdn-upload-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-border, #333);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-bg-tertiary, #1a1a2e);
+  color: var(--color-text-muted, #6b7280);
+  cursor: pointer;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+.comment-form-cdn-upload-btn:hover {
+  background: var(--color-bg-secondary, #2a2a3e);
+  color: var(--color-text, #fff);
+  border-color: var(--color-accent, #6366f1);
+}
+.comment-form-cdn-upload-btn:active {
+  transform: scale(0.95);
+}
+
 .comment-form-media-input {
     width: 100%;
     padding: 8px 12px;

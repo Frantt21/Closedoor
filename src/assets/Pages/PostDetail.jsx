@@ -27,7 +27,7 @@ import {
   dislikePost,
   undislikePost,
 } from '../services/postService';
-import { FaHeart, FaRegHeart, FaHeartBroken, FaReply, FaTrash, FaRegComment, FaRegSadTear, FaArrowLeft, FaImage, FaEllipsisV } from 'react-icons/fa';
+import { FaHeart, FaRegHeart, FaHeartBroken, FaReply, FaTrash, FaRegComment, FaRegSadTear, FaArrowLeft, FaImage, FaEllipsisV, FaUpload, FaSpinner } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import PostCard from '../Resources/Components/PostCard';
 import SafeImage from '../Resources/Components/SafeImage';
@@ -39,6 +39,7 @@ import Tooltip from '../Resources/Components/Tooltip';
 import CreatePostModal from '../Resources/Components/CreatePostModal';
 import useMentionAutocomplete from '../hooks/useMentionAutocomplete';
 import { getTimeAgo, IMG_RE, VID_RE } from '../services/helpers';
+import { uploadImage } from '../services/cdnService';
 import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/post.css';
 
@@ -75,6 +76,8 @@ export default function PostDetail() {
   const [commentMediaUrl, setCommentMediaUrl] = useState('');
   const [commentShowMedia, setCommentShowMedia] = useState(false);
   const [showCommentGifPicker, setShowCommentGifPicker] = useState(false);
+  const [commentUploading, setCommentUploading] = useState(false);
+  const [replyUploading, setReplyUploading] = useState(null); // commentId being uploaded to
   const [confirmDeleteComment, setConfirmDeleteComment] = useState(null);
   const [confirmExternalLink, setConfirmExternalLink] = useState(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
@@ -457,6 +460,43 @@ export default function PostDetail() {
     setReplyShowMedia(false);
   };
 
+  // ── CDN upload for comment media ──
+  const handleCommentMediaUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.id) return;
+    setCommentUploading(true);
+    try {
+      const result = await uploadImage(file, user.id, 'post');
+      setCommentMediaUrl(result.url);
+      setCommentShowMedia(true);
+    } catch (err) {
+      console.error('Comment CDN upload error:', err);
+      toast.error(err.message || 'Upload failed');
+    } finally {
+      setCommentUploading(false);
+      // Reset input value so re-selecting same file triggers onChange
+      e.target.value = '';
+    }
+  };
+
+  // ── CDN upload for reply media ──
+  const handleReplyMediaUpload = async (e, commentId) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.id) return;
+    setReplyUploading(commentId);
+    try {
+      const result = await uploadImage(file, user.id, 'post');
+      setReplyMediaUrl(result.url);
+      setReplyShowMedia(true);
+    } catch (err) {
+      console.error('Reply CDN upload error:', err);
+      toast.error(err.message || 'Upload failed');
+    } finally {
+      setReplyUploading(null);
+      e.target.value = '';
+    }
+  };
+
 
 
   const handleDeleteComment = (commentId) => {
@@ -799,7 +839,19 @@ export default function PostDetail() {
               )}
               {replyShowMedia && (
                 <div className="comment-form-media-inputs">
-                  <input className="comment-form-media-input" type="url" value={replyMediaUrl} onChange={(e) => setReplyMediaUrl(e.target.value)} placeholder={t('post.comment_media_url')} />
+                  <div className="comment-form-media-url-row">
+                    <input className="comment-form-media-input" type="url" value={replyMediaUrl} onChange={(e) => setReplyMediaUrl(e.target.value)} placeholder={t('post.comment_media_url')} />
+                    <label className="comment-form-cdn-upload-btn">
+                      {replyUploading === reply.id ? <FaSpinner className="fc-spin" /> : <FaUpload />}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        onChange={(e) => handleReplyMediaUpload(e, reply.id)}
+                        hidden
+                        disabled={replyUploading === reply.id}
+                      />
+                    </label>
+                  </div>
                   {replyMediaUrl && IMG_RE.test(replyMediaUrl) && (
                     <div className="comment-card-preview"><SafeImage src={replyMediaUrl} alt="Preview" hideOnError /></div>
                   )}
@@ -1027,7 +1079,19 @@ export default function PostDetail() {
               )}
               {replyShowMedia && (
                 <div className="comment-form-media-inputs">
-                  <input className="comment-form-media-input" type="url" value={replyMediaUrl} onChange={(e) => setReplyMediaUrl(e.target.value)} placeholder={t('post.comment_media_url')} />
+                  <div className="comment-form-media-url-row">
+                    <input className="comment-form-media-input" type="url" value={replyMediaUrl} onChange={(e) => setReplyMediaUrl(e.target.value)} placeholder={t('post.comment_media_url')} />
+                    <label className="comment-form-cdn-upload-btn">
+                      {replyUploading === comment.id ? <FaSpinner className="fc-spin" /> : <FaUpload />}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        onChange={(e) => handleReplyMediaUpload(e, comment.id)}
+                        hidden
+                        disabled={replyUploading === comment.id}
+                      />
+                    </label>
+                  </div>
                   {replyMediaUrl && IMG_RE.test(replyMediaUrl) && (
                     <div className="comment-card-preview"><SafeImage src={replyMediaUrl} alt="Preview" hideOnError /></div>
                   )}
@@ -1172,13 +1236,25 @@ export default function PostDetail() {
               )}
               {commentShowMedia && (
                 <div className="comment-form-media-inputs">
-                  <input
-                    className="comment-form-media-input"
-                    type="url"
-                    value={commentMediaUrl}
-                    onChange={(e) => setCommentMediaUrl(e.target.value)}
-                    placeholder={t('post.comment_media_url')}
-                  />
+                  <div className="comment-form-media-url-row">
+                    <input
+                      className="comment-form-media-input"
+                      type="url"
+                      value={commentMediaUrl}
+                      onChange={(e) => setCommentMediaUrl(e.target.value)}
+                      placeholder={t('post.comment_media_url')}
+                    />
+                    <label className="comment-form-cdn-upload-btn">
+                      {commentUploading ? <FaSpinner className="fc-spin" /> : <FaUpload />}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        onChange={handleCommentMediaUpload}
+                        hidden
+                        disabled={commentUploading}
+                      />
+                    </label>
+                  </div>
                   {commentMediaUrl && IMG_RE.test(commentMediaUrl) && (
                     <div className="comment-card-preview">
                       <SafeImage src={commentMediaUrl} alt="Preview" hideOnError />

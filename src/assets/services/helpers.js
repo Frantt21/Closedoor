@@ -2,7 +2,7 @@
 export const DEFAULT_AVATAR =
   'https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg';
 
-export const IMG_RE = /\.(jpe?g|png|gif|webp|bmp|svg)(\?.*)?$/i;
+export const IMG_RE = /\.(jpe?g|png|gif|webp|bmp|svg)(\?.*)?$|\/cdn\/files\//i;
 export const VID_RE = /\.(mp4|webm|ogg)(\?.*)?$/i;
 export const VID_RE_EXTENDED = /\.(mp4|webm|ogg|mov|avi|mkv)(\?.*)?$/i;
 
