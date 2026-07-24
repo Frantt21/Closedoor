@@ -6,11 +6,11 @@ const COMBINED_REGEX = /(?<![\w@])(@[a-zA-Z0-9_]+)|(?<![#\w])#([a-zA-Z0-9_\u00C0
 
 /**
  * Renders text with clickable @mentions, #hashtags, and external links.
+ * Mentions link to `/profile/{username}` — the profile route resolves both usernames and UUIDs.
  * 
  * @param {object} props
  * @param {string} props.text - The text to render
  * @param {string[]} [props.skipUrls] - URLs to skip (rendered as media separately)
- * @param {object} [props.mentions] - Map of userId -> username for mention resolution
  * @param {function} [props.onExternalLink] - Callback when an external link is clicked (replaces window.confirm)
  * @param {string} [props.linkClass] - CSS class for external links
  * @param {string} [props.mentionClass] - CSS class for @mentions
@@ -20,7 +20,6 @@ const COMBINED_REGEX = /(?<![\w@])(@[a-zA-Z0-9_]+)|(?<![#\w])#([a-zA-Z0-9_\u00C0
 export default function RichText({
   text,
   skipUrls = [],
-  mentions = {},
   onExternalLink,
   linkClass = 'post-card-link',
   mentionClass = 'post-card-mention',
@@ -50,8 +49,8 @@ export default function RichText({
       {parts.map((part, i) => {
         if (part.startsWith('@')) {
           const username = part.slice(1);
-          const mentionEntry = Object.entries(mentions).find(([, stored]) => stored === username);
-          const profileLink = mentionEntry ? `/profile/${mentionEntry[0]}` : `/profile/${username}`;
+          // Profile route works with both usernames and UUIDs
+          const profileLink = `/profile/${username}`;
           return (
             <Link
               key={i}

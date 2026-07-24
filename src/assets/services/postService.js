@@ -841,6 +841,46 @@ export function clearCachedPollVotes(postId) {
   }
 }
 
+// ── POLL VOTERS CACHE (detailed list with profiles) ──
+const POLL_VOTERS_PREFIX = 'fc_poll_voters_';
+const POLL_VOTERS_TTL = 1000 * 60 * 2; // 2 min (shorter since data changes with votes)
+
+export function setCachedPollVoters(postId, voters) {
+  if (!postId) return;
+  try {
+    const payload = { ts: Date.now(), ttl: POLL_VOTERS_TTL, data: voters };
+    localStorage.setItem(POLL_VOTERS_PREFIX + postId, JSON.stringify(payload));
+  } catch (err) {
+    console.warn('Could not cache poll voters:', err);
+  }
+}
+
+export function getCachedPollVoters(postId) {
+  if (!postId) return null;
+  try {
+    const raw = localStorage.getItem(POLL_VOTERS_PREFIX + postId);
+    if (!raw) return null;
+    const payload = JSON.parse(raw);
+    if (!payload?.ts) return null;
+    if (Date.now() - payload.ts > (payload.ttl || POLL_VOTERS_TTL)) {
+      localStorage.removeItem(POLL_VOTERS_PREFIX + postId);
+      return null;
+    }
+    return payload.data || null;
+  } catch (err) {
+    return null;
+  }
+}
+
+export function clearCachedPollVoters(postId) {
+  if (!postId) return;
+  try {
+    localStorage.removeItem(POLL_VOTERS_PREFIX + postId);
+  } catch (err) {
+    /* ignore */
+  }
+}
+
 // ── POLLS ──
 
 // ── NOTIFICATIONS ──

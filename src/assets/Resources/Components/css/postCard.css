@@ -1157,7 +1157,7 @@
     margin-bottom: 10px;
     padding: 12px;
     background: transparent;
-    border: 1px solid var(--color-border, #2a2a2a);
+    border: 1px solid var(--accent-color, var(--color-border, #2a2a2a));
     border-radius: var(--radius, 10px);
 }
 
@@ -1179,7 +1179,7 @@
     display: block;
     width: 100%;
     padding: 8px 10px;
-    border: 1px solid var(--color-border, #2a2a2a);
+    border: 1px solid var(--accent-color, var(--color-border, #2a2a2a));
     border-radius: var(--radius-sm, 6px);
     background: transparent;
     color: var(--color-text, #ffffff);
@@ -1193,7 +1193,7 @@
 }
 
 .post-card-poll-option:hover:not(:disabled) {
-    border-color: var(--color-text-muted, #6b7280);
+    border-color: var(--accent-color, var(--color-text-muted, #6b7280));
     background: var(--overlay-bg-hover);
 }
 
@@ -1203,7 +1203,7 @@
 }
 
 .post-card-poll-option--selected {
-    border-color: var(--color-text, #ffffff);
+    border-color: var(--accent-color, var(--color-text, #ffffff));
     background: var(--color-text, #ffffff);
 }
 
@@ -1257,7 +1257,7 @@
 
 /* ── Profile page: selected option uses same white style ── */
 .profile-page .post-card-poll-option--selected {
-    border-color: var(--color-text, #ffffff);
+    border-color: var(--accent-color, var(--color-text, #ffffff));
     background: var(--color-text, #ffffff);
 }
 
@@ -1280,7 +1280,7 @@
 }
 
 .profile-page .post-card-poll-option:hover:not(:disabled) {
-    border-color: var(--color-text-muted, #6b7280);
+    border-color: var(--accent-color, var(--color-text-muted, #6b7280));
     background: var(--overlay-bg-hover);
 }
 

@@ -19,6 +19,9 @@ import {
   undislikeComment,
   setCachedPollVotes,
   getCachedPollVotes,
+  setCachedPollVoters,
+  getCachedPollVoters,
+  clearCachedPollVoters,
 } from '../../services/postService';
 import { FaHeart, FaRegHeart, FaHeartBroken, FaComment, FaRetweet, FaThumbtack, FaEdit, FaTrash, FaEllipsisV, FaBookmark, FaRegBookmark, FaEye, FaLock, FaCheckCircle, FaRegCheckCircle, FaClock, FaBan, FaUserFriends, FaExclamationTriangle, FaShareAlt, FaCheck, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-toastify';
@@ -195,6 +198,8 @@ const PostCard = React.memo(function PostCard({
           if (payload.new.user_id === user?.id) {
             setPollUserVote(payload.new.option_id);
           }
+          // Invalidate voters cache on new vote
+          clearCachedPollVoters(post.id);
         }
       )
       .on('postgres_changes',
@@ -207,6 +212,8 @@ const PostCard = React.memo(function PostCard({
           if (payload.old.user_id === user?.id) {
             setPollUserVote(null);
           }
+          // Invalidate voters cache on vote removal
+          clearCachedPollVoters(post.id);
         }
       )
       .subscribe();
@@ -240,6 +247,7 @@ const PostCard = React.memo(function PostCard({
         await unvotePoll(post.id, user.id);
         setPollUserVote(null);
         setPollVotes(prev => prev.filter(v => v.user_id !== user.id));
+        clearCachedPollVoters(post.id);
       } else {
         await votePoll(post.id, optionId, user.id);
         setPollUserVote(optionId);
@@ -247,6 +255,7 @@ const PostCard = React.memo(function PostCard({
           const filtered = prev.filter(v => v.user_id !== user.id);
           return [...filtered, { option_id: optionId, user_id: user.id }];
         });
+        clearCachedPollVoters(post.id);
       }
     } catch (err) {
       console.error('Error voting on poll:', err);
@@ -910,14 +919,14 @@ const PostCard = React.memo(function PostCard({
           {/* ── Poll ── */}
           {hasPoll && (() => {
             const totalVotes = pollVotes ? pollVotes.length : 0;
+            const isPostOwner = user?.id === post.user_id;
+            const showAllResults = true;
             return (
             <div className="post-card-poll" onClick={(e) => e.stopPropagation()}>
               <p className="post-card-poll-question">{post.poll_data.question}</p>
               <div className="post-card-poll-options">
                 {(() => {
                   const hasVoted = !!pollUserVote;
-                  const isPostOwner = user?.id === post.user_id;
-                  const showAllResults = isPollExpired || isPostOwner;
                   return post.poll_data.options.map((option) => {
                     const votesCount = pollVotes ? pollVotes.filter(v => v.option_id === option.id).length : 0;
                     const percentage = totalVotes > 0 ? Math.round((votesCount / totalVotes) * 100) : 0;
@@ -957,28 +966,38 @@ const PostCard = React.memo(function PostCard({
               </div>
               <div className="post-card-poll-footer">
                 {totalVotes > 0 ? (
-                  <button className="post-card-poll-count post-card-poll-count--clickable" onClick={async (e) => {
-                    e.stopPropagation();
-                    if (pollVotersLoading) return;
-                    setPollVotersLoading(true);
-                    setShowPollVoters(true);
-                    try {
-                      const { getPollVotersWithProfiles } = await import('../../services/postService');
-                      const voters = await getPollVotersWithProfiles(post.id);
-                      setPollVoters(voters);
-                    } catch (err) {
-                      console.warn('Error loading poll voters:', err);
-                      setPollVoters([]);
-                    } finally {
-                      setPollVotersLoading(false);
-                    }
-                  }}>
-                    {totalVotes} {totalVotes === 1 ? t('post.poll_vote_singular') || 'voto' : t('post.poll_vote_plural') || 'votos'}
-                  </button>
+                  isPostOwner ? (
+                    <button className="post-card-poll-count post-card-poll-count--clickable" onClick={async (e) => {
+                      e.stopPropagation();
+                      if (pollVotersLoading) return;
+                      // Try cache first (show modal directly if cached, no loading state)
+                      const cachedVoters = getCachedPollVoters(post.id);
+                      if (cachedVoters) {
+                        setPollVoters(cachedVoters);
+                        setShowPollVoters(true);
+                        return;
+                      }
+                      setPollVotersLoading(true);
+                      setShowPollVoters(true);
+                      try {
+                        const { getPollVotersWithProfiles } = await import('../../services/postService');
+                        const voters = await getPollVotersWithProfiles(post.id);
+                        setPollVoters(voters);
+                        setCachedPollVoters(post.id, voters);
+                      } catch (err) {
+                        console.warn('Error loading poll voters:', err);
+                        setPollVoters([]);
+                      } finally {
+                        setPollVotersLoading(false);
+                      }
+                    }}>
+                      {totalVotes} {totalVotes === 1 ? t('post.poll_vote_singular') || 'voto' : t('post.poll_vote_plural') || 'votos'}
+                    </button>
+                  ) : (
+                    <span className="post-card-poll-count">{totalVotes} {totalVotes === 1 ? t('post.poll_vote_singular') || 'voto' : t('post.poll_vote_plural') || 'votos'}</span>
+                  )
                 ) : (
-                  <span className="post-card-poll-count">
-                    0 {t('post.poll_vote_plural') || 'votos'}
-                  </span>
+                  <span className="post-card-poll-count">0 {t('post.poll_vote_plural') || 'votos'}</span>
                 )}
                 {isPollExpired ? (
                   <span className="post-card-poll-expired">{t('post.poll_ended') || 'Finalizada'}</span>

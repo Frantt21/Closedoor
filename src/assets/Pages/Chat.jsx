@@ -282,6 +282,10 @@ export default function Chat() {
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [oldestMessageDate, setOldestMessageDate] = useState(null);
+  // Ref to preserve scroll position when prepending older messages
+  const scrollBeforeLoadRef = useRef(null);
+  // Cooldown to prevent cascading loads after scroll restoration
+  const lastLoadTimeRef = useRef(0);
 
   // ── useLayoutEffect: runs BEFORE browser paint — garantiza que no haya flash de mensajes viejos ──
   useLayoutEffect(() => {
@@ -312,27 +316,36 @@ export default function Chat() {
       const fetchedAt = cachedMeta?.fetchedAt;
 
       if (lastMsgAt && fetchedAt && new Date(lastMsgAt) > new Date(fetchedAt)) {
-        // Cache is stale — a new message arrived while we weren't in this conversation
-        // Don't show stale data, show loading instead
+        // Cache is stale — reset pagination and reload from DB
         setMessages([]);
         setMsgsLoading(true);
+        setHasMoreMessages(true);
+        setOldestMessageDate(null);
       } else {
+        // Fresh cache — restore messages + pagination state, skip DB fetch
         setMessages(cached);
         setMsgsLoading(false);
+        setHasMoreMessages(cachedMeta?.hasMoreMessages ?? true);
+        // Compute oldestMessageDate from cached messages if meta doesn't have it (legacy format)
+        const restoredDate = cachedMeta?.oldestMessageDate ?? (cached.length > 0 ? cached[0].created_at : null);
+        setOldestMessageDate(restoredDate);
+        // Signal the message loading useEffect to skip the DB fetch
+        skipMsgLoadRef.current = true;
       }
     } else {
+      // No cached messages — reset pagination and load from DB
       setMessages([]);
       setMsgsLoading(true);
+      setHasMoreMessages(true);
+      setOldestMessageDate(null);
     }
     messagesOwnerRef.current = activeConvId;
     prevConvIdRef.current = activeConvId;
   }, [activeConvId, conversations]);
 
-  // ── Reset pagination state when conversation changes ──
+  // ── Reset loadingMore when conversation changes (pagination state reset is handled in layout effect) ──
   useEffect(() => {
-    setHasMoreMessages(true);
     setLoadingMore(false);
-    setOldestMessageDate(null);
   }, [activeConvId]);
 
   // ── Load conversations ──
@@ -364,96 +377,87 @@ export default function Chat() {
   // ── Load messages when active conversation changes ──
   useEffect(() => {
     if (!activeConvId) return;
-    // Skip DB operations for pending conversations (temp IDs like "pending_xxx" are not real UUIDs)
+    // Skip DB ops for pending conversations (temp IDs like "pending_xxx" are not real UUIDs)
     if (activeConvId.startsWith('pending_')) {
       setMsgsLoading(false);
       return;
     }
-    // Skip loading when sendContent is resolving a pending conversation (conv has no messages yet)
-    if (skipMsgLoadRef.current) {
-      skipMsgLoadRef.current = false;
-      setMsgsLoading(false);
-      return;
-    }
+
+    // Determine whether to skip the DB fetch (fresh cache restored by layout effect)
+    const skipFetch = skipMsgLoadRef.current;
+    skipMsgLoadRef.current = false;
     let aborted = false;
+    const convForThisEffect = activeConvId;
 
     markAsRead(activeConvId, user.id);
 
-    const convForThisEffect = activeConvId;
-    getMessages(convForThisEffect, INITIAL_BATCH_LIMIT)
-      .then(async (msgs) => {
-        if (aborted) return; // user switched conversation while loading — discard
-        // Filter out messages deleted for me
-        const filtered = msgs.filter(m => !m.deleted_for?.includes(user.id));
-        // Decrypt each message
-        const decrypted = await Promise.all(
-          filtered.map(async (msg) => {
-            const content = await decryptMessage(msg, user.id);
-            return { ...msg, decryptedContent: content };
-          })
-        );
-        if (aborted) return; // check again after async work
-        // Pre-fetch shared post data for this batch
-        const sharedPostIds = [...new Set(decrypted.filter(m => m.shared_post_id).map(m => m.shared_post_id))];
-        if (sharedPostIds.length > 0) {
-          Promise.all(sharedPostIds.map(async (pid) => {
-            if (sharedPosts[pid]) return;
-            try {
-              const postData = await getPost(pid);
-              setSharedPosts(prev => ({ ...prev, [pid]: postData }));
-            } catch { /* ignore */ }
-          })).catch(() => {});
-        }
-        // Update cache for THIS conversation only
-        messagesCacheRef.current[convForThisEffect] = decrypted;
-        messagesOwnerRef.current = convForThisEffect;
-        setMessages(decrypted);
-        // Track oldest message date for pagination cursor (last in DESC array = oldest chronologically)
-        if (decrypted.length > 0) {
-          setOldestMessageDate(decrypted[decrypted.length - 1].created_at);
-        }
-        // If initial batch filled the limit, there might be more; otherwise we got everything
-        setHasMoreMessages(decrypted.length >= INITIAL_BATCH_LIMIT);
-      })
-      .catch((err) => { if (!aborted) console.warn('Error loading messages:', err); })
-      .finally(() => {
-        if (!aborted) {
-          setMsgsLoading(false);
-        }
-      });
+    // ══ DB fetch — skipped when layout effect restored from fresh cache ══
+    if (!skipFetch) {
+      getMessages(convForThisEffect, INITIAL_BATCH_LIMIT)
+        .then(async (msgs) => {
+          if (aborted) return;
+          const filtered = msgs.filter(m => !m.deleted_for?.includes(user.id));
+          const decrypted = await Promise.all(
+            filtered.map(async (msg) => {
+              const content = await decryptMessage(msg, user.id);
+              return { ...msg, decryptedContent: content };
+            })
+          );
+          if (aborted) return;
+          // Pre-fetch shared post data BEFORE setMessages
+          const sharedPostIds = [...new Set(decrypted.filter(m => m.shared_post_id).map(m => m.shared_post_id))];
+          if (sharedPostIds.length > 0) {
+            await Promise.all(sharedPostIds.map(async (pid) => {
+              if (sharedPosts[pid]) return;
+              try {
+                const postData = await getPost(pid);
+                setSharedPosts(prev => ({ ...prev, [pid]: postData }));
+              } catch {}
+            }));
+          }
+          messagesCacheRef.current[convForThisEffect] = decrypted;
+          messagesOwnerRef.current = convForThisEffect;
+          setMessages(decrypted);
+          if (decrypted.length > 0) {
+            setOldestMessageDate(decrypted[0].created_at);
+          }
+          setHasMoreMessages(decrypted.length >= INITIAL_BATCH_LIMIT);
+        })
+        .catch((err) => { if (!aborted) console.warn('Error loading messages:', err); })
+        .finally(() => {
+          if (!aborted) setMsgsLoading(false);
+        });
+    } else {
+      setMsgsLoading(false);
+    }
 
-    // Real-time subscription
+    // ══ Realtime subscription — ALWAYS subscribed, even when cache was fresh ══
     const unsub = subscribeToMessages(convForThisEffect, async (newMsg, eventType) => {
       if (aborted) return;
       const content = await decryptMessage(newMsg, user.id);
       if (aborted) return;
-      // Pre-fetch shared post data if present
       if (newMsg.shared_post_id && !sharedPosts[newMsg.shared_post_id]) {
         try {
           const postData = await getPost(newMsg.shared_post_id);
           setSharedPosts(prev => ({ ...prev, [newMsg.shared_post_id]: postData }));
-        } catch { /* ignore */ }
+        } catch {}
       }
       if (eventType === 'UPDATE') {
         setMessages((prev) => prev.map((msg) => msg.id === newMsg.id ? { ...msg, ...newMsg, decryptedContent: content } : msg));
       } else {
         setMessages((prev) => {
-          // Evitar duplicados: si el mensaje ya fue agregado por el optimistic send
           const exists = prev.some(m => m.id === newMsg.id);
           if (exists) {
             return prev.map(m => m.id === newMsg.id ? { ...m, ...newMsg, decryptedContent: content } : m);
           }
           return [...prev, { ...newMsg, decryptedContent: content }];
         });
-        // Update conversation list preview immediately (optimistic) for real-time messages
         updateConvPreview(
           convForThisEffect,
           content || '',
           newMsg.created_at,
-          // Increment unread only if the other user sent it
           newMsg.sender_id !== user.id
         );
-        // column-reverse: scroll to top (visual bottom) to show new message
         setTimeout(() => messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' }), 50);
       }
       markAsRead(convForThisEffect, user.id);
@@ -494,9 +498,13 @@ export default function Chat() {
     if (!activeConvId) return;
     if (messagesOwnerRef.current !== activeConvId) return; // don't write stale data
     messagesCacheRef.current[activeConvId] = messages;
-    // Update fetchedAt timestamp for staleness check on next conversation switch
+    // Update fetchedAt + pagination state for staleness check on next conversation switch
     if (!messagesCacheRef.current._meta) messagesCacheRef.current._meta = {};
-    messagesCacheRef.current._meta[activeConvId] = { fetchedAt: new Date().toISOString() };
+    messagesCacheRef.current._meta[activeConvId] = {
+      fetchedAt: new Date().toISOString(),
+      hasMoreMessages,
+      oldestMessageDate,
+    };
     // Persist to sessionStorage so cache survives page reload
     saveCacheToSession(messagesCacheRef.current);
   }, [messages, activeConvId]);
@@ -1181,8 +1189,14 @@ export default function Chat() {
   const loadOlderMessages = useCallback(async () => {
     if (!activeConvId || loadingMore || !hasMoreMessages || !oldestMessageDate || !user?.id) return;
 
-    setLoadingMore(true);      const convIdAtStart = activeConvId; // capture to abort if conversation changes
+    setLoadingMore(true);
+    const convIdAtStart = activeConvId;
     let aborted = false;
+
+    // Save scrollHeight AND scrollTop BEFORE prepending so we can restore scroll position
+    const el = messagesContainerRef.current;
+    const scrollHeightBefore = el ? el.scrollHeight : 0;
+    scrollBeforeLoadRef.current = el ? { scrollTop: el.scrollTop, scrollHeight: el.scrollHeight } : null;
 
     try {
       const olderMsgs = await getMessages(convIdAtStart, PAGE_SIZE, oldestMessageDate);
@@ -1212,10 +1226,10 @@ export default function Chat() {
       );
       if (aborted || convIdAtStart !== activeConvId) return;
 
-      // Pre-fetch shared post data
+      // ══ Pre-fetch shared post data BEFORE setMessages so DOM is stable at scroll-restore time ══
       const sharedPostIds = [...new Set(decrypted.filter(m => m.shared_post_id).map(m => m.shared_post_id))];
       if (sharedPostIds.length > 0) {
-        Promise.all(sharedPostIds.map(async (pid) => {
+        await Promise.all(sharedPostIds.map(async (pid) => {
           try {
             const postData = await getPost(pid);
             setSharedPosts(prev => prev[pid] ? prev : { ...prev, [pid]: postData });
@@ -1223,10 +1237,15 @@ export default function Chat() {
         })).catch(() => {});
       }
 
-      // Prepend older messages — they will appear at the visual top (column-reverse)
+      // Safety: user might have switched conversations during shared-post fetch
+      if (convIdAtStart !== activeConvId) return;
+
+      // Prepend older messages — they will appear at the visual bottom (column-reverse)
       setMessages(prev => [...decrypted, ...prev]);
-      // Cursor = oldest in this batch (last in DESC array) — ensures no overlap on next fetch
-      setOldestMessageDate(decrypted[decrypted.length - 1].created_at);
+      // Cursor = oldest in this batch (first in ASC array) — ensures no overlap on next fetch
+      setOldestMessageDate(decrypted[0].created_at);
+      // Mark timestamp so the scroll handler's cooldown prevents cascade
+      lastLoadTimeRef.current = Date.now();
 
     } catch (err) {
       console.warn('Error loading older messages:', err);
@@ -1241,9 +1260,15 @@ export default function Chat() {
     const el = messagesContainerRef.current;
     if (!el || loadingMore || !hasMoreMessages) return;
 
-    // In column-reverse: visual top = scrollHeight - clientHeight - scrollTop ≈ 0
-    const threshold = 80; // px from visual top to trigger load
-    if (el.scrollHeight - el.clientHeight - el.scrollTop < threshold) {
+    // Cooldown: prevent cascade — ignore scroll events within 500ms of a load
+    if (Date.now() - lastLoadTimeRef.current < 500) return;
+
+    // In column-reverse, scrollTop is NEGATIVE when scrolling up (toward oldest).
+    // At the very top (oldest messages): scrollTop ≈ -(scrollHeight - clientHeight)
+    // scrollRemaining = scrollTop + scrollHeight - clientHeight → 0 at the top
+    const scrollRemaining = el.scrollTop + el.scrollHeight - el.clientHeight;
+    const threshold = 150;
+    if (scrollRemaining < threshold) {
       loadOlderMessages();
     }
   }, [loadingMore, hasMoreMessages, loadOlderMessages]);
@@ -1255,6 +1280,24 @@ export default function Chat() {
     el.addEventListener('scroll', handleMessagesScroll, { passive: true });
     return () => el.removeEventListener('scroll', handleMessagesScroll);
   }, [handleMessagesScroll]);
+
+  // ── Restore scroll position after prepending older messages (column-reverse) ──
+  useLayoutEffect(() => {
+    if (scrollBeforeLoadRef.current == null) return;
+    const saved = scrollBeforeLoadRef.current;
+    scrollBeforeLoadRef.current = null;
+    // Format: { scrollTop, scrollHeight }
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    const { scrollTop: savedTop, scrollHeight: oldH } = saved;
+    const diff = el.scrollHeight - oldH;
+    // Add a buffer so scrollRemaining > threshold after restoration, preventing immediate re-trigger
+    const SCROLL_RESTORE_BUFFER = 200;
+    const newScrollTop = savedTop - diff + SCROLL_RESTORE_BUFFER;
+    if (diff > 0) {
+      el.scrollTop = newScrollTop;
+    }
+  }, [messages]);
 
   // ── Send GIF ──
   const handleGifSelect = useCallback(async (gifUrl) => {
@@ -1765,11 +1808,9 @@ export default function Chat() {
         {loadingMore && (
           <div className="chat-messages-loading">{t('common.loading')}</div>
         )}
-        {!loadingMore && !msgsLoading && hasMoreMessages && messages.length > 0 && (
-          <div className="chat-load-earlier-wrap">
-            <button className="chat-load-earlier-btn" onClick={loadOlderMessages}>
-              {t('chat.load_earlier') || 'Load earlier messages'}
-            </button>
+        {loadingMore && (
+          <div className="chat-load-more-spinner">
+            <div className="chat-load-more-spinner-ring" />
           </div>
         )}
       </div>
