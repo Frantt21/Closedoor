@@ -1098,7 +1098,7 @@ function Profile() {
     const roles = activeProfile?.roles || ["user"];
 
     // ── Save profile (own profile only) ──
-    const handleSaveProfile = async ({ username, avatar_url, banner_url, banner_credits, avatar_credits, bio, pronouns, social_links, accent_color, accent_color_secondary, accent_surface_color, accent_surface_glass, interests, banner_position, avatar_position, profile_background_url, profile_background_position, profile_background_blur, profile_background_dim, profile_text_color }) => {
+    const handleSaveProfile = async ({ username, avatar_url, banner_url, banner_credits, avatar_credits, bio, pronouns, social_links, accent_color, accent_color_secondary, accent_surface_color, accent_surface_glass, interests, banner_position, avatar_position, profile_background_url, profile_background_position, profile_background_blur, profile_background_dim, banner_dim, profile_text_color }) => {
         if (!user?.id) return;
 
         const normalizedUsername = (username || "").trim().toLowerCase();
@@ -1135,6 +1135,7 @@ function Profile() {
                 profile_background_position: profile_background_position || '50% 50%',
                 profile_background_blur: profile_background_blur ?? 0,
                 profile_background_dim: profile_background_dim ?? 50,
+                banner_dim: banner_dim ?? 50,
                 profile_text_color: profile_text_color || null,
             };
 
@@ -1302,6 +1303,8 @@ function Profile() {
             : bgPosition,
           '--profile-bg-blur': hasBg && bgBlur > 0 ? `blur(${bgBlur}px)` : 'none',
           '--profile-bg-dim': hasBg ? String(bgDim) : '0',
+          '--banner-dim-top': String((activeProfile?.banner_dim ?? 50) / 100 * 0.6),
+          '--banner-dim-bottom': String(Math.min((activeProfile?.banner_dim ?? 50) / 100 * 1.3, 1.0)),
           '--profile-bg-size': hasBg && bgFullStyle
             ? `auto, ${bgFullStyle.backgroundSize}`
             : 'auto, cover',
@@ -1632,6 +1635,7 @@ function Profile() {
                     initialProfileBgPosition={ownProfile?.profile_background_position || '50% 50%'}
                     initialProfileBgBlur={ownProfile?.profile_background_blur ?? 0}
                     initialProfileBgDim={ownProfile?.profile_background_dim ?? 50}
+                    initialBannerDim={ownProfile?.banner_dim ?? 50}
                     initialPronouns={ownProfile?.pronouns || ''}
                     initialProfileTextColor={modalProfileTextColor}
                     initialFollowersCount={followCounts?.followers || 0}

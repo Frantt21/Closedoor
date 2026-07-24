@@ -40,7 +40,7 @@ export default function AppLoader({ children }) {
       <div className={`app-loader-overlay ${fadeOut ? 'app-loader-overlay--hidden' : ''}`}>
         <div className="app-loader-container">
           <img
-            src="/mini_icon_white.webp"
+            src="/logo.svg"
             alt="Closedoor"
             className="app-loader-logo"
           />

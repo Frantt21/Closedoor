@@ -602,6 +602,57 @@ textarea.fc-modal-input {
     color: var(--color-text, #ffffff);
 }
 
+/* ── Upload row (CDN file upload) ── */
+.fc-modal-upload-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 16px;
+    border: 1px dashed var(--color-border, #2a2a2a);
+    border-radius: var(--radius, 10px);
+    background: var(--overlay-bg-subtle);
+}
+
+.fc-modal-upload-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--color-text, #ffffff);
+    color: var(--color-bg, #000000);
+    border: none;
+    border-radius: var(--radius, 10px);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+    position: relative;
+}
+
+.fc-modal-upload-btn:hover {
+    opacity: 0.85;
+}
+
+.fc-modal-upload-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.fc-modal-upload-or {
+    font-size: 0.75rem;
+    color: var(--color-text-muted, #6b7280);
+}
+
+@keyframes fcSpinner {
+    to { transform: rotate(360deg); }
+}
+
+.fc-spin {
+    animation: fcSpinner 0.8s linear infinite;
+}
+
 /* ── Drag & drop zone ── */
 
 .fc-modal-drag-zone {

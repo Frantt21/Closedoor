@@ -9,8 +9,11 @@ import { DEFAULT_AVATAR, getBgFullStyle, getImgTransformStyle } from '../../serv
 import { detectPlatform, getPlatformIcon, getPlatformName } from '../../services/socialPlatforms';
 import { extractColors } from '../../services/colorExtractor';
 import { useI18n } from '../../services/i18n/useI18n';
-import { FaCamera } from 'react-icons/fa';
+import { FaCamera, FaUpload, FaSpinner } from 'react-icons/fa';
+import { toast } from 'react-toastify';
 import ImagePositionEditor from './ImagePositionEditor';
+import { uploadImage } from '../../services/cdnService';
+import { useAuth } from '../../../hooks/useAuth';
 
 // Module-level color cache persists across modal mounts/unmounts
 const colorCache = {};
@@ -57,6 +60,7 @@ export default function Modal({
   initialProfileBgPosition = '50% 50%',
   initialProfileBgBlur = 0,
   initialProfileBgDim = 50,
+  initialBannerDim = 50,
   initialPronouns = '',
   initialFollowersCount = 0,
   userRoles = ['user'],
@@ -65,6 +69,7 @@ export default function Modal({
   initialProfileTextColor = '',
 }) {
   const { t } = useI18n();
+  const { user } = useAuth();
   const [username, setUsername] = useState(initialUsername);
   const [banner, setBanner] = useState(initialBanner);
   const [avatar, setAvatar] = useState(initialAvatar);
@@ -110,6 +115,7 @@ export default function Modal({
   const [profileBgPosition, setProfileBgPosition] = useState(initialProfileBgPosition);
   const [profileBgBlur, setProfileBgBlur] = useState(initialProfileBgBlur);
   const [profileBgDim, setProfileBgDim] = useState(initialProfileBgDim);
+  const [bannerDim, setBannerDim] = useState(initialBannerDim);
   const [selectedProfileTextColor, setSelectedProfileTextColor] = useState(initialProfileTextColor);
   const [interests, setInterests] = useState(initialInterests);
   const [interestInput, setInterestInput] = useState('');
@@ -121,6 +127,7 @@ export default function Modal({
   // Submodal state: null | { type: 'avatar' | 'banner', value: string }
   const [showUrlModal, setShowUrlModal] = useState(null);
   const [urlInput, setUrlInput] = useState('');
+  const [uploadingToCdn, setUploadingToCdn] = useState(false);
   const [showSuggested, setShowSuggested] = useState(false);
   const [socialLinksExpanded, setSocialLinksExpanded] = useState(false);
   const [showProfileBgSubmodal, setShowProfileBgSubmodal] = useState(null);
@@ -214,6 +221,7 @@ export default function Modal({
     setProfileBgPosition(initialProfileBgPosition);
     setProfileBgBlur(initialProfileBgBlur);
     setProfileBgDim(initialProfileBgDim);
+    setBannerDim(initialBannerDim);
     setBannerPosition(initialBannerPosition);
     setAvatarPosition(initialAvatarPosition);
     // Restore cached colors immediately (no flash)
@@ -245,6 +253,7 @@ export default function Modal({
       profileBgPosition !== initialProfileBgPosition ||
       profileBgBlur !== initialProfileBgBlur ||
       profileBgDim !== initialProfileBgDim ||
+      bannerDim !== initialBannerDim ||
       selectedProfileTextColor !== (initialProfileTextColor || '') ||
       JSON.stringify(interests) !== JSON.stringify(initialInterests || []) ||
       bannerPosition !== initialBannerPosition ||
@@ -255,7 +264,7 @@ export default function Modal({
     bannerPosition, avatarPosition,
     initialUsername, initialBanner, initialAvatar, initialBio, initialPronouns,
     initialBannerCredits, initialAvatarCredits,
-    initialSocialLinks, initialAccentColor, initialAccentColorSecondary, initialAccentSurface, initialAccentSurfaceGlass, initialProfileBg, initialProfileBgPosition, initialProfileBgBlur, initialProfileBgDim, initialInterests,
+    initialSocialLinks, initialAccentColor, initialAccentColorSecondary, initialAccentSurface, initialAccentSurfaceGlass, initialProfileBg, initialProfileBgPosition, initialProfileBgBlur,    initialProfileBgDim, initialBannerDim, initialInterests,
     initialBannerPosition, initialAvatarPosition
   ]);
 
@@ -346,9 +355,10 @@ export default function Modal({
         banner_position: bannerPosition,
         avatar_position: avatarPosition,
         profile_background_url: profileBg.trim() || null,
-        profile_background_position: profileBgPosition,
+        profile_background_position:      profileBgPosition,
         profile_background_blur: profileBgBlur,
         profile_background_dim: profileBgDim,
+        banner_dim: bannerDim,
       });
     } finally {
       setSaving(false);
@@ -410,6 +420,30 @@ export default function Modal({
     urlInitialRef.current = current;
     setUrlInput(current);
     setShowUrlModal(type);
+  };
+
+  // ── Upload file to CDN ──
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.id || !showUrlModal) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error(t('modal.invalid_image_type') || 'Invalid image type');
+      return;
+    }
+
+    setUploadingToCdn(true);
+    try {
+      const result = await uploadImage(file, user.id, showUrlModal);
+      setUrlInput(result.url);
+    } catch (err) {
+      console.error('CDN upload error:', err);
+      toast.error(err.message || 'Upload failed');
+    } finally {
+      setUploadingToCdn(false);
+      // Reset file input so the same file can be re-selected
+      e.target.value = '';
+    }
   };
 
   const handleUrlModalSave = () => {
@@ -1218,6 +1252,26 @@ export default function Modal({
                 </>
               )}
             </div>
+
+            {/* ── Banner Dim ── */}
+            <div className="fc-modal-card">
+              <label className="fc-modal-label">{t('modal.banner_dim') || 'Banner darkness'}</label>
+              <div className="fc-modal-range-row">
+                <span className="fc-modal-range-label">{t('modal.banner_dim_desc') || 'Dark overlay for text contrast'}</span>
+                <div className="fc-modal-range-control">
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={bannerDim}
+                    onChange={(e) => setBannerDim(Number(e.target.value))}
+                    className="fc-modal-range"
+                  />
+                  <span className="fc-modal-range-value">{bannerDim}%</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1247,6 +1301,20 @@ export default function Modal({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
+          <div className="fc-modal-upload-row">
+            <label className="fc-modal-upload-btn">
+              {uploadingToCdn ? <FaSpinner className="fc-spin" /> : <FaUpload />}
+              <span>{uploadingToCdn ? t('common.loading') : t('modal.upload_image') || 'Subir imagen'}</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                onChange={handleFileUpload}
+                disabled={uploadingToCdn}
+                style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
+              />
+            </label>
+            <span className="fc-modal-upload-or">{t('modal.or_paste_url') || 'O pega una URL'}</span>
+          </div>
           <input
             className="fc-modal-input"
             value={urlInput}

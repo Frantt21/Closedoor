@@ -38,7 +38,7 @@ function Header() {
         <Link to="/" className="minicard_profile" style={{ textDecoration: 'none' }}>
           <img
             className="sidebar-brand-logo"
-            src="/mini_icon_white.webp"
+            src="/logo.svg"
             alt="Closedoor"
           />
           <div className="user_nick">

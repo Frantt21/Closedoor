@@ -126,6 +126,11 @@
     margin-left: 4px;
 }
 
+/* Light theme: invert logo to black */
+[data-theme="light"] .sidebar-brand-logo {
+    filter: invert(1);
+}
+
 .user_nick {
     font-size: 0.9rem;
     font-weight: 600;

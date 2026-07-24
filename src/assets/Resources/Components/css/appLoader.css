@@ -32,6 +32,11 @@
 }
 
 /* ── Keyframes ── */
+/* Light theme: invert logo to black */
+[data-theme="light"] .app-loader-logo {
+    filter: invert(1);
+}
+
 @keyframes appLoaderPulse {
     0%, 100% { opacity: 0.5; transform: scale(1); }
     50% { opacity: 1; transform: scale(1.08); }
