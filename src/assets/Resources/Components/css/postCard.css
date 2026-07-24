@@ -212,6 +212,24 @@
     margin: 0 0 10px 0;
 }
 
+/* ── "Show more" link for truncated content ── */
+.post-card-show-more {
+    display: inline;
+    color: var(--color-text-muted, #6b7280);
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: color 0.15s ease;
+    white-space: nowrap;
+    margin-left: 4px;
+    user-select: none;
+}
+
+.post-card-show-more:hover {
+    color: var(--color-text, #ffffff);
+    text-decoration: underline;
+}
+
 /* ---- Media ---- */
 
 .post-card-media {

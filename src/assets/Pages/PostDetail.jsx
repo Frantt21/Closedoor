@@ -354,13 +354,15 @@ export default function PostDetail() {
       navigate(`/Login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
       return;
     }
-    if (!trimmed || !postId) return;
+    if (!postId) return;
 
     const trimmedMedia = commentMediaUrl.trim();
     const isImage = IMG_RE.test(trimmedMedia);
     const isVideo = VID_RE.test(trimmedMedia);
     const imageUrl = isImage ? trimmedMedia : null;
     const videoUrl = isVideo ? trimmedMedia : null;
+    // Allow posting just media (GIF/image) without text
+    if (!trimmed && !imageUrl && !videoUrl) return;
 
     setSubmittingComment(true);
     try {
@@ -401,13 +403,15 @@ export default function PostDetail() {
       navigate(`/Login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
       return;
     }
-    if (!trimmed || !postId) return;
+    if (!postId) return;
 
     const trimmedMedia = replyMediaUrl.trim();
     const isImage = IMG_RE.test(trimmedMedia);
     const isVideo = VID_RE.test(trimmedMedia);
     const imageUrl = isImage ? trimmedMedia : null;
     const videoUrl = isVideo ? trimmedMedia : null;
+    // Allow posting just media (GIF/image) without text
+    if (!trimmed && !imageUrl && !videoUrl) return;
 
     setSubmittingReply(true);
     try {
@@ -567,8 +571,17 @@ export default function PostDetail() {
     }
   };
 
+  // ── Safe back navigation: fall back to home if no history ──
+  const goBack = useCallback(() => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/');
+    }
+  }, [navigate]);
+
   const handlePostDelete = () => {
-    navigate(-1);
+    goBack();
   };
 
   // ── Group comments into top-level + replies ──
@@ -796,7 +809,7 @@ export default function PostDetail() {
                 </div>
               )}
               <div className="comment-form-actions">
-                <button className="comment-form-submit" onClick={handleSubmitReply} disabled={submittingReply || !replyContent.trim()}>
+                <button className="comment-form-submit" onClick={handleSubmitReply} disabled={submittingReply || (!replyContent.trim() && !replyMediaUrl.trim())}>
                   {submittingReply ? t('post.sending') : t('post.comment_post')}
                 </button>
               </div>
@@ -1024,7 +1037,7 @@ export default function PostDetail() {
                 </div>
               )}
               <div className="comment-form-actions">
-                <button className="comment-form-submit" onClick={handleSubmitReply} disabled={submittingReply || !replyContent.trim()}>
+                <button className="comment-form-submit" onClick={handleSubmitReply} disabled={submittingReply || (!replyContent.trim() && !replyMediaUrl.trim())}>
                   {submittingReply ? t('post.sending') : t('post.comment_post')}
                 </button>
               </div>
@@ -1067,7 +1080,7 @@ export default function PostDetail() {
   if (postError || !post) {
     return (
       <div className="post-detail-page">
-        <button className="post-detail-back" onClick={() => navigate(-1)}><FaArrowLeft /> {t('post.back')}</button>
+        <button className="post-detail-back" onClick={goBack}><FaArrowLeft /> {t('post.back')}</button>
         <div className="posts-empty">
           <span className="posts-empty-icon"><FaRegSadTear /></span>
           <p className="posts-empty-text">{postError || t('post.not_found')}</p>
@@ -1078,13 +1091,14 @@ export default function PostDetail() {
 
   return (
     <div className="post-detail-page">
-      <button className="post-detail-back" onClick={() => navigate(-1)}><FaArrowLeft /> {t('post.back')}</button>
+      <button className="post-detail-back" onClick={goBack}><FaArrowLeft /> {t('post.back')}</button>
 
       <PostCard
         post={post}
         liked={liked}
         disliked={disliked}
         reposted={reposted}
+        fullContent
         onUpdate={handlePostUpdate}
         onDelete={handlePostDelete}
         onLikeToggle={(id, nowLiked) => setLiked(nowLiked)}
@@ -1181,7 +1195,7 @@ export default function PostDetail() {
                 <button
                   className="comment-form-submit"
                   onClick={handleSubmitComment}
-                  disabled={submittingComment || !commentInput.trim()}
+                  disabled={submittingComment || (!commentInput.trim() && !commentMediaUrl.trim())}
                 >
                   {submittingComment ? t('post.sending') : t('post.comment_post')}
                 </button>

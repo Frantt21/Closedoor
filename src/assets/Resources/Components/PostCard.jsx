@@ -40,6 +40,8 @@ import ConfirmModal from './ConfirmModal';
 import Tooltip from './Tooltip';
 import './css/postCard.css';
 
+const TRUNCATE_LENGTH = 500;
+
 const PostCard = React.memo(function PostCard({
   post,
   liked: initialLiked = false,
@@ -53,6 +55,7 @@ const PostCard = React.memo(function PostCard({
   onDislikeToggle,
   onRepostToggle,
   compact = false,
+  fullContent = false,
   repostInfo = null,
   replyInfo = null,
 }) {
@@ -855,7 +858,7 @@ const PostCard = React.memo(function PostCard({
 
           {/* (badge moved inside header above) */}
 
-          {/* Text content with @mention highlighting */}
+          {/* Text content with @mention highlighting (truncated to TRUNCATE_LENGTH at word boundary) */}
           <p className="post-card-text">
             {showEncryptedLoading ? (
               <span className="post-card-encrypted-loading">{t('common.loading') || 'Descifrando...'}</span>
@@ -863,14 +866,35 @@ const PostCard = React.memo(function PostCard({
               <span className="post-card-encrypted-text">
                 <FaLock style={{ marginRight: 4, fontSize: '0.65rem' }} /> {t('post.encrypted_hidden_placeholder')}
               </span>
-            ) : (
-              <RichText
-                text={displayContent || ''}
-                skipUrls={getSkipUrls(post)}
-                mentions={post.mentions}
-                onExternalLink={handleExternalLink}
-              />
-            )}
+            ) : (() => {
+              const text = displayContent || '';
+              const shouldTruncate = !fullContent && text.length > TRUNCATE_LENGTH;
+              const truncateAt = shouldTruncate
+                ? text.lastIndexOf(' ', TRUNCATE_LENGTH) || TRUNCATE_LENGTH
+                : text.length;
+              const displayed = shouldTruncate ? text.slice(0, truncateAt) + '...' : text;
+              return (
+                <>
+                  <RichText
+                    text={displayed}
+                    skipUrls={getSkipUrls(post)}
+                    mentions={post.mentions}
+                    onExternalLink={handleExternalLink}
+                  />
+                  {shouldTruncate && (
+                    <span
+                      className="post-card-show-more"
+                      onClick={(e) => { e.stopPropagation(); navigate(`/post/${post.id}`); }}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); navigate(`/post/${post.id}`); } }}
+                    >
+                      {t('post.show_more') || 'Mostrar más'}
+                    </span>
+                  )}
+                </>
+              );
+            })()}
           </p>
 
           {/* ── Scheduled badge (solo futuro, ya-publicados son posts normales sin badge) ── */}

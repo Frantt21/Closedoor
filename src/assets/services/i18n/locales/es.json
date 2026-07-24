@@ -322,6 +322,7 @@
   "post.scheduled_future": "🕒 Programado para {date}",
   "post.scheduled_published": "Publicado recientemente",
   "post.sending": "Enviando...",
+  "post.show_more": "Mostrar más",
   "post.sensitive_click": "Haz clic para revelar",
   "post.sensitive_warning": "Contenido sensible",
   "post.unpin": "Desfijar",

@@ -3,8 +3,11 @@ import { supabase } from './supabaseclient';
 /**
  * Extract #hashtags from text content
  */
-const HASHTAG_REGEX = /(?<![#\w])#([a-zA-Z0-9_\u00C0-\u024F]+)/g;
+const HASHTAG_REGEX = /(?<![#\w])#([a-zA-Z0-9_\u00C0-\u024F]{1,20})/g;
 
+/**
+ * Extract #hashtags from text content, limited to 20 characters max.
+ */
 export function extractHashtags(content) {
   if (!content) return [];
   const tags = new Set();

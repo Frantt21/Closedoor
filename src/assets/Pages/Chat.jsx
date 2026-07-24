@@ -10,7 +10,6 @@ import {
   decryptMessage,
   markAsRead,
   getOrCreateConversation,
-  deleteConversation,
   deleteMessage,
   deleteMessageForMe,
   editMessage,
@@ -116,19 +115,28 @@ export default function Chat() {
 
   const EMOJI_CATEGORIES = [
     {
-      name: '😀', emojis: ['😀','😃','😄','😁','😅','😂','🤣','😊','😇','🙂','😉','😌','😍','🥰','😘','😗','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🤫','🤔','🤐','🤨','😐','😑','😶','😏','😒','🙄','😬','😮','😯','😲','😳','🥺','😢','😭','😤','😠','😡','🤬','💀','☠️','👻','👽','🤡','💩']
+      name: '😀', emojis: ['😀','😃','😄','😁','😅','😂','🤣','😊','😇','🙂','🙃','😉','😌','😍','🥰','😘','😗','😙','😚','😋','😛','😜','🤪','😝','🤑','🤗','🤭','🫢','🫣','🤫','🤔','🫡','🤐','🤨','😐','😑','😶','🫥','😏','😒','🙄','😬','😮','😯','😲','😳','🥺','😢','😭','😤','😠','😡','🤬','💀','☠️','💩','🤡','👹','👺','👻','👽','👾','🤖','🎃','😺','😸','😹','😻','😼','😽','🙀','😿','😾']
     },
     {
-      name: '👋', emojis: ['👍','👎','👊','✊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','✌️','🤟','🤘','👌','👉','👈','👆','👇','☝️','✋','🤚','🖐','🖖','👋','🤙','💪','🦵','🦶','👂','👃','🧠','👀','👅','👄']
+      name: '👋', emojis: ['👍','👎','👊','✊','🤛','🤜','👏','🙌','👐','🤲','🤝','🙏','✌️','🤟','🤘','👌','🤌','🤏','👉','👈','👆','👇','☝️','✋','🤚','🖐','🖖','👋','🤙','🫶','💪','🦵','🦶','👂','🦻','👃','🧠','🫀','🫁','👀','👁️','👅','👄','🦷','🦴','👶','🧒','👦','👧','🧑','👱','👨','👩','🧔','👴','👵','🙍','🙎','🙅','🙆','💁','🙋','🧏','🤦','🤷','👮','🕵️','💂','🥷','👷','🫅','🤴','👸','👳','👲','🧕','🤵','👰','🤰','🫃','🫄','🤱','👼','🎅','🤶','🦸','🦹','🧙','🧚','🧛','🧜','🧝','🧞','🧟','🧌']
     },
     {
-      name: '❤️', emojis: ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💕','💞','💗','💖','💘','💝','💟','❤️‍🔥','❤️‍🩹','💔','❣️','💑','💏','👨‍❤️‍👨','👩‍❤️‍👩','💋','💌']
+      name: '❤️', emojis: ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','❤️‍🔥','❤️‍🩹','💔','❣️','💕','💞','💗','💖','💘','💝','💟','💌','💋','💑','💏','👩‍❤️‍👨','👨‍❤️‍👨','👩‍❤️‍👩','💒','❤️‍💋‍👨','❤️‍💋‍👩']
     },
     {
-      name: '🔥', emojis: ['🔥','⭐','🌟','✨','💫','⚡','🌈','🌊','☀️','🌙','🌍','🌎','🌏','🌸','🌺','🌻','🌹','🌷','🌿','🍀','🌵','🎄','🌲','🌴','🍁','🍂']
+      name: '🐱', emojis: ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐻‍❄️','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🙈','🙉','🙊','🐒','🐔','🐧','🐦','🐤','🐣','🐥','🦆','🦅','🦉','🦇','🐺','🐗','🐴','🦄','🐝','🪱','🐛','🦋','🐌','🐞','🐜','🪰','🪲','🪳','🦟','🦗','🕷️','🦂','🐢','🐍','🦎','🦖','🦕','🐙','🦑','🦐','🦞','🦀','🐡','🐠','🐟','🐬','🐳','🐋','🦈','🪸','🐊','🐅','🐆','🦓','🦍','🦧','🐘','🦛','🦏','🐪','🐫','🦒','🦘','🦬','🐃','🐂','🐄','🐎','🐖','🐏','🐑','🦙','🐐','🦌','🐕','🐩','🦮','🐕‍🦺','🐈','🐈‍⬛','🪶','🐓','🦃','🦤','🦚','🦜','🦢','🦩','🕊️','🐇','🦝','🦨','🦡','🦫','🦦','🦥','🐁','🐀','🐿️','🦔','🐾','🐉','🐲']
     },
     {
-      name: '🎉', emojis: ['🎉','🎊','🎈','🎁','🎀','🎃','🎄','🎆','🎇','✨','🎶','🎵','🎸','🎹','🎺','🎻','🥁','🎯','🎱','🎲','🎮','🕹️','🎭','🎨','🎪','🎤','🎧']
+      name: '🔥', emojis: ['🔥','⭐','🌟','✨','💫','⚡','🌈','🌊','☀️','🌤️','⛅','🌥️','🌦️','🌧️','⛈️','🌩️','🌨️','❄️','☃️','⛄','🌬️','💨','💧','💦','🫧','☔','☂️','🌫️','🌪️','🌙','🌚','🌛','🌜','🌝','🌞','🪐','💥','☄️','🌍','🌎','🌏','🌑','🌒','🌓','🌔','🌕','🌖','🌗','🌘']
+    },
+    {
+      name: '🌸', emojis: ['🌸','💐','💮','🪷','🌹','🥀','🌺','🌻','🌼','🌷','🪻','🌱','🪴','🌿','☘️','🍀','🍁','🍂','🍃','🪹','🪺','🍄','🌾','🌵','🎄','🌲','🌳','🌴','🪵']
+    },
+    {
+      name: '🎉', emojis: ['🎉','🎊','🎈','🎁','🎀','🎃','🎄','🎆','🎇','🧨','✨','🎶','🎵','🎸','🎹','🎺','🎻','🥁','🪘','🎷','📯','🎙️','🎚️','🎛️','🎤','🎧','📻','🎯','🎱','🎲','🎮','🕹️','🎭','🎨','🎪','🎼','🪕','🎬','🎟️','🎫','🏆','🥇','🥈','🥉','🏅','🎖️','🏵️','🎗️']
+    },
+    {
+      name: '🍕', emojis: ['🍇','🍈','🍉','🍊','🍋','🍌','🍍','🥭','🍎','🍏','🍐','🍑','🍒','🍓','🫐','🥝','🍅','🫒','🥥','🥑','🍆','🥔','🥕','🌽','🌶️','🫑','🥒','🥬','🥦','🧄','🧅','🍄','🥜','🫘','🌰','🍞','🥐','🥖','🫓','🥨','🥯','🥞','🧇','🧀','🍖','🍗','🥩','🥓','🍔','🍟','🍕','🌭','🥪','🌮','🌯','🫔','🥙','🧆','🥚','🍳','🥘','🍲','🫕','🥣','🥗','🍿','🧈','🧂','🥫','🍱','🍘','🍙','🍚','🍛','🍜','🍝','🍠','🍢','🍣','🍤','🍥','🥮','🍡','🥟','🥠','🥡','🦀','🦞','🦐','🦑','🦪','🍦','🍧','🍨','🍩','🍪','🎂','🍰','🧁','🥧','🍫','🍬','🍭','🍮','🍯','🍼','🥛','☕','🫖','🍵','🍶','🍾','🍷','🍸','🍹','🍺','🍻','🥂','🥃','🫗','🥤','🧋','🧃','🧉','🧊']
     },
   ];
 
@@ -192,6 +200,7 @@ export default function Chat() {
   const inputRef = useRef(null);
   const messagesCacheRef = useRef({});
   const skipCacheWipeRef = useRef(false);  // prevents useLayoutEffect from wiping messages when resolving pending conv
+  const skipMsgLoadRef = useRef(false);   // prevents useEffect from fetching messages when sendContent resolves pending conv
   const draftsRef = useRef({}); // borradores del input por conversation ID
   const prevConvIdRef = useRef(null);
   const messagesOwnerRef = useRef(null); // tracks which conversation the current `messages` state belongs to
@@ -355,6 +364,17 @@ export default function Chat() {
   // ── Load messages when active conversation changes ──
   useEffect(() => {
     if (!activeConvId) return;
+    // Skip DB operations for pending conversations (temp IDs like "pending_xxx" are not real UUIDs)
+    if (activeConvId.startsWith('pending_')) {
+      setMsgsLoading(false);
+      return;
+    }
+    // Skip loading when sendContent is resolving a pending conversation (conv has no messages yet)
+    if (skipMsgLoadRef.current) {
+      skipMsgLoadRef.current = false;
+      setMsgsLoading(false);
+      return;
+    }
     let aborted = false;
 
     markAsRead(activeConvId, user.id);
@@ -606,8 +626,36 @@ export default function Chat() {
       }
     } catch {}
 
-    // ── Don't create conversation in DB yet — wait for first message ──
-    // This prevents the other user from seeing an empty conversation appear
+    // ── Check if there's already an existing conversation (was hidden/deleted locally) ──
+    // If so, unhide and select it directly so messages load immediately
+    try {
+      const { data: myConvs } = await supabase
+        .from('chat_participants')
+        .select('conversation_id')
+        .eq('user_id', user.id);
+
+      const myConvIds = (myConvs || []).map(p => p.conversation_id);
+
+      if (myConvIds.length > 0) {
+        const { data: match } = await supabase
+          .from('chat_participants')
+          .select('conversation_id')
+          .in('conversation_id', myConvIds)
+          .eq('user_id', otherUser.id)
+          .maybeSingle();
+
+        if (match) {
+          // Existing conversation found — unhide and select it
+          setHiddenConvIds((prev) => prev.filter(id => id !== match.conversation_id));
+          setSearchQuery('');
+          setSearchResults([]);
+          selectConversation(match.conversation_id);
+          return;
+        }
+      }
+    } catch { /* fall through to pending flow */ }
+
+    // ── No existing conversation — use pending flow to avoid creating empty conv in DB ──
     const tempId = `pending_${crypto.randomUUID()}`;
     pendingConvRef.current = { otherUser, tempId };
 
@@ -633,18 +681,30 @@ export default function Chat() {
     setContextMenu({ open: true, x: pos.x, y: pos.y, convId });
   }, [getSmartMenuPosition]);
 
-  const handleDeleteConversation = useCallback(async () => {
+  const [hiddenConvIds, setHiddenConvIds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('hiddenConvIds') || '[]');
+    } catch { return []; }
+  });
+
+  // Filter out hidden conversations from the list (but keep them in the full state for cache)
+  const visibleConversations = React.useMemo(() => {
+    return conversations.filter(c => !hiddenConvIds.includes(c.id));
+  }, [conversations, hiddenConvIds]);
+
+  // Persist hidden IDs to localStorage
+  useEffect(() => {
+    localStorage.setItem('hiddenConvIds', JSON.stringify(hiddenConvIds));
+  }, [hiddenConvIds]);
+
+  const handleDeleteConversation = useCallback(() => {
     const convId = contextMenu.convId;
     if (!convId) return;
     setContextMenu({ open: false, x: 0, y: 0, convId: null });
-    try {
-      await deleteConversation(convId);
-      setConversations((prev) => prev.filter(c => c.id !== convId));
-      if (activeConvId === convId) {
-        setActiveConvId(null);
-      }
-    } catch (err) {
-      console.error('Error deleting conversation:', err);
+    // Solo local: ocultar la conversación, no tocar la DB
+    setHiddenConvIds((prev) => [...prev, convId]);
+    if (activeConvId === convId) {
+      setActiveConvId(null);
     }
   }, [contextMenu.convId, activeConvId]);
 
@@ -1034,6 +1094,10 @@ export default function Chat() {
       pendingConvRef.current = null;
       // Mark that we're resolving a pending conversation — useLayoutEffect should not wipe messages
       skipCacheWipeRef.current = true;
+      // Also skip the useEffect that loads messages (conv has no messages yet, sendContent handles them)
+      skipMsgLoadRef.current = true;
+      // If this conversation was previously hidden (deleted locally), unhide it
+      setHiddenConvIds((prev) => prev.filter(id => id !== convId));
       // Update state with the real conversation ID
       setActiveConvId(convId);
       setConversations(prev => prev.map(c => c.id === activeConvId ? { ...c, id: convId } : c));
@@ -1347,14 +1411,14 @@ export default function Chat() {
       <div className="chat-list-items">
         {convsLoading ? (
           <div className="chat-list-loading">{t('common.loading')}</div>
-        ) : conversations.length === 0 ? (
+        ) : visibleConversations.length === 0 ? (
           <div className="chat-list-empty">
             <div className="chat-list-empty-icon"><FaComment /></div>
             <p>{t('chat.empty')}</p>
             <p className="chat-list-empty-sub">{t('chat.empty_sub')}</p>
           </div>
         ) : (
-          conversations.map((conv) => (
+          visibleConversations.map((conv) => (
             <button
               key={conv.id}
               className={`chat-list-item ${conv.id === activeConvId ? 'chat-list-item--active' : ''}`}
@@ -1710,18 +1774,6 @@ export default function Chat() {
         )}
       </div>
 
-      {/* ── Typing indicator ── */}
-      {otherUserTyping && (
-        <div className="chat-typing-indicator">
-          <div className="chat-typing-dots">
-            <span className="chat-typing-dot"></span>
-            <span className="chat-typing-dot"></span>
-            <span className="chat-typing-dot"></span>
-          </div>
-          <span className="chat-typing-label">{otherUser?.username || t('common.unknown')} {t('chat.typing') || 'typing...'}</span>
-        </div>
-      )}
-
       {/* Reply bar */}
       {replyingTo && (
         <div className="chat-reply-bar">
@@ -1747,6 +1799,17 @@ export default function Chat() {
 
       {/* Input + actions */}
       <div className="chat-messages-input">
+        {/* ── Typing indicator (absolute, does not push) ── */}
+        {otherUserTyping && (
+          <div className="chat-typing-indicator">
+            <div className="chat-typing-dots">
+              <span className="chat-typing-dot"></span>
+              <span className="chat-typing-dot"></span>
+              <span className="chat-typing-dot"></span>
+            </div>
+            <span className="chat-typing-label">{otherUser?.username || t('common.unknown')} {t('chat.typing') || 'typing...'}</span>
+          </div>
+        )}
         {/* Media preview */}
         {mediaPreviewUrl && (
           <div className="chat-media-preview">

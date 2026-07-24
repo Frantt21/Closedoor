@@ -331,6 +331,7 @@
     flex-direction: column;
     min-width: 0;
     overflow: hidden;
+    position: relative;
 }
 
 /* ── Welcome placeholder when no conversation selected ── */
@@ -807,7 +808,7 @@
     cursor: pointer;
 }
 
-/* ── Typing indicator ── */
+/* ── Typing indicator (absolutely positioned inside .chat-messages-input, floats above it) ── */
 .chat-typing-indicator {
     display: flex;
     align-items: center;
@@ -816,6 +817,13 @@
     font-size: 0.78rem;
     color: var(--color-text-muted, #6b7280);
     animation: fcFadeIn 0.15s ease;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    z-index: 5;
+    pointer-events: none;
+    background: linear-gradient(to top, var(--color-bg, #000000) 70%, transparent);
 }
 
 .chat-typing-dots {

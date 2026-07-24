@@ -309,6 +309,7 @@
   "post.shared_to_chat": "Post shared! Opening chat...",
   "post.share_error": "Error sharing post",
   "post.share_no_following": "You don't follow anyone to share with",
+  "post.show_more": "Show more",
   "post.replies_depth_limit": "Reply too deep. Create a new comment instead.",
   "post.reply": "Reply",
   "post.reply_placeholder": "Write a reply to @{user}...",

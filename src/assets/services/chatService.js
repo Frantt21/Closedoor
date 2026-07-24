@@ -520,13 +520,19 @@ export async function addReaction(messageId, userId, emoji) {
 }
 
 /**
- * Delete a conversation by ID (cascade deletes messages and participants)
+ * Delete a conversation for the current user only.
+ * Removes the participant row so the conversation disappears from the user's list,
+ * but the conversation and messages remain in the DB for the other participant.
  */
-export async function deleteConversation(conversationId) {
+export async function deleteConversation(conversationId, userId) {
+  if (!userId) {
+    throw new Error('User ID required to delete conversation');
+  }
   const { error } = await supabase
-    .from('conversations')
+    .from('chat_participants')
     .delete()
-    .eq('id', conversationId);
+    .eq('conversation_id', conversationId)
+    .eq('user_id', userId);
 
   if (error) {
     console.error('Error deleting conversation:', error);

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useI18n } from '../services/i18n/useI18n';
@@ -17,6 +17,14 @@ export default function HashtagPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { t } = useI18n();
+
+  const goBack = useCallback(() => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate('/');
+    }
+  }, [navigate]);
 
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -103,7 +111,7 @@ export default function HashtagPage() {
   return (
     <div className="post-detail-page">
       <div className="hashtag-header">
-        <button className="post-detail-back" onClick={() => navigate(-1)}>
+        <button className="post-detail-back" onClick={goBack}>
           <FaArrowLeft /> {t('post.back')}
         </button>
         <div className="hashtag-title">
