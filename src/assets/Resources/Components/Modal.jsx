@@ -128,6 +128,7 @@ export default function Modal({
   const [showUrlModal, setShowUrlModal] = useState(null);
   const [urlInput, setUrlInput] = useState('');
   const [uploadingToCdn, setUploadingToCdn] = useState(false);
+  const [uploadingBgToCdn, setUploadingBgToCdn] = useState(false);
   const [showSuggested, setShowSuggested] = useState(false);
   const [socialLinksExpanded, setSocialLinksExpanded] = useState(false);
   const [showProfileBgSubmodal, setShowProfileBgSubmodal] = useState(null);
@@ -422,25 +423,49 @@ export default function Modal({
     setShowUrlModal(type);
   };
 
-  // ── Upload file to CDN ──
+  // ── Upload file to CDN (avatar/banner or profile background) ──
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
-    if (!file || !user?.id || !showUrlModal) return;
+    if (!file || !user?.id) return;
 
     if (!file.type.startsWith('image/')) {
       toast.error(t('modal.invalid_image_type') || 'Invalid image type');
       return;
     }
 
-    setUploadingToCdn(true);
+    const isBg = !!showProfileBgSubmodal;
+    const uploadType = isBg ? 'banner' : showUrlModal;
+    if (!uploadType) return;
+
+    if (isBg) {
+      setUploadingBgToCdn(true);
+    } else {
+      setUploadingToCdn(true);
+    }
     try {
-      const result = await uploadImage(file, user.id, showUrlModal);
-      setUrlInput(result.url);
+      const result = await uploadImage(file, user.id, uploadType);
+      // Apply image directly instead of putting URL in the input
+      if (isBg) {
+        setProfileBg(result.url);
+        if (result.url && !profileBgPosition) setProfileBgPosition('50% 50%');
+        setShowProfileBgSubmodal(null);
+        setProfileBgUrlInput('');
+      } else if (showUrlModal === 'avatar') {
+        setAvatar(result.url);
+        setShowUrlModal(null);
+      } else if (showUrlModal === 'banner') {
+        setBanner(result.url);
+        setShowUrlModal(null);
+      }
     } catch (err) {
       console.error('CDN upload error:', err);
       toast.error(err.message || 'Upload failed');
     } finally {
-      setUploadingToCdn(false);
+      if (isBg) {
+        setUploadingBgToCdn(false);
+      } else {
+        setUploadingToCdn(false);
+      }
       // Reset file input so the same file can be re-selected
       e.target.value = '';
     }
@@ -1253,25 +1278,6 @@ export default function Modal({
               )}
             </div>
 
-            {/* ── Banner Dim ── */}
-            <div className="fc-modal-card">
-              <label className="fc-modal-label">{t('modal.banner_dim') || 'Banner darkness'}</label>
-              <div className="fc-modal-range-row">
-                <span className="fc-modal-range-label">{t('modal.banner_dim_desc') || 'Dark overlay for text contrast'}</span>
-                <div className="fc-modal-range-control">
-                  <input
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="5"
-                    value={bannerDim}
-                    onChange={(e) => setBannerDim(Number(e.target.value))}
-                    className="fc-modal-range"
-                  />
-                  <span className="fc-modal-range-value">{bannerDim}%</span>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
 
@@ -1348,17 +1354,47 @@ export default function Modal({
         {/* ── Image position editor ── */}
         {urlInput.trim() && (
           <div style={{ marginTop: 10 }}>
-            <ImagePositionEditor
-              key={`pos-editor-${showUrlModal}`}
-              imageUrl={urlInput.trim()}
-              initialPosition={showUrlModal === 'avatar' ? avatarPosition : bannerPosition}
-              aspectRatio={showUrlModal === 'avatar' ? 1 : 40 / 11}
-              circular={showUrlModal === 'avatar'}
-              onPositionChange={(pos) => {
-                if (showUrlModal === 'avatar') setAvatarPosition(pos);
-                else setBannerPosition(pos);
-              }}
-            />
+              <ImagePositionEditor
+                key={`pos-editor-${showUrlModal}`}
+                imageUrl={urlInput.trim()}
+                initialPosition={showUrlModal === 'avatar' ? avatarPosition : bannerPosition}
+                aspectRatio={showUrlModal === 'avatar' ? 1 : 40 / 11}
+                circular={showUrlModal === 'avatar'}
+                onPositionChange={(pos) => {
+                  if (showUrlModal === 'avatar') setAvatarPosition(pos);
+                  else setBannerPosition(pos);
+                }}
+                overlay={showUrlModal === 'banner' ? (
+                  <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    zIndex: 5,
+                    pointerEvents: 'none',
+                    background: `linear-gradient(180deg, rgba(0,0,0,${bannerDim / 100 * 0.6}) 0%, rgba(0,0,0,${Math.min(bannerDim / 100 * 1.3, 1.0)}) 100%)`,
+                    borderRadius: 'inherit',
+                  }} />
+                ) : null}
+              />
+            {/* ── Banner dim slider (only for banner) ── */}
+            {showUrlModal === 'banner' && (
+              <div style={{ marginTop: 12 }}>
+                <div className="fc-modal-range-row">
+                  <span className="fc-modal-range-label">{t('modal.banner_dim') || 'Banner darkness'}</span>
+                  <div className="fc-modal-range-control">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      step="5"
+                      value={bannerDim}
+                      onChange={(e) => setBannerDim(Number(e.target.value))}
+                      className="fc-modal-range"
+                    />
+                    <span className="fc-modal-range-value">{bannerDim}%</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
         <div className="fc-modal-sub-actions">
@@ -1393,6 +1429,20 @@ export default function Modal({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
+          <div className="fc-modal-upload-row">
+            <label className="fc-modal-upload-btn">
+              {uploadingBgToCdn ? <FaSpinner className="fc-spin" /> : <FaUpload />}
+              <span>{uploadingBgToCdn ? t('common.loading') : t('modal.upload_image') || 'Subir imagen'}</span>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                onChange={handleFileUpload}
+                disabled={uploadingBgToCdn}
+                style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
+              />
+            </label>
+            <span className="fc-modal-upload-or">{t('modal.or_paste_url') || 'O pega una URL'}</span>
+          </div>
           <input
             className="fc-modal-input"
             value={profileBgUrlInput}

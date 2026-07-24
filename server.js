@@ -17,6 +17,7 @@ import { createClient } from '@supabase/supabase-js';
 import { readFileSync, existsSync } from 'fs';
 import { resolve, join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import http from 'http';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIST = join(__dirname, 'dist');
@@ -93,8 +94,59 @@ function escapeHtml(str) {
     .replace(/'/g, '&#039;');
 }
 
+// ── CDN proxy config ──
+const CDN_TARGET = process.env.CDN_TARGET || 'http://api.foranly.space:24587';
+
+// ── Forward CDN requests to the Go CDN server (fixes Mixed Content on HTTPS) ──
+const cdnProxy = (req, res) => {
+  const cdnPath = req.originalUrl.replace(/^\/cdn/, '/cdn');
+  const options = new URL(CDN_TARGET + cdnPath);
+
+  const proxyReq = http.request(
+    {
+      hostname: options.hostname,
+      port: options.port,
+      path: options.pathname + options.search,
+      method: req.method,
+      headers: {
+        ...req.headers,
+        'X-Forwarded-Host': req.get('host'),
+        'X-Forwarded-Proto': req.protocol,
+        // Remove host header so the CDN server uses the forwarded one
+        host: options.host,
+      },
+      timeout: 30000,
+    },
+    (proxyRes) => {
+      // Forward headers from CDN server
+      const forwardHeaders = ['content-type', 'content-length', 'cache-control', 'x-content-type-options'];
+      forwardHeaders.forEach((h) => {
+        if (proxyRes.headers[h]) res.setHeader(h, proxyRes.headers[h]);
+      });
+      res.status(proxyRes.statusCode);
+      proxyRes.pipe(res);
+    }
+  );
+
+  proxyReq.on('error', (err) => {
+    console.warn('CDN proxy error:', err.message);
+    if (!res.headersSent) res.status(502).json({ success: false, error: 'CDN proxy error: ' + err.message });
+  });
+
+  proxyReq.on('timeout', () => {
+    proxyReq.destroy();
+    if (!res.headersSent) res.status(504).json({ success: false, error: 'CDN timeout' });
+  });
+
+  // Forward request body (for POST uploads)
+  req.pipe(proxyReq);
+};
+
 // ── Serve static files from dist ──
 app.use(express.static(DIST));
+
+// ── CDN proxy routes (before catch-all to intercept CDN requests) ──
+app.all('/cdn/*', cdnProxy);
 
 // ── Profile route: fetch user data and inject OG tags ──
 app.get('/profile/:username', async (req, res) => {

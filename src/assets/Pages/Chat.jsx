@@ -25,7 +25,7 @@ import { getFollowing } from '../services/followService';
 import { isBlocked, getCachedBlockStatus, cacheBlockStatus } from '../services/blockService';
 import FollowButton from '../Resources/Components/FollowButton';
 import ModalShell from '../Resources/Components/ModalShell';
-import { FaComment, FaSearch, FaArrowLeft, FaPlus, FaTimes, FaUserPlus, FaUsers, FaTrash, FaThumbtack, FaCopy, FaEdit, FaCheck, FaSmile, FaReply, FaImage, FaMusic, FaUser, FaPhone, FaLock } from 'react-icons/fa';
+import { FaComment, FaSearch, FaArrowLeft, FaPlus, FaTimes, FaUserPlus, FaUsers, FaTrash, FaThumbtack, FaCopy, FaEdit, FaCheck, FaSmile, FaReply, FaImage, FaMusic, FaUser, FaPhone, FaLock, FaUpload, FaSpinner } from 'react-icons/fa';
 import Avatar from '../Resources/Components/Avatar';
 import Badge from '../Resources/Components/Badge';
 import Tooltip from '../Resources/Components/Tooltip';
@@ -36,6 +36,7 @@ import RichText from '../Resources/Components/RichText';
 import SafeImage from '../Resources/Components/SafeImage';
 import { toast } from 'react-toastify';
 import { supabase } from '../services/supabaseclient';
+import { uploadImage } from '../services/cdnService';
 import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/chat.css';
 import '../Resources/Styles/explore.css';
@@ -95,6 +96,7 @@ export default function Chat() {
   const [showInputEmojiPicker, setShowInputEmojiPicker] = useState(false);
   const [inputEmojiTab, setInputEmojiTab] = useState(0);
   const [mediaPreviewUrl, setMediaPreviewUrl] = useState('');
+  const [uploadingChatMedia, setUploadingChatMedia] = useState(false);
   const editRef = useRef(null);
   // Preserve content during modal close animation (ref survives state clears)
   const editContentRef = useRef('');
@@ -907,6 +909,31 @@ export default function Chat() {
     setMediaUrl('');
     setTimeout(() => inputRef.current?.focus(), 50);
   }, [mediaUrl]);
+
+  // ── Upload image file to CDN for chat ──
+  const handleChatMediaUpload = useCallback(async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.id) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error(t('modal.invalid_image_type') || 'Invalid image type');
+      return;
+    }
+
+    setUploadingChatMedia(true);
+    try {
+      const result = await uploadImage(file, user.id, 'chat');
+      setMediaPreviewUrl(result.url);
+      setShowMediaInput(false);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    } catch (err) {
+      console.error('CDN upload error:', err);
+      toast.error(err.message || 'Upload failed');
+    } finally {
+      setUploadingChatMedia(false);
+      e.target.value = '';
+    }
+  }, [user?.id, t]);
 
   // ── Insert emoji at cursor position in the input ──
   const handleInputEmojiSelect = useCallback((emoji) => {
@@ -1902,6 +1929,16 @@ export default function Chat() {
         {/* Media URL input */}
         {showMediaInput && (
           <div className="chat-media-input-bar">
+            <label className="chat-media-upload-btn">
+              {uploadingChatMedia ? <FaSpinner className="fc-spin" /> : <FaUpload />}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                onChange={handleChatMediaUpload}
+                disabled={uploadingChatMedia}
+                style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
+              />
+            </label>
             <input
               className="chat-media-input"
               type="url"

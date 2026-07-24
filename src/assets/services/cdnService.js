@@ -4,7 +4,7 @@
  * Supports: avatar, banner, post, chat images
  */
 
-const CDN_BASE = import.meta.env.VITE_CDN_URL || 'http://api.foranly.space:24587';
+const CDN_BASE = import.meta.env.VITE_CDN_URL || '';
 
 /**
  * Upload an image to the CDN server.
@@ -93,6 +93,7 @@ export function getCdnUrl(fileId) {
  * @returns {boolean}
  */
 export function isCdnUrl(url) {
+  if (!CDN_BASE) return false;
   return url?.startsWith(CDN_BASE) || false;
 }
 

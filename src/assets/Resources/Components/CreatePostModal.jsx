@@ -5,13 +5,15 @@ import { createPost, updatePost, notifyMentions, notifyEncryptedAdd, extractMent
 import { searchProfiles } from '../../services/userService';
 import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../services/i18n/useI18n';
-import { FaImage, FaTimes, FaPlus, FaMinus, FaLink, FaLock, FaUnlock, FaUserPlus, FaCheck, FaSearch, FaRegHeart, FaHeartBroken, FaComment, FaRetweet, FaEye, FaPoll, FaCalendarAlt, FaClock, FaGlobe, FaUserFriends, FaBan, FaExclamationTriangle, FaBookmark, FaRegBookmark } from 'react-icons/fa';
+import { FaImage, FaTimes, FaPlus, FaMinus, FaLink, FaLock, FaUnlock, FaUserPlus, FaCheck, FaSearch, FaRegHeart, FaHeartBroken, FaComment, FaRetweet, FaEye, FaPoll, FaCalendarAlt, FaClock, FaGlobe, FaUserFriends, FaBan, FaExclamationTriangle, FaBookmark, FaRegBookmark, FaUpload, FaSpinner } from 'react-icons/fa';
 import SafeImage from './SafeImage';
 import Avatar from './Avatar';
 import Badge from './Badge';
 import GifPicker from './GifPicker';
 import { IMG_RE, VID_RE, YOUTUBE_PATTERN, VIMEO_PATTERN, extractUrls, detectMediaFromContent, getEmbedUrl as getEmbedUrlHelper } from '../../services/helpers';
 import ConfirmModal from './ConfirmModal';
+import { toast } from 'react-toastify';
+import { uploadImage } from '../../services/cdnService';
 import Tooltip from './Tooltip';
 import { encode as encryptEncode, encryptForUsers, decryptForUser } from '../../services/alphabetEncryption';
 import { supabase } from '../../services/supabaseclient';
@@ -37,6 +39,7 @@ export default function CreatePostModal({
   const [previewType, setPreviewType] = useState(null);
   const [imageUrls, setImageUrls] = useState(['']);
   const [showImageSection, setShowImageSection] = useState(false);
+  const [uploadingPostIndex, setUploadingPostIndex] = useState(-1);
   const [mediaLimitWarning, setMediaLimitWarning] = useState(null);
 
   // ── @ Mention autocomplete (shared hook) ──
@@ -302,6 +305,35 @@ export default function CreatePostModal({
 
   const removeImageUrlInput = (index) => {
     setImageUrls((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // ── Upload post image to CDN ──
+  const handlePostImageUpload = async (e, index) => {
+    const file = e.target.files?.[0];
+    if (!file || !userId) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error(t('modal.invalid_image_type') || 'Invalid image type');
+      return;
+    }
+
+    setUploadingPostIndex(index);
+    try {
+      const result = await uploadImage(file, userId, 'post');
+      setImageUrls((prev) => {
+        const updated = [...prev];
+        updated[index] = result.url;
+        return updated;
+      });
+      // Ensure image section is visible
+      setShowImageSection(true);
+    } catch (err) {
+      console.error('CDN upload error:', err);
+      toast.error(err.message || 'Upload failed');
+    } finally {
+      setUploadingPostIndex(-1);
+      e.target.value = '';
+    }
   };
 
   const handleSubmit = async () => {
@@ -944,6 +976,16 @@ export default function CreatePostModal({
                 </div>
                 {imageUrls.map((url, index) => (
                   <div key={url} className="create-post-image-input-row">
+                    <label className="create-post-image-upload-btn">
+                      {uploadingPostIndex === index ? <FaSpinner className="fc-spin" /> : <FaUpload />}
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        onChange={(e) => handlePostImageUpload(e, index)}
+                        disabled={uploadingPostIndex === index}
+                        style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
+                      />
+                    </label>
                     <input
                       className="fc-modal-input create-post-image-input"
                       type="url"

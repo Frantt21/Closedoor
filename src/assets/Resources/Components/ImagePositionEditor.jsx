@@ -19,6 +19,7 @@ import { FaSearchPlus, FaSearchMinus, FaUndo, FaArrowsAltH, FaArrowsAltV, FaRedo
  *  - aspectRatio: number       — aspect ratio del contenedor
  *  - circular: boolean         — si es true, borderRadius: 50%
  *  - onPositionChange: (encoded: string) => void
+ *  - overlay: ReactNode        — contenido superpuesto sobre la imagen (ej. dim overlay del banner)
  */
 
 function parseEncodedPosition(pos) {
@@ -70,6 +71,7 @@ export default function ImagePositionEditor({
   aspectRatio = 40 / 11,
   circular = false,
   onPositionChange,
+  overlay = null,
 }) {
   const [pos, setPos] = useState(() => parseEncodedPosition(initialPosition));
   const containerRef = useRef(null);
@@ -81,11 +83,14 @@ export default function ImagePositionEditor({
   }, [onPositionChange]);
 
   const updatePos = useCallback((updater) => {
+    let next;
     setPos((prev) => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      notify(next);
+      next = typeof updater === 'function' ? updater(prev) : updater;
       return next;
     });
+    // notify MUST be called outside the setState updater to avoid
+    // "Cannot update a component while rendering a different component"
+    notify(next);
   }, [notify]);
 
   // ── Drag ──
@@ -221,6 +226,7 @@ export default function ImagePositionEditor({
             display: 'block',
           }}
         />
+        {overlay}
         <div
           style={{
             position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
