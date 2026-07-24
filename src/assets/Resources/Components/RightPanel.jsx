@@ -8,7 +8,7 @@ import { getTrendingCategory } from '../../services/trendingDictionary';
 import ProfileSidebar from './ProfileSidebar';
 import { getContrastText, isUUID } from '../../services/helpers';
 import useBgContrast from '../../../hooks/useBgContrast';
-import { FaFire, FaHashtag } from 'react-icons/fa';
+import { FaFire, FaHashtag, FaArrowRight } from 'react-icons/fa';
 import './css/rightPanel.css';
 
 const PROFILE_ROUTE = '/profile';
@@ -77,7 +77,7 @@ function TrendingHashtags({ t, surfaceStyle }) {
                 <FaFire className="right-panel-trending-subicon" />
                 {t('right_panel.trending_words')}
               </h4>
-              <div className="right-panel-trending-list">                  {words.slice(0, 5).map((item, i) => (
+              <div className="right-panel-trending-list">                  {words.slice(0, 3).map((item, i) => (
                   <Link
                     key={`word-${i}`}
                     to={`/hashtag/${encodeURIComponent(item.word)}?text=1`}
@@ -101,7 +101,7 @@ function TrendingHashtags({ t, surfaceStyle }) {
                 <FaHashtag className="right-panel-trending-subicon" />
                 {t('right_panel.trending_hashtags')}
               </h4>
-              <div className="right-panel-trending-list">                  {hashtags.slice(0, 5).map((item, i) => (
+              <div className="right-panel-trending-list">                  {hashtags.slice(0, 3).map((item, i) => (
                   <Link
                     key={`hash-${i}`}
                     to={`/hashtag/${encodeURIComponent(item.name)}`}
@@ -117,6 +117,12 @@ function TrendingHashtags({ t, surfaceStyle }) {
               </div>
             </div>
           )}
+
+          {/* ── Link a todas las tendencias ── */}
+          <Link to="/Trending" className="right-panel-trending-all">
+            <FaArrowRight className="right-panel-trending-all-icon" />
+            {t('right_panel.view_all') || 'Ver todas las tendencias'}
+          </Link>
         </>
       )}
     </div>

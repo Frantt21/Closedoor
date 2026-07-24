@@ -14,6 +14,7 @@ import Settings from './assets/Pages/Settings.jsx';
 import HashtagPage from './assets/Pages/HashtagPage.jsx';
 import Chat from './assets/Pages/Chat.jsx';
 import Comunidades from './assets/Pages/Comunidades.jsx';
+import Trending from './assets/Pages/Trending.jsx';
 import { I18nProvider } from './assets/services/i18n/I18nContext';
 import RightPanel from './assets/Resources/Components/RightPanel';
 import AppLoader from './assets/Resources/Components/AppLoader';
@@ -62,6 +63,7 @@ function App() {
               <Route path="/hashtag/:tag" element={<HashtagPage />} />
               <Route path="/Chat" element={<Chat />} />
               <Route path="/Communities" element={<Comunidades />} />
+              <Route path="/Trending" element={<Trending />} />
             </Routes>
           </main>
 

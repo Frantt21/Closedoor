@@ -138,6 +138,27 @@
   white-space: nowrap;
 }
 
+/* ── View all trending link ── */
+.right-panel-trending-all {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted, #6b7280);
+  text-decoration: none;
+  transition: color 0.15s ease;
+  margin-top: 2px;
+}
+
+.right-panel-trending-all:hover {
+  color: var(--color-text, #ffffff);
+}
+
+.right-panel-trending-all-icon {
+  font-size: 0.7rem;
+}
+
 /* ── Skeleton ── */
 
 .right-panel-skeleton-title {
