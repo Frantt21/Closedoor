@@ -1,0 +1,23 @@
+-- ════════════════════════════════════════════════════════
+-- Migration 039: Set REPLICA IDENTITY FULL on messages table
+-- ════════════════════════════════════════════════════════
+--
+-- Por defecto PostgreSQL usa REPLICA IDENTITY DEFAULT para las tablas,
+-- lo que significa que payload.old en eventos DELETE solo contiene
+-- la primary key (id). Esto impide que los handlers Realtime del chat
+-- puedan filtrar correctamente por conversation_id cuando ocurre un
+-- borrado de mensaje, ya que conversation_id no está disponible.
+--
+-- El handler DELETE en subscribeToMessages() usa el filtro:
+--   `conversation_id=eq.${conversationId}`
+-- Sin REPLICA IDENTITY FULL, este filtro nunca coincide porque
+-- conversation_id no está en el payload.old del DELETE.
+--
+-- Con REPLICA IDENTITY FULL, payload.old contendrá TODAS las columnas,
+-- permitiendo que el filtro funcione y que el otro participante del chat
+-- reciba el evento DELETE y elimine el mensaje de su estado local.
+--
+-- Mismo fix que la migration 024 para la tabla blocks.
+-- ════════════════════════════════════════════════════════
+
+ALTER TABLE messages REPLICA IDENTITY FULL;
