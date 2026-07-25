@@ -65,6 +65,7 @@ import PostCard from "../Resources/Components/PostCard";
 import CreatePostModal from "../Resources/Components/CreatePostModal";
 import FloatingActionButton from "../Resources/Components/FloatingActionButton";
 import { toast } from 'react-toastify';
+import { normalizeCdnUrl } from '../services/cdnService';
 
 function Profile() {
     const { t, showAccent, accentVisibility, showLikes, filterEncrypted, locale } = useI18n();
@@ -1621,8 +1622,8 @@ function Profile() {
                     onClose={() => setShowModal(false)}
                     onSave={handleSaveProfile}
                     initialUsername={modalUsername}
-                    initialAvatar={modalAvatar}
-                    initialBanner={modalBanner}
+                    initialAvatar={normalizeCdnUrl(modalAvatar)}
+                    initialBanner={normalizeCdnUrl(modalBanner)}
                     initialBio={modalBio}
                     initialSocialLinks={modalSocialLinks}
                     initialAccentColor={modalAccentColor}
@@ -1635,7 +1636,7 @@ function Profile() {
                     initialBannerCredits={ownProfile?.banner_credits || ''}
                     initialAvatarCredits={ownProfile?.avatar_credits || ''}                      initialBannerCredits={ownProfile?.banner_credits || ''}
                     initialAvatarCredits={ownProfile?.avatar_credits || ''}
-                    initialProfileBg={ownProfile?.profile_background_url || ''}
+                    initialProfileBg={normalizeCdnUrl(ownProfile?.profile_background_url || '')}
                     initialProfileBgPosition={ownProfile?.profile_background_position || '50% 50%'}
                     initialProfileBgBlur={ownProfile?.profile_background_blur ?? 0}
                     initialProfileBgDim={ownProfile?.profile_background_dim ?? 50}

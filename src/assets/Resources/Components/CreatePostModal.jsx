@@ -13,7 +13,7 @@ import GifPicker from './GifPicker';
 import { IMG_RE, VID_RE, YOUTUBE_PATTERN, VIMEO_PATTERN, extractUrls, detectMediaFromContent, getEmbedUrl as getEmbedUrlHelper } from '../../services/helpers';
 import ConfirmModal from './ConfirmModal';
 import { toast } from 'react-toastify';
-import { uploadImage } from '../../services/cdnService';
+import { uploadImage, uploadWithLocalPreview } from '../../services/cdnService';
 import Tooltip from './Tooltip';
 import { encode as encryptEncode, encryptForUsers, decryptForUser } from '../../services/alphabetEncryption';
 import { supabase } from '../../services/supabaseclient';
@@ -307,31 +307,55 @@ export default function CreatePostModal({
     setImageUrls((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // ── Upload post image to CDN ──
+  // ── Upload post image to CDN (optimistic: local preview, then background upload) ──
   const handlePostImageUpload = async (e, index) => {
     const file = e.target.files?.[0];
     if (!file || !userId) return;
 
     if (!file.type.startsWith('image/')) {
-      toast.error(t('modal.invalid_image_type') || 'Invalid image type');
+      toast.error(t('modal.invalid_image_type') || 'Invalid image type', { containerId: 'modal' });
       return;
     }
 
     setUploadingPostIndex(index);
+    const toastId = toast.loading(t('upload.uploading') || 'Subiendo imagen...', { containerId: 'modal' });
+
     try {
-      const result = await uploadImage(file, userId, 'post');
+      // Mostrar preview local instantáneo mientras se sube en background
+      const { localUrl, realUrlPromise } = uploadWithLocalPreview(file, userId, 'post');
       setImageUrls((prev) => {
         const updated = [...prev];
-        updated[index] = result.url;
+        updated[index] = localUrl;
         return updated;
       });
-      // Ensure image section is visible
       setShowImageSection(true);
+
+      // Esperar subida real en background y reemplazar URL
+      const realUrl = await realUrlPromise;
+      setImageUrls((prev) => {
+        const updated = [...prev];
+        updated[index] = realUrl;
+        return updated;
+      });
+
+      toast.update(toastId, {
+        render: t('upload.uploaded') || 'Imagen subida',
+        type: 'success',
+        isLoading: false,
+        autoClose: 2000,
+        containerId: 'modal',
+      });
     } catch (err) {
       console.error('CDN upload error:', err);
-      toast.error(err.message || 'Upload failed');
+      toast.update(toastId, {
+        render: err.message || 'Upload failed',
+        type: 'error',
+        isLoading: false,
+        autoClose: 3000,
+        containerId: 'modal',
+      });
     } finally {
-      setUploadingPostIndex(-1);
+      setUploadingPostIndex(-1); // solo habilitar submit cuando ya tenemos la URL real
       e.target.value = '';
     }
   };

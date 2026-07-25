@@ -39,7 +39,7 @@ import Tooltip from '../Resources/Components/Tooltip';
 import CreatePostModal from '../Resources/Components/CreatePostModal';
 import useMentionAutocomplete from '../hooks/useMentionAutocomplete';
 import { getTimeAgo, IMG_RE, VID_RE, getAvatarTransformStyle } from '../services/helpers';
-import { uploadImage } from '../services/cdnService';
+import { uploadImage, uploadWithLocalPreview } from '../services/cdnService';
 import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/post.css';
 
@@ -474,39 +474,78 @@ export default function PostDetail() {
     setReplyShowMedia(false);
   };
 
-  // ── CDN upload for comment media ──
+  // ── CDN upload for comment media (optimistic: local preview, then background upload) ──
   const handleCommentMediaUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file || !user?.id) return;
+
     setCommentUploading(true);
+    const toastId = toast.loading(t('upload.uploading') || 'Subiendo imagen...');
+
     try {
-      const result = await uploadImage(file, user.id, 'post');
-      setCommentMediaUrl(result.url);
+      // Mostrar preview local instantáneo mientras se sube en background
+      const { localUrl, realUrlPromise } = uploadWithLocalPreview(file, user.id, 'post');
+      setCommentMediaUrl(localUrl);
       setCommentShowMedia(true);
+
+      // Esperar subida real en background y reemplazar URL
+      const realUrl = await realUrlPromise;
+      setCommentMediaUrl(realUrl);
+
+      toast.update(toastId, {
+        render: t('upload.uploaded') || 'Imagen subida',
+        type: 'success',
+        isLoading: false,
+        autoClose: 2000,
+      });
     } catch (err) {
       console.error('Comment CDN upload error:', err);
-      toast.error(err.message || 'Upload failed');
+      toast.update(toastId, {
+        render: err.message || 'Upload failed',
+        type: 'error',
+        isLoading: false,
+        autoClose: 3000,
+      });
     } finally {
-      setCommentUploading(false);
-      // Reset input value so re-selecting same file triggers onChange
+      setCommentUploading(false); // solo habilitar submit cuando tenemos URL real
       e.target.value = '';
     }
   };
 
-  // ── CDN upload for reply media ──
+  // ── CDN upload for reply media (optimistic: local preview, then background upload) ──
   const handleReplyMediaUpload = async (e, commentId) => {
     const file = e.target.files?.[0];
     if (!file || !user?.id) return;
+
     setReplyUploading(commentId);
+    const toastId = toast.loading(t('upload.uploading') || 'Subiendo imagen...');
+
     try {
-      const result = await uploadImage(file, user.id, 'post');
-      setReplyMediaUrl(result.url);
+      // Mostrar preview local instantáneo mientras se sube en background
+      const { localUrl, realUrlPromise } = uploadWithLocalPreview(file, user.id, 'post');
+      setReplyMediaUrl(localUrl);
       setReplyShowMedia(true);
+
+      // Esperar subida real en background y reemplazar URL
+      const realUrl = await realUrlPromise;
+      setReplyMediaUrl(realUrl);
+
+      toast.update(toastId, {
+        render: t('upload.uploaded') || 'Imagen subida',
+        type: 'success',
+        isLoading: false,
+        autoClose: 2000,
+      });
     } catch (err) {
       console.error('Reply CDN upload error:', err);
-      toast.error(err.message || 'Upload failed');
+      toast.update(toastId, {
+        render: err.message || 'Upload failed',
+        type: 'error',
+        isLoading: false,
+        autoClose: 3000,
+      });
     } finally {
-      setReplyUploading(null);
+      setReplyUploading(null); // solo habilitar submit cuando tenemos URL real
       e.target.value = '';
     }
   };

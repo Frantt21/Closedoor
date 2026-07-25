@@ -33,9 +33,13 @@ export default function RightPanel() {
 // ── Trending widget: dos secciones ──
 const REFRESH_INTERVAL = 1000 * 60 * 5; // 5 min
 
+// Cache en memoria del módulo: sobrevive a remounts del componente
+// al navegar entre rutas (profile → home, chat → home, etc.)
+let trendingMemoryCache = { words: null, hashtags: null };
+
 function TrendingHashtags({ t, surfaceStyle }) {
-  const [words, setWords] = useState(() => getCachedTrendingWords());
-  const [hashtags, setHashtags] = useState(() => getCachedTrendingHashtags());
+  const [words, setWords] = useState(() => trendingMemoryCache.words ?? getCachedTrendingWords());
+  const [hashtags, setHashtags] = useState(() => trendingMemoryCache.hashtags ?? getCachedTrendingHashtags());
 
   const fetchTrending = useCallback(() => {
     Promise.all([
@@ -44,13 +48,22 @@ function TrendingHashtags({ t, surfaceStyle }) {
     ]).then(([newWords, newHashtags]) => {
       // Deduplicar: remover de palabras las que ya aparecen como hashtags
       const deduped = deduplicateTrending(newWords, newHashtags);
+      trendingMemoryCache.words = deduped;
+      trendingMemoryCache.hashtags = newHashtags;
       setWords(deduped);
       setHashtags(newHashtags);
     });
   }, []);
 
   useEffect(() => {
-    fetchTrending();
+    // Usar el cache en memoria primero (evita skeleton flash en remounts).
+    // Si no hay datos en memoria ni en localStorage, hace fetch.
+    const hasCache = (!!trendingMemoryCache.words && !!trendingMemoryCache.hashtags) ||
+      (!!getCachedTrendingWords() && !!getCachedTrendingHashtags());
+    if (!hasCache) {
+      fetchTrending();
+    }
+    // El intervalo mantiene los datos frescos periódicamente
     const interval = setInterval(fetchTrending, REFRESH_INTERVAL);
     return () => clearInterval(interval);
   }, [fetchTrending]);

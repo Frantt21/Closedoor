@@ -36,7 +36,7 @@ import RichText from '../Resources/Components/RichText';
 import SafeImage from '../Resources/Components/SafeImage';
 import { toast } from 'react-toastify';
 import { supabase } from '../services/supabaseclient';
-import { uploadImage } from '../services/cdnService';
+import { uploadImage, uploadWithLocalPreview } from '../services/cdnService';
 import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/chat.css';
 import '../Resources/Styles/explore.css';
@@ -312,9 +312,22 @@ export default function Chat() {
   // Restore conversations from sessionStorage on mount
   const convsSessionRestoredRef = useRef(false);
   if (!convsSessionRestoredRef.current && user?.id) {
-    const savedConvs = loadConvsFromSession();
-    if (savedConvs.length > 0) {
-      setConversations(savedConvs);
+    // Detect full reload to avoid serving stale cache
+    let isReload = false;
+    try {
+      const navEntries = performance.getEntriesByType ? performance.getEntriesByType('navigation') : null;
+      const navType = navEntries?.[0]?.type || (performance.navigation && performance.navigation.type === 1 ? 'reload' : 'navigate');
+      isReload = navType === 'reload';
+    } catch (e) { /* ignore */ }
+
+    if (isReload) {
+      try { sessionStorage.removeItem(getConvsSessionCacheKey()); } catch (e) {}
+    } else {
+      const savedConvs = loadConvsFromSession();
+      if (savedConvs.length > 0) {
+        setConversations(savedConvs);
+        setConvsLoading(false); // evitar flash de carga si hay cache válido
+      }
     }
     convsSessionRestoredRef.current = true;
   }
@@ -445,6 +458,12 @@ export default function Chat() {
   }, [user?.id]);
 
   useEffect(() => {
+    // Si las conversaciones se restauraron desde sessionStorage en este mount,
+    // saltar el fetch a la DB para evitar un round-trip innecesario al navegar rutas.
+    // La suscripción en tiempo real mantiene los datos frescos.
+    if (convsSessionRestoredRef.current && conversations.length > 0) {
+      return;
+    }
     loadConvs();
   }, [loadConvs]);
 
@@ -1059,16 +1078,35 @@ export default function Chat() {
     }
 
     setUploadingChatMedia(true);
+    const toastId = toast.loading(t('upload.uploading') || 'Subiendo imagen...');
+
     try {
-      const result = await uploadImage(file, user.id, 'chat');
-      setMediaPreviewUrl(result.url);
+      // Mostrar preview local instantáneo mientras se sube en background
+      const { localUrl, realUrlPromise } = uploadWithLocalPreview(file, user.id, 'chat');
+      setMediaPreviewUrl(localUrl);
       setShowMediaInput(false);
       setTimeout(() => inputRef.current?.focus(), 50);
+
+      // Esperar subida real en background y reemplazar URL
+      const realUrl = await realUrlPromise;
+      setMediaPreviewUrl(realUrl);
+
+      toast.update(toastId, {
+        render: t('upload.uploaded') || 'Imagen subida',
+        type: 'success',
+        isLoading: false,
+        autoClose: 2000,
+      });
     } catch (err) {
       console.error('CDN upload error:', err);
-      toast.error(err.message || 'Upload failed');
+      toast.update(toastId, {
+        render: err.message || 'Upload failed',
+        type: 'error',
+        isLoading: false,
+        autoClose: 3000,
+      });
     } finally {
-      setUploadingChatMedia(false);
+      setUploadingChatMedia(false); // solo habilitar send cuando tenemos URL real
       e.target.value = '';
     }
   }, [user?.id, t]);

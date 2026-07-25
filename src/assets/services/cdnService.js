@@ -57,6 +57,44 @@ function setCachedUpload(userId, type, file, result) {
 }
 
 /**
+ * Upload an image to the CDN server with optimistic local preview.
+ * Creates a blob:// URL from the file instantly for immediate display,
+ * then uploads to CDN in the background.
+ *
+ * @param {File} file - The image file to upload
+ * @param {string} userId - The user's UUID
+ * @param {'avatar'|'banner'|'post'|'chat'} type - Image type for sizing
+ * @returns {Promise<{localUrl: string, realUrlPromise: Promise<string>}>}
+ *
+ * Usage:
+ *   const { localUrl, realUrlPromise } = uploadWithLocalPreview(file, userId, type);
+ *   setPreview(localUrl);           // show instantly
+ *   const realUrl = await realUrlPromise;  // wait for CDN in background
+ *   setPreview(realUrl);            // swap with real URL
+ */
+export function uploadWithLocalPreview(file, userId, type) {
+  // Create local object URL instantly for preview
+  const localUrl = URL.createObjectURL(file);
+
+  // Start CDN upload in background
+  const realUrlPromise = uploadImage(file, userId, type)
+    .then(result => {
+      // ⚠️ Delayed cleanup: esperar a que React commitée la URL real
+      // antes de revocar el blob URL, para evitar ERR_FILE_NOT_FOUND
+      // en <img> que todavía apuntan al blob.
+      requestAnimationFrame(() => URL.revokeObjectURL(localUrl));
+      return result.url;
+    })
+    .catch(err => {
+      // Clean up on error: el blob ya no sirve
+      URL.revokeObjectURL(localUrl);
+      throw err;
+    });
+
+  return { localUrl, realUrlPromise };
+}
+
+/**
  * Upload an image to the CDN server.
  * Results are cached by file fingerprint — re-uploading the same file returns
  * the cached URL immediately without a network request.
@@ -74,7 +112,8 @@ export async function uploadImage(file, userId, type) {
   const cached = getCachedUpload(userId, type, file);
   if (cached) {
     console.debug('⚡ CDN cache hit:', file.name);
-    return cached;
+    // Normalizar URLs cacheadas de sesiones anteriores (forceHttps → relativa)
+    return { ...cached, url: normalizeCdnUrl(cached.url) };
   }
 
   // Validate file type
@@ -106,8 +145,11 @@ export async function uploadImage(file, userId, type) {
     throw new Error(data.error || 'Upload failed');
   }
 
+  // Si el CDN devolvió url (nueva subida) la normalizamos a ruta relativa.
+  // Si no (dedup hit: el CDN reusó un archivo existente y solo devolvió el id),
+  // construimos la URL relativa desde el id.
   const result = {
-    url: forceHttps(data.url),
+    url: data.url ? normalizeCdnUrl(data.url) : `/cdn/files/${data.id}`,
     id: data.id,
     width: data.width,
     height: data.height,
@@ -146,22 +188,35 @@ export async function deleteImage(imageId) {
  * @returns {string}
  */
 /**
- * Force HTTPS on any URL (fix Mixed Content issues when CDN server returns http://)
+ * Convert a CDN URL to a same-origin relative path so the browser loads it
+ * through the Vite proxy (dev) or Vercel rewrites (production) instead of
+ * hitting the HTTP-only CDN server directly over HTTPS.
+ *
+ *   http://api.foranly.space:24587/cdn/files/xxx → /cdn/files/xxx
  */
-function forceHttps(url) {
+export function normalizeCdnUrl(url) {
   if (!url) return url;
-  return url.replace(/^http:\/\//i, 'https://');
+  try {
+    const parsed = new URL(url);
+    return parsed.pathname + parsed.search + parsed.hash;
+  } catch {
+    return url;
+  }
 }
 
 /**
- * Get the full CDN URL for a file ID.
- * @param {string} fileId - The file UUID
+ * Get the CDN URL for a file ID, always returning a same-origin relative path.
+ * @param {string} fileId - The file UUID or full URL
  * @returns {string}
  */
 export function getCdnUrl(fileId) {
   if (!fileId) return '';
-  if (fileId.startsWith('http://') || fileId.startsWith('https://')) return forceHttps(fileId);
-  return `${CDN_BASE}/cdn/files/${fileId}`;
+  if (fileId.startsWith('http://') || fileId.startsWith('https://')) {
+    return normalizeCdnUrl(fileId);
+  }
+  // If it's already a relative path or just an ID, prepend /cdn/files/
+  if (fileId.startsWith('/cdn/')) return fileId;
+  return `/cdn/files/${fileId}`;
 }
 
 /**
@@ -170,8 +225,11 @@ export function getCdnUrl(fileId) {
  * @returns {boolean}
  */
 export function isCdnUrl(url) {
-  if (!CDN_BASE) return false;
-  return url?.startsWith(CDN_BASE) || false;
+  if (!url) return false;
+  // Las URLs ahora son relativas (/cdn/files/xxx) para evitar SSL errors
+  if (url.startsWith('/cdn/')) return true;
+  if (CDN_BASE && url.startsWith(CDN_BASE)) return true;
+  return false;
 }
 
 /**

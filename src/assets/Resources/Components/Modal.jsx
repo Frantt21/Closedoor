@@ -12,7 +12,7 @@ import { useI18n } from '../../services/i18n/useI18n';
 import { FaCamera, FaUpload, FaSpinner } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 import ImagePositionEditor from './ImagePositionEditor';
-import { uploadImage } from '../../services/cdnService';
+import { uploadImage, uploadWithLocalPreview } from '../../services/cdnService';
 import { useAuth } from '../../../hooks/useAuth';
 
 // Module-level color cache persists across modal mounts/unmounts
@@ -429,7 +429,7 @@ export default function Modal({
     if (!file || !user?.id) return;
 
     if (!file.type.startsWith('image/')) {
-      toast.error(t('modal.invalid_image_type') || 'Invalid image type');
+      toast.error(t('modal.invalid_image_type') || 'Invalid image type', { containerId: 'modal' });
       return;
     }
 
@@ -442,31 +442,69 @@ export default function Modal({
     } else {
       setUploadingToCdn(true);
     }
+
+    const toastId = toast.loading(t('upload.uploading') || 'Subiendo imagen...', { containerId: 'modal' });
+
     try {
-      const result = await uploadImage(file, user.id, uploadType);
-      // Apply image directly instead of putting URL in the input
+      // Mostrar preview local instantáneo mientras se sube en background
+      const { localUrl, realUrlPromise } = uploadWithLocalPreview(file, user.id, uploadType);
+
+      // Actualizar vista previa y también el input del submodal
+      // para que ImagePositionEditor muestre la imagen inmediatamente
       if (isBg) {
-        setProfileBg(result.url);
-        if (result.url && !profileBgPosition) setProfileBgPosition('50% 50%');
-        setShowProfileBgSubmodal(null);
-        setProfileBgUrlInput('');
+        setProfileBg(localUrl);
+        setProfileBgUrlInput(localUrl);
+        if (localUrl && !profileBgPosition) setProfileBgPosition('50% 50%');
       } else if (showUrlModal === 'avatar') {
-        setAvatar(result.url);
-        setShowUrlModal(null);
+        setAvatar(localUrl);
+        setUrlInput(localUrl);
       } else if (showUrlModal === 'banner') {
-        setBanner(result.url);
-        setShowUrlModal(null);
+        setBanner(localUrl);
+        setUrlInput(localUrl);
       }
+
+      // NO cerrar el submodal: el usuario debe poder ajustar la posición
+      // con ImagePositionEditor antes de confirmar. El Save/Apply se
+      // deshabilita mientras `uploadingToCdn` o `uploadingBgToCdn` esté activo.
+
+      // Esperar subida real en background y reemplazar URL
+      const realUrl = await realUrlPromise;
+
+      // Usar uploadType capturado (const antes del await) en vez de
+      // showUrlModal (que puede ser null si el usuario ya hizo Apply)
+      if (isBg) {
+        setProfileBg(realUrl);
+        setProfileBgUrlInput(realUrl);
+      } else if (uploadType === 'avatar') {
+        setAvatar(realUrl);
+        setUrlInput(realUrl);
+      } else if (uploadType === 'banner') {
+        setBanner(realUrl);
+        setUrlInput(realUrl);
+      }
+
+      toast.update(toastId, {
+        render: t('upload.uploaded') || 'Imagen subida',
+        type: 'success',
+        isLoading: false,
+        autoClose: 2000,
+        containerId: 'modal',
+      });
     } catch (err) {
       console.error('CDN upload error:', err);
-      toast.error(err.message || 'Upload failed');
+      toast.update(toastId, {
+        render: err.message || 'Upload failed',
+        type: 'error',
+        isLoading: false,
+        autoClose: 3000,
+        containerId: 'modal',
+      });
     } finally {
       if (isBg) {
-        setUploadingBgToCdn(false);
+        setUploadingBgToCdn(false); // solo habilitar save cuando tenemos URL real
       } else {
-        setUploadingToCdn(false);
+        setUploadingToCdn(false); // solo habilitar save cuando tenemos URL real
       }
-      // Reset file input so the same file can be re-selected
       e.target.value = '';
     }
   };
@@ -1398,7 +1436,7 @@ export default function Modal({
           </div>
         )}
         <div className="fc-modal-sub-actions">
-          <button type="button" className="fc-modal-sub-save" onClick={handleUrlModalSave}>
+          <button type="button" className="fc-modal-sub-save" onClick={handleUrlModalSave} disabled={uploadingToCdn}>
             {t('modal.apply')}
           </button>            <button type="button" className="fc-modal-sub-cancel" onClick={closeUrlSubmodal}>
               {t('modal.cancel')}
@@ -1474,7 +1512,7 @@ export default function Modal({
           </div>
         )}
         <div className="fc-modal-sub-actions">
-          <button type="button" className="fc-modal-sub-save" onClick={handleProfileBgModalSave}>
+          <button type="button" className="fc-modal-sub-save" onClick={handleProfileBgModalSave} disabled={uploadingBgToCdn}>
             {t('modal.apply')}
           </button>              <button type="button" className="fc-modal-sub-cancel" onClick={closeBgSubmodal}>
               {t('modal.cancel')}

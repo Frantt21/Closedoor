@@ -107,15 +107,16 @@ export default function ImagePositionEditor({
     lastMouse.current = { x: clientX, y: clientY };
 
     const rect = containerRef.current.getBoundingClientRect();
-    // Con background-size: 200%, mover el mouse el ancho del contenedor
-    // equivale a cambiar background-position de 0% a 100%
+    // El arrastre es libre: mapea el movimiento del mouse a porcentaje
+    // de la imagen. Sin constraints — el usuario puede arrastrar a cualquier
+    // posición (incluso negativa o >100) para un control total.
     const deltaX = (dx / rect.width) * 100;
     const deltaY = (dy / rect.height) * 100;
 
     updatePos((prev) => ({
       ...prev,
-      x: Math.max(0, Math.min(100, prev.x - deltaX)),
-      y: Math.max(0, Math.min(100, prev.y - deltaY)),
+      x: prev.x - deltaX,
+      y: prev.y - deltaY,
     }));
   }, [updatePos]);
 
@@ -162,7 +163,8 @@ export default function ImagePositionEditor({
 
   const buildTransform = () => {
     const t = [];
-    if (pos.zoom !== 1) t.push(`scale(${pos.zoom})`);
+    // Zoom se maneja con width/height + object-fit: cover, no con
+    // transform: scale(), para evitar clipping del borde del contenedor.
     if (pos.rotation !== 0) t.push(`rotate(${pos.rotation}deg)`);
     if (pos.flipX) t.push(`scaleX(-1)`);
     if (pos.flipY) t.push(`scaleY(-1)`);
@@ -217,9 +219,11 @@ export default function ImagePositionEditor({
           alt=""
           draggable={false}
           style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain',
+            // Zoom via tamaño real de la imagen + object-fit: cover
+            // El contenedor overflow:hidden recorta lo que sobresale sin distorsionar
+            width: `${100 * pos.zoom}%`,
+            height: `${100 * pos.zoom}%`,
+            objectFit: 'cover',
             objectPosition: `${pos.x}% ${pos.y}%`,
             transform: buildTransform(),
             willChange: 'transform',

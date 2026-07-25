@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { ToastContainer } from 'react-toastify';
 
 /**
  * ModalShell — wraps content in a native <dialog> element called via showModal().
@@ -143,6 +144,23 @@ export default function ModalShell({ isOpen, onClose, onEscape, className = '', 
         {!isIdle && children}
       </div>
       <div className="fc-modal-overlays" />
+      {/* Toast container inside the dialog's top layer — appears above ::backdrop */}
+      <ToastContainer
+        containerId="modal"
+        position="top-right"
+        autoClose={3000}
+        hideProgressBar={true}
+        newestOnTop
+        closeOnClick
+        pauseOnFocusLoss={false}
+        draggable={false}
+        pauseOnHover
+        theme="dark"
+        closeButton={false}
+        toastClassName="fc-toast"
+        bodyClassName="fc-toast-body"
+        style={{ position: 'fixed', top: 30, right: 30, zIndex: 2147483647 }}
+      />
     </dialog>
   );
 }
