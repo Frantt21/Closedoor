@@ -365,7 +365,7 @@ export async function decryptMessage(message, currentUserId) {
 /**
  * Subscribe to new messages in a conversation (realtime)
  */
-export function subscribeToMessages(conversationId, onMessage) {
+export function subscribeToMessages(conversationId, onMessage, onDelete) {
   return supabase
     .channel(`chat-${conversationId}`)
     .on(
@@ -416,6 +416,19 @@ export function subscribeToMessages(conversationId, onMessage) {
           .maybeSingle();
 
         onMessage({ ...msg, profiles: profile }, 'UPDATE');
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'messages',
+        filter: `conversation_id=eq.${conversationId}`,
+      },
+      (payload) => {
+        const deletedId = payload.old.id;
+        if (onDelete) onDelete(deletedId);
       }
     )
     .subscribe();

@@ -445,36 +445,45 @@ export default function Chat() {
     }
 
     // ══ Realtime subscription — ALWAYS subscribed, even when cache was fresh ══
-    const unsub = subscribeToMessages(convForThisEffect, async (newMsg, eventType) => {
-      if (aborted) return;
-      const content = await decryptMessage(newMsg, user.id);
-      if (aborted) return;
-      if (newMsg.shared_post_id && !sharedPosts[newMsg.shared_post_id]) {
-        try {
-          const postData = await getPost(newMsg.shared_post_id);
-          setSharedPosts(prev => ({ ...prev, [newMsg.shared_post_id]: postData }));
-        } catch {}
+    const unsub = subscribeToMessages(
+      convForThisEffect,
+      async (newMsg, eventType) => {
+        if (aborted) return;
+        const content = await decryptMessage(newMsg, user.id);
+        if (aborted) return;
+        if (newMsg.shared_post_id && !sharedPosts[newMsg.shared_post_id]) {
+          try {
+            const postData = await getPost(newMsg.shared_post_id);
+            setSharedPosts(prev => ({ ...prev, [newMsg.shared_post_id]: postData }));
+          } catch {}
+        }
+        if (eventType === 'UPDATE') {
+          setMessages((prev) => prev.map((msg) => msg.id === newMsg.id ? { ...msg, ...newMsg, decryptedContent: content } : msg));
+        } else {
+          setMessages((prev) => {
+            const exists = prev.some(m => m.id === newMsg.id);
+            if (exists) {
+              return prev.map(m => m.id === newMsg.id ? { ...m, ...newMsg, decryptedContent: content } : m);
+            }
+            return [...prev, { ...newMsg, decryptedContent: content }];
+          });
+          updateConvPreview(
+            convForThisEffect,
+            content || '',
+            newMsg.created_at,
+            newMsg.sender_id !== user.id
+          );
+          setTimeout(() => messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+        }
+        markAsRead(convForThisEffect, user.id);
+      },
+      // onDelete: called when a message is deleted by the other user
+      (deletedId) => {
+        if (aborted) return;
+        setMessages((prev) => prev.filter(m => m.id !== deletedId));
+        markAsRead(convForThisEffect, user.id);
       }
-      if (eventType === 'UPDATE') {
-        setMessages((prev) => prev.map((msg) => msg.id === newMsg.id ? { ...msg, ...newMsg, decryptedContent: content } : msg));
-      } else {
-        setMessages((prev) => {
-          const exists = prev.some(m => m.id === newMsg.id);
-          if (exists) {
-            return prev.map(m => m.id === newMsg.id ? { ...m, ...newMsg, decryptedContent: content } : m);
-          }
-          return [...prev, { ...newMsg, decryptedContent: content }];
-        });
-        updateConvPreview(
-          convForThisEffect,
-          content || '',
-          newMsg.created_at,
-          newMsg.sender_id !== user.id
-        );
-        setTimeout(() => messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' }), 50);
-      }
-      markAsRead(convForThisEffect, user.id);
-    });
+    );
 
     return () => {
       aborted = true;
