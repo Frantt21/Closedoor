@@ -546,6 +546,13 @@ export async function createComment({ postId, userId, content, parentId = null, 
     );
   }
 
+  // Notificar al autor del comentario padre cuando alguien responde a su comentario
+  if (parentId) {
+    notifyCommentReply(userId, postId, parentId).catch((err) =>
+      console.warn('Error notifying comment reply:', err)
+    );
+  }
+
   return data;
 }
 
@@ -620,6 +627,8 @@ export async function likeComment(commentId, userId) {
     console.error('Error liking comment:', error);
     throw error;
   }
+  // Nota: La notificación la maneja el DB trigger `notify_comment_like`
+  // en migrations/005_fix_counters_comment_likes.sql para evitar duplicados
 }
 
 export async function unlikeComment(commentId, userId) {
@@ -948,6 +957,56 @@ export async function notifyComment(actorId, postId) {
     }
   } catch (err) {
     console.warn('Error sending comment notification:', err);
+  }
+}
+
+/**
+ * Notify the parent comment author when someone replies to their comment
+ */
+export async function notifyCommentReply(actorId, postId, parentCommentId) {
+  if (!actorId || !postId || !parentCommentId) return;
+  try {
+    const { data: parentComment } = await supabase
+      .from('comments')
+      .select('user_id')
+      .eq('id', parentCommentId)
+      .single();
+
+    if (parentComment && parentComment.user_id !== actorId) {
+      await supabase.from('notifications').insert({
+        user_id: parentComment.user_id,
+        actor_id: actorId,
+        type: 'comment_reply',
+        reference_id: postId,
+      });
+    }
+  } catch (err) {
+    console.warn('Error sending comment reply notification:', err);
+  }
+}
+
+/**
+ * Notify the comment author when someone likes their comment (JS fallback for DB trigger)
+ */
+export async function notifyCommentLike(actorId, commentId) {
+  if (!actorId || !commentId) return;
+  try {
+    const { data: comment } = await supabase
+      .from('comments')
+      .select('user_id, post_id')
+      .eq('id', commentId)
+      .single();
+
+    if (comment && comment.user_id !== actorId) {
+      await supabase.from('notifications').insert({
+        user_id: comment.user_id,
+        actor_id: actorId,
+        type: 'comment_like',
+        reference_id: comment.post_id,
+      });
+    }
+  } catch (err) {
+    console.warn('Error sending comment like notification:', err);
   }
 }
 
