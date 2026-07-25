@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
 import './css/appLoader.css';
 
-const MIN_DISPLAY_MS = 500; // Show loader at least 500ms so it doesn't flash
+const MIN_DISPLAY_MS = 500;  // Show loader at least 500ms so it doesn't flash
+const FORCE_HIDE_TIMEOUT = 10000; // Force-hide loader after 10s if auth never resolves
 
 export default function AppLoader({ children }) {
   const { loading } = useAuth();
@@ -10,17 +11,32 @@ export default function AppLoader({ children }) {
   const [fadeOut, setFadeOut] = useState(false);
   const startTime = useRef(Date.now());
   const readyRef = useRef(false);
+  const forceTimerRef = useRef(null);
 
+  // ── Safety timeout: force-hide loader if auth stays loading too long ──
+  useEffect(() => {
+    forceTimerRef.current = setTimeout(() => {
+      if (!readyRef.current) {
+        console.warn('[AppLoader] Auth loading timed out — force-hiding loader');
+        readyRef.current = true;
+        setFadeOut(true);
+        setTimeout(() => setShowLoader(false), 400);
+      }
+    }, FORCE_HIDE_TIMEOUT);
+
+    return () => clearTimeout(forceTimerRef.current);
+  }, []);
+
+  // ── Normal flow: hide loader when auth resolves ──
   useEffect(() => {
     if (!loading && !readyRef.current) {
       readyRef.current = true;
+      clearTimeout(forceTimerRef.current);
       const elapsed = Date.now() - startTime.current;
       const remaining = Math.max(0, MIN_DISPLAY_MS - elapsed);
 
-      // Wait remaining time then fade out
       const timer = setTimeout(() => {
         setFadeOut(true);
-        // After fade animation completes, remove loader from DOM
         setTimeout(() => {
           setShowLoader(false);
         }, 400);
@@ -30,8 +46,16 @@ export default function AppLoader({ children }) {
     }
   }, [loading]);
 
-  // If both loading and ready (unlikely), show loader
-  // If ready and done fading, show children normally
+  // ── Handle bfcache / page-restore: reset so new auth check drives the loader ──
+  useEffect(() => {
+    const onShow = () => {
+      readyRef.current = false;
+      startTime.current = Date.now();
+    };
+    window.addEventListener('pageshow', onShow);
+    return () => window.removeEventListener('pageshow', onShow);
+  }, []);
+
   if (!showLoader) return children;
 
   return (
