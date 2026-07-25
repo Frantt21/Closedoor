@@ -2320,7 +2320,7 @@ dialog.fc-modal.chat-followers-modal {
         max-height: 30vh;
     }
 
-    chat-messages {
+    .chat-messages {
         overflow: hidden;
     }
 }
