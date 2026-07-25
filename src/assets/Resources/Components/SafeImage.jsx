@@ -25,6 +25,13 @@ export default function SafeImage({
 }) {
   const [hasError, setHasError] = useState(false);
 
+  const handleError = () => {
+    if (!hasError) {
+      console.warn('[SafeImage] Failed to load:', src?.slice(0, 80));
+      setHasError(true);
+    }
+  };
+
   if (hasError) {
     if (hideOnError) return null;
 
@@ -53,7 +60,7 @@ export default function SafeImage({
       alt={alt}
       className={className}
       onClick={onClick}
-      onError={() => setHasError(true)}
+      onError={handleError}
       style={style}
     />
   );

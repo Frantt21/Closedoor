@@ -2,12 +2,64 @@
  * FastChange CDN Service
  * Handles image uploads to the Go CDN server at api.foranly.space
  * Supports: avatar, banner, post, chat images
+ *
+ * Upload results are cached in sessionStorage by file fingerprint
+ * (userId + type + file.name + file.size + file.lastModified) so that
+ * re-uploading the same file returns instantly without a network request.
  */
 
 const CDN_BASE = import.meta.env.VITE_CDN_URL || '';
+const CACHE_PREFIX = 'cdn_upload_';
+
+/**
+ * Generate a cache key for the upload result.
+ * Uniquely identifies a file by its name, size, and lastModified timestamp,
+ * scoped to the user and upload type.
+ */
+function getUploadCacheKey(userId, type, file) {
+  return `${CACHE_PREFIX}${userId}_${type}_${file.name}_${file.size}_${file.lastModified}`;
+}
+
+/**
+ * Try to get a cached upload result for the given file.
+ * Returns the cached result or null if not found/expired.
+ */
+function getCachedUpload(userId, type, file) {
+  try {
+    const key = getUploadCacheKey(userId, type, file);
+    const cached = sessionStorage.getItem(key);
+    if (!cached) return null;
+    const parsed = JSON.parse(cached);
+    // Expire after 10 minutes so stale URLs eventually get refreshed
+    if (Date.now() - parsed.timestamp > 10 * 60 * 1000) {
+      sessionStorage.removeItem(key);
+      return null;
+    }
+    return parsed.result;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Save an upload result to the cache.
+ */
+function setCachedUpload(userId, type, file, result) {
+  try {
+    const key = getUploadCacheKey(userId, type, file);
+    sessionStorage.setItem(key, JSON.stringify({
+      result,
+      timestamp: Date.now(),
+    }));
+  } catch {
+    // sessionStorage might be full
+  }
+}
 
 /**
  * Upload an image to the CDN server.
+ * Results are cached by file fingerprint — re-uploading the same file returns
+ * the cached URL immediately without a network request.
  * @param {File} file - The image file to upload
  * @param {string} userId - The user's UUID
  * @param {'avatar'|'banner'|'post'|'chat'} type - Image type for sizing
@@ -16,6 +68,13 @@ const CDN_BASE = import.meta.env.VITE_CDN_URL || '';
 export async function uploadImage(file, userId, type) {
   if (!file || !userId || !type) {
     throw new Error('Missing required parameters: file, userId, type');
+  }
+
+  // ── Check local cache first (instant return for re-uploads) ──
+  const cached = getCachedUpload(userId, type, file);
+  if (cached) {
+    console.debug('⚡ CDN cache hit:', file.name);
+    return cached;
   }
 
   // Validate file type
@@ -47,13 +106,18 @@ export async function uploadImage(file, userId, type) {
     throw new Error(data.error || 'Upload failed');
   }
 
-  return {
+  const result = {
     url: data.url,
     id: data.id,
     width: data.width,
     height: data.height,
     sizeKB: data.size_kb,
   };
+
+  // Cache the result so re-uploading the same file is instant
+  setCachedUpload(userId, type, file, result);
+
+  return result;
 }
 
 /**

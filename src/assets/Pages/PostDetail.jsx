@@ -350,6 +350,15 @@ export default function PostDetail() {
           );
         }
       )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'comments', filter: `post_id=eq.${postId}` },
+        (payload) => {
+          // Eliminar comentario + sus replies del estado local en todos los clientes
+          const deletedId = payload.old.id;
+          setComments((prev) => prev.filter((c) => c.id !== deletedId && c.parent_id !== deletedId));
+        }
+      )
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
