@@ -66,11 +66,9 @@ body,
     min-height: 100%;
 }
 
-html {
-    scrollbar-gutter: stable;
-}
-
-/* ── Global scrollbar customization: no track background ── */
+/* ── Global scrollbar customization: track transparent, thumb visible ── */
+/* No scrollbar-gutter: stable — the scrollbar should overlay on top of content
+   without reserving real layout space, so it never affects the layout. */
 html::-webkit-scrollbar {
     width: 6px;
 }

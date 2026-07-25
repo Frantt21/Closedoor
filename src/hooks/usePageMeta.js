@@ -9,8 +9,10 @@ const SITE_NAME = 'Closedoor';
  */
 export default function usePageMeta({ title, description, image, url } = {}) {
   useEffect(() => {
-    // Title
-    document.title = title ? `${title} | ${SITE_NAME}` : SITE_NAME;
+    // Title — preserve any existing notification badge (e.g. "(3) ") set by NotificationContext
+    const base = title ? `${title} | ${SITE_NAME}` : SITE_NAME;
+    const match = document.title.match(/^(\(\d+\)\s*)?/);
+    document.title = (match && match[1]) ? `${match[1]}${base}` : base;
 
     // Remove previous dynamic meta tags
     document.querySelectorAll('meta[data-dynamic]').forEach((el) => el.remove());

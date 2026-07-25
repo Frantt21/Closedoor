@@ -1190,6 +1190,22 @@ function Profile() {
         return profilePosts;
     }, [profilePosts, postSubFilter]);
 
+    // ── Extract body background vars early (must be before early returns for hook ordering) ──
+    const bgUrl = activeProfile?.profile_background_url;
+    const bgDim = (activeProfile?.profile_background_dim ?? 50) / 100;
+    const hasBg = !!bgUrl;
+    const ownerShowAccentProfile = isOwnProfile
+      ? true
+      : (activeProfile?.show_accent_profile ?? true);
+    const ownerAccentVisibility = isOwnProfile
+      ? accentVisibility
+      : (activeProfile?.accent_visibility ?? 'both');
+    const accentVisible = showAccent && ownerShowAccentProfile && (
+      ownerAccentVisibility === 'both' ||
+      (ownerAccentVisibility === 'me' && isOwnProfile) ||
+      (ownerAccentVisibility === 'others' && !isOwnProfile)
+    );
+
     // ── Render ──
     if (!isAuthenticated && !profileUsername) {
         return <p>{t('profile.title')}</p>;
@@ -1246,28 +1262,11 @@ function Profile() {
     const surfColor = activeProfile?.accent_surface_color;
     const surfGlass = activeProfile?.accent_surface_glass === true;
 
-    // ── Background image ──
-    const bgUrl = activeProfile?.profile_background_url;
+    // ── Background image (blur/position only — url/dim/hasBg/accentVisible already extracted before early returns) ──
     const bgPosition = activeProfile?.profile_background_position || '50% 50%';
     const bgBlur = (activeProfile?.profile_background_blur ?? 0);
-    const bgDim = (activeProfile?.profile_background_dim ?? 50) / 100; // 0-1
-    const hasBg = !!bgUrl;
     const bgFullStyle = hasBg ? getBgFullStyle(activeProfile?.profile_background_position) : null;
 
-    // Para perfiles ajenos: usar las preferencias guardadas en la BD del dueño del perfil
-    // Para perfil propio: siempre mostrar (el toggle es para controlar qué ven los demás)
-    const ownerShowAccentProfile = isOwnProfile
-      ? true
-      : (activeProfile?.show_accent_profile ?? true);
-    const ownerAccentVisibility = isOwnProfile
-      ? accentVisibility
-      : (activeProfile?.accent_visibility ?? 'both');
-
-    const accentVisible = showAccent && ownerShowAccentProfile && (
-      ownerAccentVisibility === 'both' ||
-      (ownerAccentVisibility === 'me' && isOwnProfile) ||
-      (ownerAccentVisibility === 'others' && !isOwnProfile)
-    );
     const styleVars = accentVisible
       ? {
           ...(activeProfile?.accent_color ? {

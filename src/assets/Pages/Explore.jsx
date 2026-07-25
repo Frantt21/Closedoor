@@ -4,7 +4,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { useI18n } from "../services/i18n/useI18n";
 import usePageTitle from "../../hooks/usePageTitle";
 import { supabase } from "../services/supabaseclient";
-import { listProfiles } from "../services/userService";import { getImgTransformStyle } from '../services/helpers';
+import { listProfiles } from "../services/userService";import { getImgTransformStyle, getAvatarTransformStyle } from '../services/helpers';
 import { getFollowCounts,
   setCachedFollowStatus,
   getCachedExploreData,
@@ -399,7 +399,7 @@ function ExploreCard({ profile, counts, isOwnProfile, showAccent }) {
           className="explore-card-avatar"
           src={profile.avatar_url}
           alt={profile.username}
-          style={getImgTransformStyle(profile.avatar_position)}
+          style={getAvatarTransformStyle(profile.avatar_position)}
         />
 
         <div className="explore-card-info">

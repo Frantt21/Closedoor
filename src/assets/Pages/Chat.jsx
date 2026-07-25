@@ -2548,7 +2548,7 @@ export default function Chat() {
                 className="explore-card-avatar"
                 src={otherUser.avatar_url}
                 alt={otherUser.username || '?'}
-                style={getImgTransformStyle(otherUser.avatar_position)}
+                style={getAvatarTransformStyle(otherUser.avatar_position)}
               />
               <div className="explore-card-info">
                 <div className="explore-card-name-row">

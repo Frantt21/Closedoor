@@ -5,7 +5,7 @@ import '../Styles/explore.css';
 import Badge from './Badge';
 import ConfirmModal from './ConfirmModal';
 import Avatar from './Avatar';
-import { DEFAULT_AVATAR, getBgFullStyle, getImgTransformStyle } from '../../services/helpers';
+import { DEFAULT_AVATAR, getBgFullStyle, getImgTransformStyle, getAvatarTransformStyle } from '../../services/helpers';
 import { detectPlatform, getPlatformIcon, getPlatformName } from '../../services/socialPlatforms';
 import { extractColors } from '../../services/colorExtractor';
 import { useI18n } from '../../services/i18n/useI18n';
@@ -929,7 +929,7 @@ export default function Modal({
                   className="explore-card-avatar"
                   src={avatar || defaultAvatar}
                   alt=""
-                  style={getImgTransformStyle(avatarPosition)}
+                  style={getAvatarTransformStyle(avatarPosition)}
                   onError={(e) => { e.target.src = defaultAvatar; }}
                 />
 
