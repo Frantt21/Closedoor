@@ -821,8 +821,13 @@ export default function Chat() {
     editContentRef.current = msg.decryptedContent;
     const { imageUrl } = detectMediaFromContent(msg.decryptedContent);
     editMediaUrlRef.current = imageUrl || '';
+    // Strip image URL from text, so the user only edits the text portion
+    let cleanText = msg.decryptedContent;
+    if (imageUrl) {
+      cleanText = cleanText.replace(imageUrl, '').replace(/\n{2,}/g, '\n').trim();
+    }
     setEditMsgId(msg.id);
-    setEditText(msg.decryptedContent);
+    setEditText(cleanText);
     setShowEditModal(true);
   }, [msgMenu.msg]);
 
@@ -833,8 +838,13 @@ export default function Chat() {
   }, []);
 
   const handleSaveEdit = useCallback(async () => {
-    if (!editMsgId || !editText.trim() || !user?.id) return;
+    if (!editMsgId || (!editText.trim() && !editMediaUrlRef.current) || !user?.id) return;
     try {
+      // Reconstruct full content: text + image URL
+      const textPart = editText.trim();
+      const imagePart = editMediaUrlRef.current || '';
+      const fullContent = imagePart ? (textPart ? `${textPart}\n${imagePart}` : imagePart) : textPart;
+
       // Get participant IDs
       const { data: participants } = await supabase
         .from('chat_participants')
@@ -842,12 +852,11 @@ export default function Chat() {
         .eq('conversation_id', activeConvId);
       const participantIds = (participants || []).map(p => p.user_id).filter(id => id !== user.id);
 
-      await editMessage(editMsgId, user.id, editText.trim(), participantIds);
-      // Update local state with edited content (will be re-decrypted on next load)
-      // For now, just update decryptedContent and edited_at locally
+      await editMessage(editMsgId, user.id, fullContent, participantIds);
+      // Update local state with edited content
       setMessages((prev) => prev.map(m =>
         m.id === editMsgId
-          ? { ...m, decryptedContent: editText.trim(), edited_at: new Date().toISOString() }
+          ? { ...m, decryptedContent: fullContent, edited_at: new Date().toISOString() }
           : m
       ));
       setEditMsgId(null);
@@ -2400,11 +2409,11 @@ export default function Chat() {
                 <span>{t('chat.edit_title')}</span>
                 <textarea
                   ref={editRef}
-                  className="fc-modal-input chat-message-edit-input"
+                  className="chat-edit-modal-input"
                   value={editText}
                   onChange={(e) => setEditText(e.target.value)}
                   onKeyDown={handleEditKeyDown}
-                  rows={8}
+                  rows={4}
                   maxLength={2000}
                   placeholder={t('chat.edit_placeholder')}
                 />
@@ -2414,7 +2423,12 @@ export default function Chat() {
               <div className="chat-edit-modal-preview-header">
                 <span className="chat-edit-modal-preview-label">{t('chat.edit_preview')}</span>
               </div>
-              <div className="chat-edit-modal-preview-card">
+              <div className="chat-edit-modal-preview-bubble">
+                <div className="chat-edit-modal-preview-content">
+                  <p className="chat-edit-modal-preview-text">
+                    {editText || editContentRef.current || t('chat.encrypted')}
+                  </p>
+                </div>
                 {editMediaUrlRef.current && IMG_RE.test(editMediaUrlRef.current) && (
                   <div className="chat-edit-modal-preview-media">
                     <img
@@ -2425,11 +2439,6 @@ export default function Chat() {
                     />
                   </div>
                 )}
-                <div className="chat-edit-modal-preview-content">
-                  <p className="chat-edit-modal-preview-text">
-                    {editText || editContentRef.current || t('chat.encrypted')}
-                  </p>
-                </div>
               </div>
             </div>
           </div>
