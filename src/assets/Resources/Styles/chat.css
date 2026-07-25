@@ -330,7 +330,6 @@
     display: flex;
     flex-direction: column;
     min-width: 0;
-    overflow: hidden;
     position: relative;
 }
 
@@ -1652,7 +1651,119 @@
     }
 }
 
-/* ── Context menu ── */
+/* ── Desktop button wrappers — must be flex to keep buttons horizontal ── */
+.chat-header-actions-desktop {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.chat-input-actions-desktop {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.chat-header-mobile-menu-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: var(--radius-sm, 6px);
+    background: transparent;
+    color: var(--color-text-muted, #6b7280);
+    cursor: pointer;
+    font-size: 1.1rem;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+
+.chat-header-mobile-menu-btn:hover {
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+}
+
+/* ── Mobile header dropdown menu ── */
+.chat-mobile-header-menu {
+    position: fixed;
+    right: 12px;
+    z-index: 1100;
+    background: var(--color-surface, #1a1a1a);
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius, 10px);
+    overflow: hidden;
+    min-width: 170px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    animation: fcFadeIn 0.1s ease;
+}
+
+.chat-mobile-header-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 11px 16px;
+    text-align: left;
+    background: transparent;
+    border: none;
+    color: var(--color-text, #ffffff);
+    font-size: 0.85rem;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+
+.chat-mobile-header-menu-item:hover {
+    background: var(--overlay-bg);
+}
+
+.chat-mobile-header-menu-item.active {
+    color: var(--accent-color, #f472b6);
+}
+
+.chat-mobile-header-menu-item svg {
+    font-size: 0.85rem;
+    opacity: 0.6;
+}
+
+/* ── Mobile responsive overrides ── */
+@media (max-width: 1024px) {
+    .chat-header-actions-desktop {
+        display: none;
+    }
+
+    .chat-header-mobile-menu-btn {
+        display: flex;
+    }
+
+    .chat-messages-header {
+        position: relative; /* anchor for absolute dropdown */
+        flex-shrink: 0;    /* stay at top */
+    }
+
+    .chat-messages-input {
+        flex-shrink: 0;    /* stay at bottom */
+    }
+
+    .chat-messages-body {
+        min-height: 0;    /* allow body to shrink below content height */
+    }
+}
+
+@media (min-width: 1025px) {
+    .chat-header-actions-desktop {
+        display: flex;
+    }
+
+    .chat-header-mobile-menu-btn {
+        display: none;
+    }
+
+    .chat-input-actions-mobile {
+        display: none;
+    }
+}
 .chat-context-menu {
     position: fixed;
     z-index: 1100;
@@ -1849,8 +1960,8 @@ dialog.fc-modal.chat-followers-modal {
 
 @media (max-width: 1024px) {
     .chat-page {
-        height: auto;
-        min-height: calc(100vh - 80px);
+        height: calc(100vh - 64px);
+        height: calc(100dvh - 64px); /* dynamic viewport — accounts for mobile browser chrome + MobileNav */
     }
 
     .chat-list {
@@ -2201,11 +2312,11 @@ dialog.fc-modal.chat-followers-modal {
 @media (max-width: 500px) {
     .chat-float-panel {
         position: fixed;
-        top: auto;
+        /* top: auto; */
         right: 8px;
         left: 8px;
         bottom: 8px;
         width: auto;
-        max-height: 60vh;
+        max-height: 30vh;
     }
 }

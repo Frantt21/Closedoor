@@ -68,7 +68,7 @@ function App() {
           </main>
 
           {!isChatRoute && <RightPanel />}
-          {!isChatRoute && <MobileNav />}
+          <MobileNav />
           <ToastContainer
             position="top-right"
             autoClose={3000}

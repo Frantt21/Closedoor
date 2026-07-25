@@ -25,7 +25,7 @@ import { getFollowing } from '../services/followService';
 import { isBlocked, getCachedBlockStatus, cacheBlockStatus } from '../services/blockService';
 import FollowButton from '../Resources/Components/FollowButton';
 import ModalShell from '../Resources/Components/ModalShell';
-import { FaComment, FaSearch, FaArrowLeft, FaPlus, FaTimes, FaUserPlus, FaUsers, FaTrash, FaThumbtack, FaCopy, FaEdit, FaCheck, FaSmile, FaReply, FaImage, FaMusic, FaUser, FaPhone, FaLock, FaUpload, FaSpinner } from 'react-icons/fa';
+import { FaComment, FaSearch, FaArrowLeft, FaPlus, FaTimes, FaUserPlus, FaUsers, FaTrash, FaThumbtack, FaCopy, FaEdit, FaCheck, FaSmile, FaReply, FaImage, FaMusic, FaUser, FaPhone, FaLock, FaUpload, FaSpinner, FaEllipsisH } from 'react-icons/fa';
 import Avatar from '../Resources/Components/Avatar';
 import Badge from '../Resources/Components/Badge';
 import Tooltip from '../Resources/Components/Tooltip';
@@ -190,6 +190,7 @@ export default function Chat() {
       setContextMenu({ open: false, x: 0, y: 0, convId: null });
       setMsgMenu({ open: false, x: 0, y: 0, msg: null });
       setEmojiPickerMsgId(null);
+      setShowMobileMenu(false);
     };
     document.addEventListener('click', handleClick);
     document.addEventListener('scroll', closeMenus, { passive: true, capture: true });
@@ -1001,6 +1002,8 @@ export default function Chat() {
   const [showMediaGallery, setShowMediaGallery] = useState(false);
   const [showPinnedPanel, setShowPinnedPanel] = useState(false);
   const [showProfileCard, setShowProfileCard] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [mobileMenuTop, setMobileMenuTop] = useState(0);
 
   // ── Gallery state for chat images ──
   const [chatGalleryUrls, setChatGalleryUrls] = useState(null);
@@ -1585,50 +1588,93 @@ export default function Chat() {
           </div>
         </div>
         <div className="chat-messages-header-actions">
-          <Tooltip text={t('chat.search_messages') || 'Search'} placement="bottom">
-            <button
-              className={`chat-header-action-btn ${showMsgSearch ? 'chat-header-action-btn--active' : ''}`}
-              onClick={() => { setShowMsgSearch(s => !s); setShowMediaGallery(false); setShowPinnedPanel(false); setShowProfileCard(false); }}
-            >
-              <FaSearch />
-            </button>
-          </Tooltip>
-          <Tooltip text={t('chat.media_gallery') || 'Media'} placement="bottom">
-            <button
-              className={`chat-header-action-btn ${showMediaGallery ? 'chat-header-action-btn--active' : ''}`}
-              onClick={() => {
-                setShowMediaGallery(s => !s);
-                setShowMsgSearch(false);
-                setShowPinnedPanel(false);
-                setShowProfileCard(false);
-              }}
-            >
-              <FaImage />
-            </button>
-          </Tooltip>
-          <Tooltip text={t('post.pinned') || 'Pinned'} placement="bottom">
-            <button
-              className={`chat-header-action-btn ${showPinnedPanel ? 'chat-header-action-btn--active' : ''}`}
-              onClick={() => { setShowPinnedPanel(s => !s); setShowMsgSearch(false); setShowMediaGallery(false); setShowProfileCard(false); }}
-            >
-              <FaThumbtack />
-            </button>
-          </Tooltip>
-          <Tooltip text={t('chat.view_profile') || 'Profile'} placement="bottom">
-            <button
-              className={`chat-header-action-btn ${showProfileCard ? 'chat-header-action-btn--active' : ''}`}
-              onClick={() => { setShowProfileCard(s => !s); setShowMsgSearch(false); setShowMediaGallery(false); setShowPinnedPanel(false); }}
-            >
-              <FaUser />
-            </button>
-          </Tooltip>
-          <Tooltip text={t('chat.call') || 'Call'} placement="bottom">
-            <button className="chat-header-action-btn" disabled>
-              <FaPhone />
-            </button>
-          </Tooltip>
+          <div className="chat-header-actions-desktop">
+            <Tooltip text={t('chat.search_messages') || 'Search'} placement="bottom">
+              <button
+                className={`chat-header-action-btn ${showMsgSearch ? 'chat-header-action-btn--active' : ''}`}
+                onClick={() => { setShowMsgSearch(s => !s); setShowMediaGallery(false); setShowPinnedPanel(false); setShowProfileCard(false); }}
+              >
+                <FaSearch />
+              </button>
+            </Tooltip>
+            <Tooltip text={t('chat.media_gallery') || 'Media'} placement="bottom">
+              <button
+                className={`chat-header-action-btn ${showMediaGallery ? 'chat-header-action-btn--active' : ''}`}
+                onClick={() => {
+                  setShowMediaGallery(s => !s);
+                  setShowMsgSearch(false);
+                  setShowPinnedPanel(false);
+                  setShowProfileCard(false);
+                }}
+              >
+                <FaImage />
+              </button>
+            </Tooltip>
+            <Tooltip text={t('post.pinned') || 'Pinned'} placement="bottom">
+              <button
+                className={`chat-header-action-btn ${showPinnedPanel ? 'chat-header-action-btn--active' : ''}`}
+                onClick={() => { setShowPinnedPanel(s => !s); setShowMsgSearch(false); setShowMediaGallery(false); setShowProfileCard(false); }}
+              >
+                <FaThumbtack />
+              </button>
+            </Tooltip>
+            <Tooltip text={t('chat.view_profile') || 'Profile'} placement="bottom">
+              <button
+                className={`chat-header-action-btn ${showProfileCard ? 'chat-header-action-btn--active' : ''}`}
+                onClick={() => { setShowProfileCard(s => !s); setShowMsgSearch(false); setShowMediaGallery(false); setShowPinnedPanel(false); }}
+              >
+                <FaUser />
+              </button>
+            </Tooltip>
+            <Tooltip text={t('chat.call') || 'Call'} placement="bottom">
+              <button className="chat-header-action-btn" disabled>
+                <FaPhone />
+              </button>
+            </Tooltip>
+          </div>
+          <button
+            className="chat-header-mobile-menu-btn"
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setMobileMenuTop(rect.bottom + 4);
+              setShowMobileMenu(s => !s);
+            }}
+            title="More"
+          >
+            <FaEllipsisH />
+          </button>
         </div>
       </div>
+
+      {/* ── Mobile header menu ── */}
+      {showMobileMenu && (
+        <div className="chat-mobile-header-menu" style={{ top: mobileMenuTop }}>
+          <button
+            className={`chat-mobile-header-menu-item ${showMsgSearch ? 'active' : ''}`}
+            onClick={() => { setShowMsgSearch(s => !s); setShowMobileMenu(false); setShowMediaGallery(false); setShowPinnedPanel(false); setShowProfileCard(false); }}
+          >
+            <FaSearch /> {t('chat.search_messages') || 'Search'}
+          </button>
+          <button
+            className={`chat-mobile-header-menu-item ${showMediaGallery ? 'active' : ''}`}
+            onClick={() => { setShowMediaGallery(s => !s); setShowMobileMenu(false); setShowMsgSearch(false); setShowPinnedPanel(false); setShowProfileCard(false); }}
+          >
+            <FaImage /> {t('chat.media_gallery') || 'Media'}
+          </button>
+          <button
+            className={`chat-mobile-header-menu-item ${showPinnedPanel ? 'active' : ''}`}
+            onClick={() => { setShowPinnedPanel(s => !s); setShowMobileMenu(false); setShowMsgSearch(false); setShowMediaGallery(false); setShowProfileCard(false); }}
+          >
+            <FaThumbtack /> {t('post.pinned') || 'Pinned'}
+          </button>
+          <button
+            className={`chat-mobile-header-menu-item ${showProfileCard ? 'active' : ''}`}
+            onClick={() => { setShowProfileCard(s => !s); setShowMobileMenu(false); setShowMsgSearch(false); setShowMediaGallery(false); setShowPinnedPanel(false); }}
+          >
+            <FaUser /> {t('chat.view_profile') || 'Profile'}
+          </button>
+        </div>
+      )}
 
       {/* Messages — key=activeConvId fuerza remount completo al cambiar de chat */}
       <div className="chat-messages-body" ref={messagesContainerRef}>
@@ -2010,34 +2056,37 @@ export default function Chat() {
             maxLength={2000}
           />
           <div className="chat-input-actions">
-            <button
-              className={`chat-input-action-btn ${showInputEmojiPicker ? 'chat-input-action-btn--active' : ''}`}
-              onClick={() => { setShowInputEmojiPicker(s => !s); setShowGifPicker(false); }}
-              title="Emoji"
-            >
-              <FaSmile />
-            </button>
-            <button
-              className={`chat-input-action-btn ${showGifPicker ? 'chat-input-action-btn--active' : ''}`}
-              onClick={() => { setShowGifPicker(s => !s); setShowInputEmojiPicker(false); }}
-              title="GIF"
-            >
-              <span className="chat-input-action-btn-gif">GIF</span>
-            </button>
-            <button
-              className={`chat-input-action-btn ${showMediaInput ? 'chat-input-action-btn--active' : ''}`}
-              onClick={() => setShowMediaInput(s => !s)}
-              title="Media"
-            >
-              <FaImage />
-            </button>
-            <button
-              className="chat-input-action-btn"
-              disabled
-              title="Audio"
-            >
-              <FaMusic />
-            </button>
+            <div className="chat-input-actions-desktop">
+              <button
+                className={`chat-input-action-btn ${showInputEmojiPicker ? 'chat-input-action-btn--active' : ''}`}
+                onClick={() => { setShowInputEmojiPicker(s => !s); setShowGifPicker(false); }}
+                title="Emoji"
+              >
+                <FaSmile />
+              </button>
+              <button
+                className={`chat-input-action-btn ${showGifPicker ? 'chat-input-action-btn--active' : ''}`}
+                onClick={() => { setShowGifPicker(s => !s); setShowInputEmojiPicker(false); }}
+                title="GIF"
+              >
+                <span className="chat-input-action-btn-gif">GIF</span>
+              </button>
+              <button
+                className={`chat-input-action-btn ${showMediaInput ? 'chat-input-action-btn--active' : ''}`}
+                onClick={() => setShowMediaInput(s => !s)}
+                title="Media"
+              >
+                <FaImage />
+              </button>
+              <button
+                className="chat-input-action-btn"
+                disabled
+                title="Audio"
+              >
+                <FaMusic />
+              </button>
+            </div>
+
           </div>
         </div>
       </div>

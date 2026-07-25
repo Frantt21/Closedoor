@@ -167,12 +167,6 @@ body:has(.sidebar--collapsed) .app-layout--chat {
     flex-direction: column;
 }
 
-@media (max-width: 1024px) {
-    .app-layout--chat {
-        padding-left: 0 !important;
-    }
-}
-
 /* ── Responsive: <= 1024px (ocultar sidebar, block layout, bottom nav) ── */
 @media (max-width: 1024px) {
     .app-layout {
@@ -200,6 +194,14 @@ body:has(.sidebar--collapsed) .app-layout--chat {
         padding: 12px;
         padding-bottom: 76px;
         padding-left: 12px !important;
+    }
+}
+
+/* ── Chat layout override on mobile (MUST come AFTER the .app-layout mobile rules so cascade wins) ── */
+@media (max-width: 1024px) {
+    .app-layout--chat,
+    body:has(.sidebar--collapsed) .app-layout--chat {
+        padding: 0 !important;
     }
 }
 
