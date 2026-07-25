@@ -1977,6 +1977,7 @@ dialog.fc-modal.chat-followers-modal {
 
     .chat-messages {
         height: 100%;
+        overflow: hidden;
     }
 
     .chat-message {
