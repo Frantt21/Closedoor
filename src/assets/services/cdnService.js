@@ -107,7 +107,7 @@ export async function uploadImage(file, userId, type) {
   }
 
   const result = {
-    url: data.url,
+    url: forceHttps(data.url),
     id: data.id,
     width: data.width,
     height: data.height,
@@ -145,9 +145,22 @@ export async function deleteImage(imageId) {
  * @param {string} fileId - The file UUID
  * @returns {string}
  */
+/**
+ * Force HTTPS on any URL (fix Mixed Content issues when CDN server returns http://)
+ */
+function forceHttps(url) {
+  if (!url) return url;
+  return url.replace(/^http:\/\//i, 'https://');
+}
+
+/**
+ * Get the full CDN URL for a file ID.
+ * @param {string} fileId - The file UUID
+ * @returns {string}
+ */
 export function getCdnUrl(fileId) {
   if (!fileId) return '';
-  if (fileId.startsWith('http://') || fileId.startsWith('https://')) return fileId;
+  if (fileId.startsWith('http://') || fileId.startsWith('https://')) return forceHttps(fileId);
   return `${CDN_BASE}/cdn/files/${fileId}`;
 }
 
