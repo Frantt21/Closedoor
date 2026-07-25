@@ -26,6 +26,7 @@ const NOTIF_MESSAGES = {
     comment: (name) => `${name} comentó tu publicación`,
     repost: (name) => `${name} reposteó tu publicación`,
     comment_like: (name) => `${name} le gustó tu comentario`,
+    comment_mention: (name) => `${name} te respondió o mencionó en un comentario`,
     mention: (name) => `${name} te mencionó`,
     encrypted_add: (name) => `${name} te agregó a un post encriptado`,
     poll_vote: (name) => `${name} votó en tu encuesta`,
@@ -40,6 +41,7 @@ const NOTIF_MESSAGES = {
     comment: (name) => `${name} commented on your post`,
     repost: (name) => `${name} reposted your post`,
     comment_like: (name) => `${name} liked your comment`,
+    comment_mention: (name) => `${name} replied to or mentioned you in a comment`,
     mention: (name) => `${name} mentioned you`,
     encrypted_add: (name) => `${name} added you to an encrypted post`,
     poll_vote: (name) => `${name} voted on your poll`,
@@ -64,7 +66,7 @@ function getNotifMessage(type, username) {
 
 function getNotifLink(notif) {
   const username = notif.actor?.username || '';
-  if (['like', 'comment', 'repost', 'comment_like', 'mention', 'encrypted_add', 'poll_vote'].includes(notif.type) && notif.reference_id) {
+  if (['like', 'comment', 'repost', 'comment_like', 'comment_mention', 'comment_reply', 'mention', 'encrypted_add', 'poll_vote'].includes(notif.type) && notif.reference_id) {
     return `/post/${notif.reference_id}`;
   }
   return `/profile/${username}`;
