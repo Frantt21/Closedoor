@@ -6,6 +6,19 @@ import { AuthProvider } from './context/AuthContext'
 import { NotificationProvider } from './context/NotificationContext'
 import './assets/Resources/Styles/global.css'
 
+// Fix mobile viewport height when virtual keyboard opens.
+// Sets a CSS variable `--app-height` to the current viewport height (px).
+function setAppHeight() {
+  const h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+  document.documentElement.style.setProperty('--app-height', `${h}px`);
+}
+setAppHeight();
+window.addEventListener('resize', setAppHeight);
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', setAppHeight);
+  window.visualViewport.addEventListener('scroll', setAppHeight);
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>

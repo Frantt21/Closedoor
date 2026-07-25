@@ -50,6 +50,8 @@
   "chat.encrypted": "Зашифровано",
   "chat.input_placeholder": "Напишите сообщение...",
   "chat.media_gallery": "Медиа",
+  "chat.new_message": "новое сообщение",
+  "chat.new_messages": "новых сообщений",
   "chat.media_placeholder": "Вставьте URL изображения или видео...",
   "chat.new": "Новый чат",
   "chat.no_messages": "Сообщений пока нет. Начните разговор!",

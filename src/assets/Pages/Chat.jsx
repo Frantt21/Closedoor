@@ -25,7 +25,7 @@ import { getFollowing } from '../services/followService';
 import { isBlocked, getCachedBlockStatus, cacheBlockStatus } from '../services/blockService';
 import FollowButton from '../Resources/Components/FollowButton';
 import ModalShell from '../Resources/Components/ModalShell';
-import { FaComment, FaSearch, FaArrowLeft, FaPlus, FaTimes, FaUserPlus, FaUsers, FaTrash, FaThumbtack, FaCopy, FaEdit, FaCheck, FaSmile, FaReply, FaImage, FaMusic, FaUser, FaPhone, FaLock, FaUpload, FaSpinner, FaEllipsisH } from 'react-icons/fa';
+import { FaComment, FaSearch, FaArrowLeft, FaPlus, FaTimes, FaUserPlus, FaUsers, FaTrash, FaThumbtack, FaCopy, FaEdit, FaCheck, FaSmile, FaReply, FaImage, FaMusic, FaUser, FaPhone, FaLock, FaUpload, FaSpinner, FaEllipsisH, FaArrowDown } from 'react-icons/fa';
 import Avatar from '../Resources/Components/Avatar';
 import Badge from '../Resources/Components/Badge';
 import Tooltip from '../Resources/Components/Tooltip';
@@ -173,7 +173,7 @@ export default function Chat() {
     return { x, y };
   }, []);
 
-  // Close context menus on click outside + on scroll
+  // Close context menus on click outside + on scroll (but ignore scrolls originating inside the menus)
   useEffect(() => {
     const handleClick = (e) => {
       if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
@@ -186,17 +186,30 @@ export default function Chat() {
         setEmojiPickerMsgId(null);
       }
     };
-    const closeMenus = () => {
+
+    // Scroll handler will close menus only when the scroll event does NOT originate
+    // from inside any of the interactive menu elements (context menu, message menu, emoji picker).
+    const handleScroll = (e) => {
+      const target = e?.target;
+      // If the scroll target is inside any menu, do nothing.
+      if (target) {
+        if (contextMenuRef.current && contextMenuRef.current.contains(target)) return;
+        if (msgMenuRef.current && msgMenuRef.current.contains(target)) return;
+        if (emojiPickerRef.current && emojiPickerRef.current.contains(target)) return;
+      }
+      // Otherwise, close all menus
       setContextMenu({ open: false, x: 0, y: 0, convId: null });
       setMsgMenu({ open: false, x: 0, y: 0, msg: null });
       setEmojiPickerMsgId(null);
       setShowMobileMenu(false);
     };
+
     document.addEventListener('click', handleClick);
-    document.addEventListener('scroll', closeMenus, { passive: true, capture: true });
+    // Use capture so we receive scroll events from nested scrollable elements; handler filters internal scrolls.
+    document.addEventListener('scroll', handleScroll, { passive: true, capture: true });
     return () => {
       document.removeEventListener('click', handleClick);
-      document.removeEventListener('scroll', closeMenus, { capture: true });
+      document.removeEventListener('scroll', handleScroll, { capture: true });
     };
   }, []);
 
@@ -254,10 +267,26 @@ export default function Chat() {
   // Restore cache from sessionStorage — only when user is available (not during auth loading)
   const sessionRestoredRef = useRef(false);
   if (!sessionRestoredRef.current && user?.id) {
-    const restored = loadCacheFromSession();
-    if (Object.keys(restored).length > 0) {
-      messagesCacheRef.current = restored;
+    // Detect if this page load is a full reload. If so, clear the chat session cache
+    // to avoid restoring a large message set that can cause scroll bugs.
+    let isReload = false;
+    try {
+      const navEntries = performance.getEntriesByType ? performance.getEntriesByType('navigation') : null;
+      const navType = navEntries?.[0]?.type || (performance.navigation && performance.navigation.type === 1 ? 'reload' : 'navigate');
+      isReload = navType === 'reload';
+    } catch (e) { /* ignore */ }
+
+    if (isReload) {
+      console.log('[SCROLL-DEBUG] Navigation reload detected - clearing chat session cache before restore');
+      try { sessionStorage.removeItem(getSessionCacheKey()); } catch (e) {}
+      messagesCacheRef.current = {};
+    } else {
+      const restored = loadCacheFromSession();
+      if (Object.keys(restored).length > 0) {
+        messagesCacheRef.current = restored;
+      }
     }
+
     sessionRestoredRef.current = true;
   }
 
@@ -291,8 +320,8 @@ export default function Chat() {
   }
 
   // ── Pagination state (infinite scroll / load older messages) ──
-  const PAGE_SIZE = 50;
-  const INITIAL_BATCH_LIMIT = 80; // fetch first 80 messages on initial load, then lazy load the rest via scroll
+  const PAGE_SIZE = 40;
+  const INITIAL_BATCH_LIMIT = 40; // fetch first 40 messages on initial load, then lazy load more via scroll
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [oldestMessageDate, setOldestMessageDate] = useState(null);
@@ -303,6 +332,14 @@ export default function Chat() {
   // Sync ref: prevents multiple loadOlderMessages calls in same event loop tick
   // (setLoadingMore(true) is async - React batches until next render)
   const loadingMoreRef = useRef(false);
+  // ── "New messages" floating button counter ──
+  const [newMsgCount, setNewMsgCount] = useState(0);
+  // ── Blocked status: null=unknown, 'blocked_by_me', 'blocked_by_them' ──
+  const [isBlockedConv, setIsBlockedConv] = useState(null);
+  const scrollToBottom = useCallback(() => {
+    messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    setNewMsgCount(0);
+  }, []);
 
   // ── useLayoutEffect: runs BEFORE browser paint — garantiza que no haya flash de mensajes viejos ──
   useLayoutEffect(() => {
@@ -437,17 +474,44 @@ export default function Chat() {
 
     // ══ DB fetch — skipped when layout effect restored from fresh cache ══
     if (!skipFetch) {
-      getMessages(convForThisEffect, INITIAL_BATCH_LIMIT)
-        .then(async (msgs) => {
+      (async () => {
+        try {
+          let attempts = 0;
+          let raw = [];
+          let filtered = [];
+          let decrypted = [];
+          let hasMore = false;
+          let cursor = null;
+          const fetchLimit = INITIAL_BATCH_LIMIT + 1; // request one extra to detect 'more'
+
+          do {
+            attempts += 1;
+            raw = await getMessages(convForThisEffect, fetchLimit, cursor);
+            if (aborted) return;
+            hasMore = (raw.length > INITIAL_BATCH_LIMIT);
+            // If we requested extra, drop the extra marker when mapping
+            if (raw.length > INITIAL_BATCH_LIMIT) raw = raw.slice(0, INITIAL_BATCH_LIMIT);
+
+            filtered = raw.filter(m => !m.deleted_for?.includes(user.id));
+            // Decrypt visible messages
+            decrypted = await Promise.all(
+              filtered.map(async (msg) => {
+                const content = await decryptMessage(msg, user.id);
+                return { ...msg, decryptedContent: content };
+              })
+            );
+
+            // If we got no visible messages (all were deleted), but there are more on the server,
+            // advance the cursor to the last raw item's created_at and retry up to 3 attempts.
+            if (decrypted.length === 0 && hasMore && attempts < 3) {
+              cursor = raw.length ? raw[raw.length - 1].created_at : null;
+              continue;
+            }
+            break;
+          } while (attempts < 3);
+
           if (aborted) return;
-          const filtered = msgs.filter(m => !m.deleted_for?.includes(user.id));
-          const decrypted = await Promise.all(
-            filtered.map(async (msg) => {
-              const content = await decryptMessage(msg, user.id);
-              return { ...msg, decryptedContent: content };
-            })
-          );
-          if (aborted) return;
+
           // Pre-fetch shared post data BEFORE setMessages
           const sharedPostIds = [...new Set(decrypted.filter(m => m.shared_post_id).map(m => m.shared_post_id))];
           if (sharedPostIds.length > 0) {
@@ -459,18 +523,20 @@ export default function Chat() {
               } catch {}
             }));
           }
+
           messagesCacheRef.current[convForThisEffect] = decrypted;
           messagesOwnerRef.current = convForThisEffect;
           setMessages(decrypted);
           if (decrypted.length > 0) {
             setOldestMessageDate(decrypted[0].created_at);
           }
-          setHasMoreMessages(decrypted.length >= INITIAL_BATCH_LIMIT);
-        })
-        .catch((err) => { if (!aborted) console.warn('Error loading messages:', err); })
-        .finally(() => {
+          setHasMoreMessages(hasMore);
+        } catch (err) {
+          if (!aborted) console.warn('Error loading messages:', err);
+        } finally {
           if (!aborted) setMsgsLoading(false);
-        });
+        }
+      })();
     } else {
       setMsgsLoading(false);
     }
@@ -504,7 +570,15 @@ export default function Chat() {
             newMsg.created_at,
             newMsg.sender_id !== user.id
           );
-          setTimeout(() => messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+          // Only auto-scroll if user is near the bottom of the chat
+          const el = messagesContainerRef.current;
+          const isNearBottom = el && (el.scrollTop > -80 || el.scrollHeight - el.clientHeight + el.scrollTop < 80);
+          if (isNearBottom) {
+            setTimeout(() => messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' }), 50);
+            setNewMsgCount(0);
+          } else {
+            setNewMsgCount(prev => prev + 1);
+          }
         }
         markAsRead(convForThisEffect, user.id);
       },
@@ -1140,6 +1214,33 @@ export default function Chat() {
   const activeConv = conversations.find((c) => c.id === activeConvId);
   const otherUser = activeConv?.otherUser;
 
+  // ── Blocked status detection (check cache + server) ──
+  // Reset when changing conversations
+  useEffect(() => {
+    setIsBlockedConv(null);
+    if (!activeConvId || !user?.id || !otherUser?.id) return;
+
+    const checkBlock = async () => {
+      // Cache check first (instant)
+      const cachedByMe = getCachedBlockStatus(user.id, otherUser.id);
+      const cachedByThem = getCachedBlockStatus(otherUser.id, user.id);
+      if (cachedByMe === true) { setIsBlockedConv('blocked_by_me'); return; }
+      if (cachedByThem === true) { setIsBlockedConv('blocked_by_them'); return; }
+
+      // Server check in background (the input works normally until verified)
+      try {
+        const [byMe, byThem] = await Promise.all([
+          isBlocked(user.id, otherUser.id),
+          isBlocked(otherUser.id, user.id),
+        ]);
+        if (byMe) { cacheBlockStatus(user.id, otherUser.id, true); setIsBlockedConv('blocked_by_me'); return; }
+        if (byThem) { cacheBlockStatus(otherUser.id, user.id, true); setIsBlockedConv('blocked_by_them'); return; }
+        setIsBlockedConv(false);
+      } catch { setIsBlockedConv(false); }
+    };
+    checkBlock();
+  }, [activeConvId, otherUser?.id, user?.id]);
+
   // ── Update conversation list preview immediately (optimistic local update) ──
   const updateConvPreview = useCallback((convId, lastMsgText, lastMsgAt, incrementUnread = false) => {
     setConversations(prev => {
@@ -1205,7 +1306,7 @@ export default function Chat() {
       // Reload conversations in background
       loadConvs();
     } else if (otherUser) {
-      // Existing block check for non-pending conversations
+      // Existing block check for non-pending conversations (cache + server)
       const cachedBlocked = getCachedBlockStatus(user.id, otherUser.id);
       if (cachedBlocked === true) {
         toast.error(t('chat.blocked_cannot_send'), { className: 'fc-toast' });
@@ -1216,6 +1317,21 @@ export default function Chat() {
         toast.error(t('chat.blocked_by_them'), { className: 'fc-toast' });
         return null;
       }
+      // Server double-check (cache might be stale)
+      try {
+        const blockedByMe = await isBlocked(user.id, otherUser.id);
+        if (blockedByMe) {
+          cacheBlockStatus(user.id, otherUser.id, true);
+          toast.error(t('chat.blocked_cannot_send'), { className: 'fc-toast' });
+          return null;
+        }
+        const blockedByThem = await isBlocked(otherUser.id, user.id);
+        if (blockedByThem) {
+          cacheBlockStatus(otherUser.id, user.id, true);
+          toast.error(t('chat.blocked_by_them'), { className: 'fc-toast' });
+          return null;
+        }
+      } catch {}
     }
 
     if (!convId) return null;
@@ -1296,31 +1412,44 @@ export default function Chat() {
     console.log('[SCROLL-DEBUG] loadOlderMessages proceeding', { scrollHeightBefore, convIdAtStart });
 
     try {
-      const olderMsgs = await getMessages(convIdAtStart, PAGE_SIZE, oldestMessageDate);
-      if (aborted || convIdAtStart !== activeConvId) return;
+      let attempts = 0;
+      let raw = [];
+      let filtered = [];
+      let decrypted = [];
+      let hasMore = false;
+      let cursor = oldestMessageDate;
+      const fetchLimit = PAGE_SIZE + 1; // request one extra to detect more
 
-      if (olderMsgs.length < PAGE_SIZE) {
-        setHasMoreMessages(false);
-      }
-      if (olderMsgs.length === 0) {
-        setHasMoreMessages(false);
-        return;
-      }
+      do {
+        attempts += 1;
+        console.log('[SCROLL-DEBUG] getMessages request', { convIdAtStart, fetchLimit, cursor });
+        try {
+          raw = await getMessages(convIdAtStart, fetchLimit, cursor);
+        } catch (e) {
+          console.warn('[SCROLL-DEBUG] getMessages failed', { err: e, convIdAtStart, fetchLimit, cursor });
+          raw = [];
+        }
+        if (aborted || convIdAtStart !== activeConvId) return;
+        hasMore = raw.length > PAGE_SIZE;
+        if (raw.length > PAGE_SIZE) raw = raw.slice(0, PAGE_SIZE);
+        filtered = raw.filter(m => !m.deleted_for?.includes(user.id));
+        console.log('[SCROLL-DEBUG] raw/filtered lengths', { rawLen: raw.length, filteredLen: filtered.length, hasMore });
+        decrypted = await Promise.all(
+          filtered.map(async (msg) => {
+            const content = await decryptMessage(msg, user.id);
+            return { ...msg, decryptedContent: content };
+          })
+        );
+        console.log('[SCROLL-DEBUG] decrypted length', { decryptedLen: decrypted.length });
 
-      // Filter out messages deleted for me
-      const filtered = olderMsgs.filter(m => !m.deleted_for?.includes(user.id));
-      if (filtered.length === 0) {
-        setHasMoreMessages(false);
-        return;
-      }
+        if (decrypted.length === 0 && hasMore && attempts < 3) {
+          // advance cursor to last raw item and retry
+          cursor = raw.length ? raw[raw.length - 1].created_at : null;
+          continue;
+        }
+        break;
+      } while (attempts < 3);
 
-      // Decrypt each message
-      const decrypted = await Promise.all(
-        filtered.map(async (msg) => {
-          const content = await decryptMessage(msg, user.id);
-          return { ...msg, decryptedContent: content };
-        })
-      );
       if (aborted || convIdAtStart !== activeConvId) return;
 
       // ══ Pre-fetch shared post data BEFORE setMessages so DOM is stable at scroll-restore time ══
@@ -1337,13 +1466,20 @@ export default function Chat() {
       // Safety: user might have switched conversations during shared-post fetch
       if (convIdAtStart !== activeConvId) return;
 
+      if (decrypted.length === 0) {
+        // No visible messages found; if server indicated no more, mark finished
+        if (!hasMore) setHasMoreMessages(false);
+        return;
+      }
+
       // Prepend older messages — they will appear at the visual bottom (column-reverse)
       setMessages(prev => [...decrypted, ...prev]);
       // Cursor = oldest in this batch (first in ASC array) — ensures no overlap on next fetch
       setOldestMessageDate(decrypted[0].created_at);
       // Mark timestamp so the scroll handler's cooldown prevents cascade
       lastLoadTimeRef.current = Date.now();
-      console.log('[SCROLL-DEBUG] loadOlderMessages success', { newCount: decrypted.length, oldest: decrypted[0].created_at, hasMoreAfter: !(olderMsgs.length < PAGE_SIZE) });
+      setHasMoreMessages(hasMore);
+      console.log('[SCROLL-DEBUG] loadOlderMessages success', { newCount: decrypted.length, oldest: decrypted[0].created_at, hasMoreAfter: hasMore });
 
     } catch (err) {
       console.warn('Error loading older messages:', err);
@@ -1357,8 +1493,8 @@ export default function Chat() {
   // ── Scroll handler to detect when user reaches the visual top (oldest messages) ──
   const handleMessagesScroll = useCallback(() => {
     const el = messagesContainerRef.current;
-    console.log('[SCROLL-DEBUG] handleMessagesScroll fired', { el: !!el, loadingMore, hasMoreMessages, scrollTop: el?.scrollTop, scrollHeight: el?.scrollHeight, clientHeight: el?.clientHeight, cooldown: Date.now() - lastLoadTimeRef.current });
-    if (!el || loadingMore || !hasMoreMessages) return;
+    console.log('[SCROLL-DEBUG] handleMessagesScroll fired', { el: !!el, loadingMoreRef: loadingMoreRef.current, hasMoreMessages, scrollTop: el?.scrollTop, scrollHeight: el?.scrollHeight, clientHeight: el?.clientHeight, cooldown: Date.now() - lastLoadTimeRef.current });
+    if (!el || loadingMoreRef.current || !hasMoreMessages) return;
 
     // Cooldown: prevent cascade — ignore scroll events within 500ms of a load
     if (Date.now() - lastLoadTimeRef.current < 500) return;
@@ -1370,9 +1506,22 @@ export default function Chat() {
     const threshold = 150;
     console.log('[SCROLL-DEBUG] Calc', { scrollRemaining, threshold, willLoad: scrollRemaining < threshold });
     if (scrollRemaining < threshold) {
-      loadOlderMessages();
+      // Pre-mark lastLoadTime to avoid immediate retriggers while async fetch starts
+      lastLoadTimeRef.current = Date.now();
+      // Call via ref to avoid recreating the scroll handler when the function identity changes
+      try { loadOlderMessagesRef.current(); } catch (e) { console.warn('loadOlderMessagesRef failed', e); }
     }
-  }, [loadingMore, hasMoreMessages, loadOlderMessages]);
+    // Reset new messages counter when user scrolls near bottom
+    if (newMsgCount > 0 && (el.scrollTop > -80 || el.scrollHeight - el.clientHeight + el.scrollTop < 80)) {
+      setNewMsgCount(0);
+    }
+  }, [hasMoreMessages, loadOlderMessages, newMsgCount]);
+
+  // Use a ref to call loadOlderMessages from the scroll handler so the handler
+  // identity doesn't change when the callback is recreated, avoiding frequent
+  // cleanup/attach of the scroll listener.
+  const loadOlderMessagesRef = useRef(loadOlderMessages);
+  useEffect(() => { loadOlderMessagesRef.current = loadOlderMessages; }, [loadOlderMessages]);
 
   // ── Attach scroll listener to messages container ──
   useEffect(() => {
@@ -1966,6 +2115,14 @@ export default function Chat() {
         )}
       </div>
 
+      {/* Floating "new messages" button */}
+      {newMsgCount > 0 && (
+        <button className="chat-new-msg-btn" onClick={scrollToBottom}>
+          <FaArrowDown className="chat-new-msg-btn-icon" />
+          {newMsgCount} {newMsgCount === 1 ? (t('chat.new_message') || 'new message') : (t('chat.new_messages') || 'new messages')}
+        </button>
+      )}
+
       {/* Reply bar */}
       {replyingTo && (
         <div className="chat-reply-bar">
@@ -1991,7 +2148,18 @@ export default function Chat() {
 
       {/* Input + actions */}
       <div className="chat-messages-input">
-        {/* ── Typing indicator (absolute, does not push) ── */}
+        {isBlockedConv ? (
+          <div className="chat-input-blocked">
+            <FaLock className="chat-input-blocked-icon" />
+            <span className="chat-input-blocked-text">
+              {isBlockedConv === 'blocked_by_me'
+                ? (t('chat.input_blocked_by_me') || 'You blocked this user. You cannot send messages.')
+                : (t('chat.input_blocked_by_them') || 'This user has blocked you. You cannot send messages.')}
+            </span>
+          </div>
+        ) : (
+          <>
+          {/* ── Typing indicator (absolute, does not push) ── */}
         {otherUserTyping && (
           <div className="chat-typing-indicator">
             <div className="chat-typing-dots">
@@ -2085,8 +2253,7 @@ export default function Chat() {
               <FaTimes />
             </button>
           </div>
-        )}
-        <div className="chat-input-inner">
+        )}          <div className="chat-input-inner">
           <textarea
             ref={inputRef}
             className="chat-input"
@@ -2131,6 +2298,8 @@ export default function Chat() {
 
           </div>
         </div>
+          </>
+        )}
       </div>
     </div>
   );

@@ -50,6 +50,8 @@
   "chat.encrypted": "暗号化",
   "chat.input_placeholder": "メッセージを入力...",
   "chat.media_gallery": "メディア",
+  "chat.new_message": "新しいメッセージ",
+  "chat.new_messages": "新しいメッセージ",
   "chat.media_placeholder": "画像または動画のURLを貼り付け...",
   "chat.new": "新しい会話",
   "chat.no_messages": "メッセージはまだありません。会話を始めましょう！",

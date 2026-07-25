@@ -50,6 +50,8 @@
   "chat.encrypted": "Criptografado",
   "chat.input_placeholder": "Digite uma mensagem...",
   "chat.media_gallery": "Mídia",
+  "chat.new_message": "nova mensagem",
+  "chat.new_messages": "novas mensagens",
   "chat.media_placeholder": "Cole o URL da imagem ou vídeo...",
   "chat.new": "Nova conversa",
   "chat.no_messages": "Nenhuma mensagem ainda. Comece a conversa!",
