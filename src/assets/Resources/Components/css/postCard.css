@@ -1442,14 +1442,58 @@
 .post-card-poll-voters-list {
     overflow-y: auto;
     flex: 1;
-    padding: 8px 0;
+    padding: 4px 0;
+}
+
+/* ── Group (option section) ── */
+.post-card-poll-voters-group {
+    border-bottom: 1px solid var(--color-border, #2a2a2a);
+}
+
+.post-card-poll-voters-group:last-child {
+    border-bottom: none;
+}
+
+.post-card-poll-voters-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 18px 6px;
+    position: sticky;
+    top: 0;
+    background: var(--color-surface, #1a1a1a);
+    z-index: 1;
+}
+
+.post-card-poll-voters-group-name {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--color-text, #ffffff);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.post-card-poll-voters-group-stats {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--color-text-muted, #6b7280);
+    flex-shrink: 0;
+}
+
+.post-card-poll-voters-group-empty {
+    padding: 8px 18px 12px;
+    font-size: 0.75rem;
+    color: var(--color-text-muted, #6b7280);
+    font-style: italic;
 }
 
 .post-card-poll-voter {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 8px 18px;
+    padding: 6px 18px 6px 24px;
     text-decoration: none;
     color: var(--color-text, #ffffff);
     transition: background 0.1s ease;
@@ -1460,30 +1504,18 @@
 }
 
 .post-card-poll-voter-avatar {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
     background: var(--color-bg, #000000);
 }
 
-.post-card-poll-voter-info {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-}
-
 .post-card-poll-voter-username {
-    font-size: 0.85rem;
+    font-size: 0.82rem;
     font-weight: 600;
     color: var(--color-text, #ffffff);
-}
-
-.post-card-poll-voter-option {
-    font-size: 0.72rem;
-    color: var(--color-text-muted, #6b7280);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

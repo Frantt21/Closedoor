@@ -142,6 +142,27 @@ export function parseImagePosition(pos) {
 }
 
 /**
+ * Like getImgTransformStyle but WITHOUT scale/zoom — for use on <Avatar>
+ * elements where the scale transform would make the avatar look larger.
+ * Only applies objectPosition for positioning + rotation/flip (no zoom).
+ */
+export function getAvatarTransformStyle(positionStr) {
+  const p = parseImagePosition(positionStr || '');
+  const transforms = [];
+  if (p.rotation !== 0) transforms.push(`rotate(${p.rotation}deg)`);
+  if (p.flipX) transforms.push('scaleX(-1)');
+  if (p.flipY) transforms.push('scaleY(-1)');
+
+  const style = {
+    objectPosition: `${p.x}% ${p.y}%`,
+  };
+  if (transforms.length > 0) {
+    style.transform = transforms.join(' ');
+  }
+  return style;
+}
+
+/**
  * Given a position string, return the style object for an <img> element
  * with object-fit: cover. Includes objectPosition (X/Y) and CSS transform
  * (zoom, rotation, flip).

@@ -285,7 +285,7 @@ export async function sendMessage(conversationId, senderId, content, participant
   // Fetch sender profile separately
   const { data: senderProfile } = await supabase
     .from('profiles')
-    .select('id, username, avatar_url')
+    .select('id, username, avatar_url, avatar_position')
     .eq('id', senderId)
     .maybeSingle();
 
@@ -334,7 +334,7 @@ export async function getMessages(conversationId, limit = 50, before = null) {
   const senderIds = [...new Set(msgs.map(m => m.sender_id))];
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('id, username, avatar_url')
+    .select('id, username, avatar_url, avatar_position')
     .in('id', senderIds);
 
   const profileMap = {};
@@ -386,7 +386,7 @@ export function subscribeToMessages(conversationId, onMessage) {
 
         const { data: profile } = await supabase
           .from('profiles')
-          .select('id, username, avatar_url')
+          .select('id, username, avatar_url, avatar_position')
           .eq('id', msg.sender_id)
           .maybeSingle();
 
@@ -411,7 +411,7 @@ export function subscribeToMessages(conversationId, onMessage) {
 
         const { data: profile } = await supabase
           .from('profiles')
-          .select('id, username, avatar_url')
+          .select('id, username, avatar_url, avatar_position')
           .eq('id', msg.sender_id)
           .maybeSingle();
 

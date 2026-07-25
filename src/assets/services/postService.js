@@ -82,7 +82,7 @@ export async function createPost({ userId, content, imageUrl, imageUrls, videoUr
 
 export async function getPosts({ userId, profileUserId, limit = 20, offset = 0 } = {}) {
   let query = supabase      .from('posts')
-    .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private)');
+    .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)');
 
   // Excluir posts programados (scheduled_at en futuro) — solo aparecen en pestaña "Programados"
   if (profileUserId) {
@@ -113,7 +113,7 @@ export async function getPosts({ userId, profileUserId, limit = 20, offset = 0 }
 export async function getPost(postId) {
   const { data, error } = await supabase
     .from('posts')
-    .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private)')
+    .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)')
     .eq('id', postId)
     .single();
 
@@ -207,7 +207,7 @@ export async function getProfileContent(profileUserId, currentUserId, filterEncr
         posts!reposts_post_id_fkey (
           id, user_id, content, image_url, image_urls, video_url, is_pinned, pinned_at, mentions,
           likes_count, comments_count, reposts_count, views_count, created_at, updated_at,
-          profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private)
+          profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)
         )
       `)
       .eq('user_id', profileUserId)
@@ -350,7 +350,7 @@ async function refreshVisibleIds(userId) {
 export async function getFeed({ limit = 20, offset = 0, userId, filterEncrypted = true } = {}) {
   let query = supabase
     .from('posts')
-    .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private)');
+    .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)');
 
   // Excluir posts programados del feed
   // Filter encrypted posts in JavaScript (not DB) to allow own encrypted posts
@@ -529,7 +529,7 @@ export async function createComment({ postId, userId, content, parentId = null, 
       image_url: imageUrl,
       video_url: videoUrl,
     })
-    .select('*, profiles!comments_user_id_fkey (id, username, avatar_url, roles)')
+    .select('*, profiles!comments_user_id_fkey (id, username, avatar_url, roles, avatar_position)')
     .single();
 
   if (error) {
@@ -537,10 +537,9 @@ export async function createComment({ postId, userId, content, parentId = null, 
     throw error;
   }
 
-  // Notificar al dueño del post (en background)
-  notifyComment(userId, postId);
-
   // Notificar a usuarios @mencionados en el comentario (en background)
+  // Nota: La notificación al dueño del post la maneja el DB Trigger
+  // `notify_comment()` (ver migrations/004_notifications_triggers.sql)
   if (content) {
     notifyCommentMentions(userId, postId, content).catch((err) =>
       console.warn('Error notifying comment mentions:', err)
@@ -553,7 +552,7 @@ export async function createComment({ postId, userId, content, parentId = null, 
 export async function getComments(postId) {
   const { data, error } = await supabase
     .from('comments')
-    .select('*, profiles!comments_user_id_fkey (id, username, avatar_url, roles)')
+    .select('*, profiles!comments_user_id_fkey (id, username, avatar_url, roles, avatar_position)')
     .eq('post_id', postId)
     .order('created_at', { ascending: true });
 
@@ -573,7 +572,7 @@ export async function getUserComments(userId, { limit = 50, offset = 0 } = {}) {
     .from('comments')
     .select(`
       id, content, image_url, video_url, created_at, post_id, comment_likes_count, comment_dislikes_count,
-      profiles!comments_user_id_fkey (id, username, avatar_url, roles),
+      profiles!comments_user_id_fkey (id, username, avatar_url, roles, avatar_position),
       posts!comments_post_id_fkey (id, user_id, content, image_url, profiles!posts_user_id_fkey (id, username, avatar_url, roles))
     `)
     .eq('user_id', userId)
@@ -1156,7 +1155,7 @@ export async function getScheduledPosts(userId, { limit = 50, offset = 0 } = {})
   const now = new Date().toISOString();
   const { data, error } = await supabase
     .from('posts')
-    .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private)')
+    .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)')
     .eq('user_id', userId)
     .not('scheduled_at', 'is', null)
     .gt('scheduled_at', now)
@@ -1185,7 +1184,7 @@ export async function getLikedPosts(userId, { limit = 50, offset = 0 } = {}) {
       posts!likes_post_id_fkey (
         id, user_id, content, image_url, image_urls, video_url, mentions,
         likes_count, comments_count, reposts_count, views_count, created_at, updated_at,
-        profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private)
+        profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)
       )
     `)
     .eq('user_id', userId)
@@ -1324,7 +1323,7 @@ export async function getSavedPosts(userId, { limit = 50, offset = 0 } = {}) {
       id, created_at,
       posts!saved_posts_post_id_fkey (
         id, user_id, content, image_url, image_urls, video_url, mentions,          likes_count, comments_count, reposts_count, views_count, created_at, updated_at,
-        profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private)
+        profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)
       )
     `)
     .eq('user_id', userId)

@@ -219,7 +219,7 @@ export default function ImagePositionEditor({
           style={{
             width: '100%',
             height: '100%',
-            objectFit: 'cover',
+            objectFit: 'contain',
             objectPosition: `${pos.x}% ${pos.y}%`,
             transform: buildTransform(),
             willChange: 'transform',

@@ -271,7 +271,7 @@ function Profile() {
       .catch((err) => console.warn('Error checking reverse block:', err));
   }, [user?.id, activeProfile?.id, isOwnProfile]);
 
-  // ── Close context menu on outside click ──
+  // ── Close context menu on outside click or scroll ──
   useEffect(() => {
     if (!contextMenuOpen) {
       setDropdownStyle(null);
@@ -283,8 +283,13 @@ function Profile() {
         setContextMenuOpen(false);
       }
     };
+    const closeOnScroll = () => setContextMenuOpen(false);
     document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('scroll', closeOnScroll, { passive: true, capture: true });
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('scroll', closeOnScroll, { capture: true });
+    };
   }, [contextMenuOpen]);
 
 // ── Check if current user follows this profile (solo una vez, cache + Realtime) ──

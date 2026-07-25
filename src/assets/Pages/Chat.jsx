@@ -30,7 +30,7 @@ import Avatar from '../Resources/Components/Avatar';
 import Badge from '../Resources/Components/Badge';
 import Tooltip from '../Resources/Components/Tooltip';
 import GifPicker from '../Resources/Components/GifPicker';
-import { getTimeAgo, IMG_RE, detectMediaFromContent, getImgTransformStyle } from '../services/helpers';
+import { getTimeAgo, IMG_RE, detectMediaFromContent, getImgTransformStyle, getAvatarTransformStyle } from '../services/helpers';
 import { getPost } from '../services/postService';
 import RichText from '../Resources/Components/RichText';
 import SafeImage from '../Resources/Components/SafeImage';
@@ -100,6 +100,8 @@ export default function Chat() {
   const editRef = useRef(null);
   // Preserve content during modal close animation (ref survives state clears)
   const editContentRef = useRef('');
+  // Preserve the editing message's image URL for the edit modal preview
+  const editMediaUrlRef = useRef('');
 
   // Emoji picker state
   const [emojiPickerMsgId, setEmojiPickerMsgId] = useState(null);
@@ -171,7 +173,7 @@ export default function Chat() {
     return { x, y };
   }, []);
 
-  // Close context menus on click outside
+  // Close context menus on click outside + on scroll
   useEffect(() => {
     const handleClick = (e) => {
       if (contextMenuRef.current && !contextMenuRef.current.contains(e.target)) {
@@ -184,8 +186,17 @@ export default function Chat() {
         setEmojiPickerMsgId(null);
       }
     };
+    const closeMenus = () => {
+      setContextMenu({ open: false, x: 0, y: 0, convId: null });
+      setMsgMenu({ open: false, x: 0, y: 0, msg: null });
+      setEmojiPickerMsgId(null);
+    };
     document.addEventListener('click', handleClick);
-    return () => document.removeEventListener('click', handleClick);
+    document.addEventListener('scroll', closeMenus, { passive: true, capture: true });
+    return () => {
+      document.removeEventListener('click', handleClick);
+      document.removeEventListener('scroll', closeMenus, { capture: true });
+    };
   }, []);
 
   // Focus edit input when entering edit mode
@@ -572,8 +583,10 @@ export default function Chat() {
     const content = hasPreview
       ? (trimmed ? `${trimmed}\n${mediaPreviewUrl}` : mediaPreviewUrl)
       : trimmed;
-    await sendContent(content, { clearInput: true });
+    // Clear preview IMMEDIATELY (optimistic) BEFORE the async sendContent
+    // This prevents the preview container from lingering during the send
     if (hasPreview) setMediaPreviewUrl('');
+    await sendContent(content, { clearInput: true });
   };
 
   const handleKeyDown = (e) => {
@@ -806,6 +819,8 @@ export default function Chat() {
     setMsgMenu({ open: false, x: 0, y: 0, msg: null });
     if (!msg?.decryptedContent) return;
     editContentRef.current = msg.decryptedContent;
+    const { imageUrl } = detectMediaFromContent(msg.decryptedContent);
+    editMediaUrlRef.current = imageUrl || '';
     setEditMsgId(msg.id);
     setEditText(msg.decryptedContent);
     setShowEditModal(true);
@@ -1499,6 +1514,7 @@ export default function Chat() {
                 src={conv.otherUser?.avatar_url}
                 alt={conv.otherUser?.username || '?'}
                 className="chat-list-item-avatar"
+                style={getAvatarTransformStyle(conv.otherUser?.avatar_position)}
               />
               <div className="chat-list-item-info">
                 <div className="chat-list-item-top">
@@ -1543,7 +1559,7 @@ export default function Chat() {
             src={otherUser?.avatar_url}
             alt={otherUser?.username || '?'}
             className="chat-messages-header-avatar"
-            style={{ cursor: 'pointer' }}
+            style={{ cursor: 'pointer', ...getAvatarTransformStyle(otherUser?.avatar_position) }}
             onClick={goToProfile}
           />
           <div className="chat-messages-header-info" style={{ cursor: 'pointer' }} onClick={goToProfile}>
@@ -1637,6 +1653,7 @@ export default function Chat() {
                       src={otherUser?.avatar_url}
                       alt={otherUser?.username || '?'}
                       className="chat-message-avatar"
+                      style={getAvatarTransformStyle(otherUser?.avatar_position)}
                     />
                   )}
                   {!isOwn && !showAvatar && <div className="chat-message-avatar-spacer" />}
@@ -1795,6 +1812,7 @@ export default function Chat() {
                       src={profile?.avatar_url || user?.user_metadata?.avatar_url || user?.avatar_url}
                       alt={profile?.username || user?.username || '?'}
                       className="chat-message-avatar chat-message-avatar--own"
+                      style={getAvatarTransformStyle(profile?.avatar_position)}
                     />
                   )}
                   {isOwn && !showAvatar && <div className="chat-message-avatar-spacer" />}
@@ -2397,6 +2415,16 @@ export default function Chat() {
                 <span className="chat-edit-modal-preview-label">{t('chat.edit_preview')}</span>
               </div>
               <div className="chat-edit-modal-preview-card">
+                {editMediaUrlRef.current && IMG_RE.test(editMediaUrlRef.current) && (
+                  <div className="chat-edit-modal-preview-media">
+                    <img
+                      src={editMediaUrlRef.current}
+                      alt="Media"
+                      className="chat-edit-modal-preview-img"
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                  </div>
+                )}
                 <div className="chat-edit-modal-preview-content">
                   <p className="chat-edit-modal-preview-text">
                     {editText || editContentRef.current || t('chat.encrypted')}

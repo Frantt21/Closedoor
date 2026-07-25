@@ -30,7 +30,7 @@ import SafeImage from './SafeImage';
 import Avatar from './Avatar';
 import RichText from './RichText';
 import { useI18n } from '../../services/i18n/useI18n';
-import { DEFAULT_AVATAR, getTimeAgo, getEmbedUrl as getEmbedUrlHelper, isVideoUrl as isVideoUrlHelper, IMG_RE, VID_RE, VID_RE_EXTENDED } from '../../services/helpers';import { decode as encryptDecode,
+import { DEFAULT_AVATAR, getTimeAgo, getEmbedUrl as getEmbedUrlHelper, isVideoUrl as isVideoUrlHelper, IMG_RE, VID_RE, VID_RE_EXTENDED, getAvatarTransformStyle } from '../../services/helpers';import { decode as encryptDecode,
   decryptForUser,
   getCachedDecryptedContent,
   setCachedDecryptedContent,
@@ -324,8 +324,13 @@ const PostCard = React.memo(function PostCard({
         setShowMenu(false);
       }
     };
+    const closeOnScroll = () => setShowMenu(false);
     document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('scroll', closeOnScroll, { passive: true, capture: true });
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('scroll', closeOnScroll, { capture: true });
+    };
   }, [showMenu]);
 
   const isOwner = user?.id === post.user_id;
@@ -771,6 +776,7 @@ const PostCard = React.memo(function PostCard({
             className="post-card-avatar"
             src={profile?.avatar_url}
             alt={profile?.username || 'user'}
+            style={getAvatarTransformStyle(profile?.avatar_position)}
           />
         </Link>
 
@@ -1242,7 +1248,7 @@ const PostCard = React.memo(function PostCard({
         document.body
       )}
 
-      {/* ── Poll voters modal ── */}
+      {/* ── Poll voters modal (grouped by option) ── */}
       {showPollVoters && createPortal(
         <div className="post-card-poll-voters-overlay" onClick={() => setShowPollVoters(false)}>
           <div className="post-card-poll-voters" ref={pollVotersRef} onClick={(e) => e.stopPropagation()}>
@@ -1259,42 +1265,63 @@ const PostCard = React.memo(function PostCard({
             ) : (
               <div className="post-card-poll-voters-list">
                 {(() => {
-                  // Agrupar votantes por opción
                   const options = post.poll_data?.options || [];
-                  const optionMap = {};
-                  options.forEach(o => { optionMap[o.id] = o.text; });
+                  // Build map: option_id -> { text, voters: [] }
+                  const groups = {};
+                  options.forEach(o => {
+                    groups[o.id] = { text: o.text, voters: [] };
+                  });
 
-                  // Deduplicar votantes por user_id
+                  // Deduplicate voters by user_id across all options (a user votes once)
                   const seenUsers = new Set();
-                  const uniqueVoters = [];
                   pollVoters.forEach(v => {
                     if (!seenUsers.has(v.user_id)) {
                       seenUsers.add(v.user_id);
-                      uniqueVoters.push(v);
+                      if (groups[v.option_id]) {
+                        groups[v.option_id].voters.push(v);
+                      }
                     }
                   });
 
-                  return uniqueVoters.map((voter) => {
-                    const profile = voter.profiles || {};
+                  const totalVotes = pollVotes ? pollVotes.length : 0;
+
+                  return options.map((option) => {
+                    const group = groups[option.id];
+                    const voters = group?.voters || [];
+                    const votesCount = pollVotes ? pollVotes.filter(v => v.option_id === option.id).length : 0;
+                    const percentage = totalVotes > 0 ? Math.round((votesCount / totalVotes) * 100) : 0;
+
                     return (
-                      <Link
-                        key={voter.user_id}
-                        to={`/profile/${profile.username}`}
-                        className="post-card-poll-voter"
-                        onClick={() => setShowPollVoters(false)}
-                      >
-                        <Avatar
-                          src={profile.avatar_url}
-                          alt={profile.username || 'user'}
-                          className="post-card-poll-voter-avatar"
-                        />
-                        <div className="post-card-poll-voter-info">
-                          <span className="post-card-poll-voter-username">{profile.username || 'Unknown'}</span>
-                          <span className="post-card-poll-voter-option">
-                            {t('post.poll_voted_for') || 'Votó por'}: {optionMap[voter.option_id] || '?'}
-                          </span>
+                      <div key={option.id} className="post-card-poll-voters-group">
+                        <div className="post-card-poll-voters-group-header">
+                          <span className="post-card-poll-voters-group-name">{option.text}</span>
+                          <span className="post-card-poll-voters-group-stats">{votesCount} · {percentage}%</span>
                         </div>
-                      </Link>
+                        {voters.length === 0 ? (
+                          <div className="post-card-poll-voters-group-empty">
+                            {t('post.poll_voters_no_votes') || 'Sin votos'}
+                          </div>
+                        ) : (
+                          voters.map((voter) => {
+                            const profile = voter.profiles || {};
+                            return (
+                              <Link
+                                key={voter.user_id}
+                                to={`/profile/${profile.username}`}
+                                className="post-card-poll-voter"
+                                onClick={() => setShowPollVoters(false)}
+                              >
+                                <Avatar
+                                  src={profile.avatar_url}
+                                  alt={profile.username || 'user'}
+                                  className="post-card-poll-voter-avatar"
+                                />
+                                <span className="post-card-poll-voter-username">{profile.username || 'Unknown'}</span>
+                              </Link>
+                            );
+                          })
+                        )}
+                      </div>
                     );
                   });
                 })()}

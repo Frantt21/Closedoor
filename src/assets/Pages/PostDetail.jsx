@@ -38,7 +38,7 @@ import ConfirmModal from '../Resources/Components/ConfirmModal';
 import Tooltip from '../Resources/Components/Tooltip';
 import CreatePostModal from '../Resources/Components/CreatePostModal';
 import useMentionAutocomplete from '../hooks/useMentionAutocomplete';
-import { getTimeAgo, IMG_RE, VID_RE } from '../services/helpers';
+import { getTimeAgo, IMG_RE, VID_RE, getAvatarTransformStyle } from '../services/helpers';
 import { uploadImage } from '../services/cdnService';
 import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/post.css';
@@ -113,7 +113,7 @@ export default function PostDetail() {
     setCommentMenuState({ commentId: null, style: null });
   }, []);
 
-  // Cerrar menú de comentario al hacer clic fuera
+  // Cerrar menú de comentario al hacer clic fuera o al scrollear
   useEffect(() => {
     if (!commentMenuState.commentId) return;
     const handleClick = (e) => {
@@ -123,9 +123,14 @@ export default function PostDetail() {
         closeCommentMenu();
       }
     };
+    const closeOnScroll = () => closeCommentMenu();
     // Usar mousedown para cerrar antes de que se abra otro menú
     document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    document.addEventListener('scroll', closeOnScroll, { passive: true, capture: true });
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('scroll', closeOnScroll, { capture: true });
+    };
   }, [commentMenuState.commentId, closeCommentMenu]);
   const [commentPermission, setCommentPermission] = useState(null);
   const [commentPermissionLoading, setCommentPermissionLoading] = useState(true);
@@ -659,6 +664,7 @@ export default function PostDetail() {
             className="comment-card-avatar"
             src={reply.profiles?.avatar_url}
             alt={reply.profiles?.username || 'user'}
+            style={getAvatarTransformStyle(reply.profiles?.avatar_position)}
           />
         </a>
         <div className="comment-card-content">
@@ -898,6 +904,7 @@ export default function PostDetail() {
             className="comment-card-avatar"
             src={comment.profiles?.avatar_url}
             alt={comment.profiles?.username || 'user'}
+            style={getAvatarTransformStyle(comment.profiles?.avatar_position)}
           />
         </a>
         <div className="comment-card-content">
@@ -1188,6 +1195,7 @@ export default function PostDetail() {
               className="comment-form-avatar"
               src={profile?.avatar_url}
               alt="Your avatar"
+              style={getAvatarTransformStyle(profile?.avatar_position)}
             />
             <div className="comment-form-input-wrapper">
               <textarea
