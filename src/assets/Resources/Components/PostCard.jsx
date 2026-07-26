@@ -38,7 +38,7 @@ import { DEFAULT_AVATAR, getTimeAgo, getEmbedUrl as getEmbedUrlHelper, isVideoUr
 import { supabase } from '../../services/supabaseclient';
 import { getOrCreateConversation, sendMessage } from '../../services/chatService';
 import { getFollowing } from '../../services/followService';
-import { isBlocked, getCachedBlockStatus } from '../../services/blockService';
+import { isBlocked, getCachedBlockStatus, blockUser, cacheBlockStatus } from '../../services/blockService';
 import ConfirmModal from './ConfirmModal';
 import Tooltip from './Tooltip';
 import './css/postCard.css';
@@ -840,7 +840,7 @@ const PostCard = React.memo(function PostCard({
                   )}
                 </div>
               )}
-              {/* ── Mobile-only: universal menu (save for all users) ── */}
+              {/* ── Non-owner menu: save, share, block, report ── */}
               {!isOwner && (
                 <div className="post-card-menu-wrapper post-card-menu--non-owner">
                   <button
@@ -864,6 +864,27 @@ const PostCard = React.memo(function PostCard({
                       }}>
                         {saved ? <FaBookmark /> : <FaRegBookmark />}
                         {saved ? (t('post.unsave') || 'Quitar guardado') : t('post.save')}
+                      </button>
+                      <button className="fc-dropdown-btn" onClick={openShareModal}><FaShareAlt /> {t('post.share')}</button>
+                      <button
+                        className="fc-dropdown-btn"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          setShowMenu(false);
+                          if (!user || !post?.user_id) return;
+                          try {
+                            await blockUser(user.id, post.user_id);
+                            cacheBlockStatus(user.id, post.user_id, true);
+                            toast.success(t('post.user_blocked') || 'Usuario bloqueado');
+                          } catch (err) {
+                            console.error('Error blocking user:', err);
+                          }
+                        }}
+                      >
+                        <FaBan /> {t('post.block_user') || 'Bloquear usuario'}
+                      </button>
+                      <button className="fc-dropdown-btn" disabled style={{ opacity: 0.4, cursor: 'not-allowed' }}>
+                        <FaExclamationTriangle /> {t('post.report') || 'Reportar'}
                       </button>
                     </div>,
                     document.body

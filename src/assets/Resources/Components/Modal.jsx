@@ -127,6 +127,7 @@ export default function Modal({
   // Image position state
   const [bannerPosition, setBannerPosition] = useState(initialBannerPosition);
   const [avatarPosition, setAvatarPosition] = useState(initialAvatarPosition);
+
   // Submodal state: null | { type: 'avatar' | 'banner', value: string }
   const [showUrlModal, setShowUrlModal] = useState(null);
   const [urlInput, setUrlInput] = useState('');

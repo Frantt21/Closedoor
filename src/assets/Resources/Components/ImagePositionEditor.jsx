@@ -74,6 +74,22 @@ export default function ImagePositionEditor({
   overlay = null,
 }) {
   const [pos, setPos] = useState(() => parseEncodedPosition(initialPosition));
+
+  // ── Resetear flip/rotation cuando cambia la imagen (preserva x, y, zoom) ──
+  const imageUrlRef = useRef(imageUrl);
+  useEffect(() => {
+    if (imageUrl && imageUrl !== imageUrlRef.current) {
+      let next;
+      setPos(prev => {
+        next = { ...prev, flipX: false, flipY: false, rotation: 0 };
+        return next;
+      });
+      if (next) notify(next);
+    }
+    imageUrlRef.current = imageUrl;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageUrl]);
+
   const containerRef = useRef(null);
   const dragging = useRef(false);
   const lastMouse = useRef({ x: 0, y: 0 });
@@ -85,16 +101,29 @@ export default function ImagePositionEditor({
     onPositionChange?.(encodePosition(newData));
   }, [onPositionChange]);
 
+  // updatePos ahora solo actualiza el estado local pos.
+  // La propagación al padre se hace via el useEffect de abajo,
+  // que sincroniza pos con onPositionChange de forma fiable.
   const updatePos = useCallback((updater) => {
-    let next;
     setPos((prev) => {
-      next = typeof updater === 'function' ? updater(prev) : updater;
-      return next;
+      return typeof updater === 'function' ? updater(prev) : updater;
     });
-    // notify MUST be called outside the setState updater to avoid
-    // "Cannot update a component while rendering a different component"
-    if (next) notify(next);
-  }, [notify]);
+  }, []);
+
+  // ── Sincronizar pos → onPositionChange vía useEffect ──
+  // El patrón anterior (capturar next dentro de setPos + notify fuera)
+  // falla en React 18 durante eventos rápidos como mousemove porque
+  // el updater no siempre se ejecuta sincrónicamente (eager optimization
+  // solo funciona si la cola está vacía). Al comparar el string encoded
+  // nos aseguramos de que notify se llame SIEMPRE que pos cambie.
+  const lastEncodedRef = useRef(encodePosition(pos));
+  useEffect(() => {
+    const encoded = encodePosition(pos);
+    if (encoded !== lastEncodedRef.current) {
+      lastEncodedRef.current = encoded;
+      notify(pos);
+    }
+  }, [pos, notify]);
 
   // ── Drag ──
   const handleMouseDown = useCallback((e) => {

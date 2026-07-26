@@ -170,20 +170,50 @@ export default function Settings() {
   const statsVisibility = profile?.stats_visibility;
 
   // ── Sincronizar preferencias con Supabase ──
-  const [savingPref, setSavingPref] = useState(false);
+  // Flag per-key para permitir saves concurrentes de diferentes settings
+  const savingRef = useRef({});
 
   const syncProfilePref = async (key, value) => {
-    if (!user?.id || savingPref) return;
-    setSavingPref(true);
+    if (!user?.id) return;
+    if (savingRef.current[key]) return; // Solo bloquear la misma key
+    savingRef.current[key] = true;
     try {
       await updateUserProfile(user.id, { [key]: value });
       await refreshProfile(user.id);
     } catch (err) {
       console.error('Error syncing profile pref:', err);
     } finally {
-      setSavingPref(false);
+      savingRef.current[key] = false;
     }
   };
+
+  // ── Cargar preferencias del perfil al montar (para que persistan
+  //     aunque se borre el localStorage o se abra en otro navegador) ──
+  const [profileSynced, setProfileSynced] = useState(false);
+  useEffect(() => {
+    if (!profile || profileSynced) return;
+    setProfileSynced(true);
+
+    // Mapear columnas del perfil a los setters de I18nContext
+    const mappings = [
+      { col: 'show_accent', setter: setShowAccent },
+      { col: 'show_accent_profile', setter: setShowAccentProfile },
+      { col: 'show_accent_explore', setter: setShowAccentExplore },
+      { col: 'accent_visibility', setter: setAccentVisibility },
+      { col: 'show_interests', setter: setShowInterests },
+      { col: 'show_trending', setter: setShowTrending },
+      { col: 'show_profile_stats', setter: setShowProfileStats },
+      { col: 'show_likes', setter: setShowLikes },
+      { col: 'allow_mention', setter: setAllowMention },
+      { col: 'allow_encrypted_add', setter: setAllowEncryptedAdd },
+      { col: 'filter_encrypted', setter: setFilterEncrypted },
+    ];
+    for (const { col, setter } of mappings) {
+      if (profile[col] !== undefined && profile[col] !== null) {
+        setter(profile[col]);
+      }
+    }
+  }, [profile, profileSynced, setShowAccentProfile, setShowAccentExplore, setAccentVisibility, setShowInterests, setShowTrending, setShowProfileStats, setShowLikes, setAllowMention, setAllowEncryptedAdd, setFilterEncrypted]);
 
   const handlePrivacyChange = async (value) => {
     if (!user?.id || privacyUpdating || value === isPrivate) return;
@@ -456,7 +486,11 @@ export default function Settings() {
                 <button
                   type="button"
                   className={`settings-toggle ${showAccent ? 'settings-toggle--active' : ''}`}
-                  onClick={() => setShowAccent(!showAccent)}
+                  onClick={() => {
+                      const next = !showAccent;
+                      setShowAccent(next);
+                      syncProfilePref('show_accent', next);
+                    }}
                   aria-pressed={showAccent}
                 >
                   <span className="settings-toggle-track">
@@ -917,16 +951,16 @@ export default function Settings() {
                 </div>
                 <button
                   type="button"
-                  className={`settings-toggle ${filterEncrypted ? 'settings-toggle--active' : ''}`}
-                  onClick={() => {
-                    const next = !filterEncrypted;
-                    setFilterEncrypted(next);
-                    // Si filterEncrypted se activa, desactivar allowEncryptedAdd
-                    if (next) {
-                      setAllowEncryptedAdd(false);
-                      syncProfilePref('allow_encrypted_add', false);
-                    }
-                  }}
+                  className={`settings-toggle ${filterEncrypted ? 'settings-toggle--active' : ''}`}                    onClick={() => {
+                      const next = !filterEncrypted;
+                      setFilterEncrypted(next);
+                      syncProfilePref('filter_encrypted', next);
+                      // Si filterEncrypted se activa, desactivar allowEncryptedAdd
+                      if (next) {
+                        setAllowEncryptedAdd(false);
+                        syncProfilePref('allow_encrypted_add', false);
+                      }
+                    }}
                   aria-pressed={filterEncrypted}
                 >
                   <span className="settings-toggle-track">
