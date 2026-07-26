@@ -199,7 +199,7 @@
 .explore-card-name-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px;
     flex-wrap: wrap;
 }
 
@@ -282,9 +282,58 @@
     padding-top: 8px;
 }
 
+/* ---- Pagination ---- */
+.explore-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 24px;
+    padding: 16px 0;
+}
+
+.explore-pagination-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: var(--radius, 10px);
+    font-size: 0.85rem;
+    font-weight: 500;
+    font-family: inherit;
+    color: var(--color-text-secondary, #9ca3af);
+    background: var(--color-surface, #1a1a1a);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+    white-space: nowrap;
+}
+
+.explore-pagination-btn:hover:not(:disabled) {
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+}
+
+.explore-pagination-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.explore-pagination-info {
+    font-size: 0.85rem;
+    color: var(--color-text-muted, #6b7280);
+    white-space: nowrap;
+}
+
+.explore-pagination-capped {
+    font-size: 0.75rem;
+    opacity: 0.7;
+}
+
 /* ---- Responsive ---- */
 @media (max-width: 640px) {
     .explore-grid {
         grid-template-columns: 1fr;
+    }
+    .explore-pagination {
+        flex-wrap: wrap;
+        gap: 8px;
     }
 }

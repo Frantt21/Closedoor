@@ -7,7 +7,7 @@ import { clearAllAppCaches } from '../services/postService';
 import { getBlockedUsers, getCachedBlockedUsers, unblockUser, cacheBlockStatus, subscribeBlockChanges } from '../services/blockService';
 import { useNavigate } from 'react-router-dom';
 import { getItem } from '../services/secureStorage';
-import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaHeartBroken, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaFire, FaChartBar, FaBell, FaBrush, FaBan, FaClock, FaAt, FaTrashAlt, FaTimes } from 'react-icons/fa';
+import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaHeartBroken, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaFire, FaChartBar, FaBell, FaBrush, FaBan, FaClock, FaAt, FaTrashAlt, FaTimes, FaDiscord } from 'react-icons/fa';
 import { MdLogout } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import ConfirmModal from '../Resources/Components/ConfirmModal';
@@ -78,9 +78,9 @@ const CATEGORIES = [
 /* ── Main Settings Component ── */
 
 export default function Settings() {
-  const { locale, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showTrending, setShowTrending, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showPushNotifications, setShowPushNotifications, showLikes, setShowLikes, filterEncrypted, setFilterEncrypted, allowMention, setAllowMention, allowEncryptedAdd, setAllowEncryptedAdd, hour24, setHour24, theme, setTheme, t } = useI18n();
+  const { locale, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showTrending, setShowTrending, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showPushNotifications, setShowPushNotifications, showLikes, setShowLikes, filterEncrypted, setFilterEncrypted, allowMention, setAllowMention, allowEncryptedAdd, setAllowEncryptedAdd, hour24, setHour24, showBadges, setShowBadges, theme, setTheme, t } = useI18n();
   usePageTitle(t('settings.title'));
-  const { user, profile, profileLoading, refreshProfile, logout } = useAuth();
+  const { user, profile, profileLoading, refreshProfile, logout, linkDiscord, isDiscordLinked } = useAuth();
   const navigate = useNavigate();
   const [selectOpen, setSelectOpen] = useState(false);
   const selectRef = useRef(null);
@@ -90,6 +90,7 @@ export default function Settings() {
   const [accentExpanded, setAccentExpanded] = useState(false);
   const [cardsExpanded, setCardsExpanded] = useState(false);
   const [statsExpanded, setStatsExpanded] = useState(false);
+  const [badgesExpanded, setBadgesExpanded] = useState(false);
   const [showBlockedModal, setShowBlockedModal] = useState(false);
   const [blockedUsers, setBlockedUsers] = useState(() => {
     if (!user?.id) return [];
@@ -169,6 +170,27 @@ export default function Settings() {
   // No usar || {} para poder distinguir null (legacy) de {} (explicitamente vacío)
   const statsVisibility = profile?.stats_visibility;
 
+  // ── User badges (roles excluyendo 'user') ──
+  const VALID_BADGE_TYPES = ['admin', 'dev', 'mod', 'partner', 'verified'];
+  const userBadges = useMemo(() => {
+    if (!profile?.roles) return [];
+    return (Array.isArray(profile.roles) ? profile.roles : [profile.roles])
+      .filter(r => r !== 'user' && VALID_BADGE_TYPES.includes(r));
+  }, [profile?.roles]);
+  const badgesVisibility = profile?.badges_visibility || {};
+  const getBadgeVisible = (badge) => badgesVisibility[badge] !== false;
+
+  const handleBadgeVisibilityChange = async (badge, visible) => {
+    if (!user?.id) return;
+    const newVisibility = { ...badgesVisibility, [badge]: visible };
+    try {
+      await updateUserProfile(user.id, { badges_visibility: newVisibility });
+      await refreshProfile(user.id);
+    } catch (err) {
+      console.error('Error updating badge visibility:', err);
+    }
+  };
+
   // ── Sincronizar preferencias con Supabase ──
   // Flag per-key para permitir saves concurrentes de diferentes settings
   const savingRef = useRef({});
@@ -203,6 +225,7 @@ export default function Settings() {
       { col: 'show_trending', setter: setShowTrending },
       { col: 'show_profile_stats', setter: setShowProfileStats },
       { col: 'show_likes', setter: setShowLikes },
+      { col: 'show_badges', setter: setShowBadges },
       { col: 'allow_mention', setter: setAllowMention },
       { col: 'allow_encrypted_add', setter: setAllowEncryptedAdd },
       { col: 'filter_encrypted', setter: setFilterEncrypted },
@@ -700,6 +723,120 @@ export default function Settings() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              <div className="settings-row-divider" />
+
+              {/* ── Mostrar badges ── */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaTags /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.show_badges')}</h2>
+                    <p className="settings-section-desc">{t('settings.show_badges_desc')}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={`settings-toggle ${showBadges ? 'settings-toggle--active' : ''}`}
+                  onClick={() => {
+                    const next = !showBadges;
+                    setShowBadges(next);
+                    syncProfilePref('show_badges', next);
+                  }}
+                  aria-pressed={showBadges}
+                >
+                  <span className="settings-toggle-track">
+                    <span className="settings-toggle-thumb" />
+                  </span>
+                </button>
+
+                {/* Expandir sub-opciones de badges */}
+                {userBadges.length > 0 ? (
+                  <>
+                    <button
+                      type="button"
+                      className="settings-stats-expand-btn"
+                      onClick={() => setBadgesExpanded((s) => !s)}
+                    >
+                      <span className={`settings-stats-expand-arrow ${badgesExpanded ? 'settings-stats-expand-arrow--open' : ''}`}>
+                        <FaChevronRight />
+                      </span>
+                      <span>
+                        {badgesExpanded ? t('settings.badges_hide_individual') : t('settings.badges_show_individual', { count: userBadges.length })}
+                      </span>
+                    </button>
+
+                    {badgesExpanded && (
+                      <div className="settings-accent-list">
+                        {userBadges.map((badge) => {
+                          const visible = getBadgeVisible(badge);
+                          const badgeImg = badge === 'mod' ? null : `/${badge}_badge.png`;
+                          return (
+                            <label key={badge} className="settings-stat-toggle">
+                              <span className="settings-stat-toggle-label">
+                                {badgeImg ? (
+                                  <img
+                                    src={badgeImg}
+                                    alt={badge}
+                                    className="role-badge-img"
+                                    style={{ width: 18, height: 18, objectFit: 'contain', marginRight: 8, flexShrink: 0 }}
+                                    draggable={false}
+                                  />
+                                ) : (
+                                  <span className="role-badge role-badge--mod" style={{ marginRight: 8, fontSize: '0.65rem', padding: '1px 6px' }}>
+                                    Mod
+                                  </span>
+                                )}
+                                {t(`badge.${badge}`) || badge}
+                              </span>
+                              <span className="settings-toggle">
+                                <input
+                                  type="checkbox"
+                                  checked={visible}
+                                  onChange={() => handleBadgeVisibilityChange(badge, !visible)}
+                                />
+                                <span className="settings-toggle-track">
+                                  <span className="settings-toggle-thumb" />
+                                </span>
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="settings-no-badges" style={{ fontSize: '0.78rem', opacity: 0.6, marginTop: 8, width: '100%' }}>{t('settings.no_badges')}</p>
+                )}
+              </div>
+
+              <div className="settings-row-divider" />
+
+              {/* ── Conexión con Discord ── */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaDiscord /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.discord_title')}</h2>
+                    <p className="settings-section-desc">{isDiscordLinked ? t('settings.discord_linked_desc') : t('settings.discord_not_linked_desc')}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={`settings-edit-btn ${isDiscordLinked ? 'settings-danger-btn' : ''}`}
+                  style={!isDiscordLinked ? { background: '#5865F2', color: '#fff', border: 'none' } : {}}
+                  onClick={async () => {
+                    if (isDiscordLinked) {
+                      toast.info(t('settings.discord_unlink_info'));
+                    } else {
+                      await linkDiscord();
+                    }
+                  }}
+                >
+                  <FaDiscord style={{ marginRight: 6 }} />
+                  {isDiscordLinked ? t('settings.discord_linked') : t('settings.discord_link_btn')}
+                </button>
               </div>
             </>
           )}

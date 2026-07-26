@@ -18,6 +18,7 @@ const FILTER_ENCRYPTED_KEY = 'fc_filter_encrypted';
 const ALLOW_MENTION_KEY = 'fc_allow_mention';
 const ALLOW_ENCRYPTED_ADD_KEY = 'fc_allow_encrypted_add';
 const HOUR24_KEY = 'fc_hour24';
+const SHOW_BADGES_KEY = 'fc_show_badges';
 
 const locales = { es };
 
@@ -185,6 +186,13 @@ function getSavedHour24() {
   } catch { return true; }
 }
 
+function getSavedShowBadges() {
+  try {
+    const val = getItem(SHOW_BADGES_KEY);
+    return val === null ? true : val === 'true';
+  } catch { return true; }
+}
+
 export const I18nContext = createContext({
   locale: 'es',
   t: (key, params) => key,
@@ -217,6 +225,8 @@ export const I18nContext = createContext({
   setAllowEncryptedAdd: () => {},
   hour24: true,
   setHour24: () => {},
+  showBadges: true,
+  setShowBadges: () => {},
   theme: 'dark',
   setTheme: () => {},
 });
@@ -238,6 +248,7 @@ export function I18nProvider({ children }) {
   const [allowMention, setAllowMentionState] = useState(getSavedAllowMention);
   const [allowEncryptedAdd, setAllowEncryptedAddState] = useState(getSavedAllowEncryptedAdd);
   const [hour24, setHour24State] = useState(getSavedHour24);
+  const [showBadges, setShowBadgesState] = useState(getSavedShowBadges);
   const [theme, setThemeState] = useState(getSavedTheme);
 
   // Cargar el archivo de locale asíncrono
@@ -362,6 +373,13 @@ export function I18nProvider({ children }) {
     } catch {}
   }, []);
 
+  const setShowBadges = useCallback((value) => {
+    setShowBadgesState(value);
+    try {
+      setItem(SHOW_BADGES_KEY, String(value));
+    } catch {}
+  }, []);
+
   const setTheme = useCallback((newTheme) => {
     setThemeState(newTheme);
     try {
@@ -386,7 +404,7 @@ export function I18nProvider({ children }) {
   }, [translations]);
 
   return (
-    <I18nContext.Provider      value={{ locale, t, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showPushNotifications, setShowPushNotifications, showLikes, setShowLikes, filterEncrypted, setFilterEncrypted, allowMention, setAllowMention, allowEncryptedAdd, setAllowEncryptedAdd, hour24, setHour24, theme, setTheme }}>
+    <I18nContext.Provider      value={{ locale, t, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showPushNotifications, setShowPushNotifications, showLikes, setShowLikes, filterEncrypted, setFilterEncrypted, allowMention, setAllowMention, allowEncryptedAdd, setAllowEncryptedAdd, hour24, setHour24, showBadges, setShowBadges, theme, setTheme }}>
       {children}
     </I18nContext.Provider>
   );

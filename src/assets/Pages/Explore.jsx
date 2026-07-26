@@ -16,6 +16,7 @@ import Avatar from "../Resources/Components/Avatar";
 import Badge from "../Resources/Components/Badge";
 import { FaLock } from 'react-icons/fa';
 import { getBlockedUserIds, getUsersWhoBlockedMeIds, clearBlockedListsCache, subscribeBlockChanges } from "../services/blockService";
+import { countInterestOverlap } from "../services/interestDictionary";
 import "../Resources/Styles/explore.css";
 import "../Resources/Styles/skeleton.css";
 
@@ -24,10 +25,16 @@ function Explore() {
   usePageTitle(t('explore.title'));
   const { user, profile, loading: authLoading } = useAuth();
 
+  // ── Constants ──
+  const PAGE_SIZE = 8;
+  const MAX_VISIBLE = 100;
+  const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
   // ── Search & Filters ──
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('relevance');
+  const [page, setPage] = useState(1);
   const searchTimeoutRef = useRef(null);
 
   useEffect(() => {
@@ -54,6 +61,10 @@ function Explore() {
   const [countsMap, setCountsMap] = useState(() => {
     const cached = getCachedExploreData(user?.id);
     return cached?.counts || {};
+  });
+  const [likesMap, setLikesMap] = useState(() => {
+    const cached = getCachedExploreData(user?.id);
+    return cached?.likes || {};
   });
   const [loading, setLoading] = useState(() => {
     const cached = getCachedExploreData(user?.id);
@@ -85,7 +96,7 @@ function Explore() {
 
     const fetchAll = async () => {
       const cached = getCachedExploreData(user?.id);
-      if (!cached) {
+      if (!cached || (cached._fetchedAt && Date.now() - cached._fetchedAt > CACHE_TTL_MS)) {
         setLoading(true);
       }
 
@@ -107,7 +118,7 @@ function Explore() {
         }
 
         // Fetch follow counts + follow statuses en paralelo
-        const [countsResults] = await Promise.all([
+        const [countsResults, , likesResults] = await Promise.all([
           Promise.allSettled(data.map((p) => getFollowCounts(p.id))),
           user?.id
             ? Promise.allSettled(
@@ -126,6 +137,18 @@ function Explore() {
                 )
               )
             : Promise.resolve([]),
+          // Aggregate total likes per user
+          supabase
+            .from('posts')
+            .select('user_id, likes_count')
+            .in('user_id', data.map((p) => p.id))
+            .then(({ data: likesData }) => {
+              const likes = {};
+              (likesData || []).forEach((post) => {
+                likes[post.user_id] = (likes[post.user_id] || 0) + (post.likes_count || 0);
+              });
+              return likes;
+            }),
         ]);
 
         const counts = {};
@@ -138,7 +161,8 @@ function Explore() {
 
         setProfiles(data);
         setCountsMap(counts);
-        setCachedExploreData(user?.id, { profiles: data, counts });
+        setLikesMap(likesResults || {});
+        setCachedExploreData(user?.id, { profiles: data, counts, likes: likesResults || {}, _fetchedAt: Date.now() });
       } catch (err) {
         console.warn("Error fetching profiles:", err);
       } finally {
@@ -176,7 +200,8 @@ function Explore() {
 
       setCountsMap(updated);
       // También actualizar el cache para que al volver a Explore los datos estén frescos
-      setCachedExploreData(user.id, { profiles: current, counts: updated });
+      const existing = getCachedExploreData(user.id) || {};
+      setCachedExploreData(user.id, { ...existing, profiles: current, counts: updated });
     };
 
     const channel = supabase
@@ -220,11 +245,21 @@ function Explore() {
     // Then, sort/filter based on active filter mode
     switch (activeFilter) {
       case 'relevance':
-        // Sort by follower count descending
+        // Sort by: 1) total likes 2) follower count 3) badge weight
         filtered.sort((a, b) => {
-          const aCount = countsMap[a.id]?.followers ?? 0;
-          const bCount = countsMap[b.id]?.followers ?? 0;
-          return bCount - aCount;
+          const aLikes = likesMap?.[a.id] ?? 0;
+          const bLikes = likesMap?.[b.id] ?? 0;
+          if (bLikes !== aLikes) return bLikes - aLikes;
+          const aFollowers = countsMap[a.id]?.followers ?? 0;
+          const bFollowers = countsMap[b.id]?.followers ?? 0;
+          if (bFollowers !== aFollowers) return bFollowers - aFollowers;
+          const badgeWeight = (roles = []) => {
+            if (roles.includes('admin')) return 3;
+            if (roles.includes('moderator')) return 2;
+            if (roles.includes('verified')) return 1;
+            return 0;
+          };
+          return badgeWeight(b.roles) - badgeWeight(a.roles);
         });
         break;
       case 'newest':
@@ -232,29 +267,26 @@ function Explore() {
         filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         break;
       case 'interests':
-        // Filter users whose interests overlap with the current user's interests
-        // Then sort by number of matching interests
+        // Group users by: 1) matching interests (hierarchical) 2) has interests but no match 3) no interests
         if (profile?.interests?.length > 0) {
-          const myInterests = profile.interests.map((i) => i.toLowerCase());
           const withMatch = [];
-          const withoutMatch = [];
+          const withInterestsNoMatch = [];
+          const withoutInterests = [];
           filtered.forEach((p) => {
             if (p.interests?.length > 0) {
-              const overlap = p.interests.filter((i) =>
-                myInterests.includes(i.toLowerCase())
-              ).length;
+              const overlap = countInterestOverlap(profile.interests, p.interests);
               if (overlap > 0) {
                 withMatch.push({ profile: p, overlap });
               } else {
-                withoutMatch.push(p);
+                withInterestsNoMatch.push(p);
               }
             } else {
-              withoutMatch.push(p);
+              withoutInterests.push(p);
             }
           });
           // Sort by overlap (descending), then alpha
           withMatch.sort((a, b) => b.overlap - a.overlap || a.profile.username.localeCompare(b.profile.username));
-          filtered = [...withMatch.map((w) => w.profile), ...withoutMatch];
+          filtered = [...withMatch.map((w) => w.profile), ...withInterestsNoMatch, ...withoutInterests];
         } else {
           // If current user has no interests, fall back to alphabetical
           filtered.sort((a, b) => a.username.localeCompare(b.username));
@@ -268,7 +300,26 @@ function Explore() {
     }
 
     return filtered;
-  }, [profiles, countsMap, debouncedQuery, activeFilter, profile?.interests]);
+  }, [profiles, countsMap, likesMap, debouncedQuery, activeFilter, profile?.interests]);
+
+  // ── Reset page when filters/search change ──
+  useEffect(() => {
+    setPage(1);
+  }, [activeFilter, debouncedQuery]);
+
+  // ── Cap at MAX_VISIBLE & slice current page ──
+  const totalPages = React.useMemo(() => {
+    const capped = Math.min(sortedProfiles.length, MAX_VISIBLE);
+    return Math.max(1, Math.ceil(capped / PAGE_SIZE));
+  }, [sortedProfiles.length]);
+
+  const safePage = Math.min(page, totalPages);
+  const paginatedProfiles = React.useMemo(() => {
+    const start = (safePage - 1) * PAGE_SIZE;
+    return sortedProfiles.slice(start, start + PAGE_SIZE);
+  }, [sortedProfiles, safePage]);
+
+  const totalCapped = Math.min(sortedProfiles.length, MAX_VISIBLE);
 
   return (
     <div className="explore-page">
@@ -327,32 +378,62 @@ function Explore() {
             ))}
           </div>
 
-          {/* ── Sorted & filtered grid ── */}
+          {/* ── Sorted, filtered & paginated grid ── */}
           {sortedProfiles.length === 0 ? (
             <div className="explore-empty">
               <p>{t('explore.no_results')}</p>
             </div>
           ) : (
-            <div className="explore-grid">
-              {sortedProfiles.map((profile) => {
-                const isOwn = user?.id === profile.id;
-                const profAccentVis = profile.accent_visibility ?? 'both';
-                const accentVisible = showAccent && (profile.show_accent_explore ?? true) && (
-                  profAccentVis === 'both' ||
-                  (profAccentVis === 'me' && isOwn) ||
-                  (profAccentVis === 'others' && !isOwn)
-                );
-                return (
-                  <ExploreCard
-                    key={profile.id}
-                    profile={profile}
-                    counts={countsMap[profile.id]}
-                    isOwnProfile={isOwn}
-                    showAccent={accentVisible}
-                  />
-                );
-              })}
-            </div>
+            <>
+              <div className="explore-grid">
+                {paginatedProfiles.map((profile) => {
+                  const isOwn = user?.id === profile.id;
+                  const profAccentVis = profile.accent_visibility ?? 'both';
+                  const accentVisible = showAccent && (profile.show_accent_explore ?? true) && (
+                    profAccentVis === 'both' ||
+                    (profAccentVis === 'me' && isOwn) ||
+                    (profAccentVis === 'others' && !isOwn)
+                  );
+                  return (
+                    <ExploreCard
+                      key={profile.id}
+                      profile={profile}
+                      counts={countsMap[profile.id]}
+                      isOwnProfile={isOwn}
+                      showAccent={accentVisible}
+                    />
+                  );
+                })}
+              </div>
+
+              {/* ── Pagination ── */}
+              {totalPages > 1 && (
+                <div className="explore-pagination">
+                  <button
+                    className="explore-pagination-btn"
+                    disabled={safePage <= 1}
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                  >
+                    ← {t('common.previous') || 'Previous'}
+                  </button>
+                  <span className="explore-pagination-info">
+                    {safePage} / {totalPages}
+                    {sortedProfiles.length > MAX_VISIBLE && (
+                      <span className="explore-pagination-capped">
+                        {' '}({t('explore.showing_first') || 'Showing first'} {totalCapped})
+                      </span>
+                    )}
+                  </span>
+                  <button
+                    className="explore-pagination-btn"
+                    disabled={safePage >= totalPages}
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  >
+                    {t('common.next') || 'Next'} →
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </>
       )}
@@ -405,7 +486,7 @@ function ExploreCard({ profile, counts, isOwnProfile, showAccent }) {
         <div className="explore-card-info">
           <div className="explore-card-name-row">
             <span className="explore-card-name">{profile.displayname || profile.username}</span>
-            <span style={{ fontSize: '0.68rem', fontWeight: 400, opacity: 0.5, marginLeft: 4 }}>@{profile.username}</span>
+            <span style={{ fontSize: '0.68rem', fontWeight: 400, opacity: 0.5 }}> · @{profile.username}</span>
             {profile.is_private === true && (
               <span className="explore-card-private-icon" title={t('profile.private_profile')}>
                 <FaLock />

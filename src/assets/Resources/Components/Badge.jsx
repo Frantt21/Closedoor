@@ -22,8 +22,15 @@ const ROLE_CONFIG = {
   },
   partner: {
     className: 'role-badge--partner',
-    label: 'Partner',
+    img: '/partner_badge.png',
+    alt: 'Partner',
     tooltip: 'Partner',
+  },
+  verified: {
+    className: 'role-badge--verified',
+    img: '/verified_badge.png',
+    alt: 'Verified',
+    tooltip: 'Verified',
   },
 };
 

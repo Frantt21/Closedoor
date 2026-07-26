@@ -44,7 +44,8 @@
 .role-badge--admin,
 .role-badge--dev,
 .role-badge--mod,
-.role-badge--partner {
+.role-badge--partner,
+.role-badge--verified {
     background: var(--overlay-bg);
     color: var(--color-text-secondary, #9ca3af);
     padding: 3px 10px;
@@ -52,7 +53,9 @@
 
 /* Badges with images — no background, no padding, image only */
 .role-badge--admin,
-.role-badge--dev {
+.role-badge--dev,
+.role-badge--partner,
+.role-badge--verified {
     background: none !important;
     padding: 0;
 }

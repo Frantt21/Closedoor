@@ -20,7 +20,6 @@ import {
   broadcastTyping,
   subscribeToTyping,
 } from '../services/chatService';
-import { searchProfiles } from '../services/userService';
 import { getFollowing } from '../services/followService';
 import { isBlocked, getCachedBlockStatus, cacheBlockStatus } from '../services/blockService';
 import FollowButton from '../Resources/Components/FollowButton';
@@ -72,8 +71,6 @@ export default function Chat() {
   useEffect(() => { sendingRef.current = sending; }, [sending]);
   // New conversation
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
-  const [searchingUser, setSearchingUser] = useState(false);
   const [showFollowersModal, setShowFollowersModal] = useState(false);
   const [followers, setFollowers] = useState([]);
   const [followersLoading, setFollowersLoading] = useState(false);
@@ -719,24 +716,10 @@ export default function Chat() {
   // ── Ref for pending conversations (created locally, not yet in DB) ──
   const pendingConvRef = useRef(null);
 
-  // ── Start new conversation ──
-  const handleSearchChange = useCallback(async (e) => {
-    const q = e.target.value;
-    setSearchQuery(q);
-    if (q.trim().length < 2) {
-      setSearchResults([]);
-      return;
-    }
-    setSearchingUser(true);
-    try {
-      const results = await searchProfiles(q.trim(), user?.id);
-      setSearchResults(results.filter(r => r.id !== user?.id));
-    } catch (err) {
-      console.warn('Search error:', err);
-    } finally {
-      setSearchingUser(false);
-    }
-  }, [user?.id]);
+  // ── Filter conversations by username/displayname ──
+  const handleSearchChange = useCallback((e) => {
+    setSearchQuery(e.target.value);
+  }, []);
 
   const startConversation = async (otherUser) => {
     if (!user?.id || !otherUser?.id) return;
@@ -791,7 +774,6 @@ export default function Chat() {
           // Existing conversation found — unhide and select it
           setHiddenConvIds((prev) => prev.filter(id => id !== match.conversation_id));
           setSearchQuery('');
-          setSearchResults([]);
           selectConversation(match.conversation_id);
           return;
         }
@@ -813,7 +795,6 @@ export default function Chat() {
     }, ...prev.filter(c => c.id !== tempId)]);
 
     setSearchQuery('');
-    setSearchResults([]);
     selectConversation(tempId);
   };
 
@@ -826,10 +807,19 @@ export default function Chat() {
 
   const [hiddenConvIds, setHiddenConvIds] = useState([]);
 
-  // Filter out hidden conversations from the list (but keep them in the full state for cache)
+  // Filter out hidden + searched conversations from the list
   const visibleConversations = React.useMemo(() => {
-    return conversations.filter(c => !hiddenConvIds.includes(c.id));
-  }, [conversations, hiddenConvIds]);
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) {
+      return conversations.filter(c => !hiddenConvIds.includes(c.id));
+    }
+    return conversations.filter(c => {
+      if (hiddenConvIds.includes(c.id)) return false;
+      const name = (c.otherUser?.displayname || c.otherUser?.username || '').toLowerCase();
+      const uname = (c.otherUser?.username || '').toLowerCase();
+      return name.includes(q) || uname.includes(q);
+    });
+  }, [conversations, hiddenConvIds, searchQuery]);
 
   // Persist hidden IDs
   useEffect(() => {
@@ -1704,7 +1694,7 @@ export default function Chat() {
         </Tooltip>
       </div>
 
-      {/* Persistent search bar */}
+      {/* Persistent search bar — filters conversations by name */}
       <div className="chat-search-bar">
         <div className="chat-search-bar-wrap">
           <FaSearch className="chat-search-bar-icon" />
@@ -1713,29 +1703,14 @@ export default function Chat() {
             type="text"
             value={searchQuery}
             onChange={handleSearchChange}
-            placeholder={t('chat.search_placeholder')}
+            placeholder={t('chat.search_placeholder') || 'Filter conversations...'}
           />
           {searchQuery && (
-            <button className="chat-search-bar-clear" onClick={() => { setSearchQuery(''); setSearchResults([]); }}>
+            <button className="chat-search-bar-clear" onClick={() => setSearchQuery('')}>
               <FaTimes />
             </button>
           )}
         </div>
-        {searchingUser && <div className="chat-search-bar-status">{t('common.loading')}</div>}
-        {searchQuery && searchResults.length > 0 && (
-          <div className="chat-search-results">
-            {searchResults.map((u) => (
-              <button key={u.id} className="chat-search-result" onClick={() => startConversation(u)}>
-                <Avatar src={u.avatar_url} alt={u.username} className="chat-search-result-avatar" />
-                <span className="chat-search-result-name">{u.displayname || u.username}</span>
-              <span style={{ fontSize: '0.65rem', opacity: 0.5 }}>@{u.username}</span>
-              </button>
-            ))}
-          </div>
-        )}
-        {searchQuery && searchQuery.length >= 2 && searchResults.length === 0 && !searchingUser && (
-          <div className="chat-search-bar-status chat-search-bar-status--empty">{t('explore.no_results')}</div>
-        )}
       </div>
 
       {/* Conversations */}
@@ -2631,7 +2606,7 @@ export default function Chat() {
               <div className="explore-card-info">
                 <div className="explore-card-name-row">
                   <span className="explore-card-name">{otherUser.displayname || otherUser.username || t('common.unknown')}</span>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 400, opacity: 0.5 }}>@{otherUser.username || ''}</span>
+                              <span style={{ fontSize: '0.68rem', fontWeight: 400, opacity: 0.5 }}> · @{otherUser.username || ''}</span>
                   {otherUser.is_private === true && (
                     <span className="explore-card-private-icon" title={t('profile.private_profile')}>
                       <FaLock />

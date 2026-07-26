@@ -167,6 +167,53 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const isDiscordLinked = !!(user?.identities?.some(i => i.provider === 'discord'));
+
+  const linkDiscord = async () => {
+    try {
+      setError(null);
+      const { data, error } = await supabase.auth.linkIdentity({
+        provider: 'discord',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) {
+        setError(error.message);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (err) {
+      setError(err.message);
+      return { success: false, error: err.message };
+    }
+  };
+
+  const loginWithDiscord = async () => {
+    try {
+      setError(null);
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'discord',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) {
+        setError(error.message);
+        return { success: false, error: error.message };
+      }
+
+      // OAuth redirects away from the page, so we don't set user here
+      return { success: true };
+    } catch (err) {
+      setError(err.message);
+      return { success: false, error: err.message };
+    }
+  };
+
   const login = async (emailOrUsername, password) => {
     try {
       setError(null);
@@ -356,6 +403,9 @@ export function AuthProvider({ children }) {
         loading,
         error,
         login,
+        loginWithDiscord,
+        linkDiscord,
+        isDiscordLinked,
         register,
         logout,
         refreshProfile,

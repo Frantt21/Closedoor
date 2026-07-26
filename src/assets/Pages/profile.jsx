@@ -68,7 +68,7 @@ import { toast } from 'react-toastify';
 import { getCdnUrl } from '../services/cdnService';
 
 function Profile() {
-    const { t, showAccent, accentVisibility, showLikes, filterEncrypted, locale } = useI18n();
+    const { t, showAccent, accentVisibility, showLikes, filterEncrypted, showBadges, locale } = useI18n();
     const { username: profileUsername } = useParams();
     const navigate = useNavigate();
     const { user, profile: ownProfile, refreshProfile, isAuthenticated, loading } = useAuth();
@@ -1107,6 +1107,13 @@ function Profile() {
 
     const roles = activeProfile?.roles || ["user"];
 
+    // ── Filter roles based on badges_visibility ──
+    const badgeTypes = ['admin', 'dev', 'mod', 'partner', 'verified'];
+    const badgesVisibility = activeProfile?.badges_visibility || {};
+    const visibleRoles = useMemo(() => {
+      return roles.filter(r => r === 'user' || !badgeTypes.includes(r) || badgesVisibility[r] !== false);
+    }, [roles, badgesVisibility]);
+
     // ── Save profile (own profile only) ──
     const handleSaveProfile = async ({ username, displayname, avatar_url, banner_url, banner_credits, avatar_credits, bio, pronouns, social_links, accent_color, accent_color_secondary, accent_surface_color, accent_surface_glass, interests, banner_position, avatar_position, profile_background_url, profile_background_position, profile_background_blur, profile_background_dim, banner_dim, profile_text_color }) => {
         if (!user?.id) return;
@@ -1405,7 +1412,7 @@ function Profile() {
                     <div className="profile-user-info">
                         <div className="profile-username">
                             <span>{profileDisplayName} <span style={{ fontSize: '0.78rem', fontWeight: 400, opacity: 0.55, verticalAlign: 'middle' }}>· @{activeProfile?.username || user?.user_metadata?.username || ''}</span></span>
-                            <Badge roles={roles} />
+                            {showBadges && <Badge roles={visibleRoles} />}
                         </div>
 
                         {!isOwnProfile && isBlockedByMe ? (

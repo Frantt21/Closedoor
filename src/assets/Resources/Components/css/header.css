@@ -190,7 +190,7 @@
 }
 
 .sidebar-link.active {
-    background: color-mix(in srgb, var(--accent-color, #ffffff) 6%, transparent);
+    background: var(--color-surface-hover, #252525);
     color: var(--color-text, #ffffff);
 }
 

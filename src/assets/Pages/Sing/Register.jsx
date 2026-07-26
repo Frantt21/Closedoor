@@ -3,7 +3,8 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../services/i18n/useI18n';
 import usePageTitle from '../../../hooks/usePageTitle';
-import { FaEye, FaEyeSlash } from 'react-icons/fa';
+import { FaEye, FaEyeSlash, FaDiscord } from 'react-icons/fa';
+import '../../Resources/Styles/login.css';
 import '../../Resources/Styles/register.css';
 
 function Register() {
@@ -15,8 +16,9 @@ function Register() {
   const [username, setUsername] = useState('');
   const [nickname, setNickname] = useState('');
   const [loading, setLoading] = useState(false);
+  const [discordLoading, setDiscordLoading] = useState(false);
   const [error, setError] = useState('');
-  const { register } = useAuth();
+  const { register, loginWithDiscord } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -103,6 +105,26 @@ function Register() {
           </div>
           <button className="auth-submit" type="submit" disabled={loading}>
             {loading ? t('auth.registering') : t('auth.register_btn')}
+          </button>
+
+          <div className="auth-divider">
+            <span>{t('auth.or') || 'or'}</span>
+          </div>
+
+          <button
+            className="auth-submit auth-submit--discord"
+            type="button"
+            disabled={discordLoading}
+            onClick={async () => {
+              setDiscordLoading(true);
+              await loginWithDiscord();
+              setDiscordLoading(false);
+            }}
+          >
+            <FaDiscord className="auth-discord-icon" />
+            {discordLoading
+              ? (t('auth.redirecting') || 'Redirecting...')
+              : (t('auth.login_discord') || 'Continue with Discord')}
           </button>
         </form>
 

@@ -15,6 +15,7 @@ const Home = lazy(() => import('./assets/Pages/Home.jsx'));
 const Login = lazy(() => import('./assets/Pages/Sing/Login.jsx'));
 const Register = lazy(() => import('./assets/Pages/Sing/Register.jsx'));
 const Profile = lazy(() => import('./assets/Pages/profile.jsx'));
+const AuthCallback = lazy(() => import('./assets/Pages/AuthCallback.jsx'));
 const Notifications = lazy(() => import('./assets/Pages/Notifications.jsx'));
 const Explore = lazy(() => import('./assets/Pages/Explore.jsx'));
 const PostDetail = lazy(() => import('./assets/Pages/PostDetail.jsx'));
@@ -146,6 +147,7 @@ function App() {
             <Suspense fallback={<PageFallback />}>
               <Routes>
                 <Route path="/" element={<Home />} />
+                <Route path="/auth/callback" element={<AuthCallback />} />
                 <Route path="/Login" element={<Login />} />
                 <Route path="/Register" element={<Register />} />
                 <Route path="/Profile" element={<Profile key="own" />} />
