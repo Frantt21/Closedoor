@@ -63,11 +63,18 @@ export function getContrastText(hex) {
   return luminance > 0.179 ? '#000000' : '#ffffff';
 }
 
-// ── Extract URLs from text ──
+// ── Extract URLs from text (absolute HTTP URLs + relative CDN paths) ──
 export function extractUrls(text) {
   if (!text) return [];
-  const matches = text.match(URL_PATTERN);
-  return matches || [];
+  const matches = text.match(URL_PATTERN) || [];
+  // También extraer rutas relativas del CDN: /cdn/files/xxx
+  const cdnMatches = text.match(/\/cdn\/files\/[^\s<]+/gi) || [];
+  // Combinar y deduplicar
+  const all = [...matches];
+  for (const cdn of cdnMatches) {
+    if (!all.includes(cdn)) all.push(cdn);
+  }
+  return all;
 }
 
 // ── Detect media type from text content (auto-detection) ──
