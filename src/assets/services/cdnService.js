@@ -115,7 +115,7 @@ export async function uploadImage(file, userId, type) {
   }
 
   // ── Check local cache first (instant return for re-uploads) ──
-  const cached = getCachedUpload(userId, type, file);
+  const cached = await getCachedUpload(userId, type, file);
   if (cached) {
     console.debug('⚡ CDN cache hit:', file.name);
     // Normalizar URLs cacheadas de sesiones anteriores (forceHttps → relativa)
@@ -163,7 +163,7 @@ export async function uploadImage(file, userId, type) {
   };
 
   // Cache the result so re-uploading the same file is instant
-  setCachedUpload(userId, type, file, result);
+  setCachedUpload(userId, type, file, result).catch(() => {});
 
   return result;
 }
