@@ -438,7 +438,7 @@ export default function Modal({
     if (!file || !user?.id) return;
 
     if (!file.type.startsWith('image/')) {
-      toast.error(t('modal.invalid_image_type') || 'Invalid image type', { containerId: 'modal' });
+      toast.error(t('modal.invalid_image_type') || 'Invalid image type');
       return;
     }
 
@@ -446,13 +446,14 @@ export default function Modal({
     const uploadType = isBg ? 'banner' : showUrlModal;
     if (!uploadType) return;
 
+    // Activar spinner en botón (para uploads no cacheados se verá;
+    // para uploads cacheados React 18 batch los state updates y el
+    // spinner queda invisible — es el comportamiento deseado).
     if (isBg) {
       setUploadingBgToCdn(true);
     } else {
       setUploadingToCdn(true);
     }
-
-    const toastId = toast.loading(t('upload.uploading') || 'Subiendo imagen...', { containerId: 'modal' });
 
     try {
       // Mostrar preview local instantáneo mientras se sube en background
@@ -472,11 +473,7 @@ export default function Modal({
         setUrlInput(localUrl);
       }
 
-      // NO cerrar el submodal: el usuario debe poder ajustar la posición
-      // con ImagePositionEditor antes de confirmar. El Save/Apply se
-      // deshabilita mientras `uploadingToCdn` o `uploadingBgToCdn` esté activo.
-
-      // Esperar subida real en background y reemplazar URL
+      // Esperar subida real (desde caché o red)
       const realUrl = await realUrlPromise;
 
       // Usar uploadType capturado (const antes del await) en vez de
@@ -492,27 +489,18 @@ export default function Modal({
         setUrlInput(realUrl);
       }
 
-      toast.update(toastId, {
-        render: t('upload.uploaded') || 'Imagen subida',
-        type: 'success',
-        isLoading: false,
-        autoClose: 2000,
-        containerId: 'modal',
-      });
+      // Toast único de éxito — sin containerId para que use el
+      // contenedor permanente de App.jsx (no el de ModalShell que
+      // se destruye al cerrar el submodal).
+      toast.success(t('upload.uploaded') || 'Image uploaded', { autoClose: 2000 });
     } catch (err) {
       console.error('CDN upload error:', err);
-      toast.update(toastId, {
-        render: err.message || 'Upload failed',
-        type: 'error',
-        isLoading: false,
-        autoClose: 3000,
-        containerId: 'modal',
-      });
+      toast.error(err.message || 'Upload failed', { autoClose: 3000 });
     } finally {
       if (isBg) {
-        setUploadingBgToCdn(false); // solo habilitar save cuando tenemos URL real
+        setUploadingBgToCdn(false);
       } else {
-        setUploadingToCdn(false); // solo habilitar save cuando tenemos URL real
+        setUploadingToCdn(false);
       }
       e.target.value = '';
     }
@@ -530,13 +518,21 @@ export default function Modal({
     if (hasUrlChanges) {
       setUrlSubPendingClose(true);
     } else {
+      // Restaurar valor original al cancelar
+      if (showUrlModal === 'avatar') setAvatar(urlInitialRef.current);
+      else if (showUrlModal === 'banner') setBanner(urlInitialRef.current);
       setShowUrlModal(null);
+      setUrlInput('');
     }
   };
 
   const confirmUrlDiscard = () => {
     setUrlSubPendingClose(false);
+    // Restaurar valor original al descartar cambios
+    if (showUrlModal === 'avatar') setAvatar(urlInitialRef.current);
+    else if (showUrlModal === 'banner') setBanner(urlInitialRef.current);
     setShowUrlModal(null);
+    setUrlInput('');
   };
 
   const handleUrlModalKeyDown = (e) => {
@@ -567,6 +563,8 @@ export default function Modal({
     if (hasBgChanges) {
       setBgSubPendingClose(true);
     } else {
+      // Restaurar valor original al cancelar
+      setProfileBg(bgUrlInitialRef.current);
       setShowProfileBgSubmodal(null);
       setProfileBgUrlInput('');
     }
@@ -574,6 +572,8 @@ export default function Modal({
 
   const confirmBgDiscard = () => {
     setBgSubPendingClose(false);
+    // Restaurar valor original al descartar cambios
+    setProfileBg(bgUrlInitialRef.current);
     setShowProfileBgSubmodal(null);
     setProfileBgUrlInput('');
   };

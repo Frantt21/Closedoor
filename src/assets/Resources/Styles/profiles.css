@@ -108,32 +108,32 @@
 .profile-banner-credits-label {
     font-size: 0.65rem;
     font-weight: 600;
-    color: rgba(255, 255, 255, 0.6);
-    background: rgba(0, 0, 0, 0.4);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
-    padding: 2px 8px;
-    border-radius: 4px;
-    cursor: help;
-    transition: color 0.15s ease, background 0.15s ease;
+    color: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: 3px 10px;
+    border-radius: var(--radius, 10px);
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s ease;
     text-shadow: none;
     letter-spacing: 0.03em;
     user-select: none;
 }
 
 .profile-banner-credits-label:hover {
-    color: rgba(255, 255, 255, 0.95);
-    background: rgba(0, 0, 0, 0.6);
+    background: rgba(255, 255, 255, 0.14);
 }
 
 .profile-banner-credits-text {
     font-size: 0.72rem;
     color: rgba(255, 255, 255, 0.8);
-    background: rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     padding: 4px 10px;
-    border-radius: 4px;
+    border-radius: var(--radius, 10px);
     max-width: 220px;
     text-align: right;
     line-height: 1.3;

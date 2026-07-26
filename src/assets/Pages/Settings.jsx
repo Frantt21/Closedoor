@@ -206,6 +206,9 @@ export default function Settings() {
       { col: 'allow_mention', setter: setAllowMention },
       { col: 'allow_encrypted_add', setter: setAllowEncryptedAdd },
       { col: 'filter_encrypted', setter: setFilterEncrypted },
+      { col: 'time_format_24h', setter: setHour24 },
+      { col: 'theme', setter: setTheme },
+      { col: 'locale', setter: setLocale },
     ];
     for (const { col, setter } of mappings) {
       if (profile[col] !== undefined && profile[col] !== null) {
@@ -354,6 +357,7 @@ export default function Settings() {
                           className={`settings-select-option ${value === locale ? 'settings-select-option--active' : ''}`}
                           onClick={() => {
                             setLocale(value);
+                            syncProfilePref('locale', value);
                             setSelectOpen(false);
                           }}
                         >
@@ -380,14 +384,20 @@ export default function Settings() {
                   <button
                     type="button"
                     className={`settings-segmented-btn ${hour24 ? 'settings-segmented-btn--active' : ''}`}
-                    onClick={() => setHour24(true)}
+                    onClick={() => {
+                      setHour24(true);
+                      syncProfilePref('time_format_24h', true);
+                    }}
                   >
                     {t('settings.time_format_24h')}
                   </button>
                   <button
                     type="button"
                     className={`settings-segmented-btn ${!hour24 ? 'settings-segmented-btn--active' : ''}`}
-                    onClick={() => setHour24(false)}
+                    onClick={() => {
+                      setHour24(false);
+                      syncProfilePref('time_format_24h', false);
+                    }}
                   >
                     {t('settings.time_format_12h')}
                   </button>
@@ -409,14 +419,20 @@ export default function Settings() {
                   <button
                     type="button"
                     className={`settings-segmented-btn ${theme === 'dark' ? 'settings-segmented-btn--active' : ''}`}
-                    onClick={() => setTheme('dark')}
+                    onClick={() => {
+                      setTheme('dark');
+                      syncProfilePref('theme', 'dark');
+                    }}
                   >
                     <FaMoon style={{ marginRight: 6 }} />{t('settings.theme_dark')}
                   </button>
                   <button
                     type="button"
                     className={`settings-segmented-btn ${theme === 'light' ? 'settings-segmented-btn--active' : ''}`}
-                    onClick={() => setTheme('light')}
+                    onClick={() => {
+                      setTheme('light');
+                      syncProfilePref('theme', 'light');
+                    }}
                   >
                     <FaSun style={{ marginRight: 6 }} />{t('settings.theme_light')}
                   </button>

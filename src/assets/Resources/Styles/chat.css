@@ -2054,6 +2054,182 @@ dialog.fc-modal.chat-followers-modal {
     }
 }
 
+/* ── Link Preview card inside chat bubbles ── */
+.chat-link-preview {
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--radius, 10px);
+    overflow: hidden;
+    border: 1px solid var(--color-border, #2a2a2a);
+    background: var(--color-surface, #1a1a1a);
+    margin-top: 6px;
+    margin-bottom: 2px;
+    text-decoration: none;
+    color: inherit;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+    max-width: 320px;
+}
+
+.chat-link-preview:hover {
+    border-color: var(--color-text-muted, #6b7280);
+    background: var(--color-surface-hover, #252525);
+}
+
+/* ── Loading skeleton ── */
+.chat-link-preview--loading {
+    pointer-events: none;
+}
+
+.chat-link-preview-image-skeleton {
+    width: 100%;
+    height: 120px;
+    background: var(--overlay-bg);
+    animation: chatSkeletonPulse 1.2s infinite ease-in-out;
+}
+
+.chat-link-preview-skeleton-line {
+    height: 10px;
+    border-radius: 4px;
+    background: var(--overlay-bg);
+    animation: chatSkeletonPulse 1.2s infinite ease-in-out;
+}
+
+@keyframes chatSkeletonPulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.8; }
+}
+
+.chat-link-preview-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    min-width: 0;
+}
+
+.chat-link-preview--loading .chat-link-preview-body {
+    gap: 6px;
+}
+
+.chat-link-preview-header {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-bottom: 2px;
+}
+
+.chat-link-preview-favicon {
+    width: 16px;
+    height: 16px;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+
+.chat-link-preview-domain {
+    font-size: 0.68rem;
+    color: var(--color-text-muted, #6b7280);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-transform: lowercase;
+}
+
+.chat-link-preview-title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-text, #ffffff);
+    line-height: 1.3;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    word-break: break-word;
+}
+
+.chat-link-preview-desc {
+    font-size: 0.72rem;
+    color: var(--color-text-secondary, #9ca3af);
+    line-height: 1.35;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    word-break: break-word;
+}
+
+.chat-link-preview-image-wrap {
+    width: 100%;
+    max-height: 140px;
+    overflow: hidden;
+    background: var(--color-bg, #000000);
+    position: relative;
+}
+
+.chat-link-preview-image {
+    width: 100%;
+    height: 100%;
+    max-height: 140px;
+    object-fit: cover;
+    display: block;
+}
+
+.chat-link-preview--fallback {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+}
+
+.chat-link-preview-fallback-icon {
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+
+.chat-link-preview-fallback-url {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary, #9ca3af);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    word-break: break-all;
+}
+
+/* ── Link styling inside chat bubbles (RichText) ── */
+.chat-card-link {
+    color: var(--accent-color, #6b7280);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    text-decoration-thickness: 1px;
+    text-decoration-color: rgba(107, 114, 128, 0.3);
+    transition: text-decoration-color 0.15s ease;
+    word-break: break-all;
+}
+
+.chat-card-link:hover {
+    text-decoration-color: var(--accent-color, #6b7280);
+}
+
+.chat-card-mention {
+    color: var(--accent-color, #6b7280);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.chat-card-mention:hover {
+    text-decoration: underline;
+}
+
+.chat-card-hashtag {
+    color: var(--accent-color, #6b7280);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.chat-card-hashtag:hover {
+    text-decoration: underline;
+}
+
 /* ==========================================
    Responsive (chat layout)
    ========================================== */

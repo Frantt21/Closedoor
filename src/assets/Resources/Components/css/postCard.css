@@ -115,7 +115,6 @@
     color: var(--color-text-muted, #6b7280);
     margin-bottom: 8px;
     padding-bottom: 8px;
-    border-bottom: 1px solid var(--accent-color, var(--color-border, #2a2a2a));
 }
 
 .post-card-pin svg {

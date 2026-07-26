@@ -1404,8 +1404,7 @@ function Profile() {
 
                     <div className="profile-user-info">
                         <div className="profile-username">
-                            {profileDisplayName}
-                            <span style={{ fontSize: '0.78rem', fontWeight: 400, opacity: 0.55 }}>@{activeProfile?.username || user?.user_metadata?.username || ''}</span>
+                            <span>{profileDisplayName} <span style={{ fontSize: '0.78rem', fontWeight: 400, opacity: 0.55, verticalAlign: 'middle' }}>· @{activeProfile?.username || user?.user_metadata?.username || ''}</span></span>
                             <Badge roles={roles} />
                         </div>
 

@@ -34,6 +34,8 @@ import { getTimeAgo, IMG_RE, detectMediaFromContent, getImgTransformStyle, getAv
 import { getPost } from '../services/postService';
 import RichText from '../Resources/Components/RichText';
 import SafeImage from '../Resources/Components/SafeImage';
+import ConfirmModal from '../Resources/Components/ConfirmModal';
+import LinkPreview from '../Resources/Components/LinkPreview';
 import { toast } from 'react-toastify';
 import { supabase } from '../services/supabaseclient';
 import { uploadImage } from '../services/cdnService';
@@ -41,6 +43,7 @@ import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/chat.css';
 import '../Resources/Styles/explore.css';
 import '../Resources/Styles/post.css';
+import '../Resources/Components/css/modal.css';
 import { getItem, setItem, removeItem, getSessionItem, setSessionItem, removeSessionItem } from '../services/secureStorage';
 
 export default function Chat() {
@@ -307,24 +310,8 @@ export default function Chat() {
 
   // Restore conversations from sessionStorage on mount
   const convsSessionRestoredRef = useRef(false);
+  // Only set the ref during render; actual restoration happens in a useEffect below
   if (!convsSessionRestoredRef.current && user?.id) {
-    // Detect full reload to avoid serving stale cache
-    let isReload = false;
-    try {
-      const navEntries = performance.getEntriesByType ? performance.getEntriesByType('navigation') : null;
-      const navType = navEntries?.[0]?.type || (performance.navigation && performance.navigation.type === 1 ? 'reload' : 'navigate');
-      isReload = navType === 'reload';
-    } catch (e) { /* ignore */ }
-
-    if (isReload) {
-      try { removeSessionItem(getConvsSessionCacheKey()); } catch (e) {}
-    } else {
-      const savedConvs = loadConvsFromSession();
-      if (savedConvs.length > 0) {
-        setConversations(savedConvs);
-        setConvsLoading(false); // evitar flash de carga si hay cache válido
-      }
-    }
     convsSessionRestoredRef.current = true;
   }
 
@@ -343,6 +330,8 @@ export default function Chat() {
   const loadingMoreRef = useRef(false);
   // ── "New messages" floating button counter ──
   const [newMsgCount, setNewMsgCount] = useState(0);
+  // ── Track if user has scrolled up (show scroll-to-bottom button) ──
+  const [isScrolledUp, setIsScrolledUp] = useState(false);
   // ── Blocked status: null=unknown, 'blocked_by_me', 'blocked_by_them' ──
   const [isBlockedConv, setIsBlockedConv] = useState(null);
   const scrollToBottom = useCallback(() => {
@@ -439,13 +428,21 @@ export default function Chat() {
   }, [user?.id]);
 
   useEffect(() => {
-    // Si las conversaciones se restauraron desde sessionStorage en este mount,
-    // saltar el fetch a la DB para evitar un round-trip innecesario al navegar rutas.
-    // La suscripción en tiempo real mantiene los datos frescos.
-    if (convsSessionRestoredRef.current && conversations.length > 0) {
-      return;
+    // Try sessionStorage cache first — avoids loading flash on route changes
+    if (conversations.length === 0) {
+      const cached = loadConvsFromSession();
+      if (cached.length > 0) {
+        setConversations(cached);
+        setConvsLoading(false);
+        return; // Realtime subscription keeps it fresh
+      }
     }
-    loadConvs();
+    // If already restored or no cache, fetch from DB
+    if (conversations.length === 0) {
+      loadConvs();
+    } else {
+      setConvsLoading(false);
+    }
   }, [loadConvs]);
 
   // Real-time subscription to conversation updates
@@ -1032,6 +1029,25 @@ export default function Chat() {
     }
   }, [emojiPickerMsgId, msgMenu.msg, user?.id, messages]);
 
+  // ── External link warning state ──
+  const [confirmExternalLink, setConfirmExternalLink] = useState(null);
+
+  // ── External link warning handlers ──
+  const handleExternalLink = useCallback((url) => {
+    setConfirmExternalLink(url);
+  }, []);
+
+  const executeExternalLink = useCallback(() => {
+    if (confirmExternalLink) {
+      window.open(confirmExternalLink, '_blank', 'noopener noreferrer');
+    }
+    setConfirmExternalLink(null);
+  }, [confirmExternalLink]);
+
+  const handleCancelExternalLink = useCallback(() => {
+    setConfirmExternalLink(null);
+  }, []);
+
   // ── Reply to message ──
   const handleStartReply = useCallback((msg) => {
     setReplyingTo(msg);
@@ -1530,6 +1546,9 @@ export default function Chat() {
     if (newMsgCount > 0 && (el.scrollTop > -80 || el.scrollHeight - el.clientHeight + el.scrollTop < 80)) {
       setNewMsgCount(0);
     }
+    // Track scroll position for scroll-to-bottom button
+    const nearBottom = el.scrollTop > -80 || el.scrollHeight - el.clientHeight + el.scrollTop < 80;
+    setIsScrolledUp(!nearBottom);
   }, [hasMoreMessages, loadOlderMessages, newMsgCount]);
 
   // Use a ref to call loadOlderMessages from the scroll handler so the handler
@@ -2038,7 +2057,14 @@ export default function Chat() {
                       if (!textOnly && !imageUrl) {
                         return (
                           <p className="chat-message-text">
-                            {content || <span className="chat-message-encrypted">{t('chat.encrypted')}</span>}
+                            <RichText
+                              text={content || ''}
+                              linkClass="chat-card-link"
+                              mentionClass="chat-card-mention"
+                              hashtagClass="chat-card-hashtag"
+                              onExternalLink={handleExternalLink}
+                            />
+                            {!content && <span className="chat-message-encrypted">{t('chat.encrypted')}</span>}
                           </p>
                         );
                       }
@@ -2064,9 +2090,28 @@ export default function Chat() {
                               }}
                             />
                           )}
-                          {textOnly && <p className="chat-message-text">{textOnly}</p>}
-                        </>
-                      );
+                          {textOnly && (
+                          <p className="chat-message-text">
+                            <RichText
+                              text={textOnly}
+                              linkClass="chat-card-link"
+                              mentionClass="chat-card-mention"
+                              hashtagClass="chat-card-hashtag"
+                              onExternalLink={handleExternalLink}
+                            />
+                          </p>
+                        )}
+                        {/* ── Link preview for non-media URLs ── */}
+                        {(() => {
+                          const urls = textOnly ? textOnly.match(/(https?:\/\/[^\s<]+)/gi) || [] : [];
+                          const nonMediaUrls = urls.filter(u => !IMG_RE.test(u) && u !== imageUrl);
+                          if (nonMediaUrls.length === 0) return null;
+                          return nonMediaUrls.slice(0, 1).map((url, i) => (
+                            <LinkPreview key={i} url={url} onExternalLink={handleExternalLink} />
+                          ));
+                        })()}
+                      </>
+                    );
                     })()}
                   </div>
                   {isOwn && (
@@ -2130,11 +2175,13 @@ export default function Chat() {
         )}
       </div>
 
-      {/* Floating "new messages" button */}
-      {newMsgCount > 0 && (
+      {/* Floating scroll-to-bottom button */}
+      {(newMsgCount > 0 || isScrolledUp) && (
         <button className="chat-new-msg-btn" onClick={scrollToBottom}>
           <FaArrowDown className="chat-new-msg-btn-icon" />
-          {newMsgCount} {newMsgCount === 1 ? (t('chat.new_message') || 'new message') : (t('chat.new_messages') || 'new messages')}
+          {newMsgCount > 0
+            ? `${newMsgCount} ${newMsgCount === 1 ? (t('chat.new_message') || 'new message') : (t('chat.new_messages') || 'new messages')}`
+            : (t('chat.scroll_to_bottom') || 'Volver al inicio')}
         </button>
       )}
 
@@ -2420,7 +2467,16 @@ export default function Chat() {
               {(() => {
                 const q = msgSearchQuery.toLowerCase();
                 const filtered = msgSearchQuery
-                  ? messages.filter(m => (m.decryptedContent || '').toLowerCase().includes(q))
+                  ? messages.filter(m => {
+                      const contentMatch = (m.decryptedContent || '').toLowerCase().includes(q);
+                      // Also match by sender's username or displayname (only for current conversation)
+                      const isSender = m.sender_id === user?.id;
+                      const senderMatch = !isSender && otherUser
+                        ? ((otherUser.username || '').toLowerCase().includes(q) ||
+                           (otherUser.displayname || '').toLowerCase().includes(q))
+                        : false;
+                      return contentMatch || senderMatch;
+                    })
                   : [];
                 if (filtered.length === 0) {
                   return <div className="chat-msg-search-empty">{msgSearchQuery ? t('explore.no_results') : t('chat.search_messages_placeholder') || 'Search messages...'}</div>;
@@ -2842,6 +2898,15 @@ export default function Chat() {
             </button>
           )}
         </div>,
+        document.body
+      )}
+
+      {confirmExternalLink && createPortal(
+        <ConfirmModal
+          message={t('chat.external_link_warning') || 'This link will take you to an external website. Do you want to continue?'}
+          onConfirm={executeExternalLink}
+          onCancel={handleCancelExternalLink}
+        />,
         document.body
       )}
     </div>
