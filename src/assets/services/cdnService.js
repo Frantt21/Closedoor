@@ -247,14 +247,24 @@ export function getCdnUrl(fileId) {
 
 /**
  * Check if a URL is from our CDN.
+ * Reconoce rutas relativas (/cdn/files/xxx), URLs del CDN_BASE configurado,
+ * y URLs absolutas con path /cdn/ (ej: http://api.foranly.space:24587/cdn/files/xxx).
  * @param {string} url
  * @returns {boolean}
  */
 export function isCdnUrl(url) {
   if (!url) return false;
-  // Las URLs ahora son relativas (/cdn/files/xxx) para evitar SSL errors
+  // Relativa: /cdn/files/xxx
   if (url.startsWith('/cdn/')) return true;
+  // Desde VITE_CDN_URL (si está configurado)
   if (CDN_BASE && url.startsWith(CDN_BASE)) return true;
+  // URLs absolutas con /cdn/ en el path (backend devuelve http://api.foranly.space:24587/cdn/files/xxx)
+  try {
+    const parsed = new URL(url);
+    if (parsed.pathname.startsWith('/cdn/')) return true;
+  } catch {
+    // No se puede parsear como URL — no es CDN
+  }
   return false;
 }
 
