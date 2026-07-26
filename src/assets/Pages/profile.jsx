@@ -347,6 +347,9 @@ function Profile() {
     const [followersModal, setFollowersModal] = useState({ open: false, type: "followers" });
     // ── Social Links modal state ──
     const [socialLinksModal, setSocialLinksModal] = useState(false);
+    // ── Credits toggle state ──
+    const [showBannerCredits, setShowBannerCredits] = useState(false);
+    const [showAvatarCredits, setShowAvatarCredits] = useState(false);
 
     const openFollowersModal = (type) => {
         if (activeProfile?.id && canViewContent) {
@@ -1094,6 +1097,7 @@ function Profile() {
     const avatarUrl = activeProfile?.avatar_url || null;
     const bannerUrl = activeProfile?.banner_url || null;
     const profileDisplayName =
+        activeProfile?.displayname ||
         activeProfile?.username ||
         user?.user_metadata?.display_name ||
         user?.user_metadata?.displayname ||
@@ -1104,7 +1108,7 @@ function Profile() {
     const roles = activeProfile?.roles || ["user"];
 
     // ── Save profile (own profile only) ──
-    const handleSaveProfile = async ({ username, avatar_url, banner_url, banner_credits, avatar_credits, bio, pronouns, social_links, accent_color, accent_color_secondary, accent_surface_color, accent_surface_glass, interests, banner_position, avatar_position, profile_background_url, profile_background_position, profile_background_blur, profile_background_dim, banner_dim, profile_text_color }) => {
+    const handleSaveProfile = async ({ username, displayname, avatar_url, banner_url, banner_credits, avatar_credits, bio, pronouns, social_links, accent_color, accent_color_secondary, accent_surface_color, accent_surface_glass, interests, banner_position, avatar_position, profile_background_url, profile_background_position, profile_background_blur, profile_background_dim, banner_dim, profile_text_color }) => {
         if (!user?.id) return;
 
         const normalizedUsername = (username || "").trim().toLowerCase();
@@ -1123,6 +1127,7 @@ function Profile() {
             }
 
             const updates = {
+                displayname: displayname || null,
                 avatar_url: avatar_url || null,
                 banner_url: banner_url || null,
                 banner_credits: banner_credits || null,
@@ -1341,9 +1346,42 @@ function Profile() {
                             alt="Profile Banner"
                             style={getImgTransformStyle(activeProfile?.banner_position)}
                         />
-                        {/* ── Banner credits overlay ── */}
-                        {(activeProfile?.banner_credits) && (
-                          <CreditsOverlay credits={activeProfile.banner_credits} label={t('profile.credits')} />
+                        {/* ── Credits overlay (banner + avatar) ── */}
+                        {(activeProfile?.banner_credits || activeProfile?.avatar_credits) && (
+                          <div className="profile-banner-credits">
+                            {activeProfile?.banner_credits && (
+                              <>
+                                <span
+                                  className="profile-banner-credits-label"
+                                  onClick={(e) => { e.stopPropagation(); setShowBannerCredits((s) => !s); }}
+                                  role="button"
+                                  tabIndex={0}
+                                  onKeyDown={(e) => { if (e.key === 'Enter') setShowBannerCredits((s) => !s); }}
+                                >
+                                  {t('profile.credits_banner') || 'Banner'}
+                                </span>
+                                <span className={`profile-banner-credits-text ${!showBannerCredits ? 'profile-banner-credits-text--hidden' : ''}`}>
+                                  {activeProfile.banner_credits}
+                                </span>
+                              </>
+                            )}
+                            {activeProfile?.avatar_credits && (
+                              <>
+                                <span
+                                  className="profile-banner-credits-label"
+                                  onClick={(e) => { e.stopPropagation(); setShowAvatarCredits((s) => !s); }}
+                                  role="button"
+                                  tabIndex={0}
+                                  onKeyDown={(e) => { if (e.key === 'Enter') setShowAvatarCredits((s) => !s); }}
+                                >
+                                  {t('profile.credits_avatar') || 'Avatar'}
+                                </span>
+                                <span className={`profile-banner-credits-text ${!showAvatarCredits ? 'profile-banner-credits-text--hidden' : ''}`}>
+                                  {activeProfile.avatar_credits}
+                                </span>
+                              </>
+                            )}
+                          </div>
                         )}
                         </>
                     ) : (
@@ -1367,6 +1405,7 @@ function Profile() {
                     <div className="profile-user-info">
                         <div className="profile-username">
                             {profileDisplayName}
+                            <span style={{ fontSize: '0.78rem', fontWeight: 400, opacity: 0.55 }}>@{activeProfile?.username || user?.user_metadata?.username || ''}</span>
                             <Badge roles={roles} />
                         </div>
 
@@ -1622,6 +1661,7 @@ function Profile() {
                     onClose={() => setShowModal(false)}
                     onSave={handleSaveProfile}
                     initialUsername={modalUsername}
+                    initialDisplayname={ownProfile?.displayname || ''}
                     initialAvatar={getCdnUrl(modalAvatar) || ''}
                     initialBanner={getCdnUrl(modalBanner) || ''}
                     initialBio={modalBio}
@@ -2054,24 +2094,4 @@ function Profile() {
 }
 
 /* ── Credits overlay component (appears on banner hover, click to reveal text) ── */
-function CreditsOverlay({ credits, label }) {
-  const [showText, setShowText] = useState(false);
-  return (
-    <div className="profile-banner-credits">
-      <span
-        className="profile-banner-credits-label"
-        onClick={(e) => { e.stopPropagation(); setShowText((s) => !s); }}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => { if (e.key === 'Enter') setShowText((s) => !s); }}
-      >
-        {label}
-      </span>
-      <span className={`profile-banner-credits-text ${!showText ? 'profile-banner-credits-text--hidden' : ''}`}>
-        {credits}
-      </span>
-    </div>
-  );
-}
-
 export default Profile;

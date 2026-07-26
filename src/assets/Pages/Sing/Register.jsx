@@ -13,6 +13,7 @@ function Register() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState('');
+  const [nickname, setNickname] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const { register } = useAuth();
@@ -36,7 +37,7 @@ function Register() {
       return;
     }
 
-    const result = await register(email, password, username);
+    const result = await register(email, password, username, nickname || username);
 
     if (result.success) {
       const params = new URLSearchParams(location.search);
@@ -57,6 +58,14 @@ function Register() {
         {error && <div className="auth-error">{error}</div>}
 
         <form className="auth-form" onSubmit={handleSubmit}>
+          <input
+            className="auth-input"
+            type="text"
+            placeholder={t('auth.nickname') || 'Nickname'}
+            value={nickname}
+            onChange={(e) => setNickname(e.target.value)}
+            disabled={loading}
+          />
           <input
             className="auth-input"
             type="text"

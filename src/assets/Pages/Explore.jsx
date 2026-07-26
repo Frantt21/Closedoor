@@ -404,7 +404,8 @@ function ExploreCard({ profile, counts, isOwnProfile, showAccent }) {
 
         <div className="explore-card-info">
           <div className="explore-card-name-row">
-            <span className="explore-card-name">{profile.username}</span>
+            <span className="explore-card-name">{profile.displayname || profile.username}</span>
+            <span style={{ fontSize: '0.68rem', fontWeight: 400, opacity: 0.5, marginLeft: 4 }}>@{profile.username}</span>
             {profile.is_private === true && (
               <span className="explore-card-private-icon" title={t('profile.private_profile')}>
                 <FaLock />

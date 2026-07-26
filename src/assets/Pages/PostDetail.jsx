@@ -294,7 +294,7 @@ export default function PostDetail() {
           try {
             const { data } = await supabase
               .from('comments')
-              .select('*, profiles!comments_user_id_fkey (id, username, avatar_url, roles)')
+              .select('*, profiles!comments_user_id_fkey (id, username, displayname, avatar_url, roles)')
               .eq('id', payload.new.id)
               .single();
 

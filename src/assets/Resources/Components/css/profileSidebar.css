@@ -19,8 +19,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  position: sticky;
-  top: 30px;
+  /* Ya está dentro de .right-panel que es sticky; no anidar sticky */
 }
 
 .profile-sidebar-card {

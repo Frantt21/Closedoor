@@ -214,7 +214,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const register = async (email, password, username) => {
+  const register = async (email, password, username, nickname) => {
     try {
       setError(null);
 
@@ -268,7 +268,7 @@ export function AuthProvider({ children }) {
         options: {
           data: {
             username,
-            display_name: username,
+            display_name: nickname || username,
           },
         },
       });
@@ -281,7 +281,7 @@ export function AuthProvider({ children }) {
       // Create user profile in profiles table only when a valid authenticated session exists.
       try {
         if (data?.session?.user) {
-          await createUserProfile(data.session.user.id, email, username);
+          await createUserProfile(data.session.user.id, email, username, nickname);
           setUser(data.session.user);
           try {
             const freshProfile = await getUserProfile(data.session.user.id);

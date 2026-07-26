@@ -1657,7 +1657,8 @@ export default function Chat() {
           {followers.map((u) => (
             <button key={u.id} className="chat-followers-modal-card" onClick={() => { setShowFollowersModal(false); startConversation(u); }}>
               <Avatar src={u.avatar_url} alt={u.username} className="chat-followers-modal-card-avatar" />
-              <span className="chat-followers-modal-card-name">{u.username}</span>
+              <span className="chat-followers-modal-card-name">{u.displayname || u.username}</span>
+              <span style={{ fontSize: '0.68rem', fontWeight: 400, opacity: 0.5 }}>@{u.username}</span>
               {Array.isArray(u.roles) && u.roles.some(r => r !== 'user') && (
                 <span className="chat-followers-modal-card-badges">
                   <Badge roles={u.roles} />
@@ -1707,7 +1708,8 @@ export default function Chat() {
             {searchResults.map((u) => (
               <button key={u.id} className="chat-search-result" onClick={() => startConversation(u)}>
                 <Avatar src={u.avatar_url} alt={u.username} className="chat-search-result-avatar" />
-                <span className="chat-search-result-name">@{u.username}</span>
+                <span className="chat-search-result-name">{u.displayname || u.username}</span>
+              <span style={{ fontSize: '0.65rem', opacity: 0.5 }}>@{u.username}</span>
               </button>
             ))}
           </div>
@@ -1743,7 +1745,7 @@ export default function Chat() {
               />
               <div className="chat-list-item-info">
                 <div className="chat-list-item-top">
-                  <span className="chat-list-item-name">{conv.otherUser?.username || t('common.unknown')}</span>
+                  <span className="chat-list-item-name">{conv.otherUser?.displayname || conv.otherUser?.username || t('common.unknown')}</span>
                   {conv.last_message_at && (
                     <span className="chat-list-item-time">
                       {getTimeAgo(t, locale, conv.last_message_at)}
@@ -1788,7 +1790,7 @@ export default function Chat() {
             onClick={goToProfile}
           />
           <div className="chat-messages-header-info" style={{ cursor: 'pointer' }} onClick={goToProfile}>
-            <span className="chat-messages-header-name">{otherUser?.username || t('common.unknown')}</span>
+            <span className="chat-messages-header-name">{otherUser?.displayname || otherUser?.username || t('common.unknown')}</span>
           </div>
         </div>
         <div className="chat-messages-header-actions">
@@ -2180,7 +2182,7 @@ export default function Chat() {
               <span className="chat-typing-dot"></span>
               <span className="chat-typing-dot"></span>
             </div>
-            <span className="chat-typing-label">{otherUser?.username || t('common.unknown')} {t('chat.typing') || 'typing...'}</span>
+            <span className="chat-typing-label">{otherUser?.displayname || otherUser?.username || t('common.unknown')} {t('chat.typing') || 'typing...'}</span>
           </div>
         )}
         {/* Media preview — muestra la imagen o un spinner mientras se sube */}
@@ -2572,7 +2574,8 @@ export default function Chat() {
               />
               <div className="explore-card-info">
                 <div className="explore-card-name-row">
-                  <span className="explore-card-name">{otherUser.username || t('common.unknown')}</span>
+                  <span className="explore-card-name">{otherUser.displayname || otherUser.username || t('common.unknown')}</span>
+                  <span style={{ fontSize: '0.68rem', fontWeight: 400, opacity: 0.5 }}>@{otherUser.username || ''}</span>
                   {otherUser.is_private === true && (
                     <span className="explore-card-private-icon" title={t('profile.private_profile')}>
                       <FaLock />

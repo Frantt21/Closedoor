@@ -178,7 +178,7 @@ export async function getPostsByHashtag(tag, { limit = 20, offset = 0 } = {}) {
 
   const { data, error } = await supabase
     .from('posts')
-    .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private)')
+    .select('*, profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private)')
     .in('id', (await getPostIdsByHashtag(cleanTag, limit, offset)))
     .neq('is_encrypted', true)
     .or('scheduled_at.is.null,scheduled_at.lte.now')
@@ -327,7 +327,7 @@ export async function searchPostsByContent(query, { limit = 20, offset = 0 } = {
   try {
     const { data, error } = await supabase
       .from('posts')
-      .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private)')
+      .select('*, profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private)')
       .ilike('content', `%${query}%`)
       .neq('is_encrypted', true)
       .or('scheduled_at.is.null,scheduled_at.lte.now')

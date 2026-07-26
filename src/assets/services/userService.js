@@ -138,11 +138,12 @@ export async function checkEmailExists(email) {
  * @param {string} username - Username
  * @returns {Promise<object>} - Created profile data
  */
-export async function createUserProfile(userId, email, username) {
+export async function createUserProfile(userId, email, username, displayname) {
   const profile = {
     id: userId,
     email: email.toLowerCase(),
     username: username.toLowerCase(),
+    displayname: displayname || username,
     created_at: new Date().toISOString(),
   };
 
@@ -259,7 +260,7 @@ export async function searchProfiles(query, excludeUserId, limit = 10) {
   try {
     let dbQuery = supabase
       .from('profiles')
-      .select('id, username, avatar_url')
+      .select('id, username, displayname, avatar_url')
       .ilike('username', `%${query.toLowerCase()}%`)
       .order('username', { ascending: true })
       .limit(limit);
@@ -286,7 +287,7 @@ export async function listProfiles(excludeUserId, limit = 50) {
   try {
     let query = supabase
       .from('profiles')
-      .select('id, username, avatar_url, banner_url, bio, pronouns, roles, created_at, is_private, interests, accent_color, accent_color_secondary, accent_surface_color, accent_surface_glass, accent_visibility, show_accent_profile, show_accent_explore, banner_position, avatar_position')
+      .select('id, username, displayname, avatar_url, banner_url, bio, pronouns, roles, created_at, is_private, interests, accent_color, accent_color_secondary, accent_surface_color, accent_surface_glass, accent_visibility, show_accent_profile, show_accent_explore, banner_position, avatar_position')
       .order('created_at', { ascending: false })
       .limit(limit);
 
@@ -432,13 +433,10 @@ export async function ensureUserProfile(user) {
  */
 export async function updateUserProfile(userId, updates) {
   try {
-    const sanitizedUpdates = { ...updates };
-    delete sanitizedUpdates.displayname;
-
     const { data, error } = await supabase
       .from('profiles')
       .update({
-        ...sanitizedUpdates,
+        ...updates,
         updated_at: new Date().toISOString(),
       })
       .eq('id', userId)

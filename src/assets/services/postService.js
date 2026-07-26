@@ -110,7 +110,7 @@ export async function getPosts({ userId, profileUserId, limit = 20, offset = 0 }
     'likes_count', 'comments_count', 'reposts_count', 'views_count',
     'created_at', 'updated_at', 'mentions',
     'allowed_users', 'obfuscated_display', 'comments_allowed', 'poll_data',
-    'profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)'
+    'profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position)'
   ].join(',');
   let query = supabase.from('posts').select(feedSelect);
 
@@ -148,7 +148,7 @@ export async function getPost(postId) {
     'likes_count', 'comments_count', 'reposts_count', 'views_count',
     'created_at', 'updated_at', 'mentions',
     'allowed_users', 'obfuscated_display', 'comments_allowed', 'poll_data',
-    'profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)'
+    'profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position)'
   ].join(',');
   const { data, error } = await supabase.from('posts').select(explicitSelect)
     .eq('id', postId)
@@ -388,7 +388,7 @@ async function refreshVisibleIds(userId) {
 export async function getFeed({ limit = 20, offset = 0, userId, filterEncrypted = true } = {}) {
   let query = supabase
     .from('posts')
-    .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)');
+    .select('*, profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position)');
 
   // Excluir posts programados del feed
   // Filter encrypted posts in JavaScript (not DB) to allow own encrypted posts
@@ -567,7 +567,7 @@ export async function createComment({ postId, userId, content, parentId = null, 
       image_url: imageUrl,
       video_url: videoUrl,
     })
-    .select('*, profiles!comments_user_id_fkey (id, username, avatar_url, roles, avatar_position)')
+    .select('*, profiles!comments_user_id_fkey (id, username, displayname, avatar_url, roles, avatar_position)')
     .single();
 
   if (error) {
@@ -597,7 +597,7 @@ export async function createComment({ postId, userId, content, parentId = null, 
 export async function getComments(postId) {
   const { data, error } = await supabase
     .from('comments')
-    .select('*, profiles!comments_user_id_fkey (id, username, avatar_url, roles, avatar_position)')
+    .select('*, profiles!comments_user_id_fkey (id, username, displayname, avatar_url, roles, avatar_position)')
     .eq('post_id', postId)
     .order('created_at', { ascending: true });
 
@@ -617,8 +617,8 @@ export async function getUserComments(userId, { limit = 50, offset = 0 } = {}) {
     .from('comments')
     .select(`
       id, content, image_url, video_url, created_at, post_id, comment_likes_count, comment_dislikes_count,
-      profiles!comments_user_id_fkey (id, username, avatar_url, roles, avatar_position),
-      posts!comments_post_id_fkey (id, user_id, content, image_url, profiles!posts_user_id_fkey (id, username, avatar_url, roles))
+      profiles!comments_user_id_fkey (id, username, displayname, avatar_url, roles, avatar_position),
+      posts!comments_post_id_fkey (id, user_id, content, image_url, profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles))
     `)
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
@@ -1204,7 +1204,7 @@ export async function getPollVotes(postId) {
 export async function getPollVotersWithProfiles(postId) {
   const { data, error } = await supabase
     .from('poll_votes')
-    .select('option_id, user_id, profiles!poll_votes_user_id_fkey (id, username, avatar_url)')
+    .select('option_id, user_id, profiles!poll_votes_user_id_fkey (id, username, displayname, avatar_url)')
     .eq('post_id', postId);
 
   if (error) {
@@ -1251,7 +1251,7 @@ export async function getScheduledPosts(userId, { limit = 50, offset = 0 } = {})
     'likes_count', 'comments_count', 'reposts_count', 'views_count',
     'created_at', 'updated_at', 'mentions',
     'allowed_users', 'obfuscated_display', 'comments_allowed', 'poll_data',
-    'profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)'
+    'profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position)'
   ].join(',');
   const { data, error } = await supabase.from('posts').select(explicitSelect)
     .eq('user_id', userId)

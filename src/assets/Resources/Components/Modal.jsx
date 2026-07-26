@@ -45,6 +45,7 @@ export default function Modal({
   onClose,
   onSave,
   initialUsername = '',
+  initialDisplayname = '',
   initialBanner = '',
   initialAvatar = '',
   initialBio = '',
@@ -74,6 +75,7 @@ export default function Modal({
   //    TypeError: Cannot read properties of undefined (reading 'trim')
   //    cuando normalizeCdnUrl devuelve '' o el prop no llega a tiempo.
   const [username, setUsername] = useState(initialUsername || '');
+  const [displayname, setDisplayname] = useState(initialDisplayname || '');
   const [banner, setBanner] = useState(initialBanner || '');
   const [avatar, setAvatar] = useState(initialAvatar || '');
   const [bio, setBio] = useState(initialBio || '');
@@ -200,6 +202,7 @@ export default function Modal({
   useEffect(() => {
     if (!isOpen) return;
     setUsername(initialUsername || '');
+    setDisplayname(initialDisplayname || '');
     setBanner(initialBanner || '');
     setAvatar(initialAvatar || '');
     setBio(initialBio || '');
@@ -243,6 +246,7 @@ export default function Modal({
   useEffect(() => {
     const changed =
       username !== (initialUsername || '') ||
+      displayname !== (initialDisplayname || '') ||
       banner !== (initialBanner || '') ||
       avatar !== (initialAvatar || '') ||
       bio !== (initialBio || '') ||
@@ -265,9 +269,9 @@ export default function Modal({
       avatarPosition !== initialAvatarPosition;
     setHasChanges(changed);
   }, [
-    username, banner, avatar, bio, pronouns, bannerCredits, avatarCredits, socialLinks,    selectedAccent, selectedAccentSecondary, interests,
+    username, displayname, banner, avatar, bio, pronouns, bannerCredits, avatarCredits, socialLinks,    selectedAccent, selectedAccentSecondary, interests,
     bannerPosition, avatarPosition,
-    initialUsername, initialBanner, initialAvatar, initialBio, initialPronouns,
+    initialUsername, initialDisplayname, initialBanner, initialAvatar, initialBio, initialPronouns,
     initialBannerCredits, initialAvatarCredits,
     initialSocialLinks, initialAccentColor, initialAccentColorSecondary, initialAccentSurface, initialAccentSurfaceGlass, initialProfileBg, initialProfileBgPosition, initialProfileBgBlur,    initialProfileBgDim, initialBannerDim, initialInterests,
     initialBannerPosition, initialAvatarPosition
@@ -344,6 +348,7 @@ export default function Modal({
     try {
       await onSave({
         username: username.trim(),
+        displayname: displayname.trim() || null,
         avatar_url: avatar.trim() || null,
         banner_url: banner.trim() || null,
         banner_credits: bannerCredits.trim() || null,
@@ -580,7 +585,7 @@ export default function Modal({
 
   const BIO_MAX_LENGTH = 80;
   const defaultAvatar = DEFAULT_AVATAR;
-  const previewUsername = username || 'username';
+  const previewDisplayname = displayname || username || 'username';
 
   return (
     <>
@@ -653,7 +658,8 @@ export default function Modal({
                   </button>
                 </div>                <div className="fc-preview-card-info" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
                   <div style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                    <span className="fc-preview-card-name">{previewUsername}</span>
+                    <span className="fc-preview-card-name">{previewDisplayname}</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 400, opacity: 0.6, color: 'rgba(255,255,255,0.7)' }}>@{username}</span>
                     <Badge roles={userRoles} />
                   </div>
 
@@ -716,6 +722,15 @@ export default function Modal({
 
             {/* Perfil — Username + Bio */}
             <div className="fc-modal-card">
+              <label className="fc-modal-label">
+                {t('modal.nickname_label') || 'Nickname'}
+                <input
+                  className="fc-modal-input"
+                  value={displayname}
+                  onChange={(e) => setDisplayname(e.target.value)}
+                  placeholder={t('modal.nickname_placeholder') || 'Your display name'}
+                />
+              </label>
               <label className="fc-modal-label">
                 {t('modal.username_label')}
                 <input
@@ -977,7 +992,8 @@ export default function Modal({
 
                 <div className="explore-card-info">
                   <div className="explore-card-name-row">
-                    <span className="explore-card-name">{previewUsername}</span>
+                    <span className="explore-card-name">{previewDisplayname}</span>
+                    <span style={{ fontSize: '0.68rem', fontWeight: 400, opacity: 0.5 }}>@{username}</span>
                     <Badge roles={userRoles} />
                   </div>
                   <span className="explore-card-followers">

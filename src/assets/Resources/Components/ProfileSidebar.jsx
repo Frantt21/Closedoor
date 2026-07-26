@@ -34,7 +34,8 @@ function setCachedStats(profileId, stats) {
   }
 }
 
-export default function ProfileSidebar({ profile, isPrivate, canViewContent, statsVisibility, isOwnProfile, surfaceStyle, showInterests = true, showStats = true }) {
+export default function ProfileSidebar({ profile, isPrivate, canViewContent, statsVisibility, isOwnProfile, surfaceStyle, showStats = true }) {
+  const showInterests = true;
   const { t } = useI18n();
   const { user } = useAuth();
   const isBlockedByMe = user?.id && profile?.id && !isOwnProfile
@@ -157,8 +158,9 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
     };
   }, [profile?.id, isOwnProfile]);
 
-  const bothCardsHidden = !showInterests && !showStats;
-  if (!profile || bothCardsHidden) return null;
+  // Las cards de intereses siempre se muestran (ya no se puede ocultar)
+  // El sidebar solo se oculta si no hay perfil
+  if (!profile) return null;
 
   // Determinar si todas las stats están intencionalmente ocultas
   // (statsVisibility es un objeto no-null sin ninguna stat en true)
@@ -192,9 +194,8 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
 
   return (
     <aside className="profile-sidebar">
-      {/* ── Interests ── */}
-      {showInterests && (
-        <div className="profile-sidebar-card" style={surfaceStyle}>
+      {/* ── Interests (siempre visible) ── */}
+      <div className="profile-sidebar-card" style={surfaceStyle}>
         <h3 className="profile-sidebar-title">
           <FaTags className="profile-sidebar-title-icon" />
           {t('profile.interests')}
@@ -234,8 +235,7 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
             )}
           </>
         )}
-        </div>
-      )}
+      </div>
 
       {/* ── Stats ── */}
       {showStats && (

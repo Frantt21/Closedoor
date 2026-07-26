@@ -792,7 +792,7 @@ const PostCard = React.memo(function PostCard({
               className="post-card-author"
               onClick={(e) => e.stopPropagation()}
             >
-              <span className="post-card-username">{profile?.username || 'unknown'}</span>
+              <span className="post-card-username">{profile?.displayname || profile?.username || 'unknown'}</span>
               {profile?.roles && <Badge roles={profile.roles} />}
               <span className="post-card-time">{timeAgo}</span>
             </Link>

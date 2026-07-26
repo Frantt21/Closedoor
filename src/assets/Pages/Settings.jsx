@@ -78,7 +78,7 @@ const CATEGORIES = [
 /* ── Main Settings Component ── */
 
 export default function Settings() {
-  const { locale, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showTrending, setShowTrending, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showPushNotifications, setShowPushNotifications, showLikes, setShowLikes, filterEncrypted, setFilterEncrypted, allowMention, setAllowMention, allowEncryptedAdd, setAllowEncryptedAdd, hour24, setHour24, theme, setTheme, t } = useI18n();
+  const { locale, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showTrending, setShowTrending, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showPushNotifications, setShowPushNotifications, showLikes, setShowLikes, filterEncrypted, setFilterEncrypted, allowMention, setAllowMention, allowEncryptedAdd, setAllowEncryptedAdd, hour24, setHour24, theme, setTheme, t } = useI18n();
   usePageTitle(t('settings.title'));
   const { user, profile, profileLoading, refreshProfile, logout } = useAuth();
   const navigate = useNavigate();
@@ -200,7 +200,6 @@ export default function Settings() {
       { col: 'show_accent_profile', setter: setShowAccentProfile },
       { col: 'show_accent_explore', setter: setShowAccentExplore },
       { col: 'accent_visibility', setter: setAccentVisibility },
-      { col: 'show_interests', setter: setShowInterests },
       { col: 'show_trending', setter: setShowTrending },
       { col: 'show_profile_stats', setter: setShowProfileStats },
       { col: 'show_likes', setter: setShowLikes },
@@ -213,7 +212,7 @@ export default function Settings() {
         setter(profile[col]);
       }
     }
-  }, [profile, profileSynced, setShowAccentProfile, setShowAccentExplore, setAccentVisibility, setShowInterests, setShowTrending, setShowProfileStats, setShowLikes, setAllowMention, setAllowEncryptedAdd, setFilterEncrypted]);
+  }, [profile, profileSynced, setShowAccentProfile, setShowAccentExplore, setAccentVisibility, setShowTrending, setShowProfileStats, setShowLikes, setAllowMention, setAllowEncryptedAdd, setFilterEncrypted]);
 
   const handlePrivacyChange = async (value) => {
     if (!user?.id || privacyUpdating || value === isPrivate) return;
@@ -634,31 +633,6 @@ export default function Settings() {
 
                 {cardsExpanded && (
                   <div className="settings-accent-list">
-                    {/* Mostrar intereses */}
-                    <div className="settings-row">
-                      <div className="settings-row-header">
-                        <span className="settings-section-icon"><FaTags /></span>
-                        <div>
-                          <h2 className="settings-section-title">{t('settings.show_interests')}</h2>
-                          <p className="settings-section-desc">{t('settings.show_interests_desc')}</p>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        className={`settings-toggle ${showInterests ? 'settings-toggle--active' : ''}`}
-                        onClick={() => {
-                          const next = !showInterests;
-                          setShowInterests(next);
-                          syncProfilePref('show_interests', next);
-                        }}
-                        aria-pressed={showInterests}
-                      >
-                        <span className="settings-toggle-track">
-                          <span className="settings-toggle-thumb" />
-                        </span>
-                      </button>
-                    </div>
-
                     {/* Mostrar estadísticas */}
                     <div className="settings-row">
                       <div className="settings-row-header">
