@@ -66,6 +66,8 @@ export default function Chat() {
   const sendingRef = useRef(false);
   // Keep sendingRef in sync
   useEffect(() => { sendingRef.current = sending; }, [sending]);
+  // ── Ref to track in-flight uploads so handleSend can wait for them ──
+  const uploadPromiseRef = useRef(null);
 
   // New conversation
   const [searchQuery, setSearchQuery] = useState('');
@@ -711,8 +713,12 @@ export default function Chat() {
     setShowProfileCard(false);
   };
 
-  // ── Send message (optimistic — no delay, includes media preview) ──
+  // ── Send message — espera a que la imagen termine de subirse si hay upload en curso ──
   const handleSend = async () => {
+    // Si hay una subida en curso, esperar a que termine para tener la URL real
+    if (uploadPromiseRef.current) {
+      await uploadPromiseRef.current;
+    }
     const trimmed = inputValue.trim();
     const hasPreview = !!mediaPreviewUrl;
     if (!trimmed && !hasPreview) return;
@@ -1082,12 +1088,15 @@ export default function Chat() {
     try {
       // Mostrar preview local instantáneo mientras se sube en background
       const { localUrl, realUrlPromise } = uploadWithLocalPreview(file, user.id, 'chat');
+      // Guardar la promise para que handleSend pueda esperarla si el usuario presiona Enter antes de que termine
+      uploadPromiseRef.current = realUrlPromise;
       setMediaPreviewUrl(localUrl);
       setShowMediaInput(false);
       setTimeout(() => inputRef.current?.focus(), 50);
 
       // Esperar subida real en background y reemplazar URL
       const realUrl = await realUrlPromise;
+      uploadPromiseRef.current = null;
       setMediaPreviewUrl(realUrl);
 
       toast.update(toastId, {
@@ -1106,6 +1115,7 @@ export default function Chat() {
       });
     } finally {
       setUploadingChatMedia(false); // solo habilitar send cuando tenemos URL real
+      uploadPromiseRef.current = null;
       e.target.value = '';
     }
   }, [user?.id, t]);
@@ -2207,10 +2217,17 @@ export default function Chat() {
             <span className="chat-typing-label">{otherUser?.username || t('common.unknown')} {t('chat.typing') || 'typing...'}</span>
           </div>
         )}
-        {/* Media preview */}
-        {mediaPreviewUrl && (
+        {/* Media preview — muestra la imagen o un spinner mientras se sube */}
+        {(mediaPreviewUrl || uploadingChatMedia) && (
           <div className="chat-media-preview">
-            {IMG_RE.test(mediaPreviewUrl) ? (
+            {uploadingChatMedia ? (
+              <div className="chat-media-preview-uploading">
+                <FaSpinner className="fc-spin" />
+                <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted, #6b7280)' }}>
+                  {t('upload.uploading') || 'Subiendo...'}
+                </span>
+              </div>
+            ) : IMG_RE.test(mediaPreviewUrl) ? (
               <SafeImage src={mediaPreviewUrl} alt="Preview" className="chat-media-preview-img" />
             ) : (
               <span className="chat-media-preview-text">{mediaPreviewUrl}</span>
