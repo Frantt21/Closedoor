@@ -63,7 +63,7 @@ const PostCard = React.memo(function PostCard({
   replyInfo = null,
 }) {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile: currentProfile } = useAuth();
   const { t, locale, hour24 } = useI18n();
   const [liked, setLiked] = useState(initialLiked);
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
@@ -334,7 +334,9 @@ const PostCard = React.memo(function PostCard({
   }, [showMenu]);
 
   const isOwner = user?.id === post.user_id;
-  const profile = post.profiles;
+  // Si el post es del usuario actual, usar el perfil de AuthContext (se actualiza en tiempo real)
+  // para que el avatar, username, etc. se reflejen al instante sin recargar.
+  const profile = isOwner && currentProfile ? currentProfile : (post.profiles || {});
   const isPrivateProfile = profile?.is_private === true;
   const repostDisabled = isPrivateProfile && !isOwner;
   const timeAgo = useMemo(() => getTimeAgo(t, locale, post.created_at), [t, locale, post.created_at]);
