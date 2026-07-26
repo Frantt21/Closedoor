@@ -7,9 +7,9 @@
  * (userId + type + file.name + file.size + file.lastModified) so that
  * re-uploading the same file returns instantly without a network request.
  *
- * Cache TTL: 30 days. Since backend CDN stores files permanently by hash
- * (dedup), cached URLs never go stale — the 30-day TTL is just a safety
- * net to prevent unbounded storage growth.
+ * Cache: permanente. El backend CDN usa dedup por hash, así que las URLs
+ * cacheadas NUNCA se vuelven obsoletas. Cada entrada ocupa ~300 bytes en
+ * encrypted localStorage — caben miles antes de llenar la cuota (~5MB).
  */
 
 import { getItem, setItem, removeItem } from './secureStorage';
@@ -35,12 +35,6 @@ async function getCachedUpload(userId, type, file) {
     const key = getUploadCacheKey(userId, type, file);
     const parsed = await getItem(key);
     if (!parsed) return null;
-    // Expire after 30 days. Las URLs del CDN son permanentes (dedup por hash),
-    // pero este TTL evita crecimiento infinito del almacenamiento.
-    if (Date.now() - parsed.timestamp > 30 * 24 * 60 * 60 * 1000) {
-      await removeItem(key);
-      return null;
-    }
     return parsed.result;
   } catch {
     return null;
