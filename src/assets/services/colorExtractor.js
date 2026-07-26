@@ -84,10 +84,19 @@ async function fetchImageAsBlob(url, timeoutMs = 8000) {
 
 /**
  * Generate a proxied URL via wsrv.nl — resizes image + adds CORS headers
+ *
+ * IMPORTANT: wsrv.nl requires a full absolute URL (with protocol + hostname).
+ * If the URL is relative (e.g. "/cdn/files/xxx"), we prepend the current
+ * window.location.origin so the proxy can fetch it correctly.
  */
 function proxyViaWsrv(originalUrl) {
+  let absoluteUrl = originalUrl;
+  if (absoluteUrl && !absoluteUrl.startsWith('http://') && !absoluteUrl.startsWith('https://')) {
+    // Relative URL → make it absolute using the current origin
+    absoluteUrl = window.location.origin + (absoluteUrl.startsWith('/') ? absoluteUrl : '/' + absoluteUrl);
+  }
   const params = new URLSearchParams({
-    url: originalUrl,
+    url: absoluteUrl,
     w: '200',      // Resize to 200px wide (plenty for color extraction)
     output: 'webp', // WebP is smaller, faster to download
     q: '60',       // Quality 60% — good enough for colors

@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { FaImage } from 'react-icons/fa';
+import { getCdnUrl } from '../../services/cdnService';
 
 /**
  * SafeImage — Wrapper around <img> that gracefully handles load errors.
  *
+ * - Normaliza URLs del CDN automáticamente (previene Mixed Content).
  * - By default: shows a dark placeholder with an icon when the image fails.
  * - hideOnError: returns null when the image fails (no placeholder rendered).
  * - fallbackIcon: custom icon element for the placeholder.
@@ -24,6 +26,9 @@ export default function SafeImage({
   ...rest
 }) {
   const [hasError, setHasError] = useState(false);
+
+  // Normalizar URL del CDN para evitar Mixed Content
+  const normalizedSrc = getCdnUrl(src);
 
   const handleError = () => {
     if (!hasError) {
@@ -56,7 +61,7 @@ export default function SafeImage({
   return (
     <img
       {...rest}
-      src={src}
+      src={normalizedSrc}
       alt={alt}
       className={className}
       onClick={onClick}

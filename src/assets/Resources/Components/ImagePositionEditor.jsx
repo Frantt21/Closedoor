@@ -79,6 +79,9 @@ export default function ImagePositionEditor({
   const lastMouse = useRef({ x: 0, y: 0 });
 
   const notify = useCallback((newData) => {
+    // Guard: si newData es undefined (p.ej. React StrictMode re-ejecutando el updater),
+    // no llamar a encodePosition que rompería con "Cannot read properties of undefined"
+    if (!newData) return;
     onPositionChange?.(encodePosition(newData));
   }, [onPositionChange]);
 
@@ -90,7 +93,7 @@ export default function ImagePositionEditor({
     });
     // notify MUST be called outside the setState updater to avoid
     // "Cannot update a component while rendering a different component"
-    notify(next);
+    if (next) notify(next);
   }, [notify]);
 
   // ── Drag ──

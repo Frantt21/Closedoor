@@ -199,29 +199,49 @@ export async function deleteImage(imageId) {
  * hitting the HTTP-only CDN server directly over HTTPS.
  *
  *   http://api.foranly.space:24587/cdn/files/xxx → /cdn/files/xxx
+ *
+ * También asegura que URLs que ya son relativas pero sin /cdn/ prefix
+ * se normalicen igualmente (p.ej. un ID suelto).
  */
 export function normalizeCdnUrl(url) {
   if (!url) return url;
+  // Si es una URL absoluta HTTP/HTTPS, extraer solo el path relativo
   try {
     const parsed = new URL(url);
     return parsed.pathname + parsed.search + parsed.hash;
   } catch {
+    // No es una URL parseable → probablemente ya es relativa o un ID
     return url;
   }
 }
 
 /**
  * Get the CDN URL for a file ID, always returning a same-origin relative path.
- * @param {string} fileId - The file UUID or full URL
- * @returns {string}
+ * Úsala en TODOS los componentes que rendericen imágenes del CDN para
+ * garantizar que nunca se cargue una URL HTTP directa (previene Mixed Content).
+ *
+ * ⚠️ IMPORTANTE: Solo normaliza URLs que sean realmente del CDN.
+ * URLs externas (Pinterest, GIPHY, Tenor, etc.) se devuelven intactas.
+ *
+ * @param {string} fileId - The file UUID, full URL, or relative path
+ * @returns {string} - Relative path like "/cdn/files/xxx" or the original URL
  */
 export function getCdnUrl(fileId) {
   if (!fileId) return '';
+
+  // Si NO es URL del CDN, devolver tal cual (imágenes externas: Pinterest, GIPHY, etc.)
+  if (!isCdnUrl(fileId)) return fileId;
+
+  // Es URL del CDN → normalizar a ruta relativa
   if (fileId.startsWith('http://') || fileId.startsWith('https://')) {
-    return normalizeCdnUrl(fileId);
+    const normalized = normalizeCdnUrl(fileId);
+    if (normalized.startsWith('/cdn/')) return normalized;
+    // Si normalizeCdnUrl devolvió algo inesperado, reconstruir desde el ID
+    return `/cdn/files/${fileId.split('/').pop()}`;
   }
-  // If it's already a relative path or just an ID, prepend /cdn/files/
+  // Si ya es /cdn/files/xxx, devolver tal cual
   if (fileId.startsWith('/cdn/')) return fileId;
+  // Es solo un ID → construir ruta completa
   return `/cdn/files/${fileId}`;
 }
 

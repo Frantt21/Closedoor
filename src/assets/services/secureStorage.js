@@ -4,7 +4,9 @@
  * Encrypted wrapper around localStorage + sessionStorage.
  * - Keys: hashed with a fast one-way hash so key names aren't readable
  * - Values: XOR-encrypted with a random session key so they're not plain text/JSON
- * - XOR key is stored in sessionStorage so it survives page reloads
+ * - XOR key is stored in LOCALstorage (no sessionStorage) so it survives
+ *   browser tab closes — this is required because Supabase auth session
+ *   data is encrypted with this key and stored in localStorage.
  * - API is 100% synchronous (no async/await needed)
  *
  * This prevents casual inspection of cached data via DevTools localStorage view.
@@ -15,25 +17,28 @@
 
 const STORAGE_PREFIX = '_s';
 const SESSION_STORAGE_PREFIX = '_ss';
-const XOR_KEY_STORAGE_KEY = '_xk';
+const XOR_KEY_STORAGE_RAW = '_xk';
 
-// XOR key — persisted in sessionStorage so it survives page reloads
+// XOR key — persisted in localStorage so it survives tab closes
+// The XOR key itself is stored under a hashed key like any other entry
 let _xorKey = null;
 
 function getXorKey() {
   if (_xorKey) return _xorKey;
-  // Try to restore existing key from sessionStorage (survives page reload)
+  // Try to restore existing key from localStorage (survives tab close & page reload)
   try {
-    const stored = sessionStorage.getItem(XOR_KEY_STORAGE_KEY);
+    const hashed = hashKey(XOR_KEY_STORAGE_RAW);
+    const stored = localStorage.getItem(hashed);
     if (stored) {
       _xorKey = Uint8Array.from(JSON.parse(stored));
       return _xorKey;
     }
   } catch {}
-  // Generate new key and persist it
+  // Generate new key and persist it in localStorage
   _xorKey = crypto.getRandomValues(new Uint8Array(32));
   try {
-    sessionStorage.setItem(XOR_KEY_STORAGE_KEY, JSON.stringify(Array.from(_xorKey)));
+    const hashed = hashKey(XOR_KEY_STORAGE_RAW);
+    localStorage.setItem(hashed, JSON.stringify(Array.from(_xorKey)));
   } catch {}
   return _xorKey;
 }
