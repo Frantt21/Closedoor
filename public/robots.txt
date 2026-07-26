@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /Login
+Disallow: /Register
+Disallow: /Settings
+Disallow: /Chat
+Disallow: /Notifications
+Disallow: /api/
+
+Sitemap: https://app.foranly.space/sitemap.xml

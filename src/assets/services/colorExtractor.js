@@ -35,13 +35,13 @@ const CACHE_KEY_PREFIX = 'fc_colors_';
 const CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours (but the user suggested 5 min, let's do 1 week since we don't need to delete anything)
 // Actually, cache is fine for a long time since colors don't change per URL
 
+import { getItem, setItem } from './secureStorage';
+
 // ── Cache ──
 
 function getCachedColors(imageUrl) {
   try {
-    const raw = localStorage.getItem(CACHE_KEY_PREFIX + imageUrl);
-    if (!raw) return null;
-    const entry = JSON.parse(raw);
+    const entry = getItem(CACHE_KEY_PREFIX + imageUrl);
     if (!entry || !entry.colors || !entry.ts) return null;
     // No TTL check — if cached, it's valid. User can clear cache manually.
     return entry.colors;
@@ -52,10 +52,10 @@ function getCachedColors(imageUrl) {
 
 function setCachedColors(imageUrl, colors) {
   try {
-    localStorage.setItem(CACHE_KEY_PREFIX + imageUrl, JSON.stringify({
+    setItem(CACHE_KEY_PREFIX + imageUrl, {
       colors,
       ts: Date.now(),
-    }));
+    });
   } catch {
     // localStorage might be full, ignore
   }

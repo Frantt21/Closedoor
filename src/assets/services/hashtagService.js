@@ -1,4 +1,5 @@
 import { supabase } from './supabaseclient';
+import { getItem, setItem, removeItem } from './secureStorage';
 
 /**
  * Extract #hashtags from text content
@@ -232,7 +233,7 @@ const TRENDING_HOURS = 24;
 function setCache(key, data, customTtl) {
   try {
     const payload = { ts: Date.now(), ttl: customTtl || TRENDING_CACHE_TTL, data };
-    localStorage.setItem(key, JSON.stringify(payload));
+    setItem(key, payload);
   } catch (err) {
     console.warn('Could not cache trending data:', err);
   }
@@ -240,12 +241,10 @@ function setCache(key, data, customTtl) {
 
 function getCache(key) {
   try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const payload = JSON.parse(raw);
+    const payload = getItem(key);
     if (!payload?.ts) return null;
     if (Date.now() - payload.ts > (payload.ttl || TRENDING_CACHE_TTL)) {
-      localStorage.removeItem(key);
+      removeItem(key);
       return null;
     }
     return payload.data || null;
@@ -267,8 +266,8 @@ export function getCachedTrendingHashtags() {
 
 export function clearTrendingCache() {
   try {
-    localStorage.removeItem(TRENDING_WORDS_CACHE_KEY);
-    localStorage.removeItem(TRENDING_HASHTAGS_CACHE_KEY);
+    removeItem(TRENDING_WORDS_CACHE_KEY);
+    removeItem(TRENDING_HASHTAGS_CACHE_KEY);
   } catch (err) {
     /* ignore */
   }

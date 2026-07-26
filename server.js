@@ -18,6 +18,7 @@ import { readFileSync, existsSync } from 'fs';
 import { resolve, join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import http from 'http';
+import { buildSitemapUrls, wrapSitemapXml } from './api/_sitemap.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIST = join(__dirname, 'dist');
@@ -53,7 +54,7 @@ if (!existsSync(DIST)) {
 const htmlTemplate = readFileSync(INDEX_HTML, 'utf-8');
 
 // ── Inject OG tags into HTML ──
-function injectOGTags(html, { title, description, image, url, username }) {
+function injectOGTags(html, { title, description, image, url, username, type = 'website' } = {}) {
   const siteName = 'Closedoor';
   const fullTitle = title ? `${title} | ${siteName}` : siteName;
   const ogTitle = title || siteName;
@@ -71,7 +72,7 @@ function injectOGTags(html, { title, description, image, url, username }) {
     <meta property="og:description" content="${escapeHtml(ogDesc)}" />
     <meta property="og:image" content="${escapeHtml(ogImage)}" />
     <meta property="og:url" content="${escapeHtml(ogUrl)}" />
-    <meta property="og:type" content="profile" />
+    <meta property="og:type" content="${escapeHtml(type)}" />
     <meta property="og:site_name" content="${escapeHtml(siteName)}" />
     <meta name="description" content="${escapeHtml(ogDesc)}" />
     ${username ? `<meta property="profile:username" content="${escapeHtml(username)}" />` : ''}
@@ -142,23 +143,121 @@ const cdnProxy = (req, res) => {
   req.pipe(proxyReq);
 };
 
-// ── Serve static files from dist ──
-app.use(express.static(DIST));
+// ── Sitemap route — must be BEFORE express.static to take priority ──
+app.get('/sitemap.xml', async (req, res) => {
+  const SITE_URL = `${req.protocol}://${req.get('host')}`;
 
-// ── CDN proxy routes (before catch-all to intercept CDN requests) ──
+  if (!supabase) {
+    // Fallback: serve the static sitemap.xml from public/
+    const staticSitemap = join(DIST, 'sitemap.xml');
+    if (existsSync(staticSitemap)) {
+      return res.sendFile(staticSitemap);
+    }
+    // Minimal inline sitemap
+    const fallbackUrls = [
+      `  <url><loc>${SITE_URL}/</loc><changefreq>daily</changefreq><priority>1.0</priority></url>`,
+      `  <url><loc>${SITE_URL}/Explore</loc><changefreq>daily</changefreq><priority>0.8</priority></url>`,
+      `  <url><loc>${SITE_URL}/Trending</loc><changefreq>daily</changefreq><priority>0.7</priority></url>`,
+    ];
+    res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+    return res.status(200).send(wrapSitemapXml(fallbackUrls));
+  }
+
+  const urls = await buildSitemapUrls(supabase, SITE_URL);
+  const xml = wrapSitemapXml(urls);
+
+  res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=1800, s-maxage=1800');
+  res.status(200).end(xml);
+});
+
+// ── Serve static files with intelligent caching ──
+// Files with content hashes in their name (e.g., vendor-react-X4ZWUDZZ.js)
+// are immutable — the hash changes only when content changes.
+// index.html is served here for the root path / (before the catch-all),
+// so we explicitly set no-cache to ensure fresh content on each visit.
+const YEAR_IN_SECONDS = 31536000;
+
+function isImmutable(filePath) {
+  // Match Vite's hashed filenames: name-HASH.ext where HASH is 8+ alphanumeric chars
+  return /-[A-Za-z0-9_-]{6,}\.[a-z]+$/.test(filePath);
+}
+
+app.use(
+  express.static(DIST, {
+    setHeaders(res, filePath) {
+      if (isImmutable(filePath)) {
+        // Content-hashed files = cache forever (filename changes on content change)
+        res.setHeader(
+          'Cache-Control',
+          `public, max-age=${YEAR_IN_SECONDS}, immutable`
+        );
+      } else if (filePath.endsWith('index.html')) {
+        // index.html must always be fresh — ETag handles conditional revalidation
+        res.setHeader('Cache-Control', 'no-cache');
+      } else {
+        // Other static assets (logo.svg, robots.txt, etc.) — cache 1 day
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+      }
+    },
+  })
+);
+
+// ── CDN proxy routes ──
 app.all('/cdn/*', cdnProxy);
 
-// ── Profile route: fetch user data and inject OG tags ──
+// ── Route-based OG tag configuration ──
+function getOGForRoute(req) {
+  const host = req.get('host');
+  const protocol = req.protocol;
+  const baseUrl = `${protocol}://${host}`;
+  const path = req.path;
+  const fullUrl = `${baseUrl}${path}`;
+
+  // Default: Home
+  let og = {
+    title: 'Closedoor',
+    description: 'Join the community, share your thoughts, and discover new people on Closedoor.',
+    image: 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor',
+    url: fullUrl,
+    type: 'website',
+    username: null,
+  };
+
+  if (path.startsWith('/profile/')) {
+    og.title = `${path.replace('/profile/', '@')}`;
+    og.description = `Check out ${path.replace('/profile/', '@')} on Closedoor!`;
+    og.type = 'profile';
+    og.username = path.replace('/profile/', '');
+  } else if (path === '/Explore' || path.startsWith('/Explore')) {
+    og.title = 'Explore | Closedoor';
+    og.description = 'Discover new people and profiles on Closedoor.';
+  } else if (path === '/Trending' || path.startsWith('/Trending')) {
+    og.title = 'Trending | Closedoor';
+    og.description = 'See what\'s trending on Closedoor — hashtags, topics, and more.';
+  } else if (path === '/Comunidades' || path.startsWith('/Comunidades')) {
+    og.title = 'Comunidades | Closedoor';
+    og.description = 'Join communities and connect with people who share your interests on Closedoor.';
+  } else if (path.startsWith('/Hashtag/')) {
+    const tag = path.replace('/Hashtag/', '');
+    og.title = `#${tag} | Closedoor`;
+    og.description = `Explore posts tagged with #${tag} on Closedoor.`;
+  }
+
+  return og;
+}
+
+// ── Profile route: fetch user data and inject rich OG tags ──
 app.get('/profile/:username', async (req, res) => {
   const { username } = req.params;
 
-  // Default OG tags
   let ogData = {
     title: `@${username}`,
     description: `Check out @${username} on Closedoor!`,
     image: 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor',
     url: `${req.protocol}://${req.get('host')}/profile/${username}`,
     username,
+    type: 'profile',
   };
 
   // Try to fetch from Supabase for richer OG tags
@@ -179,6 +278,7 @@ app.get('/profile/:username', async (req, res) => {
           image: data.avatar_url || data.banner_url || 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor',
           url: `${req.protocol}://${req.get('host')}/profile/${data.username || username}`,
           username: data.username || username,
+          type: 'profile',
         };
       }
     } catch (err) {
@@ -191,10 +291,60 @@ app.get('/profile/:username', async (req, res) => {
   res.send(html);
 });
 
-// ── All other routes: serve default index.html ──
-app.get('/{*path}', (req, res) => {
+// ── Post route: fetch post data for rich OG tags ──
+app.get('/post/:id', async (req, res) => {
+  const { id } = req.params;
+
+  let ogData = {
+    title: 'Post | Closedoor',
+    description: 'Check out this post on Closedoor.',
+    image: 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor',
+    url: `${req.protocol}://${req.get('host')}/post/${id}`,
+    username: null,
+    type: 'article',
+  };
+
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('posts')
+        .select('content, image_url, profiles!posts_user_id_fkey (username)')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (data && !error) {
+        const cleanContent = data.content
+          ? data.content.replace(/<[^>]*>/g, '').replace(/https?:\/\/\S+/g, '').trim()
+          : '';
+        ogData = {
+          title: data.profiles?.username
+            ? `Post by @${data.profiles.username} | Closedoor`
+            : 'Post | Closedoor',
+          description: cleanContent
+            ? (cleanContent.length > 200 ? cleanContent.slice(0, 200) + '...' : cleanContent)
+            : 'Check out this post on Closedoor.',
+          image: data.image_url || 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor',
+          url: `${req.protocol}://${req.get('host')}/post/${id}`,
+          username: null,
+          type: 'article',
+        };
+      }
+    } catch (err) {
+      console.warn('Error fetching post for OG tags:', err.message);
+    }
+  }
+
+  const html = injectOGTags(htmlTemplate, ogData);
   res.set('Content-Type', 'text/html; charset=utf-8');
-  res.send(htmlTemplate);
+  res.send(html);
+});
+
+// ── All other routes: serve index.html with route-specific OG tags ──
+app.get('/{*path}', (req, res) => {
+  const og = getOGForRoute(req);
+  const html = injectOGTags(htmlTemplate, og);
+  res.set('Content-Type', 'text/html; charset=utf-8');
+  res.send(html);
 });
 
 app.listen(PORT, () => {

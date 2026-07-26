@@ -6,6 +6,7 @@ import { updateUserProfile } from '../services/userService';
 import { clearAllAppCaches } from '../services/postService';
 import { getBlockedUsers, getCachedBlockedUsers, unblockUser, cacheBlockStatus, subscribeBlockChanges } from '../services/blockService';
 import { useNavigate } from 'react-router-dom';
+import { getItem } from '../services/secureStorage';
 import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaHeartBroken, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaFire, FaChartBar, FaBell, FaBrush, FaBan, FaClock, FaAt, FaTrashAlt, FaTimes } from 'react-icons/fa';
 import { MdLogout } from 'react-icons/md';
 import { toast } from 'react-toastify';
@@ -105,9 +106,10 @@ export default function Settings() {
   const cacheSize = useMemo(() => {
     try {
       let total = 0;
+      // Cuenta entradas encriptadas (prefijo _s) + legacy fc_* que aun existan
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && key.startsWith('fc_')) {
+        if (key && (key.startsWith('_s') || key.startsWith('fc_'))) {
           const value = localStorage.getItem(key);
           if (value) total += value.length * 2; // UTF-16: 2 bytes per char
         }

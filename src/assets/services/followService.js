@@ -1,4 +1,5 @@
 import { supabase } from './supabaseclient';
+import { getItem, setItem, removeItem } from './secureStorage';
 import { clearVisibleIdsCache } from './postService';
 
 /**
@@ -355,7 +356,7 @@ export function setCachedExploreData(userId, data) {
   try {
     const key = EXPLORE_CACHE_PREFIX + (userId || 'anon');
     const payload = { ts: Date.now(), ttl: EXPLORE_CACHE_TTL, data };
-    localStorage.setItem(key, JSON.stringify(payload));
+    setItem(key, payload);
   } catch (err) {
     console.warn('Could not cache explore data:', err);
   }
@@ -364,12 +365,10 @@ export function setCachedExploreData(userId, data) {
 export function getCachedExploreData(userId) {
   try {
     const key = EXPLORE_CACHE_PREFIX + (userId || 'anon');
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const payload = JSON.parse(raw);
+    const payload = getItem(key);
     if (!payload || !payload.ts) return null;
     if (Date.now() - payload.ts > (payload.ttl || EXPLORE_CACHE_TTL)) {
-      localStorage.removeItem(key);
+      removeItem(key);
       return null;
     }
     return payload.data || null;
@@ -388,7 +387,7 @@ export function setCachedFollowStatus(followerId, targetId, status) {
   try {
     const key = `${FOLLOW_STATUS_PREFIX}${followerId}_${targetId}`;
     const payload = { ts: Date.now(), ttl: FOLLOW_STATUS_TTL, status };
-    localStorage.setItem(key, JSON.stringify(payload));
+    setItem(key, payload);
   } catch (err) {
     console.warn('Could not cache follow status:', err);
   }
@@ -398,12 +397,10 @@ export function getCachedFollowStatus(followerId, targetId) {
   if (!followerId || !targetId) return null;
   try {
     const key = `${FOLLOW_STATUS_PREFIX}${followerId}_${targetId}`;
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const payload = JSON.parse(raw);
+    const payload = getItem(key);
     if (!payload || !payload.ts) return null;
     if (Date.now() - payload.ts > (payload.ttl || FOLLOW_STATUS_TTL)) {
-      localStorage.removeItem(key);
+      removeItem(key);
       return null;
     }
     return payload.status;
@@ -421,7 +418,7 @@ export function setCachedFollowCounts(userId, counts) {
   if (!userId || !counts) return;
   try {
     const payload = { ts: Date.now(), ttl: COUNTS_CACHE_TTL, counts };
-    localStorage.setItem(COUNTS_CACHE_PREFIX + userId, JSON.stringify(payload));
+    setItem(COUNTS_CACHE_PREFIX + userId, payload);
   } catch (err) {
     console.warn('Could not cache follow counts:', err);
   }
@@ -430,7 +427,7 @@ export function setCachedFollowCounts(userId, counts) {
 export function clearCachedFollowCounts(userId) {
   if (!userId) return;
   try {
-    localStorage.removeItem(COUNTS_CACHE_PREFIX + userId);
+    removeItem(COUNTS_CACHE_PREFIX + userId);
   } catch (err) {
     console.warn('Could not clear cached follow counts:', err);
   }
@@ -439,12 +436,10 @@ export function clearCachedFollowCounts(userId) {
 export function getCachedFollowCounts(userId) {
   if (!userId) return null;
   try {
-    const raw = localStorage.getItem(COUNTS_CACHE_PREFIX + userId);
-    if (!raw) return null;
-    const payload = JSON.parse(raw);
+    const payload = getItem(COUNTS_CACHE_PREFIX + userId);
     if (!payload || !payload.ts) return null;
     if (Date.now() - payload.ts > (payload.ttl || COUNTS_CACHE_TTL)) {
-      localStorage.removeItem(COUNTS_CACHE_PREFIX + userId);
+      removeItem(COUNTS_CACHE_PREFIX + userId);
       return null;
     }
     return payload.counts || null;
@@ -463,7 +458,7 @@ export function setCachedFollowers(userId, data) {
   if (!userId) return;
   try {
     const payload = { ts: Date.now(), ttl: FOLLOW_LIST_TTL, data };
-    localStorage.setItem(FOLLOWERS_LIST_PREFIX + userId, JSON.stringify(payload));
+    setItem(FOLLOWERS_LIST_PREFIX + userId, payload);
   } catch (err) {
     console.warn('Could not cache followers list:', err);
   }
@@ -472,12 +467,10 @@ export function setCachedFollowers(userId, data) {
 export function getCachedFollowers(userId) {
   if (!userId) return null;
   try {
-    const raw = localStorage.getItem(FOLLOWERS_LIST_PREFIX + userId);
-    if (!raw) return null;
-    const payload = JSON.parse(raw);
+    const payload = getItem(FOLLOWERS_LIST_PREFIX + userId);
     if (!payload || !payload.ts) return null;
     if (Date.now() - payload.ts > (payload.ttl || FOLLOW_LIST_TTL)) {
-      localStorage.removeItem(FOLLOWERS_LIST_PREFIX + userId);
+      removeItem(FOLLOWERS_LIST_PREFIX + userId);
       return null;
     }
     return payload.data || null;
@@ -491,7 +484,7 @@ export function setCachedFollowing(userId, data) {
   if (!userId) return;
   try {
     const payload = { ts: Date.now(), ttl: FOLLOW_LIST_TTL, data };
-    localStorage.setItem(FOLLOWING_LIST_PREFIX + userId, JSON.stringify(payload));
+    setItem(FOLLOWING_LIST_PREFIX + userId, payload);
   } catch (err) {
     console.warn('Could not cache following list:', err);
   }
@@ -500,12 +493,10 @@ export function setCachedFollowing(userId, data) {
 export function getCachedFollowing(userId) {
   if (!userId) return null;
   try {
-    const raw = localStorage.getItem(FOLLOWING_LIST_PREFIX + userId);
-    if (!raw) return null;
-    const payload = JSON.parse(raw);
+    const payload = getItem(FOLLOWING_LIST_PREFIX + userId);
     if (!payload || !payload.ts) return null;
     if (Date.now() - payload.ts > (payload.ttl || FOLLOW_LIST_TTL)) {
-      localStorage.removeItem(FOLLOWING_LIST_PREFIX + userId);
+      removeItem(FOLLOWING_LIST_PREFIX + userId);
       return null;
     }
     return payload.data || null;

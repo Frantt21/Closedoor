@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 import ogTagsPlugin from './plugins/ogTagsPlugin'
+import preloadRouteChunks from './plugins/preloadRouteChunks'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -21,9 +22,32 @@ export default defineConfig({
   },
   build: {
     cssMinify: 'esbuild',
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Vendor splitting — keep stable libraries in separate chunks
+          if (id.includes('/node_modules/react-dom') || id.includes('/node_modules/react/')) {
+            return 'vendor-react';
+          }
+          if (id.includes('/node_modules/@supabase/supabase-js')) {
+            return 'vendor-supabase';
+          }
+          if (id.includes('/node_modules/react-router')) {
+            return 'vendor-router';
+          }
+          if (id.includes('/node_modules/react-icons')) {
+            return 'vendor-icons';
+          }
+          if (id.includes('/node_modules/react-toastify')) {
+            return 'vendor-toastify';
+          }
+        },
+      },
+    },
   },
   plugins: [
     ogTagsPlugin(),
+    preloadRouteChunks(),
     react(),
     babel({ presets: [reactCompilerPreset()] })
   ],

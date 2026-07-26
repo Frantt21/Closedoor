@@ -2,12 +2,26 @@
   "functions": {
     "api/og-profile.js": {
       "maxDuration": 10
+    },
+    "api/og-post.js": {
+      "maxDuration": 10
+    },
+    "api/sitemap.xml.js": {
+      "maxDuration": 15
     }
   },
   "rewrites": [
     {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap.xml"
+    },
+    {
       "source": "/profile/:username",
       "destination": "/api/og-profile"
+    },
+    {
+      "source": "/post/:id",
+      "destination": "/api/og-post"
     },
     {
       "source": "/cdn/(.*)",

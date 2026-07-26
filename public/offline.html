@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Closedoor — Offline</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        background: #0f0f13;
+        color: #e0e0e0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 100dvh;
+        padding: 24px;
+      }
+      .offline-card {
+        text-align: center;
+        max-width: 400px;
+      }
+      .offline-icon {
+        font-size: 64px;
+        margin-bottom: 24px;
+        display: block;
+      }
+      h1 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        margin-bottom: 12px;
+        color: #ffffff;
+      }
+      p {
+        font-size: 0.95rem;
+        line-height: 1.5;
+        color: #888;
+        margin-bottom: 24px;
+      }
+      .retry-btn {
+        display: inline-block;
+        padding: 10px 28px;
+        background: #e94560;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        font-family: inherit;
+        cursor: pointer;
+        transition: background 0.2s ease;
+      }
+      .retry-btn:hover {
+        background: #d63851;
+      }
+      .retry-btn:active {
+        transform: scale(0.97);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="offline-card">
+      <span class="offline-icon">📡</span>
+      <h1>Sin conexión</h1>
+      <p>
+        Parece que no tienes conexión a Internet.
+        Vuelve a intentarlo cuando estés conectado.
+      </p>
+      <button class="retry-btn" onclick="window.location.reload()">
+        Reintentar
+      </button>
+    </div>
+  </body>
+</html>

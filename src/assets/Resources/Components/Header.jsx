@@ -7,13 +7,14 @@ import { NotificationContext } from '../../../context/NotificationContext';
 import { useI18n } from '../../../assets/services/i18n/useI18n';
 import Tooltip from './Tooltip';
 import React from 'react';
+import { getItem, setItem } from '../../services/secureStorage';
 
 const SIDEBAR_STORAGE_KEY = 'fc_sidebar_collapsed';
 
 function getInitialCollapsed() {
   try {
-    const stored = localStorage.getItem(SIDEBAR_STORAGE_KEY);
-    if (stored !== null) return JSON.parse(stored);
+    const stored = getItem(SIDEBAR_STORAGE_KEY);
+    if (stored !== null) return stored;
   } catch { /* ignore */ }
   return true;
 }
@@ -28,7 +29,7 @@ function Header() {
   // Persistir preferencia de sidebar colapsado/expandido
   useEffect(() => {
     try {
-      localStorage.setItem(SIDEBAR_STORAGE_KEY, JSON.stringify(collapsed));
+      setItem(SIDEBAR_STORAGE_KEY, collapsed);
     } catch { /* ignore */ }
   }, [collapsed]);
 

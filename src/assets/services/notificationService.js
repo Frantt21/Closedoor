@@ -1,4 +1,5 @@
 import { supabase } from './supabaseclient';
+import { getItem, setItem, removeItem } from './secureStorage';
 
 const NOTIF_CACHE_PREFIX = 'fc_notif_';
 const NOTIF_CACHE_TTL = 1000 * 60 * 5; // 5 min
@@ -11,7 +12,7 @@ export function setCachedNotifications(userId, notifications) {
       ttl: NOTIF_CACHE_TTL,
       data: { notifications },
     };
-    localStorage.setItem(NOTIF_CACHE_PREFIX + userId, JSON.stringify(payload));
+    setItem(NOTIF_CACHE_PREFIX + userId, payload);
   } catch (err) {
     console.warn('Could not cache notifications:', err);
   }
@@ -20,12 +21,10 @@ export function setCachedNotifications(userId, notifications) {
 export function getCachedNotifications(userId) {
   if (!userId) return null;
   try {
-    const raw = localStorage.getItem(NOTIF_CACHE_PREFIX + userId);
-    if (!raw) return null;
-    const payload = JSON.parse(raw);
+    const payload = getItem(NOTIF_CACHE_PREFIX + userId);
     if (!payload?.ts) return null;
     if (Date.now() - payload.ts > (payload.ttl || NOTIF_CACHE_TTL)) {
-      localStorage.removeItem(NOTIF_CACHE_PREFIX + userId);
+      removeItem(NOTIF_CACHE_PREFIX + userId);
       return null;
     }
     const notifs = payload.data?.notifications || [];

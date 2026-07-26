@@ -1,4 +1,5 @@
 import { supabase } from './supabaseclient';
+import { getItem, setItem, removeItem } from './secureStorage';
 
 /**
  * Get email by username
@@ -288,7 +289,7 @@ const PROFILE_CACHE_TTL = 1000 * 60 * 60; // 1 hour
 export function clearCachedProfile(userId) {
   if (!userId) return;
   try {
-    localStorage.removeItem(PROFILE_CACHE_PREFIX + userId);
+    removeItem(PROFILE_CACHE_PREFIX + userId);
   } catch (err) {
     console.warn('Could not clear cached profile:', err);
   }
@@ -297,7 +298,7 @@ export function clearCachedProfile(userId) {
 export function clearCachedProfileByUsername(username) {
   if (!username) return;
   try {
-    localStorage.removeItem(PROFILE_USERNAME_PREFIX + username.toLowerCase());
+    removeItem(PROFILE_USERNAME_PREFIX + username.toLowerCase());
   } catch (err) {
     console.warn('Could not clear cached profile by username:', err);
   }
@@ -313,7 +314,7 @@ export function setCachedProfile(profile, ttlMs = PROFILE_CACHE_TTL) {
       ttl: ttlMs,
       profile: safeProfile,
     };
-    localStorage.setItem(PROFILE_CACHE_PREFIX + profile.id, JSON.stringify(payload));
+    setItem(PROFILE_CACHE_PREFIX + profile.id, payload);
   } catch (err) {
     console.warn('Could not set profile cache:', err);
   }
@@ -321,12 +322,10 @@ export function setCachedProfile(profile, ttlMs = PROFILE_CACHE_TTL) {
 
 export function getCachedProfile(userId) {
   try {
-    const raw = localStorage.getItem(PROFILE_CACHE_PREFIX + userId);
-    if (!raw) return null;
-    const payload = JSON.parse(raw);
+    const payload = getItem(PROFILE_CACHE_PREFIX + userId);
     if (!payload || !payload.ts) return null;
     if (Date.now() - payload.ts > (payload.ttl || PROFILE_CACHE_TTL)) {
-      localStorage.removeItem(PROFILE_CACHE_PREFIX + userId);
+      removeItem(PROFILE_CACHE_PREFIX + userId);
       return null;
     }
     return payload.profile || null;
@@ -346,7 +345,7 @@ export function setCachedProfileByUsername(username, profile) {
     setCachedProfile(profile);
     // Cache por username (mapea username → ID)
     const index = { id: profile.id, ts: Date.now(), ttl: PROFILE_CACHE_TTL };
-    localStorage.setItem(PROFILE_USERNAME_PREFIX + username.toLowerCase(), JSON.stringify(index));
+    setItem(PROFILE_USERNAME_PREFIX + username.toLowerCase(), index);
   } catch (err) {
     console.warn('Could not cache profile by username:', err);
   }
@@ -355,12 +354,10 @@ export function setCachedProfileByUsername(username, profile) {
 export function getCachedProfileByUsername(username) {
   if (!username) return null;
   try {
-    const raw = localStorage.getItem(PROFILE_USERNAME_PREFIX + username.toLowerCase());
-    if (!raw) return null;
-    const index = JSON.parse(raw);
+    const index = getItem(PROFILE_USERNAME_PREFIX + username.toLowerCase());
     if (!index?.id || !index.ts) return null;
     if (Date.now() - index.ts > (index.ttl || PROFILE_CACHE_TTL)) {
-      localStorage.removeItem(PROFILE_USERNAME_PREFIX + username.toLowerCase());
+      removeItem(PROFILE_USERNAME_PREFIX + username.toLowerCase());
       return null;
     }
     // Recuperar el perfil completo por ID (usando el cache existente)
@@ -450,8 +447,7 @@ export async function trackProfileView(profileId, userId) {
   if (!profileId) return false;
   const key = VIEWED_PROFILE_KEY + (userId || 'anon');
   try {
-    const raw = localStorage.getItem(key);
-    const viewed = raw ? JSON.parse(raw) : [];
+    const viewed = getItem(key) || [];
     if (viewed.includes(profileId)) return false;
 
     // Increment profile_views_count (resiliente a columna faltante)
@@ -473,7 +469,7 @@ export async function trackProfileView(profileId, userId) {
     }
 
     viewed.push(profileId);
-    localStorage.setItem(key, JSON.stringify(viewed));
+    setItem(key, viewed);
     return true;
   } catch (err) {
     console.warn('Error tracking profile view:', err);

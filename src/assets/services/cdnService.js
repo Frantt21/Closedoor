@@ -3,10 +3,16 @@
  * Handles image uploads to the Go CDN server at api.foranly.space
  * Supports: avatar, banner, post, chat images
  *
- * Upload results are cached in sessionStorage by file fingerprint
+ * Upload results are cached in encrypted localStorage by file fingerprint
  * (userId + type + file.name + file.size + file.lastModified) so that
  * re-uploading the same file returns instantly without a network request.
+ *
+ * Cache TTL: 30 days. Since backend CDN stores files permanently by hash
+ * (dedup), cached URLs never go stale — the 30-day TTL is just a safety
+ * net to prevent unbounded storage growth.
  */
+
+import { getItem, setItem, removeItem } from './secureStorage';
 
 const CDN_BASE = import.meta.env.VITE_CDN_URL || '';
 const CACHE_PREFIX = 'cdn_upload_';
@@ -24,15 +30,15 @@ function getUploadCacheKey(userId, type, file) {
  * Try to get a cached upload result for the given file.
  * Returns the cached result or null if not found/expired.
  */
-function getCachedUpload(userId, type, file) {
+async function getCachedUpload(userId, type, file) {
   try {
     const key = getUploadCacheKey(userId, type, file);
-    const cached = sessionStorage.getItem(key);
-    if (!cached) return null;
-    const parsed = JSON.parse(cached);
-    // Expire after 10 minutes so stale URLs eventually get refreshed
-    if (Date.now() - parsed.timestamp > 10 * 60 * 1000) {
-      sessionStorage.removeItem(key);
+    const parsed = await getItem(key);
+    if (!parsed) return null;
+    // Expire after 30 days. Las URLs del CDN son permanentes (dedup por hash),
+    // pero este TTL evita crecimiento infinito del almacenamiento.
+    if (Date.now() - parsed.timestamp > 30 * 24 * 60 * 60 * 1000) {
+      await removeItem(key);
       return null;
     }
     return parsed.result;
@@ -44,15 +50,15 @@ function getCachedUpload(userId, type, file) {
 /**
  * Save an upload result to the cache.
  */
-function setCachedUpload(userId, type, file, result) {
+async function setCachedUpload(userId, type, file, result) {
   try {
     const key = getUploadCacheKey(userId, type, file);
-    sessionStorage.setItem(key, JSON.stringify({
+    await setItem(key, {
       result,
       timestamp: Date.now(),
-    }));
+    });
   } catch {
-    // sessionStorage might be full
+    // localStorage might be full
   }
 }
 

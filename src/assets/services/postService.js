@@ -1,4 +1,5 @@
 import { supabase } from './supabaseclient';
+import { getItem, setItem, removeItem, clearAll } from './secureStorage';
 
 // ── POSTS ──
 
@@ -81,8 +82,16 @@ export async function createPost({ userId, content, imageUrl, imageUrls, videoUr
 }
 
 export async function getPosts({ userId, profileUserId, limit = 20, offset = 0 } = {}) {
-  let query = supabase      .from('posts')
-    .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)');
+  // Seleccionar solo las columnas necesarias para el feed (evitar SELECT *)
+  const feedSelect = [
+    'id', 'user_id', 'content', 'image_url', 'image_urls', 'video_url',
+    'is_pinned', 'pinned_at', 'is_encrypted', 'is_sensitive',
+    'likes_count', 'comments_count', 'reposts_count', 'views_count',
+    'created_at', 'updated_at', 'mentions',
+    'allowed_users', 'obfuscated_display', 'comments_allowed', 'poll_data',
+    'profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)'
+  ].join(',');
+  let query = supabase.from('posts').select(feedSelect);
 
   // Excluir posts programados (scheduled_at en futuro) — solo aparecen en pestaña "Programados"
   if (profileUserId) {
@@ -111,9 +120,15 @@ export async function getPosts({ userId, profileUserId, limit = 20, offset = 0 }
 }
 
 export async function getPost(postId) {
-  const { data, error } = await supabase
-    .from('posts')
-    .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)')
+  const explicitSelect = [
+    'id', 'user_id', 'content', 'image_url', 'image_urls', 'video_url',
+    'is_pinned', 'pinned_at', 'is_encrypted', 'is_sensitive',
+    'likes_count', 'comments_count', 'reposts_count', 'views_count',
+    'created_at', 'updated_at', 'mentions',
+    'allowed_users', 'obfuscated_display', 'comments_allowed', 'poll_data',
+    'profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)'
+  ].join(',');
+  const { data, error } = await supabase.from('posts').select(explicitSelect)
     .eq('id', postId)
     .single();
 
@@ -262,7 +277,7 @@ function setCachedVisibleIds(userId, ids) {
   try {
     const key = VISIBLE_IDS_PREFIX + (userId || 'anon');
     const payload = { ts: Date.now(), ttl: VISIBLE_IDS_TTL, ids };
-    localStorage.setItem(key, JSON.stringify(payload));
+    setItem(key, payload);
   } catch (err) {
     console.warn('Could not cache visible IDs:', err);
   }
@@ -271,12 +286,10 @@ function setCachedVisibleIds(userId, ids) {
 function getCachedVisibleIds(userId) {
   try {
     const key = VISIBLE_IDS_PREFIX + (userId || 'anon');
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const payload = JSON.parse(raw);
+    const payload = getItem(key);
     if (!payload?.ts) return null;
     if (Date.now() - payload.ts > (payload.ttl || VISIBLE_IDS_TTL)) {
-      localStorage.removeItem(key);
+      removeItem(key);
       return null;
     }
     return payload.ids || null;
@@ -292,7 +305,7 @@ function getCachedVisibleIds(userId) {
 export function clearVisibleIdsCache(userId) {
   try {
     const key = VISIBLE_IDS_PREFIX + (userId || 'anon');
-    localStorage.removeItem(key);
+    removeItem(key);
   } catch (err) {
     /* ignore */
   }
@@ -781,8 +794,7 @@ export async function trackPostView(postId, userId) {
   if (!postId) return false;
   const key = VIEWED_POSTS_KEY + (userId || 'anon');
   try {
-    const raw = localStorage.getItem(key);
-    const viewed = raw ? JSON.parse(raw) : [];
+    const viewed = getItem(key) || [];
     if (viewed.includes(postId)) return false; // Already viewed
 
     // Increment views_count on the post
@@ -801,7 +813,7 @@ export async function trackPostView(postId, userId) {
 
     // Add to viewed set
     viewed.push(postId);
-    localStorage.setItem(key, JSON.stringify(viewed));
+    setItem(key, viewed);
     return true;
   } catch (err) {
     console.warn('Error tracking view:', err);
@@ -817,7 +829,7 @@ export function setCachedPollVotes(postId, votes, userVote) {
   if (!postId) return;
   try {
     const payload = { ts: Date.now(), ttl: POLL_CACHE_TTL, data: { votes, userVote } };
-    localStorage.setItem(POLL_CACHE_PREFIX + postId, JSON.stringify(payload));
+    setItem(POLL_CACHE_PREFIX + postId, payload);
   } catch (err) {
     console.warn('Could not cache poll votes:', err);
   }
@@ -826,12 +838,10 @@ export function setCachedPollVotes(postId, votes, userVote) {
 export function getCachedPollVotes(postId) {
   if (!postId) return null;
   try {
-    const raw = localStorage.getItem(POLL_CACHE_PREFIX + postId);
-    if (!raw) return null;
-    const payload = JSON.parse(raw);
+    const payload = getItem(POLL_CACHE_PREFIX + postId);
     if (!payload?.ts) return null;
     if (Date.now() - payload.ts > (payload.ttl || POLL_CACHE_TTL)) {
-      localStorage.removeItem(POLL_CACHE_PREFIX + postId);
+      removeItem(POLL_CACHE_PREFIX + postId);
       return null;
     }
     return payload.data || null;
@@ -843,7 +853,7 @@ export function getCachedPollVotes(postId) {
 export function clearCachedPollVotes(postId) {
   if (!postId) return;
   try {
-    localStorage.removeItem(POLL_CACHE_PREFIX + postId);
+    removeItem(POLL_CACHE_PREFIX + postId);
   } catch (err) {
     /* ignore */
   }
@@ -857,7 +867,7 @@ export function setCachedPollVoters(postId, voters) {
   if (!postId) return;
   try {
     const payload = { ts: Date.now(), ttl: POLL_VOTERS_TTL, data: voters };
-    localStorage.setItem(POLL_VOTERS_PREFIX + postId, JSON.stringify(payload));
+    setItem(POLL_VOTERS_PREFIX + postId, payload);
   } catch (err) {
     console.warn('Could not cache poll voters:', err);
   }
@@ -866,12 +876,10 @@ export function setCachedPollVoters(postId, voters) {
 export function getCachedPollVoters(postId) {
   if (!postId) return null;
   try {
-    const raw = localStorage.getItem(POLL_VOTERS_PREFIX + postId);
-    if (!raw) return null;
-    const payload = JSON.parse(raw);
+    const payload = getItem(POLL_VOTERS_PREFIX + postId);
     if (!payload?.ts) return null;
     if (Date.now() - payload.ts > (payload.ttl || POLL_VOTERS_TTL)) {
-      localStorage.removeItem(POLL_VOTERS_PREFIX + postId);
+      removeItem(POLL_VOTERS_PREFIX + postId);
       return null;
     }
     return payload.data || null;
@@ -883,7 +891,7 @@ export function getCachedPollVoters(postId) {
 export function clearCachedPollVoters(postId) {
   if (!postId) return;
   try {
-    localStorage.removeItem(POLL_VOTERS_PREFIX + postId);
+    removeItem(POLL_VOTERS_PREFIX + postId);
   } catch (err) {
     /* ignore */
   }
@@ -1212,9 +1220,15 @@ export async function getPollUserVotes(postIds, userId) {
 export async function getScheduledPosts(userId, { limit = 50, offset = 0 } = {}) {
   if (!userId) return [];
   const now = new Date().toISOString();
-  const { data, error } = await supabase
-    .from('posts')
-    .select('*, profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)')
+  const explicitSelect = [
+    'id', 'user_id', 'content', 'image_url', 'image_urls', 'video_url',
+    'is_pinned', 'pinned_at', 'is_encrypted', 'is_sensitive',
+    'likes_count', 'comments_count', 'reposts_count', 'views_count',
+    'created_at', 'updated_at', 'mentions',
+    'allowed_users', 'obfuscated_display', 'comments_allowed', 'poll_data',
+    'profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)'
+  ].join(',');
+  const { data, error } = await supabase.from('posts').select(explicitSelect)
     .eq('user_id', userId)
     .not('scheduled_at', 'is', null)
     .gt('scheduled_at', now)
@@ -1496,7 +1510,7 @@ export function setCachedPost(post) {
   if (!post?.id) return;
   try {
     const payload = { ts: Date.now(), ttl: POST_CACHE_TTL, post };
-    localStorage.setItem(POST_CACHE_PREFIX + post.id, JSON.stringify(payload));
+    setItem(POST_CACHE_PREFIX + post.id, payload);
   } catch (err) {
     console.warn('Could not cache post:', err);
   }
@@ -1505,12 +1519,10 @@ export function setCachedPost(post) {
 export function getCachedPost(postId) {
   if (!postId) return null;
   try {
-    const raw = localStorage.getItem(POST_CACHE_PREFIX + postId);
-    if (!raw) return null;
-    const payload = JSON.parse(raw);
+    const payload = getItem(POST_CACHE_PREFIX + postId);
     if (!payload?.ts) return null;
     if (Date.now() - payload.ts > (payload.ttl || POST_CACHE_TTL)) {
-      localStorage.removeItem(POST_CACHE_PREFIX + postId);
+      removeItem(POST_CACHE_PREFIX + postId);
       return null;
     }
     return payload.post || null;
@@ -1531,7 +1543,7 @@ export function setCachedComments(postId, comments, commentLikes, commentDislike
       ttl: COMMENTS_CACHE_TTL,
       data: { comments, commentLikes: commentLikes || {}, commentDislikes: commentDislikes || {} },
     };
-    localStorage.setItem(COMMENTS_CACHE_PREFIX + postId, JSON.stringify(payload));
+    setItem(COMMENTS_CACHE_PREFIX + postId, payload);
   } catch (err) {
     console.warn('Could not cache comments:', err);
   }
@@ -1540,12 +1552,10 @@ export function setCachedComments(postId, comments, commentLikes, commentDislike
 export function getCachedComments(postId) {
   if (!postId) return null;
   try {
-    const raw = localStorage.getItem(COMMENTS_CACHE_PREFIX + postId);
-    if (!raw) return null;
-    const payload = JSON.parse(raw);
+    const payload = getItem(COMMENTS_CACHE_PREFIX + postId);
     if (!payload?.ts) return null;
     if (Date.now() - payload.ts > (payload.ttl || COMMENTS_CACHE_TTL)) {
-      localStorage.removeItem(COMMENTS_CACHE_PREFIX + postId);
+      removeItem(COMMENTS_CACHE_PREFIX + postId);
       return null;
     }
     return payload.data || null;
@@ -1582,7 +1592,7 @@ export function setCachedFeed(key, items, likedIds, repostedIds, savedIds, disli
       ttl: FEED_CACHE_TTL,
       data: { items, likedIds: likedIds || [], repostedIds: repostedIds || [], savedIds: savedIds || [], dislikedIds: dislikedIds || [] },
     };
-    localStorage.setItem(FEED_CACHE_PREFIX + key, JSON.stringify(payload));
+    setItem(FEED_CACHE_PREFIX + key, payload);
   } catch (err) {
     console.warn('Could not cache feed:', err);
   }
@@ -1591,26 +1601,19 @@ export function setCachedFeed(key, items, likedIds, repostedIds, savedIds, disli
 export function clearFeedCache(key) {
   if (!key) return;
   try {
-    localStorage.removeItem(FEED_CACHE_PREFIX + key);
+    removeItem(FEED_CACHE_PREFIX + key);
   } catch (err) {
     console.warn('Could not clear feed cache:', err);
   }
 }
 
 /**
- * Clear ALL app caches from localStorage (keys starting with fc_).
+ * Clear ALL app caches from localStorage.
  * Called on logout to wipe all user-specific cached data.
  */
 export function clearAllAppCaches() {
   try {
-    const keysToRemove = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('fc_')) {
-        keysToRemove.push(key);
-      }
-    }
-    keysToRemove.forEach((k) => localStorage.removeItem(k));
+    clearAll();
   } catch (err) {
     console.warn('Could not clear app caches:', err);
   }
@@ -1619,12 +1622,10 @@ export function clearAllAppCaches() {
 export function getCachedFeed(key) {
   if (!key) return null;
   try {
-    const raw = localStorage.getItem(FEED_CACHE_PREFIX + key);
-    if (!raw) return null;
-    const payload = JSON.parse(raw);
+    const payload = getItem(FEED_CACHE_PREFIX + key);
     if (!payload?.ts) return null;
     if (Date.now() - payload.ts > (payload.ttl || FEED_CACHE_TTL)) {
-      localStorage.removeItem(FEED_CACHE_PREFIX + key);
+      removeItem(FEED_CACHE_PREFIX + key);
       return null;
     }
     // Formato nuevo: { items, likedIds, repostedIds }

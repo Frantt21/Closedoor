@@ -13,6 +13,7 @@ import {
 } from '../assets/services/notificationService';
 import { decryptMessage, getTotalUnreadChatCount } from '../assets/services/chatService';
 import { useAuth } from '../hooks/useAuth';
+import { getItem } from '../assets/services/secureStorage';
 
 // ── Helpers para notificaciones en vivo ──
 
@@ -51,7 +52,7 @@ const NOTIF_MESSAGES = {
 
 function getCurrentLocale() {
   try {
-    return localStorage.getItem('fc_locale') || 'es';
+    return getItem('fc_locale') || 'es';
   } catch {
     return 'es';
   }
@@ -123,7 +124,7 @@ function showLiveNotification(data, navigate) {
   const isHidden = document.visibilityState === 'hidden' || !document.hasFocus();
   if (isHidden) {
     try {
-      if (localStorage.getItem('fc_show_push_notifications') === 'true') {
+      if (getItem('fc_show_push_notifications') === 'true') {
         tryShowOsNotification(message, avatarUrl, link, data.id);
       }
     } catch {}
@@ -131,7 +132,7 @@ function showLiveNotification(data, navigate) {
 
   // ── Tab visible (o hidden con push deshabilitada) → Toast (si habilitada) ──
   try {
-    if (localStorage.getItem('fc_show_toast_notifications') === 'false') return;
+    if (getItem('fc_show_toast_notifications') === 'false') return;
   } catch {}
 
   toast(
@@ -388,7 +389,7 @@ export function NotificationProvider({ children }) {
           const isHidden = document.visibilityState === 'hidden' || !document.hasFocus();
           if (isHidden) {
             try {
-              if (localStorage.getItem('fc_show_push_notifications') === 'true') {
+              if (getItem('fc_show_push_notifications') === 'true') {
                 tryShowOsNotification(messageText, avatarUrl, '/Chat', `chat-msg-${newMsg.id}`);
               }
             } catch (e) {
@@ -399,7 +400,7 @@ export function NotificationProvider({ children }) {
           // No mostrar toast si ya estamos en la ruta de chat
           if (!isChatRoute()) {
             try {
-              if (localStorage.getItem('fc_show_toast_notifications') === 'false') return;
+              if (getItem('fc_show_toast_notifications') === 'false') return;
             } catch (e) {}
 
             toast(

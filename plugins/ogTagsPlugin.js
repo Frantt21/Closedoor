@@ -3,16 +3,18 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 /**
- * Vite plugin that injects Open Graph meta tags into /profile/:username pages.
+ * Vite plugin that injects Open Graph meta tags for crawlers.
  *
  * For bot/crawler requests (Discord, Twitter, Facebook, etc.):
  *   - Reads index.html directly from disk
- *   - Injects OG/twitter meta tags with profile data from Supabase
+ *   - Injects OG/twitter meta tags with route-specific data
  *   - Sends the modified HTML (crawlers don't execute JS anyway)
  *
- * For real browser requests:
- *   - Passes through to Vite's normal middleware chain
- *   - The React SPA loads normally with HMR
+ * Supported routes:
+ *   /profile/:username  — fetches profile from Supabase for rich OG
+ *   /Post/:id           — fetches post content from Supabase for rich OG
+ *   /Explore, /Trending, /Comunidades, /Hashtag/:tag — static OG per route
+ *   / (Home) and others — default OG tags
  */
 export default function ogTagsPlugin() {
   let supabase = null;
@@ -32,6 +34,35 @@ export default function ogTagsPlugin() {
     return indexHtml;
   }
 
+  function getOGForPath(path) {
+    let title = 'Closedoor';
+    let description = 'Join the community, share your thoughts, and discover new people on Closedoor.';
+    let image = 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor';
+    let type = 'website';
+    let username = null;
+
+    if (path.startsWith('/Explore')) {
+      title = 'Explore | Closedoor';
+      description = 'Discover new people and profiles on Closedoor.';
+    } else if (path.startsWith('/Trending')) {
+      title = 'Trending | Closedoor';
+      description = "See what's trending on Closedoor.";
+    } else if (path.startsWith('/Comunidades')) {
+      title = 'Comunidades | Closedoor';
+      description = 'Join communities and connect with people who share your interests on Closedoor.';
+    } else if (path.startsWith('/Hashtag/')) {
+      const tag = path.replace('/Hashtag/', '');
+      title = `#${tag} | Closedoor`;
+      description = `Explore posts tagged with #${tag} on Closedoor.`;
+    } else if (path.startsWith('/Post/')) {
+      title = 'Post | Closedoor';
+      description = 'Check out this post on Closedoor.';
+      type = 'article';
+    }
+
+    return { title, description, image, type, username };
+  }
+
   return {
     name: 'og-tags',
 
@@ -47,15 +78,8 @@ export default function ogTagsPlugin() {
         supabase = createClient(url, key);
       }
 
-      // ── Middleware: intercept /profile/:username for crawlers only ──
+      // ── Middleware: intercept public routes for crawlers ──
       server.middlewares.use(async (req, res, next) => {
-        const match = req.url?.match(/^\/profile\/([a-zA-Z0-9_]+)/);
-        if (!match) {
-          next();
-          return;
-        }
-
-        // Check if OG tags are forced via query param (?og) or request is from a known crawler
         const hasOgParam = req.url?.includes('?og') || req.url?.includes('&og');
         const ua = (req.headers['user-agent'] || '').toLowerCase();
         const isCrawler = /discord|twitterbot|facebookexternalhit|slack|telegram|whatsapp|bot\//.test(ua);
@@ -64,39 +88,97 @@ export default function ogTagsPlugin() {
           return;
         }
 
-        const username = match[1];
+        const path = (req.url || '').split('?')[0];
+        const profileMatch = path.match(/^\/profile\/([a-zA-Z0-9_]+)/);
+        const postMatch = path.match(/^\/Post\/([a-zA-Z0-9-]+)/);
+        const username = profileMatch ? profileMatch[1] : null;
 
-        // ── Fetch or get cached OG data ──
-        let og = cache.get(username);
-        if (!og) {
-          og = {
-            title: `@${username}`,
-            description: `Check out @${username} on Closedoor!`,
-            image: 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor',
-          };
+        // ── Resolve OG data ──
+        let og;
 
-          if (supabase) {
-            try {
-              const { data } = await supabase
-                .from('profiles')
-                .select('username, bio, avatar_url, banner_url')
-                .eq('username', username.toLowerCase())
-                .maybeSingle();
+        if (username) {
+          // Profile route — fetch from Supabase with cache
+          og = cache.get('profile_' + username);
+          if (!og) {
+            og = {
+              title: `@${username}`,
+              description: `Check out @${username} on Closedoor!`,
+              image: 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor',
+              type: 'profile',
+              username,
+            };
 
-              if (data) {
-                og = {
-                  title: `@${data.username || username}`,
-                  description: data.bio
-                    ? (data.bio.length > 200 ? data.bio.slice(0, 200) + '...' : data.bio)
-                    : `Check out @${data.username || username} on Closedoor!`,
-                  image: data.avatar_url || data.banner_url || 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor',
-                };
-                cache.set(username, og);
+            if (supabase) {
+              try {
+                const { data } = await supabase
+                  .from('profiles')
+                  .select('username, bio, avatar_url, banner_url')
+                  .eq('username', username.toLowerCase())
+                  .maybeSingle();
+
+                if (data) {
+                  og = {
+                    title: `@${data.username || username}`,
+                    description: data.bio
+                      ? (data.bio.length > 200 ? data.bio.slice(0, 200) + '...' : data.bio)
+                      : `Check out @${data.username || username} on Closedoor!`,
+                    image: data.avatar_url || data.banner_url || 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor',
+                    type: 'profile',
+                    username: data.username || username,
+                  };
+                  cache.set('profile_' + username, og);
+                }
+              } catch (err) {
+                console.warn('[og-tags] Profile fetch error:', err.message);
               }
-            } catch (err) {
-              console.warn('[og-tags] Profile fetch error:', err.message);
             }
           }
+        } else if (postMatch) {
+          // Post route — fetch from Supabase
+          const postId = postMatch[1];
+          og = cache.get('post_' + postId);
+          if (!og) {
+            og = {
+              title: 'Post | Closedoor',
+              description: 'Check out this post on Closedoor.',
+              image: 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor',
+              type: 'article',
+              username: null,
+            };
+
+            if (supabase) {
+              try {
+                const { data } = await supabase
+                  .from('posts')
+                  .select('content, image_url, profiles!posts_user_id_fkey (username)')
+                  .eq('id', postId)
+                  .maybeSingle();
+
+                if (data) {
+                  const cleanContent = data.content
+                    ? data.content.replace(/<[^>]*>/g, '').replace(/https?:\/\/\S+/g, '').trim()
+                    : '';
+                  og = {
+                    title: data.profiles?.username
+                      ? `Post by @${data.profiles.username} | Closedoor`
+                      : 'Post | Closedoor',
+                    description: cleanContent
+                      ? (cleanContent.length > 200 ? cleanContent.slice(0, 200) + '...' : cleanContent)
+                      : 'Check out this post on Closedoor.',
+                    image: data.image_url || 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor',
+                    type: 'article',
+                    username: null,
+                  };
+                  cache.set('post_' + postId, og);
+                }
+              } catch (err) {
+                console.warn('[og-tags] Post fetch error:', err.message);
+              }
+            }
+          }
+        } else {
+          // Static routes — use config map
+          og = getOGForPath(path);
         }
 
         // ── Build modified HTML with OG tags ──
@@ -107,15 +189,16 @@ export default function ogTagsPlugin() {
         }
 
         const siteName = 'Closedoor';
+        const ogUrl = `https://${req.headers.host || 'localhost:5173'}${path}`;
         const metaTags = `
     <meta property="og:title" content="${esc(og.title)}" />
     <meta property="og:description" content="${esc(og.description)}" />
     <meta property="og:image" content="${esc(og.image)}" />
-    <meta property="og:url" content="${esc(req.url)}" />
-    <meta property="og:type" content="profile" />
+    <meta property="og:url" content="${esc(ogUrl)}" />
+    <meta property="og:type" content="${esc(og.type || 'website')}" />
     <meta property="og:site_name" content="${esc(siteName)}" />
     <meta name="description" content="${esc(og.description)}" />
-    <meta property="profile:username" content="${esc(username)}" />
+    ${og.username ? `<meta property="profile:username" content="${esc(og.username)}" />` : ''}
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${esc(og.title)}" />
     <meta name="twitter:description" content="${esc(og.description)}" />

@@ -4,6 +4,7 @@ import { useI18n } from '../../services/i18n/useI18n';
 import { supabase } from '../../services/supabaseclient';
 import { useAuth } from '../../../hooks/useAuth';
 import { getCachedBlockStatus, subscribeBlockChanges } from '../../services/blockService';
+import { getItem, setItem, removeItem } from '../../services/secureStorage';
 import './css/profileSidebar.css';
 
 // ── Stats cache ──
@@ -12,12 +13,10 @@ const STATS_CACHE_TTL = 1000 * 60 * 5; // 5 minutos
 
 function getCachedStats(profileId) {
   try {
-    const raw = localStorage.getItem(STATS_CACHE_PREFIX + profileId);
-    if (!raw) return null;
-    const payload = JSON.parse(raw);
+    const payload = getItem(STATS_CACHE_PREFIX + profileId);
     if (!payload?.ts) return null;
     if (Date.now() - payload.ts > STATS_CACHE_TTL) {
-      localStorage.removeItem(STATS_CACHE_PREFIX + profileId);
+      removeItem(STATS_CACHE_PREFIX + profileId);
       return null;
     }
     return payload.stats;
@@ -29,7 +28,7 @@ function getCachedStats(profileId) {
 function setCachedStats(profileId, stats) {
   try {
     const payload = { ts: Date.now(), stats };
-    localStorage.setItem(STATS_CACHE_PREFIX + profileId, JSON.stringify(payload));
+    setItem(STATS_CACHE_PREFIX + profileId, payload);
   } catch {
     /* ignore */
   }

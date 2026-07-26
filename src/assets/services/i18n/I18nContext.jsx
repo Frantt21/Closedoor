@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import es from './locales/es.json';
+import { getItem, setItem } from '../secureStorage';
 
 const LOCALE_KEY = 'fc_locale';
 const ACCENT_KEY = 'fc_show_accent';
@@ -49,7 +50,7 @@ function detectBrowserLocale() {
 // Cargar locale guardado o auto-detectar del navegador
 function getSavedLocale() {
   try {
-    const saved = localStorage.getItem(LOCALE_KEY);
+    const saved = getItem(LOCALE_KEY);
     if (saved) return saved;
     return detectBrowserLocale();
   } catch {
@@ -59,7 +60,7 @@ function getSavedLocale() {
 
 function getSavedShowAccent() {
   try {
-    const val = localStorage.getItem(ACCENT_KEY);
+    const val = getItem(ACCENT_KEY);
     return val === null ? true : val === 'true';
   } catch {
     return true;
@@ -68,7 +69,7 @@ function getSavedShowAccent() {
 
 function getSavedShowAccentProfile() {
   try {
-    const val = localStorage.getItem(ACCENT_PROFILE_KEY);
+    const val = getItem(ACCENT_PROFILE_KEY);
     return val === null ? true : val === 'true';
   } catch {
     return true;
@@ -77,7 +78,7 @@ function getSavedShowAccentProfile() {
 
 function getSavedShowAccentExplore() {
   try {
-    const val = localStorage.getItem(ACCENT_EXPLORE_KEY);
+    const val = getItem(ACCENT_EXPLORE_KEY);
     return val === null ? true : val === 'true';
   } catch {
     return true;
@@ -86,7 +87,7 @@ function getSavedShowAccentExplore() {
 
 function getSavedAccentVisibility() {
   try {
-    return localStorage.getItem(ACCENT_VISIBILITY_KEY) || 'both';
+    return getItem(ACCENT_VISIBILITY_KEY) || 'both';
   } catch {
     return 'both';
   }
@@ -94,7 +95,7 @@ function getSavedAccentVisibility() {
 
 function getSavedTheme() {
   try {
-    return localStorage.getItem(THEME_KEY) || 'dark';
+    return getItem(THEME_KEY) || 'dark';
   } catch {
     return 'dark';
   }
@@ -102,7 +103,7 @@ function getSavedTheme() {
 
 function getSavedShowInterests() {
   try {
-    const val = localStorage.getItem(SHOW_INTERESTS_KEY);
+    const val = getItem(SHOW_INTERESTS_KEY);
     return val === null ? true : val === 'true';
   } catch {
     return true;
@@ -111,7 +112,7 @@ function getSavedShowInterests() {
 
 function getSavedShowTrending() {
   try {
-    const val = localStorage.getItem(SHOW_TRENDING_KEY);
+    const val = getItem(SHOW_TRENDING_KEY);
     return val === null ? true : val === 'true';
   } catch {
     return true;
@@ -120,7 +121,7 @@ function getSavedShowTrending() {
 
 function getSavedShowProfileStats() {
   try {
-    const val = localStorage.getItem(SHOW_PROFILE_STATS_KEY);
+    const val = getItem(SHOW_PROFILE_STATS_KEY);
     return val === null ? true : val === 'true';
   } catch {
     return true;
@@ -129,40 +130,40 @@ function getSavedShowProfileStats() {
 
 function getSavedShowToastNotifications() {
   try {
-    const val = localStorage.getItem(SHOW_TOAST_NOTIFS_KEY);
+    const val = getItem(SHOW_TOAST_NOTIFS_KEY);
     if (val !== null) return val === 'true';
     // Migración desde la antigua key fc_show_live_notifications
-    const oldVal = localStorage.getItem('fc_show_live_notifications');
+    const oldVal = getItem('fc_show_live_notifications');
     const defaultVal = oldVal !== null ? oldVal === 'true' : true;
-    localStorage.setItem(SHOW_TOAST_NOTIFS_KEY, String(defaultVal));
+    setItem(SHOW_TOAST_NOTIFS_KEY, String(defaultVal));
     return defaultVal;
   } catch { return true; }
 }
 
 function getSavedShowPushNotifications() {
   try {
-    const val = localStorage.getItem(SHOW_PUSH_NOTIFS_KEY);
+    const val = getItem(SHOW_PUSH_NOTIFS_KEY);
     return val === null ? false : val === 'true';
   } catch { return false; }
 }
 
 function getSavedShowLikes() {
   try {
-    const val = localStorage.getItem(SHOW_LIKES_KEY);
+    const val = getItem(SHOW_LIKES_KEY);
     return val === null ? false : val === 'true';
   } catch { return false; }
 }
 
 function getSavedFilterEncrypted() {
   try {
-    const val = localStorage.getItem(FILTER_ENCRYPTED_KEY);
+    const val = getItem(FILTER_ENCRYPTED_KEY);
     return val === null ? true : val === 'true';
   } catch { return true; }
 }
 
 function getSavedAllowMention() {
   try {
-    const val = localStorage.getItem(ALLOW_MENTION_KEY);
+    const val = getItem(ALLOW_MENTION_KEY);
     return val === null ? true : val === 'true';
   } catch { return true; }
 }
@@ -170,16 +171,16 @@ function getSavedAllowMention() {
 function getSavedAllowEncryptedAdd() {
   try {
     // Si filterEncrypted está activo, allowEncryptedAdd siempre es false
-    const filterVal = localStorage.getItem(FILTER_ENCRYPTED_KEY);
+    const filterVal = getItem(FILTER_ENCRYPTED_KEY);
     if (filterVal === null || filterVal === 'true') return false;
-    const val = localStorage.getItem(ALLOW_ENCRYPTED_ADD_KEY);
+    const val = getItem(ALLOW_ENCRYPTED_ADD_KEY);
     return val === 'true';
   } catch { return false; }
 }
 
 function getSavedHour24() {
   try {
-    const val = localStorage.getItem(HOUR24_KEY);
+    const val = getItem(HOUR24_KEY);
     return val === null ? true : val === 'true';
   } catch { return true; }
 }
@@ -259,112 +260,112 @@ export function I18nProvider({ children }) {
   const setLocale = useCallback((newLocale) => {
     setLocaleState(newLocale);
     try {
-      localStorage.setItem(LOCALE_KEY, newLocale);
+      setItem(LOCALE_KEY, newLocale);
     } catch {}
   }, []);
 
   const setShowAccent = useCallback((value) => {
     setShowAccentState(value);
     try {
-      localStorage.setItem(ACCENT_KEY, String(value));
+      setItem(ACCENT_KEY, String(value));
     } catch {}
   }, []);
 
   const setShowAccentProfile = useCallback((value) => {
     setShowAccentProfileState(value);
     try {
-      localStorage.setItem(ACCENT_PROFILE_KEY, String(value));
+      setItem(ACCENT_PROFILE_KEY, String(value));
     } catch {}
   }, []);
 
   const setShowAccentExplore = useCallback((value) => {
     setShowAccentExploreState(value);
     try {
-      localStorage.setItem(ACCENT_EXPLORE_KEY, String(value));
+      setItem(ACCENT_EXPLORE_KEY, String(value));
     } catch {}
   }, []);
 
   const setAccentVisibility = useCallback((value) => {
     setAccentVisibilityState(value);
     try {
-      localStorage.setItem(ACCENT_VISIBILITY_KEY, value);
+      setItem(ACCENT_VISIBILITY_KEY, value);
     } catch {}
   }, []);
 
   const setShowInterests = useCallback((value) => {
     setShowInterestsState(value);
     try {
-      localStorage.setItem(SHOW_INTERESTS_KEY, String(value));
+      setItem(SHOW_INTERESTS_KEY, String(value));
     } catch {}
   }, []);
 
   const setShowTrending = useCallback((value) => {
     setShowTrendingState(value);
     try {
-      localStorage.setItem(SHOW_TRENDING_KEY, String(value));
+      setItem(SHOW_TRENDING_KEY, String(value));
     } catch {}
   }, []);
 
   const setShowProfileStats = useCallback((value) => {
     setShowProfileStatsState(value);
     try {
-      localStorage.setItem(SHOW_PROFILE_STATS_KEY, String(value));
+      setItem(SHOW_PROFILE_STATS_KEY, String(value));
     } catch {}
   }, []);
 
   const setShowToastNotifications = useCallback((value) => {
     setShowToastNotificationsState(value);
     try {
-      localStorage.setItem(SHOW_TOAST_NOTIFS_KEY, String(value));
+      setItem(SHOW_TOAST_NOTIFS_KEY, String(value));
     } catch {}
   }, []);
 
   const setShowPushNotifications = useCallback((value) => {
     setShowPushNotificationsState(value);
     try {
-      localStorage.setItem(SHOW_PUSH_NOTIFS_KEY, String(value));
+      setItem(SHOW_PUSH_NOTIFS_KEY, String(value));
     } catch {}
   }, []);
 
   const setShowLikes = useCallback((value) => {
     setShowLikesState(value);
     try {
-      localStorage.setItem(SHOW_LIKES_KEY, String(value));
+      setItem(SHOW_LIKES_KEY, String(value));
     } catch {}
   }, []);
 
   const setFilterEncrypted = useCallback((value) => {
     setFilterEncryptedState(value);
     try {
-      localStorage.setItem(FILTER_ENCRYPTED_KEY, String(value));
+      setItem(FILTER_ENCRYPTED_KEY, String(value));
     } catch {}
   }, []);
 
   const setAllowMention = useCallback((value) => {
     setAllowMentionState(value);
     try {
-      localStorage.setItem(ALLOW_MENTION_KEY, String(value));
+      setItem(ALLOW_MENTION_KEY, String(value));
     } catch {}
   }, []);
 
   const setAllowEncryptedAdd = useCallback((value) => {
     setAllowEncryptedAddState(value);
     try {
-      localStorage.setItem(ALLOW_ENCRYPTED_ADD_KEY, String(value));
+      setItem(ALLOW_ENCRYPTED_ADD_KEY, String(value));
     } catch {}
   }, []);
 
   const setHour24 = useCallback((value) => {
     setHour24State(value);
     try {
-      localStorage.setItem(HOUR24_KEY, String(value));
+      setItem(HOUR24_KEY, String(value));
     } catch {}
   }, []);
 
   const setTheme = useCallback((newTheme) => {
     setThemeState(newTheme);
     try {
-      localStorage.setItem(THEME_KEY, newTheme);
+      setItem(THEME_KEY, newTheme);
     } catch {}
   }, []);
 

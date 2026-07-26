@@ -40,6 +40,7 @@ import { uploadImage, uploadWithLocalPreview } from '../services/cdnService';
 import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/chat.css';
 import '../Resources/Styles/explore.css';
+import { getItem, setItem, removeItem, getSessionItem, setSessionItem, removeSessionItem } from '../services/secureStorage';
 
 export default function Chat() {
   const { t, locale } = useI18n();
@@ -107,11 +108,7 @@ export default function Chat() {
   const [emojiPickerMsgId, setEmojiPickerMsgId] = useState(null);
   const [emojiPickerPos, setEmojiPickerPos] = useState({ x: 0, y: 0 });
   const [emojiTab, setEmojiTab] = useState(0);
-  const [recentEmojis, setRecentEmojis] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('chatRecentEmojis') || '[]');
-    } catch { return []; }
-  });
+  const [recentEmojis, setRecentEmojis] = useState([]);
   const emojiPickerRef = useRef(null);
 
   // Categorized emojis for reactions
@@ -239,8 +236,8 @@ export default function Chat() {
   const getSessionCacheKey = () => `chatMessagesCache_${user?.id || 'anon'}`;
   const loadCacheFromSession = () => {
     try {
-      const saved = sessionStorage.getItem(getSessionCacheKey());
-      if (saved) return JSON.parse(saved);
+      const saved = getSessionItem(getSessionCacheKey());
+      if (saved) return saved;
     } catch {}
     return {};
   };
@@ -255,11 +252,11 @@ export default function Chat() {
           trimmed[convId] = msgs.length > 200 ? msgs.slice(msgs.length - 200) : msgs;
         }
       }
-      sessionStorage.setItem(getSessionCacheKey(), JSON.stringify(trimmed));
+      setSessionItem(getSessionCacheKey(), trimmed);
     } catch (e) {
       // sessionStorage quota exceeded — clear cache
       if (e.name === 'QuotaExceededError' || e.code === 22) {
-        try { sessionStorage.removeItem(getSessionCacheKey()); } catch {}
+        try { removeSessionItem(getSessionCacheKey()); } catch {}
       }
     }
   };
@@ -278,7 +275,7 @@ export default function Chat() {
 
     if (isReload) {
       console.log('[SCROLL-DEBUG] Navigation reload detected - clearing chat session cache before restore');
-      try { sessionStorage.removeItem(getSessionCacheKey()); } catch (e) {}
+      try { removeSessionItem(getSessionCacheKey()); } catch (e) {}
       messagesCacheRef.current = {};
     } else {
       const restored = loadCacheFromSession();
@@ -294,17 +291,17 @@ export default function Chat() {
   const getConvsSessionCacheKey = () => `chatConvsCache_${user?.id || 'anon'}`;
   const loadConvsFromSession = () => {
     try {
-      const saved = sessionStorage.getItem(getConvsSessionCacheKey());
-      if (saved) return JSON.parse(saved);
+      const saved = getSessionItem(getConvsSessionCacheKey());
+      if (saved) return saved;
     } catch {}
     return [];
   };
   const saveConvsToSession = (convs) => {
     try {
-      sessionStorage.setItem(getConvsSessionCacheKey(), JSON.stringify(convs));
+      setSessionItem(getConvsSessionCacheKey(), convs);
     } catch (e) {
       if (e.name === 'QuotaExceededError' || e.code === 22) {
-        try { sessionStorage.removeItem(getConvsSessionCacheKey()); } catch {}
+        try { removeSessionItem(getConvsSessionCacheKey()); } catch {}
       }
     }
   };
@@ -321,7 +318,7 @@ export default function Chat() {
     } catch (e) { /* ignore */ }
 
     if (isReload) {
-      try { sessionStorage.removeItem(getConvsSessionCacheKey()); } catch (e) {}
+      try { removeSessionItem(getConvsSessionCacheKey()); } catch (e) {}
     } else {
       const savedConvs = loadConvsFromSession();
       if (savedConvs.length > 0) {
@@ -633,9 +630,15 @@ export default function Chat() {
     };
   }, [activeConvId, user?.id]);
 
-  // ── Persist recent emojis to localStorage ──
+  // ── Load stored emojis on mount, persist on change ──
   useEffect(() => {
-    localStorage.setItem('chatRecentEmojis', JSON.stringify(recentEmojis));
+    const stored = getItem('chatRecentEmojis');
+    if (Array.isArray(stored) && stored.length > 0) {
+      setRecentEmojis(stored);
+    }
+  }, []);
+  useEffect(() => {
+    setItem('chatRecentEmojis', recentEmojis);
   }, [recentEmojis]);
 
   // Sync messages cache on every update (realtime, delete, edit, etc.)
@@ -837,20 +840,16 @@ export default function Chat() {
     setContextMenu({ open: true, x: pos.x, y: pos.y, convId });
   }, [getSmartMenuPosition]);
 
-  const [hiddenConvIds, setHiddenConvIds] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem('hiddenConvIds') || '[]');
-    } catch { return []; }
-  });
+  const [hiddenConvIds, setHiddenConvIds] = useState([]);
 
   // Filter out hidden conversations from the list (but keep them in the full state for cache)
   const visibleConversations = React.useMemo(() => {
     return conversations.filter(c => !hiddenConvIds.includes(c.id));
   }, [conversations, hiddenConvIds]);
 
-  // Persist hidden IDs to localStorage
+  // Persist hidden IDs
   useEffect(() => {
-    localStorage.setItem('hiddenConvIds', JSON.stringify(hiddenConvIds));
+    setItem('hiddenConvIds', hiddenConvIds);
   }, [hiddenConvIds]);
 
   const handleDeleteConversation = useCallback(() => {

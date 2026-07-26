@@ -1,4 +1,5 @@
 import { supabase } from './supabaseclient';
+import { getItem, setItem, removeItem } from './secureStorage';
 
 /**
  * Block a user
@@ -130,7 +131,7 @@ function notifyBlockChanged() {
 export function cacheBlockStatus(blockerId, blockedId, isBlocked, skipNotify = false) {
   try {
     const key = BLOCK_CACHE_PREFIX + blockerId + '_' + blockedId;
-    localStorage.setItem(key, isBlocked ? '1' : '0');
+    setItem(key, isBlocked);
     if (!skipNotify) {
       notifyBlockChanged();
     }
@@ -146,9 +147,9 @@ export function cacheBlockStatus(blockerId, blockedId, isBlocked, skipNotify = f
 export function getCachedBlockStatus(blockerId, blockedId) {
   try {
     const key = BLOCK_CACHE_PREFIX + blockerId + '_' + blockedId;
-    const val = localStorage.getItem(key);
-    if (val === '1') return true;
-    if (val === '0') return false;
+    const val = getItem(key);
+    if (val === true) return true;
+    if (val === false) return false;
     return null;
   } catch {
     return null;
@@ -163,7 +164,7 @@ export function getCachedBlockStatus(blockerId, blockedId) {
 export function clearCachedBlockStatus(blockerId, blockedId) {
   try {
     const key = BLOCK_CACHE_PREFIX + blockerId + '_' + blockedId;
-    localStorage.removeItem(key);
+    removeItem(key);
   } catch {}
 }
 
@@ -271,17 +272,16 @@ const BLOCKED_LISTS_TTL = 1000 * 60 * 5; // 5 minutos
 function setCachedBlockedIds(userId, ids) {
   try {
     const key = BLOCKED_IDS_CACHE_PREFIX + userId;
-    localStorage.setItem(key, JSON.stringify({ ts: Date.now(), ttl: BLOCKED_LISTS_TTL, ids }));
+    setItem(key, { ts: Date.now(), ttl: BLOCKED_LISTS_TTL, ids });
   } catch {}
 }
 
 function getCachedBlockedIds(userId) {
   try {
-    const raw = localStorage.getItem(BLOCKED_IDS_CACHE_PREFIX + userId);
-    if (!raw) return null;
-    const p = JSON.parse(raw);
+    const p = getItem(BLOCKED_IDS_CACHE_PREFIX + userId);
+    if (!p) return null;
     if (Date.now() - p.ts > (p.ttl || BLOCKED_LISTS_TTL)) {
-      localStorage.removeItem(BLOCKED_IDS_CACHE_PREFIX + userId);
+      removeItem(BLOCKED_IDS_CACHE_PREFIX + userId);
       return null;
     }
     return p.ids || null;
@@ -291,17 +291,16 @@ function getCachedBlockedIds(userId) {
 function setCachedBlockedMeIds(userId, ids) {
   try {
     const key = BLOCKED_ME_IDS_CACHE_PREFIX + userId;
-    localStorage.setItem(key, JSON.stringify({ ts: Date.now(), ttl: BLOCKED_LISTS_TTL, ids }));
+    setItem(key, { ts: Date.now(), ttl: BLOCKED_LISTS_TTL, ids });
   } catch {}
 }
 
 function getCachedBlockedMeIds(userId) {
   try {
-    const raw = localStorage.getItem(BLOCKED_ME_IDS_CACHE_PREFIX + userId);
-    if (!raw) return null;
-    const p = JSON.parse(raw);
+    const p = getItem(BLOCKED_ME_IDS_CACHE_PREFIX + userId);
+    if (!p) return null;
     if (Date.now() - p.ts > (p.ttl || BLOCKED_LISTS_TTL)) {
-      localStorage.removeItem(BLOCKED_ME_IDS_CACHE_PREFIX + userId);
+      removeItem(BLOCKED_ME_IDS_CACHE_PREFIX + userId);
       return null;
     }
     return p.ids || null;
@@ -310,9 +309,9 @@ function getCachedBlockedMeIds(userId) {
 
 export function clearBlockedListsCache(userId) {
   try {
-    localStorage.removeItem(BLOCKED_IDS_CACHE_PREFIX + userId);
-    localStorage.removeItem(BLOCKED_ME_IDS_CACHE_PREFIX + userId);
-    localStorage.removeItem(BLOCKED_USERS_CACHE_PREFIX + userId);
+    removeItem(BLOCKED_IDS_CACHE_PREFIX + userId);
+    removeItem(BLOCKED_ME_IDS_CACHE_PREFIX + userId);
+    removeItem(BLOCKED_USERS_CACHE_PREFIX + userId);
   } catch {}
 }
 
@@ -324,19 +323,17 @@ function setCachedBlockedUsers(userId, data) {
   if (!userId) return;
   try {
     const payload = { ts: Date.now(), ttl: BLOCKED_USERS_TTL, data };
-    localStorage.setItem(BLOCKED_USERS_CACHE_PREFIX + userId, JSON.stringify(payload));
+    setItem(BLOCKED_USERS_CACHE_PREFIX + userId, payload);
   } catch {}
 }
 
 export function getCachedBlockedUsers(userId) {
   if (!userId) return null;
   try {
-    const raw = localStorage.getItem(BLOCKED_USERS_CACHE_PREFIX + userId);
-    if (!raw) return null;
-    const p = JSON.parse(raw);
+    const p = getItem(BLOCKED_USERS_CACHE_PREFIX + userId);
     if (!p || !p.ts) return null;
     if (Date.now() - p.ts > (p.ttl || BLOCKED_USERS_TTL)) {
-      localStorage.removeItem(BLOCKED_USERS_CACHE_PREFIX + userId);
+      removeItem(BLOCKED_USERS_CACHE_PREFIX + userId);
       return null;
     }
     return p.data || null;

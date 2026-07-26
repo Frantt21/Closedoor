@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { getItem, setItem, removeItem } from './secureStorage';
 
 const rawSupabaseUrl =
   import.meta.env.VITE_SUPABASE_URL ||
@@ -32,4 +33,29 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
   );
 }
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+/**
+ * Custom storage adapter que cifra el token de auth de Supabase
+ * usando nuestro secureStorage en vez de localStorage plano.
+ * El token aún usa la key `sb-{project-ref}-auth-token` pero el valor
+ * queda cifrado (base64 en vez de JSON legible).
+ */
+const secureSupabaseStorage = {
+  getItem(key) {
+    return getItem(key);
+  },
+  setItem(key, value) {
+    setItem(key, value);
+  },
+  removeItem(key) {
+    removeItem(key);
+  },
+};
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    storage: secureSupabaseStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+  },
+});
