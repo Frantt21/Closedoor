@@ -65,7 +65,7 @@ import PostCard from "../Resources/Components/PostCard";
 import CreatePostModal from "../Resources/Components/CreatePostModal";
 import FloatingActionButton from "../Resources/Components/FloatingActionButton";
 import { toast } from 'react-toastify';
-import { normalizeCdnUrl } from '../services/cdnService';
+import { normalizeCdnUrl, getCdnUrl } from '../services/cdnService';
 
 function Profile() {
     const { t, showAccent, accentVisibility, showLikes, filterEncrypted, locale } = useI18n();
@@ -1622,8 +1622,8 @@ function Profile() {
                     onClose={() => setShowModal(false)}
                     onSave={handleSaveProfile}
                     initialUsername={modalUsername}
-                    initialAvatar={normalizeCdnUrl(modalAvatar)}
-                    initialBanner={normalizeCdnUrl(modalBanner)}
+                    initialAvatar={normalizeCdnUrl(modalAvatar) || ''}
+                    initialBanner={normalizeCdnUrl(modalBanner) || ''}
                     initialBio={modalBio}
                     initialSocialLinks={modalSocialLinks}
                     initialAccentColor={modalAccentColor}

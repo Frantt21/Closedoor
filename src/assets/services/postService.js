@@ -1,5 +1,26 @@
 import { supabase } from './supabaseclient';
 import { getItem, setItem, removeItem, clearAll } from './secureStorage';
+import { getCdnUrl } from './cdnService';
+
+/**
+ * Normaliza URLs del CDN en objetos de post devueltos por Supabase.
+ * Convierte URLs absolutas HTTP a rutas relativas para evitar Mixed Content.
+ *
+ * ⚠️ Usa getCdnUrl() en vez de normalizeCdnUrl() para NO romper URLs externas
+ *    como GIPHY, Tenor, etc. (getCdnUrl solo modifica URLs que empiezan con /cdn/).
+ */
+function normalizePostUrls(post) {
+  if (!post) return post;
+  if (post.image_url) post.image_url = getCdnUrl(post.image_url);
+  if (post.video_url) post.video_url = getCdnUrl(post.video_url);
+  if (Array.isArray(post.image_urls)) {
+    post.image_urls = post.image_urls.map(u => getCdnUrl(u));
+  }
+  if (post.profiles) {
+    if (post.profiles.avatar_url) post.profiles.avatar_url = getCdnUrl(post.profiles.avatar_url);
+  }
+  return post;
+}
 
 // ── POSTS ──
 
@@ -116,6 +137,7 @@ export async function getPosts({ userId, profileUserId, limit = 20, offset = 0 }
     console.error('Error fetching posts:', error);
     throw error;
   }
+  if (data) data.forEach(normalizePostUrls);
   return data || [];
 }
 
@@ -136,7 +158,7 @@ export async function getPost(postId) {
     console.error('Error fetching post:', error);
     throw error;
   }
-  return data;
+  return normalizePostUrls(data);
 }
 
 export async function updatePost(postId, updates) {
@@ -170,7 +192,7 @@ export async function updatePost(postId, updates) {
     console.error('Error updating post:', error);
     throw error;
   }
-  return data;
+  return normalizePostUrls(data);
 }
 
 export async function deletePost(postId) {
@@ -246,6 +268,9 @@ export async function getProfileContent(profileUserId, currentUserId, filterEncr
       item.profiles.is_private = item.profiles.is_private ?? false;
     }
   }
+
+  // Normalizar URLs en reposts también
+  repostItems.forEach(normalizePostUrls);
 
   // Deduplicar por post.id: si el usuario reposteó su propio post, evitar duplicado
   const seenIds = new Set();
@@ -391,7 +416,7 @@ export async function getFeed({ limit = 20, offset = 0, userId, filterEncrypted 
     console.error('Error fetching feed:', error);
     throw error;
   }
-  const posts = data || [];
+  const posts = (data || []).map(normalizePostUrls);
 
   // Si vino de cache, refrescar IDs y actualizar cache en background
   if (fromCache && userId) {
@@ -1239,6 +1264,7 @@ export async function getScheduledPosts(userId, { limit = 50, offset = 0 } = {})
     console.error('Error fetching scheduled posts:', error);
     return [];
   }
+  if (data) data.forEach(normalizePostUrls);
   return data || [];
 }
 

@@ -1,5 +1,25 @@
 import { supabase } from './supabaseclient';
 import { getItem, setItem, removeItem } from './secureStorage';
+import { getCdnUrl } from './cdnService';
+
+/**
+ * Normaliza TODAS las URLs del CDN en un objeto profile para garantizar
+ * que sean rutas relativas (/cdn/files/xxx) y nunca HTTP directo.
+ * Se aplica en cada respuesta de Supabase para eliminar Mixed Content de raíz.
+ *
+ * ⚠️ Usa getCdnUrl() en vez de normalizeCdnUrl() para NO romper URLs externas
+ *    (getCdnUrl solo modifica URLs que empiezan con /cdn/).
+ */
+function normalizeProfileUrls(profile) {
+  if (!profile) return profile;
+  const fields = ['avatar_url', 'banner_url', 'profile_background_url'];
+  for (const field of fields) {
+    if (profile[field]) {
+      profile[field] = getCdnUrl(profile[field]);
+    }
+  }
+  return profile;
+}
 
 /**
  * Get email by username
@@ -178,7 +198,10 @@ export async function getUserProfile(userId) {
       throw error;
     }
 
-    if (data) setCachedProfile(data);
+    if (data) {
+      normalizeProfileUrls(data);
+      setCachedProfile(data);
+    }
     return data;
   } catch (err) {
     console.error('Fetch profile error:', err);
@@ -208,6 +231,7 @@ export async function getUserProfileByUsername(username) {
     }
 
     if (data) {
+      normalizeProfileUrls(data);
       setCachedProfile(data);
       setCachedProfileByUsername(username, data);
     }
@@ -249,6 +273,8 @@ export async function searchProfiles(query, excludeUserId, limit = 10) {
       console.error('Error searching profiles:', error);
       return [];
     }
+    // Normalizar URLs del CDN en resultados de búsqueda
+    if (data) data.forEach(normalizeProfileUrls);
     return data || [];
   } catch (err) {
     console.error('Search profiles error:', err);
@@ -275,6 +301,8 @@ export async function listProfiles(excludeUserId, limit = 50) {
       throw error;
     }
 
+    // Normalizar URLs del CDN en todos los perfiles listados
+    if (data) data.forEach(normalizeProfileUrls);
     return data || [];
   } catch (err) {
     console.error('List profiles error:', err);

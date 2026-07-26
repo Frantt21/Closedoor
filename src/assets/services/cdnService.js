@@ -200,11 +200,11 @@ export async function deleteImage(imageId) {
  *
  *   http://api.foranly.space:24587/cdn/files/xxx → /cdn/files/xxx
  *
- * También asegura que URLs que ya son relativas pero sin /cdn/ prefix
- * se normalicen igualmente (p.ej. un ID suelto).
+ * ⚠️ SIEMPRE devuelve un string (nunca undefined/null) para evitar que
+ *    componentes llamen .trim() sobre undefined y lancen TypeError.
  */
 export function normalizeCdnUrl(url) {
-  if (!url) return url;
+  if (!url) return ''; // ← devolver '' en vez del valor falsy
   // Si es una URL absoluta HTTP/HTTPS, extraer solo el path relativo
   try {
     const parsed = new URL(url);

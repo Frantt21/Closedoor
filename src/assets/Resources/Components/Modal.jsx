@@ -70,13 +70,16 @@ export default function Modal({
 }) {
   const { t } = useI18n();
   const { user } = useAuth();
-  const [username, setUsername] = useState(initialUsername);
-  const [banner, setBanner] = useState(initialBanner);
-  const [avatar, setAvatar] = useState(initialAvatar);
-  const [bio, setBio] = useState(initialBio);
-  const [pronouns, setPronouns] = useState(initialPronouns);
-  const [bannerCredits, setBannerCredits] = useState(initialBannerCredits);
-  const [avatarCredits, setAvatarCredits] = useState(initialAvatarCredits);
+  // ── Estados inicializados con fallback '' para prevenir
+  //    TypeError: Cannot read properties of undefined (reading 'trim')
+  //    cuando normalizeCdnUrl devuelve '' o el prop no llega a tiempo.
+  const [username, setUsername] = useState(initialUsername || '');
+  const [banner, setBanner] = useState(initialBanner || '');
+  const [avatar, setAvatar] = useState(initialAvatar || '');
+  const [bio, setBio] = useState(initialBio || '');
+  const [pronouns, setPronouns] = useState(initialPronouns || '');
+  const [bannerCredits, setBannerCredits] = useState(initialBannerCredits || '');
+  const [avatarCredits, setAvatarCredits] = useState(initialAvatarCredits || '');
   const [saving, setSaving] = useState(false);
   const [socialLinks, setSocialLinks] = useState([]);
   const [newSocial, setNewSocial] = useState('');
