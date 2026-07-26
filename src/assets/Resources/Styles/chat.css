@@ -957,6 +957,25 @@
     white-space: nowrap;
 }
 
+.chat-media-preview-uploading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    padding: 4px 0;
+    color: var(--color-text-muted, #6b7280);
+}
+
+.chat-media-preview-uploading .fc-spin {
+    animation: fcSpin 0.8s linear infinite;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+}
+
+@keyframes fcSpin {
+    to { transform: rotate(360deg); }
+}
+
 .chat-media-preview-remove {
     display: flex;
     align-items: center;
