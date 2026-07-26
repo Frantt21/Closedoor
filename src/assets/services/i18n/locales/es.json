@@ -64,6 +64,7 @@
   "chat.select_chat": "Selecciona una conversación para empezar a chatear",
   "chat.send_error": "Error al enviar el mensaje",
   "chat.title": "Chat",
+  "chat.waiting_upload": "Espera a que la imagen termine de subirse",
   "chat.typing": "escribiendo...",
   "chat.view_profile": "Ver perfil",
   "chat.input_blocked_by_me": "Bloqueaste a este usuario. No puedes enviar mensajes.",

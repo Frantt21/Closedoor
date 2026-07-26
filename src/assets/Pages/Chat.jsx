@@ -36,7 +36,7 @@ import RichText from '../Resources/Components/RichText';
 import SafeImage from '../Resources/Components/SafeImage';
 import { toast } from 'react-toastify';
 import { supabase } from '../services/supabaseclient';
-import { uploadImage, uploadWithLocalPreview } from '../services/cdnService';
+import { uploadImage } from '../services/cdnService';
 import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/chat.css';
 import '../Resources/Styles/explore.css';
@@ -66,9 +66,6 @@ export default function Chat() {
   const sendingRef = useRef(false);
   // Keep sendingRef in sync
   useEffect(() => { sendingRef.current = sending; }, [sending]);
-  // ── Ref to track in-flight uploads so handleSend can wait for them ──
-  const uploadPromiseRef = useRef(null);
-
   // New conversation
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -713,21 +710,10 @@ export default function Chat() {
     setShowProfileCard(false);
   };
 
-  // ── Send message — espera a que la imagen termine de subirse si hay upload en curso ──
+  // ── Send message — solo enviar si no hay subida en curso ──
   const handleSend = async () => {
-    // Si hay una subida en curso, obtener la URL real directamente de la promesa
-    // en vez de confiar en `mediaPreviewUrl` (que aún es el blob URL en este closure)
-    if (uploadPromiseRef.current) {
-      // Capturar la promesa AHORA (no después del await) porque
-      // handleChatMediaUpload puede limpiar uploadPromiseRef.current
-      // ANTES de que esta continuación se ejecute
-      const uploadPromise = uploadPromiseRef.current;
-      const realUrl = await uploadPromise;
-      const trimmed = inputValue.trim();
-      if (!trimmed && !realUrl) return;
-      const content = trimmed ? `${trimmed}\n${realUrl}` : realUrl;
-      if (realUrl) setMediaPreviewUrl('');
-      await sendContent(content, { clearInput: true });
+    if (uploadingChatMedia) {
+      toast.info(t('chat.waiting_upload') || 'Espera a que la imagen termine de subirse');
       return;
     }
     const trimmed = inputValue.trim();
@@ -737,7 +723,6 @@ export default function Chat() {
       ? (trimmed ? `${trimmed}\n${mediaPreviewUrl}` : mediaPreviewUrl)
       : trimmed;
     // Clear preview IMMEDIATELY (optimistic) BEFORE the async sendContent
-    // This prevents the preview container from lingering during the send
     if (hasPreview) setMediaPreviewUrl('');
     await sendContent(content, { clearInput: true });
   };
@@ -1083,7 +1068,7 @@ export default function Chat() {
     setTimeout(() => inputRef.current?.focus(), 50);
   }, [mediaUrl]);
 
-  // ── Upload image file to CDN for chat ──
+  // ── Upload image file to CDN for chat (subida directa, sin blob) ──
   const handleChatMediaUpload = useCallback(async (e) => {
     const file = e.target.files?.[0];
     if (!file || !user?.id) return;
@@ -1094,21 +1079,17 @@ export default function Chat() {
     }
 
     setUploadingChatMedia(true);
+    setMediaPreviewUrl('');
+    setShowMediaInput(false);
     const toastId = toast.loading(t('upload.uploading') || 'Subiendo imagen...');
 
     try {
-      // Mostrar preview local instantáneo mientras se sube en background
-      const { localUrl, realUrlPromise } = uploadWithLocalPreview(file, user.id, 'chat');
-      // Guardar la promise para que handleSend pueda esperarla si el usuario presiona Enter antes de que termine
-      uploadPromiseRef.current = realUrlPromise;
-      setMediaPreviewUrl(localUrl);
-      setShowMediaInput(false);
-      setTimeout(() => inputRef.current?.focus(), 50);
+      const result = await uploadImage(file, user.id, 'chat');
+      const realUrl = result.url || '';
+      if (!realUrl) throw new Error('Upload returned empty URL');
 
-      // Esperar subida real en background y reemplazar URL
-      const realUrl = await realUrlPromise;
-      uploadPromiseRef.current = null;
       setMediaPreviewUrl(realUrl);
+      setTimeout(() => inputRef.current?.focus(), 50);
 
       toast.update(toastId, {
         render: t('upload.uploaded') || 'Imagen subida',
@@ -1118,6 +1099,7 @@ export default function Chat() {
       });
     } catch (err) {
       console.error('CDN upload error:', err);
+      setMediaPreviewUrl('');
       toast.update(toastId, {
         render: err.message || 'Upload failed',
         type: 'error',
@@ -1125,8 +1107,7 @@ export default function Chat() {
         autoClose: 3000,
       });
     } finally {
-      setUploadingChatMedia(false); // solo habilitar send cuando tenemos URL real
-      uploadPromiseRef.current = null;
+      setUploadingChatMedia(false);
       e.target.value = '';
     }
   }, [user?.id, t]);
