@@ -3,6 +3,7 @@ import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 import ogTagsPlugin from './plugins/ogTagsPlugin'
 import preloadRouteChunks from './plugins/preloadRouteChunks'
+import inlineCssPlugin from './plugins/inlineCssPlugin'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -48,6 +49,7 @@ export default defineConfig({
   plugins: [
     ogTagsPlugin(),
     preloadRouteChunks(),
+    inlineCssPlugin(),
     react(),
     babel({ presets: [reactCompilerPreset()] })
   ],

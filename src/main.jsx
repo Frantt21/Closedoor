@@ -6,6 +6,11 @@ import { AuthProvider } from './context/AuthContext'
 import { NotificationProvider } from './context/NotificationContext'
 import './assets/Resources/Styles/global.css'
 
+// ── Hide the pre-rendered hero placeholder as soon as JS executes ──
+// This makes the LCP element visible immediately (before React mounts),
+// and hides it once the app is ready to render the real Home component.
+document.documentElement.classList.add('js-ready');
+
 // Fix mobile viewport height when virtual keyboard opens.
 // Sets a CSS variable `--app-height` to the current viewport height (px).
 function setAppHeight() {
