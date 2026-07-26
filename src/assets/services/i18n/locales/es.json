@@ -495,5 +495,13 @@
   "settings.title": "Ajustes",
   "trending.empty": "No hay tendencias en este momento.",
   "trending.title": "Tendencias",
-  "trending.various": "Varios"
+  "trending.various": "Varios",
+  "upload.uploading": "Subiendo imagen...",
+  "upload.uploaded": "Imagen subida",
+  "common.undo": "Deshacer",
+  "post.block_user": "Bloquear usuario",
+  "post.report": "Reportar",
+  "post.user_blocked": "Usuario @{user} bloqueado",
+  "post.user_unblocked": "Usuario desbloqueado",
+  "post.undo_block_error": "Error al deshacer bloqueo"
 }

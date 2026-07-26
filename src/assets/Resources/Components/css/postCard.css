@@ -732,15 +732,11 @@
     .post-card-action--save {
         display: none;
     }
-
-    .post-card-menu--non-owner .post-card-menu-btn {
-        display: flex;
-    }
 }
 
 @media (min-width: 1025px) {
     .post-card-menu--non-owner .post-card-menu-btn {
-        display: none;
+        display: flex;
     }
 }
 

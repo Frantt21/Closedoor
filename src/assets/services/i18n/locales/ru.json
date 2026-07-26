@@ -492,5 +492,16 @@
   "settings.title": "Настройки",
   "trending.empty": "Сейчас нет трендов.",
   "trending.title": "Тренды",
-  "trending.various": "Разное"
+  "trending.various": "Разное",
+  "chat.waiting_upload": "Пожалуйста, дождитесь завершения загрузки изображения",
+  "chat.input_blocked_by_me": "Вы заблокировали этого пользователя. Вы не можете отправлять сообщения.",
+  "chat.input_blocked_by_them": "Этот пользователь заблокировал вас. Вы не можете отправлять сообщения.",
+  "upload.uploading": "Загрузка изображения...",
+  "upload.uploaded": "Изображение загружено",
+  "common.undo": "Отменить",
+  "post.block_user": "Заблокировать пользователя",
+  "post.report": "Пожаловаться",
+  "post.user_blocked": "Пользователь @{user} заблокирован",
+  "post.user_unblocked": "Пользователь разблокирован",
+  "post.undo_block_error": "Ошибка отмены блокировки"
 }

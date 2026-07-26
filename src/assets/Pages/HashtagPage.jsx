@@ -108,6 +108,12 @@ export default function HashtagPage() {
     clearFeedCache('hashtag_' + decodedTag);
   };
 
+  const handleBlockUser = (blockedUserId) => {
+    if (!blockedUserId) return;
+    setPosts((prev) => prev.filter((p) => p.user_id !== blockedUserId));
+    clearFeedCache('hashtag_' + decodedTag);
+  };
+
   return (
     <div className="post-detail-page">
       <div className="hashtag-header">
@@ -158,6 +164,7 @@ export default function HashtagPage() {
               onLikeToggle={handleLikeToggle}
               onDislikeToggle={handleDislikeToggle}
               onRepostToggle={handleRepostToggle}
+              onBlockUser={handleBlockUser}
             />
           ))}
         </div>

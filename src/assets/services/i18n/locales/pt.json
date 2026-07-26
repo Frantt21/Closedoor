@@ -492,5 +492,16 @@
   "settings.title": "Configurações",
   "trending.empty": "Nenhuma tendência no momento.",
   "trending.title": "Tendências",
-  "trending.various": "Vários"
+  "trending.various": "Vários",
+  "chat.waiting_upload": "Aguarde a imagem terminar de enviar",
+  "chat.input_blocked_by_me": "Você bloqueou este usuário. Não pode enviar mensagens.",
+  "chat.input_blocked_by_them": "Este usuário bloqueou você. Não pode enviar mensagens.",
+  "upload.uploading": "Enviando imagem...",
+  "upload.uploaded": "Imagem enviada",
+  "common.undo": "Desfazer",
+  "post.block_user": "Bloquear usuário",
+  "post.report": "Denunciar",
+  "post.user_blocked": "Usuário @{user} bloqueado",
+  "post.user_unblocked": "Usuário desbloqueado",
+  "post.undo_block_error": "Erro ao desfazer bloqueio"
 }

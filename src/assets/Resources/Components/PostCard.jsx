@@ -38,7 +38,7 @@ import { DEFAULT_AVATAR, getTimeAgo, getEmbedUrl as getEmbedUrlHelper, isVideoUr
 import { supabase } from '../../services/supabaseclient';
 import { getOrCreateConversation, sendMessage } from '../../services/chatService';
 import { getFollowing } from '../../services/followService';
-import { isBlocked, getCachedBlockStatus, blockUser, cacheBlockStatus } from '../../services/blockService';
+import { isBlocked, getCachedBlockStatus, blockUser, unblockUser, cacheBlockStatus, clearBlockedListsCache } from '../../services/blockService';
 import ConfirmModal from './ConfirmModal';
 import Tooltip from './Tooltip';
 import './css/postCard.css';
@@ -57,6 +57,7 @@ const PostCard = React.memo(function PostCard({
   onLikeToggle,
   onDislikeToggle,
   onRepostToggle,
+  onBlockUser,
   compact = false,
   fullContent = false,
   repostInfo = null,
@@ -875,7 +876,53 @@ const PostCard = React.memo(function PostCard({
                           try {
                             await blockUser(user.id, post.user_id);
                             cacheBlockStatus(user.id, post.user_id, true);
-                            toast.success(t('post.user_blocked') || 'Usuario bloqueado');
+                            clearBlockedListsCache(user.id);
+                            onBlockUser?.(post.user_id);
+                            const blockedUsername = post.profiles?.username || 'user';
+                            const undoBlock = async () => {
+                              try {
+                                await unblockUser(user.id, post.user_id);
+                                cacheBlockStatus(user.id, post.user_id, false);
+                                clearBlockedListsCache(user.id);
+                                toast.dismiss(toastId);
+                                toast.success(t('post.user_unblocked') || 'Usuario desbloqueado');
+                              } catch (err) {
+                                console.error('Error undoing block:', err);
+                                toast.error(t('post.undo_block_error') || 'Error al deshacer bloqueo');
+                              }
+                            };
+                            const toastId = toast(
+                              ({ closeToast }) => (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                  <span style={{ flex: 1 }}>{(t('post.user_blocked') || 'Usuario bloqueado').replace('{user}', blockedUsername)}</span>
+                                  <button
+                                    onClick={() => { undoBlock(); closeToast?.(); }}
+                                    style={{
+                                      background: 'var(--overlay-bg)',
+                                      border: '1px solid var(--color-border)',
+                                      borderRadius: 'var(--radius-sm, 6px)',
+                                      color: 'var(--color-text)',
+                                      cursor: 'pointer',
+                                      fontFamily: 'inherit',
+                                      fontSize: '0.8rem',
+                                      fontWeight: 600,
+                                      padding: '4px 10px',
+                                      whiteSpace: 'nowrap',
+                                      transition: 'background 0.12s ease',
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.background = 'var(--overlay-bg-hover)'}
+                                    onMouseLeave={(e) => e.currentTarget.style.background = 'var(--overlay-bg)'}
+                                  >
+                                    {t('common.undo') || 'Deshacer'}
+                                  </button>
+                                </div>
+                              ),
+                              {
+                                autoClose: 5000,
+                                closeOnClick: false,
+                                className: 'fc-toast',
+                              }
+                            );
                           } catch (err) {
                             console.error('Error blocking user:', err);
                           }

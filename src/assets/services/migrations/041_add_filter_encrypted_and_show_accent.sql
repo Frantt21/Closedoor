@@ -15,3 +15,4 @@ ALTER TABLE profiles ADD COLUMN IF NOT EXISTS show_accent BOOLEAN DEFAULT true;
 
 COMMENT ON COLUMN profiles.filter_encrypted IS 'Filter/hide encrypted/obfuscated posts from the feed. Default: true';
 COMMENT ON COLUMN profiles.show_accent IS 'Master toggle for accent colors on the profile. Default: true';
+ 

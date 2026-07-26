@@ -16,6 +16,7 @@ import {
   getDislikedPostIds,
   setCachedFeed,
   getCachedFeed,
+  clearFeedCache,
 } from '../services/postService';
 import PostCard from '../Resources/Components/PostCard';
 import CreatePostModal from '../Resources/Components/CreatePostModal';
@@ -206,6 +207,13 @@ function Home() {
         setPosts((prev) => prev.filter((p) => p.id !== postId));
     };
 
+    // ── Handle blocking a user: remove their posts from feed + clear cache ──
+    const handleBlockUser = (blockedUserId) => {
+        if (!blockedUserId) return;
+        setPosts((prev) => prev.filter((p) => p.user_id !== blockedUserId));
+        clearFeedCache('home_feed');
+    };
+
     return (
         <div>
             {!isAuthenticated ? (
@@ -271,6 +279,7 @@ function Home() {
                                 onLikeToggle={handleLikeToggle}
                                 onDislikeToggle={handleDislikeToggle}
                                 onRepostToggle={handleRepostToggle}
+                                onBlockUser={handleBlockUser}
                             />
                         ))
                     )}

@@ -492,5 +492,16 @@
   "settings.title": "設定",
   "trending.empty": "現在トレンドはありません。",
   "trending.title": "トレンド",
-  "trending.various": "その他"
+  "trending.various": "その他",
+  "chat.waiting_upload": "画像のアップロードが完了するまでお待ちください",
+  "chat.input_blocked_by_me": "このユーザーをブロックしました。メッセージを送信できません。",
+  "chat.input_blocked_by_them": "このユーザーにブロックされました。メッセージを送信できません。",
+  "upload.uploading": "画像をアップロード中...",
+  "upload.uploaded": "画像をアップロードしました",
+  "common.undo": "元に戻す",
+  "post.block_user": "ユーザーをブロック",
+  "post.report": "報告",
+  "post.user_blocked": "@{user}をブロックしました",
+  "post.user_unblocked": "ブロックを解除しました",
+  "post.undo_block_error": "ブロック解除エラー"
 }
