@@ -715,9 +715,20 @@ export default function Chat() {
 
   // ── Send message — espera a que la imagen termine de subirse si hay upload en curso ──
   const handleSend = async () => {
-    // Si hay una subida en curso, esperar a que termine para tener la URL real
+    // Si hay una subida en curso, obtener la URL real directamente de la promesa
+    // en vez de confiar en `mediaPreviewUrl` (que aún es el blob URL en este closure)
     if (uploadPromiseRef.current) {
-      await uploadPromiseRef.current;
+      // Capturar la promesa AHORA (no después del await) porque
+      // handleChatMediaUpload puede limpiar uploadPromiseRef.current
+      // ANTES de que esta continuación se ejecute
+      const uploadPromise = uploadPromiseRef.current;
+      const realUrl = await uploadPromise;
+      const trimmed = inputValue.trim();
+      if (!trimmed && !realUrl) return;
+      const content = trimmed ? `${trimmed}\n${realUrl}` : realUrl;
+      if (realUrl) setMediaPreviewUrl('');
+      await sendContent(content, { clearInput: true });
+      return;
     }
     const trimmed = inputValue.trim();
     const hasPreview = !!mediaPreviewUrl;
