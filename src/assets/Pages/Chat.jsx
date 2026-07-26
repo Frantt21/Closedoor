@@ -40,6 +40,7 @@ import { uploadImage } from '../services/cdnService';
 import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/chat.css';
 import '../Resources/Styles/explore.css';
+import '../Resources/Styles/post.css';
 import { getItem, setItem, removeItem, getSessionItem, setSessionItem, removeSessionItem } from '../services/secureStorage';
 
 export default function Chat() {
@@ -273,7 +274,6 @@ export default function Chat() {
     } catch (e) { /* ignore */ }
 
     if (isReload) {
-      console.log('[SCROLL-DEBUG] Navigation reload detected - clearing chat session cache before restore');
       try { removeSessionItem(getSessionCacheKey()); } catch (e) {}
       messagesCacheRef.current = {};
     } else {
@@ -374,16 +374,6 @@ export default function Chat() {
 
     const cacheLen = cached && Array.isArray(cached) ? cached.length : 0;
     const cacheMeta = cachedMeta?.hasMoreMessages;
-    console.log('[SCROLL-DEBUG] useLayoutEffect cache restore', {
-      hasCached: !!cached && Array.isArray(cached),
-      cacheLen,
-      cachedMetaHasMore: cacheMeta,
-      lastMsgAt: activeConv?.last_message_at,
-      fetchedAt: cachedMeta?.fetchedAt,
-      stale: cachedMeta?.fetchedAt ? new Date(activeConv?.last_message_at || 0) > new Date(cachedMeta.fetchedAt) : false,
-      INITIAL_BATCH_LIMIT
-    });
-
     if (cached && Array.isArray(cached)) {
       // Check if cache is stale by comparing with conv.last_message_at
       const activeConv = conversations.find(c => c.id === activeConvId);
@@ -391,7 +381,6 @@ export default function Chat() {
       const fetchedAt = cachedMeta?.fetchedAt;
 
       if (lastMsgAt && fetchedAt && new Date(lastMsgAt) > new Date(fetchedAt)) {
-        console.log('[SCROLL-DEBUG] Cache STALE - reloading from DB');
         // Cache is stale — reset pagination and reload from DB
         setMessages([]);
         setMsgsLoading(true);
@@ -406,22 +395,18 @@ export default function Chat() {
         // older messages exist. The first scroll-to-top queries the DB; if 0 results, it
         // self-corrects to false.
         if (cached.length > 0 && cachedMeta?.hasMoreMessages === false) {
-          console.log('[SCROLL-DEBUG] Override hasMoreMessages false -> true (restoring from cache)');
           setHasMoreMessages(true);
         } else {
           const newVal = cachedMeta?.hasMoreMessages ?? true;
-          console.log('[SCROLL-DEBUG] Restore hasMoreMessages from cache:', newVal);
           setHasMoreMessages(newVal);
         }
         // Compute oldestMessageDate from cached messages if meta doesn't have it (legacy format)
         const restoredDate = cachedMeta?.oldestMessageDate ?? (cached.length > 0 ? cached[0].created_at : null);
-        console.log('[SCROLL-DEBUG] Restore oldestMessageDate:', restoredDate);
         setOldestMessageDate(restoredDate);
         // Signal the message loading useEffect to skip the DB fetch
         skipMsgLoadRef.current = true;
       }
     } else {
-      console.log('[SCROLL-DEBUG] No cached messages - fetching from DB');
       // No cached messages — reset pagination and load from DB
       setMessages([]);
       setMsgsLoading(true);
@@ -1435,7 +1420,6 @@ export default function Chat() {
 
   // ── Load older messages (infinite scroll / pagination) ──
   const loadOlderMessages = useCallback(async () => {
-    console.log('[SCROLL-DEBUG] loadOlderMessages called', { activeConvId, loadingMore, hasMoreMessages, oldestMessageDate, userExists: !!user?.id, loadingMoreRef: loadingMoreRef.current });
     // SYNCHRONOUS check — prevents cascade from multiple scroll events in same event loop tick
     if (!activeConvId || loadingMoreRef.current || !hasMoreMessages || !oldestMessageDate || !user?.id) return;
     loadingMoreRef.current = true;
@@ -1448,7 +1432,6 @@ export default function Chat() {
     const el = messagesContainerRef.current;
     const scrollHeightBefore = el ? el.scrollHeight : 0;
     scrollBeforeLoadRef.current = el ? { scrollTop: el.scrollTop, scrollHeight: el.scrollHeight } : null;    
-    console.log('[SCROLL-DEBUG] loadOlderMessages proceeding', { scrollHeightBefore, convIdAtStart });
 
     try {
       let attempts = 0;
@@ -1461,25 +1444,21 @@ export default function Chat() {
 
       do {
         attempts += 1;
-        console.log('[SCROLL-DEBUG] getMessages request', { convIdAtStart, fetchLimit, cursor });
         try {
           raw = await getMessages(convIdAtStart, fetchLimit, cursor);
         } catch (e) {
-          console.warn('[SCROLL-DEBUG] getMessages failed', { err: e, convIdAtStart, fetchLimit, cursor });
           raw = [];
         }
         if (aborted || convIdAtStart !== activeConvId) return;
         hasMore = raw.length > PAGE_SIZE;
         if (raw.length > PAGE_SIZE) raw = raw.slice(0, PAGE_SIZE);
         filtered = raw.filter(m => !m.deleted_for?.includes(user.id));
-        console.log('[SCROLL-DEBUG] raw/filtered lengths', { rawLen: raw.length, filteredLen: filtered.length, hasMore });
         decrypted = await Promise.all(
           filtered.map(async (msg) => {
             const content = await decryptMessage(msg, user.id);
             return { ...msg, decryptedContent: content };
           })
         );
-        console.log('[SCROLL-DEBUG] decrypted length', { decryptedLen: decrypted.length });
 
         if (decrypted.length === 0 && hasMore && attempts < 3) {
           // advance cursor to last raw item and retry
@@ -1518,7 +1497,6 @@ export default function Chat() {
       // Mark timestamp so the scroll handler's cooldown prevents cascade
       lastLoadTimeRef.current = Date.now();
       setHasMoreMessages(hasMore);
-      console.log('[SCROLL-DEBUG] loadOlderMessages success', { newCount: decrypted.length, oldest: decrypted[0].created_at, hasMoreAfter: hasMore });
 
     } catch (err) {
       console.warn('Error loading older messages:', err);
@@ -1532,7 +1510,6 @@ export default function Chat() {
   // ── Scroll handler to detect when user reaches the visual top (oldest messages) ──
   const handleMessagesScroll = useCallback(() => {
     const el = messagesContainerRef.current;
-    console.log('[SCROLL-DEBUG] handleMessagesScroll fired', { el: !!el, loadingMoreRef: loadingMoreRef.current, hasMoreMessages, scrollTop: el?.scrollTop, scrollHeight: el?.scrollHeight, clientHeight: el?.clientHeight, cooldown: Date.now() - lastLoadTimeRef.current });
     if (!el || loadingMoreRef.current || !hasMoreMessages) return;
 
     // Cooldown: prevent cascade — ignore scroll events within 500ms of a load
@@ -1543,7 +1520,6 @@ export default function Chat() {
     // scrollRemaining = scrollTop + scrollHeight - clientHeight → 0 at the top
     const scrollRemaining = el.scrollTop + el.scrollHeight - el.clientHeight;
     const threshold = 150;
-    console.log('[SCROLL-DEBUG] Calc', { scrollRemaining, threshold, willLoad: scrollRemaining < threshold });
     if (scrollRemaining < threshold) {
       // Pre-mark lastLoadTime to avoid immediate retriggers while async fetch starts
       lastLoadTimeRef.current = Date.now();
@@ -1565,11 +1541,9 @@ export default function Chat() {
   // ── Attach scroll listener to messages container ──
   useEffect(() => {
     const el = messagesContainerRef.current;
-    console.log('[SCROLL-DEBUG] Attach listener effect', { elExists: !!el, elTag: el?.tagName, elClass: el?.className, handleMessagesScrollRef: true });
     if (!el) return;
     el.addEventListener('scroll', handleMessagesScroll, { passive: true });
     return () => {
-      console.log('[SCROLL-DEBUG] Cleanup listener');
       el.removeEventListener('scroll', handleMessagesScroll);
     };
   }, [handleMessagesScroll]);
