@@ -335,7 +335,7 @@ textarea.fc-modal-input {
   border-radius: 50%;
   font-size: 0.75rem;
   line-height: 1;
-  color: #fca5a5;
+  color: #6b7280;
   cursor: pointer;
   transition: background 0.15s ease;
 }
@@ -388,7 +388,7 @@ textarea.fc-modal-input {
 }
 
 .fc-modal-social-error {
-    color: #fca5a5;
+    color: #6b7280;
     font-size: 0.8rem;
     margin: 4px 0 0 0;
 }
@@ -449,7 +449,7 @@ textarea.fc-modal-input {
     height: 28px;
     border-radius: var(--radius-sm, 6px);
     background: transparent;
-    color: #fca5a5;
+    color: #6b7280;
     border: none;
     font-size: 1rem;
     cursor: pointer;
@@ -864,7 +864,7 @@ textarea.fc-modal-input {
     border-radius: 50%;
     background: transparent;
     border: none;
-    color: #fca5a5;
+    color: #6b7280;
     font-size: 1.2rem;
     cursor: pointer;
     flex-shrink: 0;

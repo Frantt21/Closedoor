@@ -56,7 +56,7 @@
 }
 
 .create-post-error {
-    color: #fca5a5;
+    color: #6b7280;
     font-size: 0.85rem;
     margin-bottom: 12px;
     padding: 8px 12px;
@@ -136,7 +136,7 @@
     min-width: 16px;
     height: 16px;
     padding: 0 4px;
-    background: var(--accent-color, #f472b6);
+    background: var(--accent-color, #6b7280);
     color: #fff;
     font-size: 0.6rem;
     font-weight: 700;
@@ -477,7 +477,7 @@
 
 .create-post-image-remove:hover {
     background: rgba(255, 80, 80, 0.15);
-    color: #fca5a5;
+    color: #6b7280;
     border-color: rgba(255, 80, 80, 0.3);
 }
 
@@ -951,7 +951,7 @@
 
 .create-post-poll-option-remove:hover {
     background: rgba(255, 80, 80, 0.15);
-    color: #fca5a5;
+    color: #6b7280;
     border-color: rgba(255, 80, 80, 0.3);
 }
 
@@ -1162,7 +1162,7 @@
 }
 
 .gif-picker-status--error {
-    color: #fca5a5;
+    color: #6b7280;
 }
 
 .gif-picker-spinner {

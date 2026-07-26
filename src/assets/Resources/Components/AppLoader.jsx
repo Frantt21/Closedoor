@@ -56,11 +56,13 @@ export default function AppLoader({ children }) {
     return () => window.removeEventListener('pageshow', onShow);
   }, []);
 
+  // ── Loader completamente oculto: renderizar solo la app ──
   if (!showLoader) return children;
 
   return (
     <>
-      {children}
+      {/* Overlay siempre PRIMERO en el fragment — React preserva el DOM element,
+          así la transición CSS (opacity 1→0) funciona correctamente */}
       <div className={`app-loader-overlay ${fadeOut ? 'app-loader-overlay--hidden' : ''}`}>
         <div className="app-loader-container">
           <img
@@ -70,6 +72,8 @@ export default function AppLoader({ children }) {
           />
         </div>
       </div>
+      {/* Children solo se montan cuando auth ya está resuelto (fadeOut activo) */}
+      {fadeOut && children}
     </>
   );
 }

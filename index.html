@@ -13,7 +13,7 @@
     <meta property="og:url" content="https://app.foranly.space/" />
     <meta property="og:title" content="Closedoor" />
     <meta property="og:description" content="Join the community, share your thoughts, and discover new people on Closedoor." />
-    <meta property="og:image" content="https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor" />
+    <meta property="og:image" content="https://placehold.co/1200x630/1a1a2e/6b7280?text=Closedoor" />
     <meta property="og:site_name" content="Closedoor" />
 
     <!-- Twitter -->
@@ -21,7 +21,7 @@
     <meta name="twitter:url" content="https://app.foranly.space/" />
     <meta name="twitter:title" content="Closedoor" />
     <meta name="twitter:description" content="Join the community, share your thoughts, and discover new people on Closedoor." />
-    <meta name="twitter:image" content="https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor" />
+    <meta name="twitter:image" content="https://placehold.co/1200x630/1a1a2e/6b7280?text=Closedoor" />
 
     <!-- Preconnect to critical origins -->
     <link rel="preconnect" href="https://<TU_PROYECTO>.supabase.co" />
@@ -29,76 +29,49 @@
     <link rel="dns-prefetch" href="https://<TU_PROYECTO>.supabase.co" />
     <link rel="dns-prefetch" href="https://api.foranly.space:24587" />
 
-    <!-- ── Hero placeholder: visible immediately, replaces when React mounts ── -->
+    <!-- ── Splash placeholder: logo + fondo oscuro, visible inmediatamente ──
+         Se oculta al instante cuando JS carga (js-ready) y React monta el AppLoader
+         sobre el mismo fondo #000. Evita el flash del hero de 'no sesión'. ── -->
     <style>
-      #hero-placeholder {
+      /* Ensures no white flash between splash hiding and React mounting */
+      body { background: #000; }
+
+      #splash-placeholder {
+        position: fixed;
+        inset: 0;
+        z-index: 99999;
         display: flex;
-        flex-direction: column;
+        justify-content: center;
+        padding-top: 30px;
+        background: #000;
+      }
+      #splash-placeholder .splash-inner {
+        display: flex;
         align-items: center;
         justify-content: center;
-        min-height: 70vh;
-        text-align: center;
-        padding: 40px 24px;
-        max-width: 680px;
-        margin: 0 auto;
       }
-      #hero-placeholder h1 {
-        font-size: 2rem;
-        font-weight: 700;
-        color: #ffffff;
-        margin-bottom: 16px;
-        line-height: 1.3;
+      #splash-placeholder .splash-logo {
+        width: 80px;
+        height: 80px;
+        object-fit: contain;
+        animation: splashPulse 1.5s ease-in-out infinite;
       }
-      #hero-placeholder p {
-        font-size: 1rem;
-        color: #9ca3af;
-        line-height: 1.6;
-        margin-bottom: 8px;
+      @keyframes splashPulse {
+        0%, 100% { opacity: 0.5; transform: scale(1); }
+        50% { opacity: 1; transform: scale(1.08); }
       }
-      #hero-placeholder .hero-actions {
-        display: flex;
-        gap: 12px;
-        margin-top: 24px;
-        flex-wrap: wrap;
-        justify-content: center;
-      }
-      #hero-placeholder .hero-btn {
-        display: inline-block;
-        padding: 10px 28px;
-        border-radius: 8px;
-        font-size: 0.9rem;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        text-decoration: none;
-        cursor: pointer;
-        transition: background 0.2s ease;
-      }
-      #hero-placeholder .hero-btn--primary {
-        background: #e94560;
-        color: #fff;
-      }
-      #hero-placeholder .hero-btn--secondary {
-        background: transparent;
-        color: #e94560;
-        border: 1px solid #e94560;
-      }
-      @media (max-width: 480px) {
-        #hero-placeholder h1 { font-size: 1.6rem; }
-        #hero-placeholder p { font-size: 0.9rem; }
-      }
-      .js-ready #hero-placeholder {
+      .js-ready #splash-placeholder {
         display: none !important;
       }
     </style>
   </head>
   <body>
-    <!-- ── Pre-rendered hero for instant LCP on mobile ── -->
-    <div id="hero-placeholder">
-      <h1>Post what you want, when you want, where you want.</h1>
-      <p>Join the community and share your thoughts with the world.</p>
-      <p>Discover new people, follow your interests, and be part of something bigger.</p>
-      <div class="hero-actions">
-        <a href="/Register" class="hero-btn hero-btn--primary">Get Started</a>
-        <a href="/Login" class="hero-btn hero-btn--secondary">Sign In</a>
+    <!-- ── Pre-rendered splash: logo animado sobre fondo oscuro ──
+         La estructura (padding-top + inner centrado) coincide exactamente con
+         el AppLoader de React para evitar saltos visuales. -->
+    <div id="splash-placeholder">
+      <div class="splash-inner">
+        <img src="/logo.svg" alt="Closedoor" class="splash-logo" />
       </div>
     </div>
 

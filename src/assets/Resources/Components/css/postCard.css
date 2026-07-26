@@ -296,13 +296,13 @@
 
 /* Like activo: usa el color de acento */
 .post-card-action--liked {
-    background: color-mix(in srgb, var(--accent-color, #f472b6) 8%, transparent);
-    color: var(--accent-color, #f472b6);
+    background: color-mix(in srgb, var(--accent-color, #6b7280) 8%, transparent);
+    color: var(--accent-color, #6b7280);
 }
 
 .post-card-action--liked:hover {
-    background: color-mix(in srgb, var(--accent-color, #f472b6) 15%, transparent);
-    color: var(--accent-color, #f472b6);
+    background: color-mix(in srgb, var(--accent-color, #6b7280) 15%, transparent);
+    color: var(--accent-color, #6b7280);
 }
 
 /* Comentarios restringidos (nobody / followers_only) */
@@ -1363,7 +1363,7 @@
 }
 
 .post-card-poll-expired {
-    color: #f87171;
+    color: #6b7280;
 }
 
 /* ── Poll voters modal ── */

@@ -59,7 +59,7 @@ function injectOGTags(html, { title, description, image, url, username, type = '
   const fullTitle = title ? `${title} | ${siteName}` : siteName;
   const ogTitle = title || siteName;
   const ogDesc = description || 'Join the community and share your thoughts on Closedoor.';
-  const ogImage = image || 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor';
+  const ogImage = image || 'https://placehold.co/1200x630/1a1a2e/6b7280?text=Closedoor';
   const ogUrl = url || 'https://closedoor.app';
 
   let result = html;
@@ -218,7 +218,7 @@ function getOGForRoute(req) {
   let og = {
     title: 'Closedoor',
     description: 'Join the community, share your thoughts, and discover new people on Closedoor.',
-    image: 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor',
+    image: 'https://placehold.co/1200x630/1a1a2e/6b7280?text=Closedoor',
     url: fullUrl,
     type: 'website',
     username: null,
@@ -254,7 +254,7 @@ app.get('/profile/:username', async (req, res) => {
   let ogData = {
     title: `@${username}`,
     description: `Check out @${username} on Closedoor!`,
-    image: 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor',
+    image: 'https://placehold.co/1200x630/1a1a2e/6b7280?text=Closedoor',
     url: `${req.protocol}://${req.get('host')}/profile/${username}`,
     username,
     type: 'profile',
@@ -275,7 +275,7 @@ app.get('/profile/:username', async (req, res) => {
           description: data.bio
             ? (data.bio.length > 200 ? data.bio.slice(0, 200) + '...' : data.bio)
             : `Check out @${data.username || username} on Closedoor!`,
-          image: data.avatar_url || data.banner_url || 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor',
+          image: data.avatar_url || data.banner_url || 'https://placehold.co/1200x630/1a1a2e/6b7280?text=Closedoor',
           url: `${req.protocol}://${req.get('host')}/profile/${data.username || username}`,
           username: data.username || username,
           type: 'profile',
@@ -298,7 +298,7 @@ app.get('/post/:id', async (req, res) => {
   let ogData = {
     title: 'Post | Closedoor',
     description: 'Check out this post on Closedoor.',
-    image: 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor',
+    image: 'https://placehold.co/1200x630/1a1a2e/6b7280?text=Closedoor',
     url: `${req.protocol}://${req.get('host')}/post/${id}`,
     username: null,
     type: 'article',
@@ -323,7 +323,7 @@ app.get('/post/:id', async (req, res) => {
           description: cleanContent
             ? (cleanContent.length > 200 ? cleanContent.slice(0, 200) + '...' : cleanContent)
             : 'Check out this post on Closedoor.',
-          image: data.image_url || 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor',
+          image: data.image_url || 'https://placehold.co/1200x630/1a1a2e/6b7280?text=Closedoor',
           url: `${req.protocol}://${req.get('host')}/post/${id}`,
           username: null,
           type: 'article',

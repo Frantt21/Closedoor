@@ -44,7 +44,7 @@ function PageFallback() {
           width: 28,
           height: 28,
           border: '3px solid var(--color-border, #2a2a2a)',
-          borderTopColor: 'var(--color-accent, #e94560)',
+          borderTopColor: 'var(--color-accent, #6b7280)',
           borderRadius: '50%',
           animation: 'fc-spin 0.7s linear infinite',
         }} />
@@ -72,14 +72,14 @@ function NotFound() {
         <div style={{
           fontSize: '5rem',
           fontWeight: 800,
-          color: 'var(--color-accent, #e94560)',
+          color: 'var(--color-accent, #6b7280)',
           lineHeight: 1,
           marginBottom: 8,
         }}>404</div>
         <div style={{
           width: 48,
           height: 3,
-          background: 'var(--color-accent, #e94560)',
+          background: 'var(--color-accent, #6b7280)',
           borderRadius: 2,
           margin: '16px auto',
         }} />
@@ -101,7 +101,7 @@ function NotFound() {
         <a href="/" style={{
           display: 'inline-block',
           padding: '10px 28px',
-          background: 'var(--color-accent, #e94560)',
+          background: 'var(--color-accent, #6b7280)',
           color: '#fff',
           border: 'none',
           borderRadius: 8,
@@ -111,8 +111,8 @@ function NotFound() {
           cursor: 'pointer',
           transition: 'background 0.2s ease',
         }}
-          onMouseEnter={(e) => e.target.style.background = '#d63851'}
-          onMouseLeave={(e) => e.target.style.background = 'var(--color-accent, #e94560)'}
+          onMouseEnter={(e) => e.target.style.background = '#4b5563'}
+          onMouseLeave={(e) => e.target.style.background = 'var(--color-accent, #6b7280)'}
         >
           Volver al inicio
         </a>

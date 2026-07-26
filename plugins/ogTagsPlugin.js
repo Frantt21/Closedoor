@@ -37,7 +37,7 @@ export default function ogTagsPlugin() {
   function getOGForPath(path) {
     let title = 'Closedoor';
     let description = 'Join the community, share your thoughts, and discover new people on Closedoor.';
-    let image = 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor';
+    let image = 'https://placehold.co/1200x630/1a1a2e/6b7280?text=Closedoor';
     let type = 'website';
     let username = null;
 
@@ -103,7 +103,7 @@ export default function ogTagsPlugin() {
             og = {
               title: `@${username}`,
               description: `Check out @${username} on Closedoor!`,
-              image: 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor',
+              image: 'https://placehold.co/1200x630/1a1a2e/6b7280?text=Closedoor',
               type: 'profile',
               username,
             };
@@ -122,7 +122,7 @@ export default function ogTagsPlugin() {
                     description: data.bio
                       ? (data.bio.length > 200 ? data.bio.slice(0, 200) + '...' : data.bio)
                       : `Check out @${data.username || username} on Closedoor!`,
-                    image: data.avatar_url || data.banner_url || 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor',
+                    image: data.avatar_url || data.banner_url || 'https://placehold.co/1200x630/1a1a2e/6b7280?text=Closedoor',
                     type: 'profile',
                     username: data.username || username,
                   };
@@ -141,7 +141,7 @@ export default function ogTagsPlugin() {
             og = {
               title: 'Post | Closedoor',
               description: 'Check out this post on Closedoor.',
-              image: 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor',
+              image: 'https://placehold.co/1200x630/1a1a2e/6b7280?text=Closedoor',
               type: 'article',
               username: null,
             };
@@ -165,7 +165,7 @@ export default function ogTagsPlugin() {
                     description: cleanContent
                       ? (cleanContent.length > 200 ? cleanContent.slice(0, 200) + '...' : cleanContent)
                       : 'Check out this post on Closedoor.',
-                    image: data.image_url || 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor',
+                    image: data.image_url || 'https://placehold.co/1200x630/1a1a2e/6b7280?text=Closedoor',
                     type: 'article',
                     username: null,
                   };

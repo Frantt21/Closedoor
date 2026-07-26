@@ -1216,7 +1216,7 @@ function Profile() {
         return (
             <div className="profile-page">
                 <div className="profile-card" style={{ padding: "40px", textAlign: "center" }}>
-                    <p style={{ color: "#fca5a5", fontSize: "1.1rem" }}>{profileError}</p>
+                    <p style={{ color: "#6b7280", fontSize: "1.1rem" }}>{profileError}</p>
                 </div>
             </div>
         );

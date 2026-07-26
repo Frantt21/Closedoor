@@ -13,7 +13,7 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
-const FALLBACK_IMAGE = 'https://placehold.co/1200x630/1a1a2e/e94560?text=Closedoor';
+const FALLBACK_IMAGE = 'https://placehold.co/1200x630/1a1a2e/6b7280?text=Closedoor';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {

@@ -9,6 +9,8 @@
     --color-text: #ffffff;
     --color-text-secondary: #9ca3af;
     --color-text-muted: #6b7280;
+    --color-accent: #6b7280;
+    --accent-color: #6b7280;
     --radius: 10px;
     --radius-sm: 6px;
     --radius-lg: 14px;
@@ -39,6 +41,8 @@
     --color-text: #1a1a1a;
     --color-text-secondary: #6b7280;
     --color-text-muted: #9ca3af;
+    --color-accent: #9ca3af;
+    --accent-color: #9ca3af;
 
     /* Overlay colors — modo claro */
     --overlay-bg: rgba(0, 0, 0, 0.06);
@@ -239,7 +243,7 @@ body:has(.sidebar--collapsed) .app-layout--chat {
 }
 
 .Toastify__toast--error .Toastify__toast-icon {
-    color: #f87171 !important;
+    color: var(--color-text-secondary, #9ca3af) !important;
 }
 
 /* ── Live notification toast (nuevas notificaciones en tiempo real) ── */
@@ -333,9 +337,9 @@ body:has(.sidebar--collapsed) .app-layout--chat {
 }
 
 .fc-dropdown-btn--danger {
-    color: #fca5a5 !important;
+    color: var(--color-text-secondary, #9ca3af) !important;
 }
 
 .fc-dropdown-btn--danger:hover {
-    background: rgba(255, 80, 80, 0.12) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
 }

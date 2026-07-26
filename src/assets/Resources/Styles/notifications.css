@@ -72,7 +72,7 @@
   background: rgba(255, 70, 70, 0.12);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  color: #fca5a5;
+  color: #6b7280;
   border: none;
   transition: background 0.2s ease, color 0.2s ease;
   white-space: nowrap;
@@ -389,7 +389,7 @@
 
 .notification-delete-btn:hover {
   background: rgba(255, 70, 70, 0.15);
-  color: #fca5a5;
+  color: #6b7280;
 }
 
 .notification-delete-btn:active {

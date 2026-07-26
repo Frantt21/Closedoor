@@ -739,32 +739,32 @@
 }
 
 .comment-card-btn--liked {
-    background: color-mix(in srgb, var(--accent-color, #f472b6) 8%, transparent);
-    color: var(--accent-color, #f472b6);
+    background: color-mix(in srgb, var(--accent-color, #6b7280) 8%, transparent);
+    color: var(--accent-color, #6b7280);
 }
 
 .comment-card-btn--liked:hover {
-    background: color-mix(in srgb, var(--accent-color, #f472b6) 15%, transparent);
-    color: var(--accent-color, #f472b6);
+    background: color-mix(in srgb, var(--accent-color, #6b7280) 15%, transparent);
+    color: var(--accent-color, #6b7280);
 }
 
 .comment-card-btn--disliked {
     background: rgba(248, 113, 113, 0.08);
-    color: #f87171;
+    color: #6b7280;
 }
 
 .comment-card-btn--disliked:hover {
     background: rgba(248, 113, 113, 0.15);
-    color: #f87171;
+    color: #6b7280;
 }
 
 .comment-card-btn--danger {
-    color: #fca5a5;
+    color: #6b7280;
 }
 
 .comment-card-btn--danger:hover {
     background: rgba(255, 80, 80, 0.12);
-    color: #fca5a5;
+    color: #6b7280;
 }
 
 /* ── Comment context menu ── */
@@ -808,7 +808,7 @@
 .comment-form-cancel-reply {
     background: transparent;
     border: none;
-    color: #f472b6;
+    color: #6b7280;
     font-size: 0.75rem;
     cursor: pointer;
     font-family: inherit;

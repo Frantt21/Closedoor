@@ -446,7 +446,7 @@
 }
 
 .chat-header-action-btn--active {
-    background: var(--accent-color, #f472b6);
+    background: var(--accent-color, #6b7280);
     color: #ffffff;
 }
 
@@ -1374,7 +1374,7 @@
     align-items: center;
     gap: 4px;
     font-size: 0.65rem;
-    color: var(--accent-color, #f472b6);
+    color: var(--accent-color, #6b7280);
     margin-bottom: 2px;
     padding-left: 4px;
 }
@@ -1515,7 +1515,7 @@
 }
 
 .emoji-picker-btn--active {
-    background: var(--accent-color, #f472b6);
+    background: var(--accent-color, #6b7280);
 }
 
 /* ── Edit message ── */
@@ -1824,7 +1824,7 @@
 }
 
 .chat-mobile-header-menu-item.active {
-    color: var(--accent-color, #f472b6);
+    color: var(--accent-color, #6b7280);
 }
 
 .chat-mobile-header-menu-item svg {
@@ -1908,7 +1908,7 @@
 }
 
 .chat-context-menu-btn--danger {
-    color: #fca5a5 !important;
+    color: #6b7280 !important;
 }
 
 .chat-context-menu-btn--danger:hover {
