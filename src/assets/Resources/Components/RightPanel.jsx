@@ -8,7 +8,7 @@ import { getTrendingCategory } from '../../services/trendingDictionary';
 import ProfileSidebar from './ProfileSidebar';
 import { getContrastText, isUUID } from '../../services/helpers';
 import useBgContrast from '../../../hooks/useBgContrast';
-import { FaFire, FaHashtag, FaArrowRight } from 'react-icons/fa';
+import { IconFire, IconHashtag, IconArrowRight } from './ShellIcons';
 import './css/rightPanel.css';
 
 const PROFILE_ROUTE = '/profile';
@@ -87,7 +87,7 @@ function TrendingHashtags({ t, surfaceStyle }) {
           {words?.length > 0 && (
             <div className="right-panel-trending-section">
               <h4 className="right-panel-trending-subtitle">
-                <FaFire className="right-panel-trending-subicon" />
+                <IconFire className="right-panel-trending-subicon" />
                 {t('right_panel.trending_words')}
               </h4>
               <div className="right-panel-trending-list">                  {words.slice(0, 3).map((item, i) => (
@@ -111,7 +111,7 @@ function TrendingHashtags({ t, surfaceStyle }) {
           {hashtags?.length > 0 && (
             <div className="right-panel-trending-section">
               <h4 className="right-panel-trending-subtitle">
-                <FaHashtag className="right-panel-trending-subicon" />
+                <IconHashtag className="right-panel-trending-subicon" />
                 {t('right_panel.trending_hashtags')}
               </h4>
               <div className="right-panel-trending-list">                  {hashtags.slice(0, 3).map((item, i) => (
@@ -133,7 +133,7 @@ function TrendingHashtags({ t, surfaceStyle }) {
 
           {/* ── Link a todas las tendencias ── */}
           <Link to="/Trending" className="right-panel-trending-all">
-            <FaArrowRight className="right-panel-trending-all-icon" />
+            <IconArrowRight className="right-panel-trending-all-icon" />
             {t('right_panel.view_all') || 'Ver todas las tendencias'}
           </Link>
         </>

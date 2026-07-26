@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useState, useContext, useEffect } from 'react';
 import './css/header.css';
-import { FaHome, FaUser, FaBars, FaBell, FaCompass, FaCog, FaComment, FaUsers } from 'react-icons/fa';
+import { IconHome, IconUser, IconBars, IconBell, IconCompass, IconCog, IconComment, IconUsers } from './ShellIcons';
 import { useAuth } from '../../../hooks/useAuth';
 import { NotificationContext } from '../../../context/NotificationContext';
 import { useI18n } from '../../../assets/services/i18n/useI18n';
@@ -51,7 +51,7 @@ function Header() {
       <nav className="sidebar-nav">
         <Tooltip text={collapsed ? t('nav.home') : ''} placement="right">
           <Link to="/" className={`sidebar-link${location.pathname === '/' ? ' active' : ''}`}>
-            <span className="sidebar-icon"><FaHome /></span>
+            <span className="sidebar-icon"><IconHome /></span>
             <span>{t('nav.home')}</span>
           </Link>
         </Tooltip>
@@ -60,19 +60,19 @@ function Header() {
           <>
             <Tooltip text={collapsed ? t('nav.profile') : ''} placement="right">
               <Link to="/Profile" className={`sidebar-link${location.pathname.toLowerCase() === '/profile' ? ' active' : ''}`}>
-                <span className="sidebar-icon"><FaUser /></span>
+                <span className="sidebar-icon"><IconUser /></span>
                 <span>{t('nav.profile')}</span>
               </Link>
             </Tooltip>
             <Tooltip text={collapsed ? t('nav.explore') : ''} placement="right">
               <Link to="/Explore" className={`sidebar-link${location.pathname.toLowerCase() === '/explore' ? ' active' : ''}`}>
-                <span className="sidebar-icon"><FaCompass /></span>
+                <span className="sidebar-icon"><IconCompass /></span>
                 <span>{t('nav.explore')}</span>
               </Link>
             </Tooltip>
             <Tooltip text={collapsed ? t('nav.chat') : ''} placement="right">
               <Link to="/Chat" className={`sidebar-link${location.pathname.toLowerCase() === '/chat' ? ' active' : ''}`}>
-                <span className="sidebar-icon"><FaComment /></span>
+                <span className="sidebar-icon"><IconComment /></span>
                 {unreadChatCount > 0 && (
                   <span className="sidebar-notif-badge">{unreadChatCount > 99 ? '99+' : unreadChatCount}</span>
                 )}
@@ -81,13 +81,13 @@ function Header() {
             </Tooltip>
             <Tooltip text={collapsed ? t('nav.comunidades') : ''} placement="right">
               <Link to="/Communities" className={`sidebar-link${location.pathname.toLowerCase() === '/communities' ? ' active' : ''}`}>
-                <span className="sidebar-icon"><FaUsers /></span>
+                <span className="sidebar-icon"><IconUsers /></span>
                 <span>{t('nav.comunidades')}</span>
               </Link>
             </Tooltip>
             <Tooltip text={collapsed ? t('nav.notifications') : ''} placement="right">
               <Link to="/Notifications" className={`sidebar-link${location.pathname.toLowerCase() === '/notifications' ? ' active' : ''}`}>
-                <span className="sidebar-icon"><FaBell /></span>
+                <span className="sidebar-icon"><IconBell /></span>
                 {unreadCount > 0 && (
                   <span className="sidebar-notif-badge">{unreadCount > 99 ? '99+' : unreadCount}</span>
                 )}
@@ -96,7 +96,7 @@ function Header() {
             </Tooltip>
             <Tooltip text={collapsed ? t('nav.settings') : ''} placement="right">
               <Link to="/Settings" className={`sidebar-link${location.pathname.toLowerCase() === '/settings' ? ' active' : ''}`}>
-                <span className="sidebar-icon"><FaCog /></span>
+                <span className="sidebar-icon"><IconCog /></span>
                 <span>{t('nav.settings')}</span>
               </Link>
             </Tooltip>
@@ -105,13 +105,13 @@ function Header() {
           <>
             <Tooltip text={collapsed ? t('nav.login') : ''} placement="right">
               <Link to="/Login" className={`sidebar-link${location.pathname.toLowerCase() === '/login' ? ' active' : ''}`}>
-                <span className="sidebar-icon"><FaUser /></span>
+                <span className="sidebar-icon"><IconUser /></span>
                 <span>{t('nav.login')}</span>
               </Link>
             </Tooltip>
             <Tooltip text={collapsed ? t('nav.explore') : ''} placement="right">
               <Link to="/Explore" className={`sidebar-link${location.pathname.toLowerCase() === '/explore' ? ' active' : ''}`}>
-                <span className="sidebar-icon"><FaCompass /></span>
+                <span className="sidebar-icon"><IconCompass /></span>
                 <span>{t('nav.explore')}</span>
               </Link>
             </Tooltip>
@@ -127,7 +127,7 @@ function Header() {
           onClick={() => setCollapsed((prev) => !prev)}
           aria-label={collapsed ? t('nav.expand_menu') : t('nav.collapse_menu')}
         >
-          <span className="sidebar-icon"><FaBars /></span>
+          <span className="sidebar-icon"><IconBars /></span>
           <span className="sidebar-footer-label">{collapsed ? t('nav.expand') : t('nav.collapse')}</span>
         </button>
         </Tooltip>

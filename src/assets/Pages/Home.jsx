@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { FaRegNewspaper } from 'react-icons/fa';
+import { IconNewspaper } from '../Resources/Components/ShellIcons';
 import { useI18n } from '../services/i18n/useI18n';
 import '../Resources/Styles/Home.css';
 import '../Resources/Styles/post.css';
@@ -252,7 +252,7 @@ function Home() {
                         </div>
                     ) : posts.length === 0 ? (
                         <div className="posts-empty">
-                            <span className="posts-empty-icon"><FaRegNewspaper /></span>
+                            <span className="posts-empty-icon"><IconNewspaper /></span>
                             <p className="posts-empty-text">
                                 {t('home.no_posts_first')}
                             </p>

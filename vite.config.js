@@ -36,9 +36,6 @@ export default defineConfig({
           if (id.includes('/node_modules/react-router')) {
             return 'vendor-router';
           }
-          if (id.includes('/node_modules/react-icons')) {
-            return 'vendor-icons';
-          }
           if (id.includes('/node_modules/react-toastify')) {
             return 'vendor-toastify';
           }
