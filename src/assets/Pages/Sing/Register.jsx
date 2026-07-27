@@ -39,6 +39,13 @@ function Register() {
       return;
     }
 
+    // Username: solo letras, números y guiones bajos
+    if (!/^[a-zA-Z0-9_]+$/.test(username.trim())) {
+      setError(t('auth.username_invalid_chars') || 'Username can only contain letters, numbers and underscores');
+      setLoading(false);
+      return;
+    }
+
     const result = await register(email, password, username, nickname || username);
 
     if (result.success) {

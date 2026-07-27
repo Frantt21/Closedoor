@@ -27,6 +27,7 @@
   "auth.show_password": "Mostrar contraseña",
   "auth.signup_link": "Regístrate",
   "auth.nickname": "Apodo",
+  "auth.username_invalid_chars": "El usuario solo puede contener letras, números y guiones bajos",
   "auth.username": "Nombre de usuario",
   "block.block": "Bloquear usuario",
   "block.blocked": "Bloqueado",

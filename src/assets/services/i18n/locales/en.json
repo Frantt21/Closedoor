@@ -27,6 +27,7 @@
   "auth.show_password": "Show password",
   "auth.signup_link": "Sign up",
   "auth.nickname": "Nickname",
+  "auth.username_invalid_chars": "Username can only contain letters, numbers and underscores",
   "auth.username": "Username",
   "block.block": "Block user",
   "block.blocked": "Blocked",

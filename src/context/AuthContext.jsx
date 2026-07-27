@@ -172,7 +172,10 @@ export function AuthProvider({ children }) {
   const linkDiscord = async () => {
     try {
       setError(null);
-      const { data, error } = await supabase.auth.linkIdentity({
+      // linkIdentity no está disponible en esta versión de Supabase.
+      // Usamos signInWithOAuth en su lugar: como el usuario ya tiene sesión,
+      // Supabase vincula la identidad automáticamente al procesar el callback.
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'discord',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,
@@ -280,6 +283,13 @@ export function AuthProvider({ children }) {
 
       if (username.length < 3) {
         const err = 'Username must be at least 3 characters';
+        setError(err);
+        return { success: false, error: err };
+      }
+
+      // Username: solo letras, números y guiones bajos
+      if (!/^[a-zA-Z0-9_]+$/.test(username.trim())) {
+        const err = 'Username can only contain letters, numbers and underscores';
         setError(err);
         return { success: false, error: err };
       }
