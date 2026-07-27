@@ -1221,8 +1221,17 @@ export default function Chat() {
   const activeConv = conversations.find((c) => c.id === activeConvId);
   const otherUser = activeConv?.otherUser;
 
-  // ── Subscribe to other user's realtime status with mutual-follow check ──
-  const { status: otherUserStatus } = useUserStatus(user?.id, otherUser?.id, true);
+  // ── Subscribe to other users' realtime status for the visible conversation list ──
+  const visibleConversationUserIds = React.useMemo(() => {
+    return (visibleConversations || [])
+      .map((conv) => conv.otherUser?.id)
+      .filter(Boolean);
+  }, [visibleConversations]);
+
+  const { status: activeOtherUserStatus, statuses: otherUserStatuses } = useUserStatus(user?.id, visibleConversationUserIds, true);
+  const activeConversationStatus = otherUser?.id
+    ? (otherUserStatuses?.[otherUser.id] ?? activeOtherUserStatus ?? otherUser?.user_status)
+    : null;
 
   // ── Blocked status detection (check cache + server) ──
   // Reset when changing conversations
@@ -1768,7 +1777,7 @@ export default function Chat() {
                 alt={conv.otherUser?.username || '?'}
                 className="chat-list-item-avatar"
                 style={getAvatarTransformStyle(conv.otherUser?.avatar_position)}
-                status={conv.id === activeConvId ? (otherUserStatus ?? conv.otherUser?.user_status) : conv.otherUser?.user_status}
+                status={otherUserStatuses?.[conv.otherUser?.id] ?? conv.otherUser?.user_status}
               />
               <div className="chat-list-item-info">
                 <div className="chat-list-item-top">
@@ -1815,7 +1824,7 @@ export default function Chat() {
             className="chat-messages-header-avatar"
             style={{ cursor: 'pointer', ...getAvatarTransformStyle(otherUser?.avatar_position) }}
             onClick={goToProfile}
-            status={otherUserStatus}
+            status={activeConversationStatus ?? otherUser?.user_status}
           />
           <div className="chat-messages-header-info" style={{ cursor: 'pointer' }} onClick={goToProfile}>
             <span className="chat-messages-header-name">{otherUser?.displayname || otherUser?.username || t('common.unknown')}</span>

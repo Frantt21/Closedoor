@@ -17,13 +17,127 @@ import { getCachedFollowStatus } from './followService';
  */
 export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
   const [status, setStatus] = useState(null);
+  const [statuses, setStatuses] = useState({});
   const [myStatus, setMyStatusState] = useState('online');
   const myStatusRef = useRef('online');
   const idleTimerRef = useRef(null);
-  const channelRef = useRef(null);
   const sessionTokenRef = useRef(null);
   const autoIdleRef = useRef(false);
   const mountedCleanupRef = useRef(null);
+  const sessionIdRef = useRef(null);
+  const lastLocalChangeAtRef = useRef(0);
+  const STALE_STATUS_THRESHOLD_MS = 2 * 60 * 1000;
+
+  const getPresenceRegistryKey = useCallback(() => `fc_presence_sessions:${userId || 'anon'}`, [userId]);
+
+  const readPresenceSessions = useCallback(() => {
+    try {
+      const raw = window.localStorage.getItem(getPresenceRegistryKey());
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }, [getPresenceRegistryKey]);
+
+  const writePresenceSessions = useCallback((sessions) => {
+    try {
+      window.localStorage.setItem(getPresenceRegistryKey(), JSON.stringify(sessions));
+    } catch {}
+  }, [getPresenceRegistryKey]);
+
+  const computeEffectiveStatus = useCallback((sessions) => {
+    const entries = Object.values(sessions || {}).filter(Boolean);
+    if (entries.some((entry) => entry.status === 'dnd')) return 'dnd';
+    if (entries.some((entry) => entry.status === 'idle')) return 'idle';
+    if (entries.some((entry) => entry.status === 'online')) return 'online';
+    return 'disconnected';
+  }, []);
+
+  const persistPresence = useCallback(async (newStatus, { force = false } = {}) => {
+    if (!userId) return null;
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_status, user_status_updated_at')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (!force && !error && data?.user_status !== undefined) {
+        const remoteUpdatedAt = data.user_status_updated_at;
+        const remoteTs = remoteUpdatedAt ? new Date(remoteUpdatedAt).getTime() : 0;
+        const localTs = lastLocalChangeAtRef.current;
+        if (remoteTs > localTs && data.user_status !== newStatus) {
+          myStatusRef.current = data.user_status;
+          setMyStatusState(data.user_status);
+          return data.user_status;
+        }
+      }
+
+      const payload = {
+        user_status: newStatus,
+        user_status_updated_at: new Date().toISOString(),
+      };
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update(payload)
+        .eq('id', userId);
+
+      if (updateError) console.warn('[STATUS] DB update error:', updateError);
+      else console.log('[STATUS] DB updated OK →', newStatus);
+      return newStatus;
+    } catch (err) {
+      console.warn('[STATUS] Error updating user_status:', err);
+      return newStatus;
+    }
+  }, [userId]);
+
+  const syncPresenceRegistry = useCallback(async (status, { active = true, force = false } = {}) => {
+    if (!userId || !sessionIdRef.current) return null;
+
+    const sessions = readPresenceSessions();
+    sessions[sessionIdRef.current] = {
+      status,
+      updatedAt: new Date().toISOString(),
+      active,
+    };
+
+    const cleaned = Object.fromEntries(
+      Object.entries(sessions).filter(([, entry]) => {
+        if (!entry || typeof entry !== 'object' || !entry.updatedAt) return false;
+        const ageMs = Date.now() - new Date(entry.updatedAt).getTime();
+        return ageMs <= STALE_STATUS_THRESHOLD_MS;
+      })
+    );
+
+    writePresenceSessions(cleaned);
+
+    const effectiveStatus = computeEffectiveStatus(cleaned);
+    if (force || effectiveStatus !== myStatusRef.current) {
+      myStatusRef.current = effectiveStatus;
+      setMyStatusState(effectiveStatus);
+      await persistPresence(effectiveStatus, { force: true });
+    }
+
+    return effectiveStatus;
+  }, [userId, readPresenceSessions, writePresenceSessions, computeEffectiveStatus, persistPresence]);
+
+  const unregisterPresenceSession = useCallback(async () => {
+    if (!userId || !sessionIdRef.current) return null;
+
+    const sessions = readPresenceSessions();
+    delete sessions[sessionIdRef.current];
+    writePresenceSessions(sessions);
+
+    const effectiveStatus = computeEffectiveStatus(sessions);
+    myStatusRef.current = effectiveStatus;
+    setMyStatusState(effectiveStatus);
+    await persistPresence(effectiveStatus, { force: true });
+    return effectiveStatus;
+  }, [userId, readPresenceSessions, writePresenceSessions, computeEffectiveStatus, persistPresence]);
 
   // ── Actualizar mi estado ──
   const setMyStatus = useCallback(async (newStatus, { auto = false } = {}) => {
@@ -34,6 +148,7 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
 
     if (!auto) autoIdleRef.current = false;
 
+    lastLocalChangeAtRef.current = Date.now();
     myStatusRef.current = newStatus;
     setMyStatusState(newStatus);
 
@@ -45,17 +160,8 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
     } catch {}
 
     // Persistir en DB (dispara postgres_changes Realtime)
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ user_status: newStatus })
-        .eq('id', userId);
-      if (error) console.warn('[STATUS] DB update error:', error);
-      else console.log('[STATUS] DB updated OK →', newStatus);
-    } catch (err) {
-      console.warn('[STATUS] Error updating user_status:', err);
-    }
-  }, [userId]);
+    await syncPresenceRegistry(newStatus, { force: true });
+  }, [syncPresenceRegistry]);
 
   // ── Inicializar estado al montar ──
   useEffect(() => {
@@ -76,6 +182,8 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
       } catch {}
 
       console.log('[STATUS] Mount — initialStatus:', initialStatus);
+      sessionIdRef.current = `tab-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      lastLocalChangeAtRef.current = Date.now();
       myStatusRef.current = initialStatus;
       setMyStatusState(initialStatus);
 
@@ -111,6 +219,17 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
       const events = ['mousedown', 'keydown', 'touchstart', 'scroll', 'mousemove'];
       events.forEach((ev) => window.addEventListener(ev, onUserActivity, { passive: true }));
 
+      const handleStorageChange = async (event) => {
+        if (event.key !== getPresenceRegistryKey()) return;
+        const sessions = readPresenceSessions();
+        const effectiveStatus = computeEffectiveStatus(sessions);
+        if (effectiveStatus !== myStatusRef.current) {
+          myStatusRef.current = effectiveStatus;
+          setMyStatusState(effectiveStatus);
+        }
+      };
+      window.addEventListener('storage', handleStorageChange);
+
       resetIdleTimer();
 
       // ── Heartbeat cada 30s ──
@@ -120,61 +239,38 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
         heartbeatRef.current = setInterval(() => {
           const s = myStatusRef.current;
           if (s === 'online' || s === 'idle' || s === 'dnd') {
-            supabase
-              .from('profiles')
-              .update({ user_status: s })
-              .eq('id', userId)
-              .then()
-              .catch(() => {});
+            syncPresenceRegistry(s).catch(() => {});
           }
         }, 30000);
       };
       startHeartbeat();
 
-      // ── beforeunload: poner disconnected ──
+      // ── beforeunload/pagehide: poner disconnected ──
       const SB_URL = import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_DATA_API_URL || '';
       const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
       const restOrigin = (() => { try { return new URL(SB_URL).origin; } catch { return ''; } })();
 
-      const handleBeforeUnload = () => {
+      const handleDisconnect = () => {
         if (heartbeatRef.current) clearInterval(heartbeatRef.current);
-        const token = sessionTokenRef.current;
-        if (!token || !restOrigin) return;
-        try {
-          fetch(`${restOrigin}/rest/v1/profiles?id=eq.${userId}`, {
-            method: 'PATCH',
-            headers: {
-              'Content-Type': 'application/json',
-              'apiKey': SB_KEY,
-              'Authorization': `Bearer ${token}`,
-              'Prefer': 'return=minimal',
-            },
-            body: JSON.stringify({ user_status: 'disconnected' }),
-            keepalive: true,
-          });
-        } catch {}
+        unregisterPresenceSession().catch(() => {});
       };
-      window.addEventListener('beforeunload', handleBeforeUnload);
+      window.addEventListener('beforeunload', handleDisconnect);
+      window.addEventListener('pagehide', handleDisconnect);
 
       mountedCleanupRef.current = () => {
-        window.removeEventListener('beforeunload', handleBeforeUnload);
+        window.removeEventListener('beforeunload', handleDisconnect);
+        window.removeEventListener('pagehide', handleDisconnect);
+        window.removeEventListener('storage', handleStorageChange);
         if (heartbeatRef.current) clearInterval(heartbeatRef.current);
         subscription?.unsubscribe();
         events.forEach((ev) => window.removeEventListener(ev, onUserActivity));
         if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+        unregisterPresenceSession().catch(() => {});
       };
 
       // Sync inicial con la DB
       console.log('[STATUS] Mount — syncing DB with:', initialStatus);
-      supabase
-        .from('profiles')
-        .update({ user_status: initialStatus })
-        .eq('id', userId)
-        .then(({ error }) => {
-          if (error) console.warn('[STATUS] Mount DB sync error:', error);
-          else console.log('[STATUS] Mount DB sync OK');
-        })
-        .catch(() => {});
+      syncPresenceRegistry(initialStatus, { force: true }).catch(() => {});
     })();
 
     return () => {
@@ -187,89 +283,129 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
 
   // ── Suscribirse al estado de otro usuario ──
   useEffect(() => {
-    if (!otherUserId) {
+    const targetIds = (Array.isArray(otherUserId) ? otherUserId : [otherUserId]).filter(Boolean);
+    const isMultiTarget = Array.isArray(otherUserId);
+
+    if (targetIds.length === 0) {
       setStatus(null);
+      setStatuses({});
       return;
     }
 
-    // Resetear estado previo (evita flicker)
+    const normalizedIds = [...new Set(targetIds)];
     setStatus(null);
+    setStatuses({});
     let cancelled = false;
+    const cleanupFns = [];
 
-    // ── Verificar follow mutuo ──
-    const checkVisibility = async () => {
-      if (!userId || !checkMutualFollow) return true;
-
-      const iFollowThem = getCachedFollowStatus(userId, otherUserId);
-      const theyFollowMe = getCachedFollowStatus(otherUserId, userId);
-
-      if (iFollowThem !== null && theyFollowMe !== null) {
-        return iFollowThem === true && theyFollowMe === true;
-      }
-
-      try {
-        const [iFollow, theyFollow] = await Promise.all([
-          supabase
-            .from('follows')
-            .select('follower_id', { count: 'exact', head: true })
-            .eq('follower_id', userId)
-            .eq('following_id', otherUserId)
-            .eq('status', 'accepted'),
-          supabase
-            .from('follows')
-            .select('follower_id', { count: 'exact', head: true })
-            .eq('follower_id', otherUserId)
-            .eq('following_id', userId)
-            .eq('status', 'accepted'),
-        ]);
-        return (iFollow.count ?? 0) > 0 && (theyFollow.count ?? 0) > 0;
-      } catch (err) {
-        console.warn('Error checking mutual follow:', err);
-        return false;
+    const updateStatusForUser = (targetId, value) => {
+      if (cancelled) return;
+      if (isMultiTarget) {
+        setStatuses(prev => (prev[targetId] === value ? prev : { ...prev, [targetId]: value }));
+      } else {
+        setStatus(value);
       }
     };
 
-    checkVisibility().then((visible) => {
+    const subscribeToUserStatus = async (targetId) => {
+      if (!targetId || cancelled) return;
+
+      // ── Verificar follow mutuo ──
+      const checkVisibility = async () => {
+        if (!userId || !checkMutualFollow) return true;
+
+        const iFollowThem = getCachedFollowStatus(userId, targetId);
+        const theyFollowMe = getCachedFollowStatus(targetId, userId);
+
+        if (iFollowThem !== null && theyFollowMe !== null) {
+          return iFollowThem === true && theyFollowMe === true;
+        }
+
+        try {
+          const [iFollow, theyFollow] = await Promise.all([
+            supabase
+              .from('follows')
+              .select('follower_id', { count: 'exact', head: true })
+              .eq('follower_id', userId)
+              .eq('following_id', targetId)
+              .eq('status', 'accepted'),
+            supabase
+              .from('follows')
+              .select('follower_id', { count: 'exact', head: true })
+              .eq('follower_id', targetId)
+              .eq('following_id', userId)
+              .eq('status', 'accepted'),
+          ]);
+          return (iFollow.count ?? 0) > 0 && (theyFollow.count ?? 0) > 0;
+        } catch (err) {
+          console.warn('Error checking mutual follow:', err);
+          return false;
+        }
+      };
+
+      const visible = await checkVisibility();
       if (cancelled) return;
-      if (!visible) { setStatus(null); return; }
+      if (!visible) {
+        updateStatusForUser(targetId, null);
+        return;
+      }
 
       // ── 1. Fetch initial status ──
-      supabase
-        .from('profiles')
-        .select('user_status')
-        .eq('id', otherUserId)
-        .maybeSingle()
-        .then(({ data, error }) => {
-          if (!error && data && !cancelled) {
-            console.log('[STATUS] Obs — initial fetch result:', data.user_status, 'for', otherUserId);
-            setStatus(data.user_status);
-          } else if (!cancelled) {
-            console.log('[STATUS] Obs — initial fetch no data/error:', error?.message);
-          }
-        });
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('user_status, user_status_updated_at')
+          .eq('id', targetId)
+          .maybeSingle();
+
+        if (!cancelled && !error && data?.user_status !== undefined) {
+          const normalizedStatus = (() => {
+            const rawStatus = data.user_status;
+            const updatedAt = data.user_status_updated_at;
+            if (rawStatus === 'disconnected') return 'disconnected';
+            if (!updatedAt) return rawStatus;
+            const ageMs = Date.now() - new Date(updatedAt).getTime();
+            return ageMs > STALE_STATUS_THRESHOLD_MS ? 'disconnected' : rawStatus;
+          })();
+          console.log('[STATUS] Obs — initial fetch result:', normalizedStatus, 'for', targetId);
+          updateStatusForUser(targetId, normalizedStatus);
+        } else if (!cancelled) {
+          console.log('[STATUS] Obs — initial fetch no data/error:', error?.message);
+        }
+      } catch {}
 
       // ── 2. Subscribe a postgres_changes (Realtime vía DB) ──
       const channel = supabase
-        .channel(`user-status-${otherUserId}-${userId}`)
+        .channel(`user-status-${targetId}-${userId || 'anon'}`)
         .on('postgres_changes', {
           event: 'UPDATE',
           schema: 'public',
           table: 'profiles',
-          filter: `id=eq.${otherUserId}`,
+          filter: `id=eq.${targetId}`,
         }, (payload) => {
           if (!cancelled && payload.new.user_status !== undefined) {
-            console.log('[STATUS] Obs — postgres_changes received:', payload.new.user_status, '→ old:', payload.old?.user_status);
-            setStatus(payload.new.user_status);
+            const updatedAt = payload.new.user_status_updated_at;
+            const normalizedStatus = (() => {
+              const rawStatus = payload.new.user_status;
+              if (rawStatus === 'disconnected') return 'disconnected';
+              if (!updatedAt) return rawStatus;
+              const ageMs = Date.now() - new Date(updatedAt).getTime();
+              return ageMs > STALE_STATUS_THRESHOLD_MS ? 'disconnected' : rawStatus;
+            })();
+            console.log('[STATUS] Obs — postgres_changes received:', normalizedStatus, '→ old:', payload.old?.user_status, 'for', targetId);
+            updateStatusForUser(targetId, normalizedStatus);
           } else if (!cancelled) {
             console.log('[STATUS] Obs — postgres_changes but no user_status in payload');
           }
         })
         .subscribe((subStatus) => {
-          console.log('[STATUS] Obs — subscribe status:', subStatus, 'for', otherUserId);
+          console.log('[STATUS] Obs — subscribe status:', subStatus, 'for', targetId);
         });
 
-      console.log('[STATUS] Obs — channel created + subscribed for', otherUserId);
-      channelRef.current = channel;
+      console.log('[STATUS] Obs — channel created + subscribed for', targetId);
+      cleanupFns.push(() => {
+        if (channel) supabase.removeChannel(channel);
+      });
 
       // ── 3. Polling fallback cada 3s (no depende de Realtime) ──
       const pollStatus = async () => {
@@ -278,39 +414,41 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
           const { data, error } = await supabase
             .from('profiles')
             .select('user_status')
-            .eq('id', otherUserId)
+            .eq('id', targetId)
             .maybeSingle();
           if (!cancelled && !error && data?.user_status !== undefined) {
-            setStatus(data.user_status);
+            const normalizedStatus = (() => {
+              const rawStatus = data.user_status;
+              const updatedAt = data.user_status_updated_at;
+              if (rawStatus === 'disconnected') return 'disconnected';
+              if (!updatedAt) return rawStatus;
+              const ageMs = Date.now() - new Date(updatedAt).getTime();
+              return ageMs > STALE_STATUS_THRESHOLD_MS ? 'disconnected' : rawStatus;
+            })();
+            updateStatusForUser(targetId, normalizedStatus);
           }
         } catch {}
       };
       const pollInterval = setInterval(pollStatus, 3000);
       const onVisible = () => { if (!document.hidden) pollStatus(); };
       document.addEventListener('visibilitychange', onVisible);
-
-      // Guardar cleanup extra
-      const extraCleanup = () => {
+      cleanupFns.push(() => {
         clearInterval(pollInterval);
         document.removeEventListener('visibilitychange', onVisible);
-      };
+      });
+    };
 
-      // Almacenar channel + cleanup en channelRef
-      channelRef.current = { channel, extra: extraCleanup };
-    });
+    Promise.all(normalizedIds.map(subscribeToUserStatus));
 
     return () => {
       cancelled = true;
-      if (channelRef.current) {
-        console.log('[STATUS] Obs — cleanup: removing channel + polling for', otherUserId);
-        if (channelRef.current.channel) supabase.removeChannel(channelRef.current.channel);
-        if (channelRef.current.extra) channelRef.current.extra();
-        channelRef.current = null;
-      }
+      cleanupFns.forEach((cleanup) => cleanup());
+      setStatuses({});
+      setStatus(null);
     };
   }, [userId, otherUserId, checkMutualFollow]);
 
-  return { status, myStatus, setMyStatus };
+  return { status, statuses, myStatus, setMyStatus };
 }
 
 /**
