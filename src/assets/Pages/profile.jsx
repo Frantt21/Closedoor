@@ -1107,12 +1107,10 @@ function Profile() {
 
     const roles = activeProfile?.roles || ["user"];
 
-    // ── Filter roles based on badges_visibility ──
+    // ── Filter roles based on badges_visibility (sin useMemo para evitar hooks tras early returns) ──
     const badgeTypes = ['admin', 'dev', 'mod', 'partner', 'verified'];
     const badgesVisibility = activeProfile?.badges_visibility || {};
-    const visibleRoles = useMemo(() => {
-      return roles.filter(r => r === 'user' || !badgeTypes.includes(r) || badgesVisibility[r] !== false);
-    }, [roles, badgesVisibility]);
+    const visibleRoles = roles.filter(r => r === 'user' || !badgeTypes.includes(r) || badgesVisibility[r] !== false);
 
     // ── Save profile (own profile only) ──
     const handleSaveProfile = async ({ username, displayname, avatar_url, banner_url, banner_credits, avatar_credits, bio, pronouns, social_links, accent_color, accent_color_secondary, accent_surface_color, accent_surface_glass, interests, banner_position, avatar_position, profile_background_url, profile_background_position, profile_background_blur, profile_background_dim, banner_dim, profile_text_color }) => {
