@@ -109,7 +109,7 @@ export async function getConversations(userId) {
   if (uniqueUserIds.length > 0) {
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, username, displayname, avatar_url, banner_url, bio, pronouns, roles, is_private, interests, accent_color, accent_color_secondary, banner_position, avatar_position')
+      .select('id, username, displayname, avatar_url, banner_url, bio, pronouns, roles, is_private, interests, accent_color, accent_color_secondary, banner_position, avatar_position, user_status')
       .in('id', uniqueUserIds);
     for (const p of profiles || []) {
       profilesMap[p.id] = p;
@@ -285,7 +285,7 @@ export async function sendMessage(conversationId, senderId, content, participant
   // Fetch sender profile separately
   const { data: senderProfile } = await supabase
     .from('profiles')
-    .select('id, username, displayname, avatar_url, avatar_position')
+    .select('id, username, displayname, avatar_url, avatar_position, user_status')
     .eq('id', senderId)
     .maybeSingle();
 
@@ -334,7 +334,7 @@ export async function getMessages(conversationId, limit = 50, before = null) {
   const senderIds = [...new Set(msgs.map(m => m.sender_id))];
   const { data: profiles } = await supabase
     .from('profiles')
-    .select('id, username, displayname, avatar_url, avatar_position')
+    .select('id, username, displayname, avatar_url, avatar_position, user_status')
     .in('id', senderIds);
 
   const profileMap = {};
@@ -386,7 +386,7 @@ export function subscribeToMessages(conversationId, onMessage, onDelete) {
 
         const { data: profile } = await supabase
           .from('profiles')
-          .select('id, username, displayname, avatar_url, avatar_position')
+          .select('id, username, displayname, avatar_url, avatar_position, user_status')
           .eq('id', msg.sender_id)
           .maybeSingle();
 
@@ -411,7 +411,7 @@ export function subscribeToMessages(conversationId, onMessage, onDelete) {
 
         const { data: profile } = await supabase
           .from('profiles')
-          .select('id, username, displayname, avatar_url, avatar_position')
+          .select('id, username, displayname, avatar_url, avatar_position, user_status')
           .eq('id', msg.sender_id)
           .maybeSingle();
 

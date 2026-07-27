@@ -1168,11 +1168,11 @@ export default function Settings() {
         disableBackdropClose={false}
         className="settings-blocked-modal"
       >
-        <div className="followers-modal-header">
+        <div className="settings-blocked-header">
           <h3 className="fc-modal-title">{t('settings.blocked_users')}</h3>
           <button
             type="button"
-            className="followers-modal-close"
+            className="settings-blocked-close"
             onClick={() => setShowBlockedModal(false)}
             aria-label={t('common.close')}
           >

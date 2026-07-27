@@ -66,6 +66,7 @@ import CreatePostModal from "../Resources/Components/CreatePostModal";
 import FloatingActionButton from "../Resources/Components/FloatingActionButton";
 import { toast } from 'react-toastify';
 import { getCdnUrl } from '../services/cdnService';
+import { useUserStatus } from '../services/useUserStatus';
 
 function Profile() {
     const { t, showAccent, accentVisibility, showLikes, filterEncrypted, showBadges, locale } = useI18n();
@@ -149,6 +150,9 @@ function Profile() {
         const targetId = activeProfile?.id || resolveUserId();
         return targetId ? !getCachedFollowCounts(targetId) : true;
     });
+
+  // ── User status ──
+  const { status: myStatus, setMyStatus } = useUserStatus(isOwnProfile ? user?.id : null);
 
   // ── Block / context menu state ──
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
@@ -1396,14 +1400,12 @@ function Profile() {
                     )}
 
                     <div className="profile-avatar-container">
-                        <img
-                            className="profile-avatar"
-                            src={
-                                avatarUrl ||
-                                "https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg"
-                            }
+                        <Avatar
+                            src={avatarUrl}
                             alt="User Avatar"
+                            className="profile-avatar"
                             style={getImgTransformStyle(activeProfile?.avatar_position)}
+                            status={isOwnProfile ? myStatus : (isFollower === true && isFollowedBy === true ? activeProfile?.user_status : null)}
                         />
                     </div>
 
@@ -1518,9 +1520,8 @@ function Profile() {
                         </>
                         )}
 
-                        <div className="profile-actions">
-                            {isOwnProfile ? (
-                                <button
+                        <div className="profile-actions">                            {isOwnProfile ? (<>
+                                 <button
                                     type="button"
                                     className="profile-edit-button"
                                     onClick={() => {
@@ -1540,19 +1541,31 @@ function Profile() {
                                 >
                                     <span className="profile-edit-label">{t('profile.edit')}</span>
                                 </button>
-                            ) : (
-                                <>
-                                {isBlockedByMe ? (
-                                  <button
-                                    type="button"
-                                    className="profile-edit-button"
-                                    disabled
-                                    style={{ opacity: 0.7, cursor: 'not-allowed', display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                                  >
-                                    <FaBan style={{ marginRight: 4 }} />
-                                    {t('block.blocked')}
-                                  </button>
-                                ) : (
+                                {/* ── 3-dots context menu (own profile) ── */}
+                                {user && (
+                                  <div className="profile-actions-menu" ref={contextMenuRef}>
+                                    <button
+                                      type="button"
+                                      className="profile-actions-menu-btn"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        setDropdownStyle({
+                                          position: 'fixed',
+                                          top: `${rect.bottom + 6}px`,
+                                          right: `${window.innerWidth - rect.right}px`,
+                                          zIndex: 9999,
+                                        });
+                                        setContextMenuOpen((s) => !s);
+                                      }}
+                                      aria-label="More actions"
+                                    >
+                                      <FaEllipsisH />
+                                    </button>
+                                  </div>
+                                )}
+                                </>
+                            ) : (<>
                                 <FollowButton
                                     targetUserId={activeProfile.id}
                                     isPrivate={isPrivate}
@@ -1567,7 +1580,6 @@ function Profile() {
                                         }
                                     }}
                                 />
-                                )}
                                 {/* ── 3-dots context menu ── */}
                                 {user && (
                                   <div className="profile-actions-menu" ref={contextMenuRef}>
@@ -1609,52 +1621,84 @@ function Profile() {
                   <FaShareAlt />
                   {t('profile.share_profile') || 'Share profile'}
                 </button>
-                <button
-                  type="button"
-                  className="fc-dropdown-btn"
-                  onClick={async () => {
-                    setBlockLoading(true);
-                    try {
-                      if (isBlockedByMe) {
-                        await unblockUser(user.id, activeProfile.id);
-                        setIsBlockedByMeDb(false);
-                        cacheBlockStatus(user.id, activeProfile.id, false);
-                      } else {
-                        await blockUser(user.id, activeProfile.id);
-                        // Auto-unfollow: ambos sentidos via RPC (bypass RLS)
-                        try {
-                          await unfollowBothWays(user.id, activeProfile.id);
-                          setIsFollower(false);
-                          setCachedFollowStatus(user.id, activeProfile.id, false);
-                          setIsFollowedBy(false);
-                          setCachedFollowStatus(activeProfile.id, user.id, false);
-                        } catch (e) {
-                          console.warn('Could not unfollow both ways on block:', e);
+                {isOwnProfile && (
+                  <>
+                    <div className="fc-dropdown-divider" />
+                    <div className="fc-dropdown-label">{t('status.set_status') || 'Set status'}</div>
+                    <button
+                      type="button"
+                      className={`fc-dropdown-btn ${myStatus === 'online' ? 'fc-dropdown-btn--active' : ''}`}
+                      onClick={() => { setMyStatus('online'); setContextMenuOpen(false); }}
+                    >
+                      <span className="fc-dropdown-status-dot fc-dropdown-status-dot--online" />
+                      {t('status.set_online') || 'Online'}
+                    </button>
+                    <button
+                      type="button"
+                      className={`fc-dropdown-btn ${myStatus === 'idle' ? 'fc-dropdown-btn--active' : ''}`}
+                      onClick={() => { setMyStatus('idle'); setContextMenuOpen(false); }}
+                    >
+                      <span className="fc-dropdown-status-dot fc-dropdown-status-dot--idle" />
+                      {t('status.set_idle') || 'Idle'}
+                    </button>
+                    <button
+                      type="button"
+                      className={`fc-dropdown-btn ${myStatus === 'dnd' ? 'fc-dropdown-btn--active' : ''}`}
+                      onClick={() => { setMyStatus('dnd'); setContextMenuOpen(false); }}
+                    >
+                      <span className="fc-dropdown-status-dot fc-dropdown-status-dot--dnd" />
+                      {t('status.set_dnd') || 'Do Not Disturb'}
+                    </button>
+                  </>
+                )}
+                {!isOwnProfile && (
+                  <button
+                    type="button"
+                    className="fc-dropdown-btn"
+                    onClick={async () => {
+                      setBlockLoading(true);
+                      try {
+                        if (isBlockedByMe) {
+                          await unblockUser(user.id, activeProfile.id);
+                          setIsBlockedByMeDb(false);
+                          cacheBlockStatus(user.id, activeProfile.id, false);
+                        } else {
+                          await blockUser(user.id, activeProfile.id);
+                          // Auto-unfollow: ambos sentidos via RPC (bypass RLS)
+                          try {
+                            await unfollowBothWays(user.id, activeProfile.id);
+                            setIsFollower(false);
+                            setCachedFollowStatus(user.id, activeProfile.id, false);
+                            setIsFollowedBy(false);
+                            setCachedFollowStatus(activeProfile.id, user.id, false);
+                          } catch (e) {
+                            console.warn('Could not unfollow both ways on block:', e);
+                          }
+                          // Refrescar follow counts despues de anular seguimiento
+                          try {
+                            const counts = await getFollowCounts(activeProfile.id);
+                            setFollowCounts(counts);
+                            setCachedFollowCounts(activeProfile.id, counts);
+                            setCountsLoading(false);
+                          } catch (e) {
+                            console.warn('Could not refresh follow counts after block:', e);
+                          }
+                          setIsBlockedByMeDb(true);
+                          cacheBlockStatus(user.id, activeProfile.id, true);
                         }
-                        // Refrescar follow counts despues de anular seguimiento
-                        try {
-                          const counts = await getFollowCounts(activeProfile.id);
-                          setFollowCounts(counts);
-                          setCachedFollowCounts(activeProfile.id, counts);
-                          setCountsLoading(false);
-                        } catch (e) {
-                          console.warn('Could not refresh follow counts after block:', e);
-                        }
-                        setIsBlockedByMeDb(true);
-                        cacheBlockStatus(user.id, activeProfile.id, true);
+                        setContextMenuOpen(false);
+                      } catch (err) {
+                        console.error('Block/unblock error:', err);
+                      } finally {
+                        setBlockLoading(false);
                       }
-                      setContextMenuOpen(false);
-                    } catch (err) {
-                      console.error('Block/unblock error:', err);
-                    } finally {
-                      setBlockLoading(false);
-                    }
-                  }}
-                  disabled={blockLoading}
-                >
-                  <FaBan />
-                  {isBlockedByMe ? t('block.unblock') : t('block.block')}
-                </button>
+                    }}
+                    disabled={blockLoading}
+                  >
+                    <FaBan />
+                    {isBlockedByMe ? t('block.unblock') : t('block.block')}
+                  </button>
+                )}
               </div>,
               document.body
             )}

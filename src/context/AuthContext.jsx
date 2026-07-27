@@ -172,10 +172,7 @@ export function AuthProvider({ children }) {
   const linkDiscord = async () => {
     try {
       setError(null);
-      // linkIdentity no está disponible en esta versión de Supabase.
-      // Usamos signInWithOAuth en su lugar: como el usuario ya tiene sesión,
-      // Supabase vincula la identidad automáticamente al procesar el callback.
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.linkIdentity({
         provider: 'discord',
         options: {
           redirectTo: `${window.location.origin}/auth/callback`,

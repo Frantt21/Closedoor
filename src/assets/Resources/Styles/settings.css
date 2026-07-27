@@ -545,12 +545,60 @@
 
 /* ── Blocked Users Modal ── */
 
-.settings-blocked-modal {
-  max-width: 400px;
+dialog.fc-modal.settings-blocked-modal {
+  max-width: 420px;
   max-height: 480px;
   display: flex;
   flex-direction: column;
   padding: 0;
+}
+
+.settings-blocked-modal .settings-blocked-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px 12px;
+    border-bottom: 1px solid var(--color-border, #2a2a2a);
+    flex-shrink: 0;
+}
+
+.settings-blocked-modal .settings-blocked-header .fc-modal-title {
+    margin: 0;
+}
+
+.settings-blocked-modal .settings-blocked-close {
+    background: none;
+    border: none;
+    color: var(--color-text-secondary, #9ca3af);
+    font-size: 1.4rem;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    border-radius: var(--radius-sm, 6px);
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.settings-blocked-modal .settings-blocked-close:hover {
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+}
+
+@media (max-width: 1024px) {
+    dialog.fc-modal.settings-blocked-modal {
+        max-width: 90vw;
+    }
+}
+
+@media (max-width: 480px) {
+    dialog.fc-modal.settings-blocked-modal {
+        max-height: 85vh;
+    }
+
+    .settings-blocked-modal .settings-blocked-header {
+        padding: 16px 16px 10px;
+    }
 }
 
 .settings-blocked-list {

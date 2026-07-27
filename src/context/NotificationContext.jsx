@@ -114,6 +114,12 @@ function showLiveNotification(data, navigate) {
   // No mostrar toasts si el usuario está en el chat
   if (isChatRoute()) return;
 
+  // ── DND: No mostrar notificaciones si el usuario tiene estado DND ──
+  try {
+    const userStatus = getItem('fc_user_status');
+    if (userStatus === 'dnd') return;
+  } catch {}
+
   const username = data.actor.username || 'Alguien';
   const message = getNotifMessage(data.type, username);
   const link = getNotifLink(data);
@@ -124,7 +130,7 @@ function showLiveNotification(data, navigate) {
   const isHidden = document.visibilityState === 'hidden' || !document.hasFocus();
   if (isHidden) {
     try {
-      if (getItem('fc_show_push_notifications') === 'true') {
+      if (getItem('fc_show_push_notifications') === 'true' && getItem('fc_user_status') !== 'dnd') {
         tryShowOsNotification(message, avatarUrl, link, data.id);
       }
     } catch {}
