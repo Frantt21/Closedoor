@@ -17,6 +17,7 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
   const myStatusRef = useRef('online');
   const idleTimerRef = useRef(null);
   const channelRef = useRef(null);
+  const sessionTokenRef = useRef(null);
 
   // ── Actualizar mi estado en la DB ──
   const setMyStatus = useCallback(async (newStatus) => {
@@ -76,11 +77,41 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
 
     resetIdleTimer();
 
-    // ── Note: disconnected on page unload isn't reliable from browser JS.
-    // Supabase will see the user as still "online" until they re-appear.
-    // This is acceptable — on next load, status resets to 'online'.
+    // ── On page unload, set status to disconnected via fetch(keepalive) ──
+    const SB_URL = import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_DATA_API_URL || '';
+    const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
+    const restOrigin = (() => { try { return new URL(SB_URL).origin; } catch { return ''; } })();
+    // Store initial token
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      sessionTokenRef.current = session?.access_token || null;
+    });
+    // Keep token refreshed on auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      sessionTokenRef.current = session?.access_token || null;
+    });
+
+    const handleBeforeUnload = () => {
+      const token = sessionTokenRef.current;
+      if (!token || !restOrigin) return;
+      try {
+        fetch(`${restOrigin}/rest/v1/profiles?id=eq.${userId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'apiKey': SB_KEY,
+            'Authorization': `Bearer ${token}`,
+            'Prefer': 'return=minimal',
+          },
+          body: JSON.stringify({ user_status: 'disconnected' }),
+          keepalive: true,
+        });
+      } catch {}
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      subscription?.unsubscribe();
       events.forEach((ev) => window.removeEventListener(ev, onUserActivity));
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     };
