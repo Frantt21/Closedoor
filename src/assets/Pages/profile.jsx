@@ -174,24 +174,38 @@ function Profile() {
   useEffect(() => {
     const targetId = activeProfile?.id;
     if (!targetId || isOwnProfile) return;
+    console.log('[STATUS] Poll — starting 10s interval for', targetId);
     const poll = async () => {
       try {
-        const { data } = await supabase
+        console.log('[STATUS] Poll — fetching...');
+        const { data, error } = await supabase
           .from('profiles')
           .select('user_status')
           .eq('id', targetId)
           .maybeSingle();
-        if (data?.user_status !== undefined) {
+        if (error) console.warn('[STATUS] Poll error:', error.message);
+        else if (data?.user_status !== undefined) {
+          console.log('[STATUS] Poll — got:', data.user_status);
           setProfileStatus(data.user_status);
+        } else {
+          console.log('[STATUS] Poll — no data');
         }
-      } catch {}
+      } catch (err) {
+        console.warn('[STATUS] Poll exception:', err);
+      }
     };
-    // Poll cada 10s (más rápido que 30s para mejor feedback)
+    // Poll cada 10s
     const interval = setInterval(poll, 10000);
-    // Re-sincronizar al volver al tab activo (soluciona background tab)
-    const onVisible = () => { if (!document.hidden) poll(); };
+    // Re-sincronizar al volver al tab activo
+    const onVisible = () => {
+      if (!document.hidden) {
+        console.log('[STATUS] Poll — visibilitychange → poll');
+        poll();
+      }
+    };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
+      console.log('[STATUS] Poll — cleanup interval');
       clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisible);
     };
