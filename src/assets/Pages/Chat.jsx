@@ -884,57 +884,6 @@ export default function Chat() {
     }
   }, [msgMenu.msg]);
 
-  const handleDeleteMessage = useCallback(async () => {
-    const msg = msgMenu.msg;
-    const convId = activeConvId;
-    setMsgMenu({ open: false, x: 0, y: 0, msg: null });
-    if (!msg || !convId) return;
-    try {
-      await deleteMessage(msg.id);
-      setMessages((prev) => {
-        const filtered = prev.filter(m => m.id !== msg.id);
-        // If deleted message was the last one, update the conversation preview
-        const wasLast = msg.id === prev[prev.length - 1]?.id;
-        if (wasLast) {
-          const newLast = filtered[filtered.length - 1];
-          updateConvPreview(
-            convId,
-            newLast?.content || newLast?.decryptedContent || null,
-            newLast?.created_at || null
-          );
-        }
-        return filtered;
-      });
-    } catch (err) {
-      console.error('Error deleting message:', err);
-    }
-  }, [msgMenu.msg, activeConvId, updateConvPreview]);
-
-  const handleDeleteMessageForMe = useCallback(async () => {
-    const msg = msgMenu.msg;
-    const convId = activeConvId;
-    setMsgMenu({ open: false, x: 0, y: 0, msg: null });
-    if (!msg || !user?.id || !convId) return;
-    try {
-      await deleteMessageForMe(msg.id, user.id);
-      setMessages((prev) => {
-        const filtered = prev.filter(m => m.id !== msg.id);
-        const wasLast = msg.id === prev[prev.length - 1]?.id;
-        if (wasLast) {
-          const newLast = filtered[filtered.length - 1];
-          updateConvPreview(
-            convId,
-            newLast?.content || newLast?.decryptedContent || null,
-            newLast?.created_at || null
-          );
-        }
-        return filtered;
-      });
-    } catch (err) {
-      console.error('Error hiding message:', err);
-    }
-  }, [msgMenu.msg, activeConvId, updateConvPreview, user?.id]);
-
   const handlePinMessage = useCallback(async () => {
     const msg = msgMenu.msg;
     setMsgMenu({ open: false, x: 0, y: 0, msg: null });
@@ -1326,6 +1275,58 @@ export default function Chat() {
         });
     });
   }, []);
+
+  // ── Delete message handlers (defined after updateConvPreview to avoid TDZ) ──
+  const handleDeleteMessage = useCallback(async () => {
+    const msg = msgMenu.msg;
+    const convId = activeConvId;
+    setMsgMenu({ open: false, x: 0, y: 0, msg: null });
+    if (!msg || !convId) return;
+    try {
+      await deleteMessage(msg.id);
+      setMessages((prev) => {
+        const filtered = prev.filter(m => m.id !== msg.id);
+        // If deleted message was the last one, update the conversation preview
+        const wasLast = msg.id === prev[prev.length - 1]?.id;
+        if (wasLast) {
+          const newLast = filtered[filtered.length - 1];
+          updateConvPreview(
+            convId,
+            newLast?.content || newLast?.decryptedContent || null,
+            newLast?.created_at || null
+          );
+        }
+        return filtered;
+      });
+    } catch (err) {
+      console.error('Error deleting message:', err);
+    }
+  }, [msgMenu.msg, activeConvId, updateConvPreview]);
+
+  const handleDeleteMessageForMe = useCallback(async () => {
+    const msg = msgMenu.msg;
+    const convId = activeConvId;
+    setMsgMenu({ open: false, x: 0, y: 0, msg: null });
+    if (!msg || !user?.id || !convId) return;
+    try {
+      await deleteMessageForMe(msg.id, user.id);
+      setMessages((prev) => {
+        const filtered = prev.filter(m => m.id !== msg.id);
+        const wasLast = msg.id === prev[prev.length - 1]?.id;
+        if (wasLast) {
+          const newLast = filtered[filtered.length - 1];
+          updateConvPreview(
+            convId,
+            newLast?.content || newLast?.decryptedContent || null,
+            newLast?.created_at || null
+          );
+        }
+        return filtered;
+      });
+    } catch (err) {
+      console.error('Error hiding message:', err);
+    }
+  }, [msgMenu.msg, activeConvId, updateConvPreview, user?.id]);
 
   // ── Shared send logic (optimistic + API + dedup) ──
   const sendContent = useCallback(async (content, { clearInput = false } = {}) => {
