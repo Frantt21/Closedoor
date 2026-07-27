@@ -806,7 +806,12 @@ export default function Chat() {
     setContextMenu({ open: true, x: pos.x, y: pos.y, convId });
   }, [getSmartMenuPosition]);
 
-  const [hiddenConvIds, setHiddenConvIds] = useState([]);
+  const [hiddenConvIds, setHiddenConvIds] = useState(() => {
+    try {
+      const saved = getItem('hiddenConvIds');
+      return Array.isArray(saved) ? saved : [];
+    } catch { return []; }
+  });
 
   // Filter out hidden + searched conversations from the list
   const visibleConversations = React.useMemo(() => {
@@ -822,7 +827,7 @@ export default function Chat() {
     });
   }, [conversations, hiddenConvIds, searchQuery]);
 
-  // Persist hidden IDs
+  // Persist hidden IDs (saved by lazy initializer on mount, persisted on every change)
   useEffect(() => {
     setItem('hiddenConvIds', hiddenConvIds);
   }, [hiddenConvIds]);
@@ -2675,7 +2680,7 @@ export default function Chat() {
                       <span key={interest} className="explore-card-interest">{interest}</span>
                     ))}
                     {otherUser.interests.length > 3 && (
-                      <span className="explore-card-interests-more">+{otherUser.interests.length - 3}</span>
+                      <span className="explore-card-interests-more">show {otherUser.interests.length - 3} more</span>
                     )}
                   </div>
                 )}

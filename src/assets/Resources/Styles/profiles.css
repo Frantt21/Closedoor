@@ -186,7 +186,7 @@
    the circular border, making it visually attached with no gap. */
 .profile-avatar-container .status-dot {
     bottom: calc(12% - 8px);
-    right: calc(12% - 8px);
+    right: calc(12% - 1px);
 }
 
 /* ---- User info overlay ---- */

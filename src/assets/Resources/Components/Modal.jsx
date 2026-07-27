@@ -540,6 +540,7 @@ export default function Modal({
     else if (e.key === 'Escape') { e.preventDefault(); closeUrlSubmodal(); }
   };
 
+
   // ── Profile Background submodal ──
   const bgUrlInitialRef = useRef('');
   const [bgSubPendingClose, setBgSubPendingClose] = useState(false);
@@ -1066,9 +1067,10 @@ export default function Modal({
                     </button>
                   ))}
 
-                  <div className="fc-modal-color-swatch fc-modal-custom-swatch"
-                    onClick={() => document.getElementById('accent-color-input')?.click()}
+                  <label className="fc-modal-color-swatch fc-modal-custom-swatch"
+                    htmlFor="accent-color-input"
                     title={`${t('modal.accent_color_custom')}: ${selectedAccent || '#000000'}`}
+                    style={{ position: 'relative' }}
                   >
                     <input
                       id="accent-color-input"
@@ -1081,7 +1083,7 @@ export default function Modal({
                       <circle cx="12" cy="12" r="3" />
                       <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
                     </svg>
-                  </div>
+                  </label>
                   <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted, #6b7280)', whiteSpace: 'nowrap', alignSelf: 'center' }}>
                     {t('modal.accent_color_custom')}
                   </span>
@@ -1112,8 +1114,8 @@ export default function Modal({
               <div className="fc-modal-color-section">
                 <span className="fc-modal-color-subtitle">{t('modal.accent_color_secondary')}</span>
                 <div className="fc-modal-color-picker">
-                  <div
-                    onClick={() => document.getElementById('accent-secondary-input')?.click()}
+                  <label
+                    htmlFor="accent-secondary-input"
                     className="fc-modal-color-swatch"
                     style={{
                       width: 36,
@@ -1124,11 +1126,12 @@ export default function Modal({
                       cursor: 'pointer',
                       flexShrink: 0,
                       transition: 'transform 0.15s ease',
+                      position: 'relative',
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
                     onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                     title={`${t('modal.accent_color_secondary')}: ${selectedAccentSecondary || '#000000'}`}
-                  />
+                  >
                   <input
                     id="accent-secondary-input"
                     type="color"
@@ -1136,6 +1139,7 @@ export default function Modal({
                     onChange={(e) => setSelectedAccentSecondary(e.target.value)}
                     style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
                   />
+                  </label>
                   {selectedAccentSecondary && (
                     <button
                       type="button"
@@ -1159,8 +1163,8 @@ export default function Modal({
               <div className="fc-modal-color-section">
                 <span className="fc-modal-color-subtitle">{t('modal.accent_surface')}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                  <div
-                    onClick={() => document.getElementById('accent-surface-input')?.click()}
+                  <label
+                    htmlFor="accent-surface-input"
                     style={{
                       width: 36,
                       height: 36,
@@ -1170,11 +1174,12 @@ export default function Modal({
                       cursor: 'pointer',
                       flexShrink: 0,
                       transition: 'transform 0.15s ease',
+                      position: 'relative',
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
                     onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                     title={`${t('modal.accent_surface')}: ${selectedAccentSurface || t('modal.accent_surface_default')}`}
-                  />
+                  >
                   <input
                     id="accent-surface-input"
                     type="color"
@@ -1182,6 +1187,7 @@ export default function Modal({
                     onChange={(e) => setSelectedAccentSurface(e.target.value)}
                     style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
                   />
+                  </label>
                   <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted, #6b7280)' }}>
                     {selectedAccentSurface ? selectedAccentSurface : t('modal.accent_surface_default')}
                   </span>
@@ -1208,8 +1214,8 @@ export default function Modal({
               <div className="fc-modal-color-section">
                 <span className="fc-modal-color-subtitle">{t('modal.profile_text_color')}</span>
                 <div className="fc-modal-color-picker">
-                  <div
-                    onClick={() => document.getElementById('profile-text-color-input')?.click()}
+                  <label
+                    htmlFor="profile-text-color-input"
                     className="fc-modal-color-swatch"
                     style={{
                       width: 36,
@@ -1220,11 +1226,12 @@ export default function Modal({
                       cursor: 'pointer',
                       flexShrink: 0,
                       transition: 'transform 0.15s ease',
+                      position: 'relative',
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
                     onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
                     title={`${t('modal.profile_text_color')}: ${selectedProfileTextColor || '#ffffff'}`}
-                  />
+                  >
                   <input
                     id="profile-text-color-input"
                     type="color"
@@ -1232,6 +1239,7 @@ export default function Modal({
                     onChange={(e) => setSelectedProfileTextColor(e.target.value)}
                     style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
                   />
+                  </label>
                   <span style={{ fontSize: '0.78rem', color: 'var(--color-text-muted, #6b7280)' }}>
                     {selectedProfileTextColor || t('modal.profile_text_color_default')}
                   </span>
