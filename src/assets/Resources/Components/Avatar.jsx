@@ -37,16 +37,21 @@ export default function Avatar({ src, alt = 'avatar', className, style, onClick,
   // With status, wrap in a div for the dot positioning.
   // The style (transform/objectPosition) goes on the inner <img>
   // so the status dot isn't affected by rotation, flip, or zoom.
+  // An inner clipping div wraps the img so the status dot (sibling of that div)
+  // is NOT clipped by the circular overflow:hidden — critical for profile avatar
+  // where the parent container clips to border-radius.
   return (
     <div className={`avatar-wrapper ${className || ''}`.trim()} style={{ position: 'relative', display: 'inline-flex' }}>
-      <img
-        className="avatar-img"
-        src={normalizedSrc}
-        alt={alt}
-        style={{ display: 'block', width: '100%', height: '100%', borderRadius: 'inherit', objectFit: 'cover', ...style }}
-        onClick={onClick}
-        onError={handleError}
-      />
+      <div style={{ width: '100%', height: '100%', borderRadius: 'inherit', overflow: 'hidden' }}>
+        <img
+          className="avatar-img"
+          src={normalizedSrc}
+          alt={alt}
+          style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover', ...style }}
+          onClick={onClick}
+          onError={handleError}
+        />
+      </div>
       <span className={`status-dot status-dot--lg status-dot--${status}`} />
     </div>
   );

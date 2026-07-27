@@ -9,7 +9,7 @@ import { getCachedFollowStatus } from './followService';
  * @param {string} userId — ID del usuario actual (para actualizar su propio estado)
  * @param {string} otherUserId — ID del usuario a observar (opcional, para perfil/chat)
  * @param {boolean} checkMutualFollow — Si true, solo muestra status si hay follow mutuo
- * @returns {{ status: string|null, setMyStatus: fn }}
+ * @returns {{ status: string|null, myStatus: string, setMyStatus: fn }}
  */
 export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
   const [status, setStatus] = useState(null); // Estado del otro usuario (o null si no visible)
@@ -18,121 +18,162 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
   const idleTimerRef = useRef(null);
   const channelRef = useRef(null);
   const sessionTokenRef = useRef(null);
+  const autoIdleRef = useRef(false); // true si el idle fue puesto automáticamente por inactividad
+  const mountedCleanupRef = useRef(null);
 
   // ── Actualizar mi estado en la DB ──
-  const setMyStatus = useCallback(async (newStatus) => {
+  const setMyStatus = useCallback(async (newStatus, { auto = false } = {}) => {
     if (!userId) return;
     if (!['online', 'dnd', 'idle', 'disconnected'].includes(newStatus)) return;
 
-    myStatusRef.current = newStatus;
-    setMyStatusState(newStatus); // ← Actualiza el estado local para re-render
+    if (!auto) {
+      autoIdleRef.current = false;
+    }
 
-    // ── Sincronizar con localStorage para que NotificationContext pueda leerlo ──
+    myStatusRef.current = newStatus;
+    setMyStatusState(newStatus);
+
+    // Guardar en secureStorage (status + si fue automático)
     try {
       const { setItem } = await import('./secureStorage');
       setItem('fc_user_status', newStatus);
+      setItem('fc_user_status_auto', auto);
     } catch {}
 
     try {
       await supabase
         .from('profiles')
-        .update({ user_status: newStatus, user_status_updated_at: new Date().toISOString() })
+        .update({ user_status: newStatus })
         .eq('id', userId);
     } catch (err) {
       console.warn('Error updating user_status:', err);
     }
   }, [userId]);
 
-  // ── Inicializar estado al montar (online) ──
+  // ── Inicializar estado al montar ──
   useEffect(() => {
     if (!userId) return;
 
-    // Set initial status to online
-    setMyStatus('online');
-
-    // ── Idle detection ──
-    const ACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 min de inactividad → idle
-
-    const resetIdleTimer = () => {
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
-      // Only set idle if current status is online
-      if (myStatusRef.current === 'online') {
-        idleTimerRef.current = setTimeout(() => {
-          setMyStatus('idle');
-        }, ACTIVITY_TIMEOUT);
-      }
-    };
-
-    const onUserActivity = () => {
-      // If was idle and now active, go back to online
-      if (myStatusRef.current === 'idle') {
-        setMyStatus('online');
-      }
-      resetIdleTimer();
-    };
-
-    // Listen for user activity events
-    const events = ['mousedown', 'keydown', 'touchstart', 'scroll', 'mousemove'];
-    events.forEach((ev) => window.addEventListener(ev, onUserActivity, { passive: true }));
-
-    resetIdleTimer();
-
-    // ── Heartbeat: re-sync status every 30s to keep it fresh ──
-    const heartbeatRef = { current: null };
-    const startHeartbeat = () => {
-      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
-      heartbeatRef.current = setInterval(() => {
-        if (myStatusRef.current === 'online' || myStatusRef.current === 'idle') {
-          supabase
-            .from('profiles')
-            .update({ user_status: myStatusRef.current, user_status_updated_at: new Date().toISOString() })
-            .eq('id', userId)
-            .then()
-            .catch(() => {});
-        }
-      }, 30000);
-    };
-    startHeartbeat();
-
-    // ── On page unload, set status to disconnected via fetch(keepalive) ──
-    const SB_URL = import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_DATA_API_URL || '';
-    const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
-    const restOrigin = (() => { try { return new URL(SB_URL).origin; } catch { return ''; } })();
-    // Store initial token
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      sessionTokenRef.current = session?.access_token || null;
-    });
-    // Keep token refreshed on auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      sessionTokenRef.current = session?.access_token || null;
-    });
-
-    const handleBeforeUnload = () => {
-      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
-      const token = sessionTokenRef.current;
-      if (!token || !restOrigin) return;
+    (async () => {
+      let initialStatus = 'online';
       try {
-        fetch(`${restOrigin}/rest/v1/profiles?id=eq.${userId}`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'apiKey': SB_KEY,
-            'Authorization': `Bearer ${token}`,
-            'Prefer': 'return=minimal',
-          },
-          body: JSON.stringify({ user_status: 'disconnected', user_status_updated_at: new Date().toISOString() }),
-          keepalive: true,
-        });
+        const { getItem } = await import('./secureStorage');
+        const saved = getItem('fc_user_status');
+        const wasAuto = getItem('fc_user_status_auto');
+        // Persistir 'dnd' siempre. Persistir 'idle' solo si fue manual (no automático).
+        if (saved === 'dnd') {
+          initialStatus = 'dnd';
+        } else if (saved === 'idle' && wasAuto !== true) {
+          // Manual idle: restaurar. Si fue auto-idle, volver a online al abrir la app.
+          initialStatus = 'idle';
+        }
       } catch {}
-    };
-    window.addEventListener('beforeunload', handleBeforeUnload);
+
+      myStatusRef.current = initialStatus;
+      setMyStatusState(initialStatus);
+
+      // ── Setup session token ──
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        sessionTokenRef.current = session?.access_token || null;
+      });
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        sessionTokenRef.current = session?.access_token || null;
+      });
+
+      // ── Idle detection ──
+      const ACTIVITY_TIMEOUT = 5 * 60 * 1000;
+
+      const resetIdleTimer = () => {
+        if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+        if (myStatusRef.current === 'online') {
+          idleTimerRef.current = setTimeout(() => {
+            autoIdleRef.current = true;
+            setMyStatus('idle', { auto: true });
+          }, ACTIVITY_TIMEOUT);
+        }
+      };
+
+      const onUserActivity = () => {
+        // Solo revertir a online si el idle fue automático
+        if (myStatusRef.current === 'idle' && autoIdleRef.current) {
+          autoIdleRef.current = false;
+          setMyStatus('online', { auto: true });
+        }
+        resetIdleTimer();
+      };
+
+      const events = ['mousedown', 'keydown', 'touchstart', 'scroll', 'mousemove'];
+      events.forEach((ev) => window.addEventListener(ev, onUserActivity, { passive: true }));
+
+      // Iniciar timer solo si es 'online'
+      resetIdleTimer();
+
+      // ── Heartbeat cada 30s ──
+      const heartbeatRef = { current: null };
+      const startHeartbeat = () => {
+        if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+        heartbeatRef.current = setInterval(() => {
+          const s = myStatusRef.current;
+          if (s === 'online' || s === 'idle' || s === 'dnd') {
+            supabase
+              .from('profiles')
+              .update({ user_status: s })
+              .eq('id', userId)
+              .then()
+              .catch(() => {});
+          }
+        }, 30000);
+      };
+      startHeartbeat();
+
+      // ── beforeunload: poner disconnected ──
+      const SB_URL = import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_DATA_API_URL || '';
+      const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
+      const restOrigin = (() => { try { return new URL(SB_URL).origin; } catch { return ''; } })();
+
+      const handleBeforeUnload = () => {
+        if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+        const token = sessionTokenRef.current;
+        if (!token || !restOrigin) return;
+        try {
+          fetch(`${restOrigin}/rest/v1/profiles?id=eq.${userId}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'apiKey': SB_KEY,
+              'Authorization': `Bearer ${token}`,
+              'Prefer': 'return=minimal',
+            },
+            body: JSON.stringify({ user_status: 'disconnected' }),
+            keepalive: true,
+          });
+        } catch {}
+      };
+      window.addEventListener('beforeunload', handleBeforeUnload);
+
+      // ── Guardar cleanup ──
+      mountedCleanupRef.current = () => {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+        if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+        subscription?.unsubscribe();
+        events.forEach((ev) => window.removeEventListener(ev, onUserActivity));
+        if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      };
+
+      // Sync inicial con la DB (fire-and-forget)
+      supabase
+        .from('profiles')
+        .update({ user_status: initialStatus })
+        .eq('id', userId)
+        .then()
+        .catch(() => {});
+    })();
 
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
-      subscription?.unsubscribe();
-      events.forEach((ev) => window.removeEventListener(ev, onUserActivity));
-      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      if (mountedCleanupRef.current) {
+        mountedCleanupRef.current();
+        mountedCleanupRef.current = null;
+      }
     };
   }, [userId, setMyStatus]);
 
@@ -143,14 +184,11 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
       return;
     }
 
-    // ── Check mutual follow relationship ──
     const checkVisibility = async () => {
       if (!userId || !checkMutualFollow) {
-        // No mutual check needed — just observe
         return true;
       }
 
-      // Check mutual follow: I follow them AND they follow me
       const iFollowThem = getCachedFollowStatus(userId, otherUserId);
       const theyFollowMe = getCachedFollowStatus(otherUserId, userId);
 
@@ -158,7 +196,6 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
         return iFollowThem === true && theyFollowMe === true;
       }
 
-      // If cache miss, query DB
       try {
         const [iFollow, theyFollow] = await Promise.all([
           supabase
@@ -192,29 +229,19 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
         return;
       }
 
-      // ── Subscribe to Realtime changes on the other user's profile ──
-      // First, fetch current status
+      // Fetch initial status
       supabase
         .from('profiles')
-        .select('user_status, user_status_updated_at')
+        .select('user_status')
         .eq('id', otherUserId)
         .maybeSingle()
         .then(({ data, error }) => {
           if (!error && data && !cancelled) {
-            // Check staleness: if status is online/idle and >2 min old, treat as disconnected
-            const STALE_MS = 2 * 60 * 1000;
-            if (data.user_status_updated_at) {
-              const elapsed = Date.now() - new Date(data.user_status_updated_at).getTime();
-              if (elapsed > STALE_MS && (data.user_status === 'online' || data.user_status === 'idle')) {
-                setStatus('disconnected');
-                return;
-              }
-            }
             setStatus(data.user_status);
           }
         });
 
-      // Then subscribe to changes
+      // Subscribe to Realtime changes
       const channel = supabase
         .channel(`user-status-${otherUserId}-${userId}`)
         .on(
@@ -226,11 +253,8 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
             filter: `id=eq.${otherUserId}`,
           },
           (payload) => {
-            if (!cancelled) {
-              // Only update if user_status changed
-              if (payload.new.user_status !== payload.old.user_status) {
-                setStatus(payload.new.user_status);
-              }
+            if (!cancelled && payload.new.user_status !== payload.old.user_status) {
+              setStatus(payload.new.user_status);
             }
           }
         )

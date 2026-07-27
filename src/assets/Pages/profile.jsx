@@ -153,6 +153,49 @@ function Profile() {
 
   // ── User status ──
   const { myStatus, setMyStatus } = useUserStatus(isOwnProfile ? user?.id : null);
+  // Observar el estado del perfil visitado via Realtime (canal redundante)
+  const { status: observedStatus } = useUserStatus(null, !isOwnProfile ? activeProfile?.id : null, true);
+  // Estado del perfil visitado — combina observedStatus (Realtime) con fallback de activeProfile
+  const [profileStatus, setProfileStatus] = useState(() => activeProfile?.user_status || null);
+  // Sync profileStatus when activeProfile changes (initial load / cache restore)
+  useEffect(() => {
+    if (activeProfile?.user_status !== undefined && activeProfile.user_status !== profileStatus) {
+      setProfileStatus(activeProfile.user_status);
+    }
+  }, [activeProfile?.user_status]);
+  // Actualizar profileStatus desde observedStatus (useUserStatus hook + su canal Realtime)
+  useEffect(() => {
+    if (observedStatus !== null && observedStatus !== profileStatus) {
+      setProfileStatus(observedStatus);
+    }
+  }, [observedStatus]);
+
+  // ── Polling fallback cada 10s + resync al volver al tab activo ──
+  useEffect(() => {
+    const targetId = activeProfile?.id;
+    if (!targetId || isOwnProfile) return;
+    const poll = async () => {
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('user_status')
+          .eq('id', targetId)
+          .maybeSingle();
+        if (data?.user_status !== undefined) {
+          setProfileStatus(data.user_status);
+        }
+      } catch {}
+    };
+    // Poll cada 10s (más rápido que 30s para mejor feedback)
+    const interval = setInterval(poll, 10000);
+    // Re-sincronizar al volver al tab activo (soluciona background tab)
+    const onVisible = () => { if (!document.hidden) poll(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [activeProfile?.id, isOwnProfile]);
 
   // ── Block / context menu state ──
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
@@ -641,7 +684,7 @@ function Profile() {
                 setIsBlockedByThemDb(false);
                 cacheBlockStatus(profileId, user.id, false);
             })
-            // ── Profile updates (is_private, avatar, bio, etc.) ──
+            // ── Profile updates (is_private, avatar, bio, user_status, etc.) ──
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${profileId}` }, (payload) => {
                 const updated = payload.new;
                 const merged = { ...activeProfile, ...updated };
@@ -649,6 +692,11 @@ function Profile() {
                 setCachedProfile(merged);
                 if (profileUsername && !isUUID(profileUsername)) {
                     setCachedProfileByUsername(profileUsername, merged);
+                }
+                // Update profile status in real-time from any profile update
+                // (activeProfile in the closure is stale, so we skip the comparison)
+                if (updated.user_status !== undefined) {
+                    setProfileStatus(updated.user_status);
                 }
                 const prevIsPrivate = payload.old?.is_private === true;
                 const newIsPrivate = updated?.is_private === true;
@@ -1405,7 +1453,7 @@ function Profile() {
                             alt="User Avatar"
                             className="profile-avatar"
                             style={getImgTransformStyle(activeProfile?.avatar_position)}
-                            status={isOwnProfile ? myStatus : (isFollower === true && isFollowedBy === true ? activeProfile?.user_status : null)}
+                            status={isOwnProfile ? myStatus : (isFollower === true && isFollowedBy === true ? (observedStatus ?? profileStatus) : null)}
                         />
                     </div>
 

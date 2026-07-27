@@ -166,7 +166,6 @@
     width: var(--avatar-size);
     height: var(--avatar-size);
     border-radius: 50%;
-    overflow: hidden;
     border: 3px solid color-mix(in srgb, var(--accent-color) 40%, transparent);
     z-index: 2;
 }
@@ -174,8 +173,20 @@
 .profile-avatar {
     width: 100%;
     height: 100%;
+    border-radius: 50%;
     object-fit: cover;
     display: block;
+}
+
+/* ── Status dot positioning inside profile avatar ── */
+/* The wrapper is a square inside the container (which has 3px border).
+   The avatar circle (border-radius: 50%) has its edge at ~14.65% from
+   any square corner. calc(12% - 8px) shifts the dot 3% closer to the
+   corner so it overlaps the avatar circle by ~30% and extends outside
+   the circular border, making it visually attached with no gap. */
+.profile-avatar-container .status-dot {
+    bottom: calc(12% - 8px);
+    right: calc(12% - 8px);
 }
 
 /* ---- User info overlay ---- */
