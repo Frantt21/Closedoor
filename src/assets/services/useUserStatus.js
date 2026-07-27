@@ -36,7 +36,7 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
     try {
       await supabase
         .from('profiles')
-        .update({ user_status: newStatus })
+        .update({ user_status: newStatus, user_status_updated_at: new Date().toISOString() })
         .eq('id', userId);
     } catch (err) {
       console.warn('Error updating user_status:', err);
@@ -77,6 +77,23 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
 
     resetIdleTimer();
 
+    // ── Heartbeat: re-sync status every 30s to keep it fresh ──
+    const heartbeatRef = { current: null };
+    const startHeartbeat = () => {
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+      heartbeatRef.current = setInterval(() => {
+        if (myStatusRef.current === 'online' || myStatusRef.current === 'idle') {
+          supabase
+            .from('profiles')
+            .update({ user_status: myStatusRef.current, user_status_updated_at: new Date().toISOString() })
+            .eq('id', userId)
+            .then()
+            .catch(() => {});
+        }
+      }, 30000);
+    };
+    startHeartbeat();
+
     // ── On page unload, set status to disconnected via fetch(keepalive) ──
     const SB_URL = import.meta.env.VITE_SUPABASE_URL || import.meta.env.VITE_SUPABASE_DATA_API_URL || '';
     const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
@@ -91,6 +108,7 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
     });
 
     const handleBeforeUnload = () => {
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
       const token = sessionTokenRef.current;
       if (!token || !restOrigin) return;
       try {
@@ -102,7 +120,7 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
             'Authorization': `Bearer ${token}`,
             'Prefer': 'return=minimal',
           },
-          body: JSON.stringify({ user_status: 'disconnected' }),
+          body: JSON.stringify({ user_status: 'disconnected', user_status_updated_at: new Date().toISOString() }),
           keepalive: true,
         });
       } catch {}
@@ -111,6 +129,7 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
       subscription?.unsubscribe();
       events.forEach((ev) => window.removeEventListener(ev, onUserActivity));
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
@@ -177,11 +196,20 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
       // First, fetch current status
       supabase
         .from('profiles')
-        .select('user_status')
+        .select('user_status, user_status_updated_at')
         .eq('id', otherUserId)
         .maybeSingle()
         .then(({ data, error }) => {
           if (!error && data && !cancelled) {
+            // Check staleness: if status is online/idle and >2 min old, treat as disconnected
+            const STALE_MS = 2 * 60 * 1000;
+            if (data.user_status_updated_at) {
+              const elapsed = Date.now() - new Date(data.user_status_updated_at).getTime();
+              if (elapsed > STALE_MS && (data.user_status === 'online' || data.user_status === 'idle')) {
+                setStatus('disconnected');
+                return;
+              }
+            }
             setStatus(data.user_status);
           }
         });
