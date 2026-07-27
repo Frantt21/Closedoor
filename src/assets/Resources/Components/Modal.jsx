@@ -1070,7 +1070,7 @@ export default function Modal({
                   <label className="fc-modal-color-swatch fc-modal-custom-swatch"
                     htmlFor="accent-color-input"
                     title={`${t('modal.accent_color_custom')}: ${selectedAccent || '#000000'}`}
-                    style={{ position: 'relative' }}
+                    style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                   >
                     <input
                       id="accent-color-input"
@@ -1127,6 +1127,9 @@ export default function Modal({
                       flexShrink: 0,
                       transition: 'transform 0.15s ease',
                       position: 'relative',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
                     onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
@@ -1175,6 +1178,9 @@ export default function Modal({
                       flexShrink: 0,
                       transition: 'transform 0.15s ease',
                       position: 'relative',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
                     onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
@@ -1227,6 +1233,9 @@ export default function Modal({
                       flexShrink: 0,
                       transition: 'transform 0.15s ease',
                       position: 'relative',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.1)'}
                     onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
