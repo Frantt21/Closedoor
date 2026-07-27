@@ -13,6 +13,7 @@ import { getCachedFollowStatus } from './followService';
  */
 export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
   const [status, setStatus] = useState(null); // Estado del otro usuario (o null si no visible)
+  const [myStatus, setMyStatusState] = useState('online'); // Estado del usuario actual
   const myStatusRef = useRef('online');
   const idleTimerRef = useRef(null);
   const channelRef = useRef(null);
@@ -23,6 +24,7 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
     if (!['online', 'dnd', 'idle', 'disconnected'].includes(newStatus)) return;
 
     myStatusRef.current = newStatus;
+    setMyStatusState(newStatus); // ← Actualiza el estado local para re-render
 
     // ── Sincronizar con localStorage para que NotificationContext pueda leerlo ──
     try {
@@ -187,7 +189,7 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
     };
   }, [userId, otherUserId, checkMutualFollow]);
 
-  return { status, setMyStatus };
+  return { status, myStatus, setMyStatus };
 }
 
 /**

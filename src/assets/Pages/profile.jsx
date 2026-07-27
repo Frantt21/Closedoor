@@ -152,7 +152,7 @@ function Profile() {
     });
 
   // ── User status ──
-  const { status: myStatus, setMyStatus } = useUserStatus(isOwnProfile ? user?.id : null);
+  const { myStatus, setMyStatus } = useUserStatus(isOwnProfile ? user?.id : null);
 
   // ── Block / context menu state ──
   const [contextMenuOpen, setContextMenuOpen] = useState(false);

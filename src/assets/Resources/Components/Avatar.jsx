@@ -34,14 +34,16 @@ export default function Avatar({ src, alt = 'avatar', className, style, onClick,
     );
   }
 
-  // With status, wrap in a div for the dot positioning
+  // With status, wrap in a div for the dot positioning.
+  // The style (transform/objectPosition) goes on the inner <img>
+  // so the status dot isn't affected by rotation, flip, or zoom.
   return (
-    <div className={`avatar-wrapper ${className || ''}`.trim()} style={{ position: 'relative', display: 'inline-flex', ...style }}>
+    <div className={`avatar-wrapper ${className || ''}`.trim()} style={{ position: 'relative', display: 'inline-flex' }}>
       <img
         className="avatar-img"
         src={normalizedSrc}
         alt={alt}
-        style={{ display: 'block', width: '100%', height: '100%', borderRadius: 'inherit', objectFit: 'cover' }}
+        style={{ display: 'block', width: '100%', height: '100%', borderRadius: 'inherit', objectFit: 'cover', ...style }}
         onClick={onClick}
         onError={handleError}
       />
