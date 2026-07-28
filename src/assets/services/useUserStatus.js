@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from './supabaseclient';
 import { getCachedFollowStatus } from './followService';
-import { updateTrackedStatus, getPresence } from './presenceService';
+import { updateTrackedStatus } from './presenceService';
 
 /**
  * useUserStatus — Hook para manejar el estado online/dnd/idle/disconnected
@@ -274,35 +274,32 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
         return;
       }
 
-      // ── Fetch inicial desde DB (SOLO si Presence NO tiene datos para este usuario) ──
-      const alreadyHasPresence = getPresence(targetId)?.user_status;
-      if (!alreadyHasPresence) {
-        try {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('user_status, user_status_updated_at')
-            .eq('id', targetId)
-            .maybeSingle();
+      // ── Fetch inicial desde DB ──
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('user_status, user_status_updated_at')
+          .eq('id', targetId)
+          .maybeSingle();
 
-          if (!cancelled && !error && data?.user_status !== undefined) {
-            const normalizedStatus = (() => {
-              const rawStatus = data.user_status;
-              const updatedAt = data.user_status_updated_at;
-              if (rawStatus === 'disconnected') return 'disconnected';
-              if (!updatedAt) return rawStatus;
-              const ageMs = Date.now() - new Date(updatedAt).getTime();
-              return ageMs > STALE_STATUS_THRESHOLD_MS ? 'disconnected' : rawStatus;
-            })();
-            console.log('[STATUS] Obs — initial fetch result:', normalizedStatus, 'for', targetId);
-            updateStatusForUser(targetId, normalizedStatus);
-          }
-        } catch {}
-      }
+        if (!cancelled && !error && data?.user_status !== undefined) {
+          const normalizedStatus = (() => {
+            const rawStatus = data.user_status;
+            if (rawStatus === 'disconnected') return 'disconnected';
+            const updatedAt = data.user_status_updated_at;
+            if (!updatedAt) return rawStatus;
+            const ageMs = Date.now() - new Date(updatedAt).getTime();
+            return ageMs > STALE_STATUS_THRESHOLD_MS ? 'disconnected' : rawStatus;
+          })();
+          console.log('[STATUS] Obs — initial fetch result:', normalizedStatus, 'for', targetId);
+          updateStatusForUser(targetId, normalizedStatus);
+        }
+      } catch {}
 
-      // ── Polling cada 3s (solo sobreescribe cuando DB dice 'disconnected') ──
-      // Presence es la autoridad para online/idle/dnd (en tiempo real).
-      // El poll solo corrige cuando la DB indica desconexión explícita
-      // (escrita por keepalive fetch en beforeunload).
+      // ── Polling cada 3s ──
+      // La DB es la ÚNICA fuente de verdad. No se usa Presence para observar
+      // porque el servidor Presence puede mantener usuarios atascados en el
+      // canal después de desconectarse, causando ciclos de override.
       const pollStatus = async () => {
         if (cancelled) return;
 
@@ -314,28 +311,19 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
             .maybeSingle();
           if (!cancelled && !error && data?.user_status !== undefined) {
             const rawStatus = data.user_status;
-            const presenceData = getPresence(targetId);
-            console.log('[STATUS] POLL', targetId.slice(0,8), 'DB:', rawStatus, 'Presence:', presenceData?.user_status || '∅');
-
-            // DB dice 'disconnected' → sobreescribir SIEMPRE
-            // (escrito por keepalive fetch al cerrar pestaña)
-            if (rawStatus === 'disconnected') {
-              console.log('[STATUS] POLL DB=disconnected → overriding');
-              updateStatusForUser(targetId, 'disconnected');
-            } else {
-              // Para online/idle/dnd: verificar stale (timestamp muy antiguo)
-              // y solo corregir si Presence no tiene datos
-              if (!presenceData?.user_status) {
-                const updatedAt = data.user_status_updated_at;
-                if (updatedAt) {
-                  const ageMs = Date.now() - new Date(updatedAt).getTime();
-                  if (ageMs > STALE_STATUS_THRESHOLD_MS) {
-                    console.log('[STATUS] POLL stale → disconnected (age:', Math.round(ageMs/1000)+'s)');
-                    updateStatusForUser(targetId, 'disconnected');
-                  }
+            // Aplicar stale check para estados no-disconnected
+            let effectiveStatus = rawStatus;
+            if (rawStatus !== 'disconnected') {
+              const updatedAt = data.user_status_updated_at;
+              if (updatedAt) {
+                const ageMs = Date.now() - new Date(updatedAt).getTime();
+                if (ageMs > STALE_STATUS_THRESHOLD_MS) {
+                  effectiveStatus = 'disconnected';
                 }
               }
             }
+            console.log('[STATUS] POLL', targetId.slice(0,8), 'DB:', rawStatus, '→ effective:', effectiveStatus);
+            updateStatusForUser(targetId, effectiveStatus);
           }
         } catch {}
       };
