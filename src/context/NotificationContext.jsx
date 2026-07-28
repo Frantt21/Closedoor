@@ -182,6 +182,12 @@ export function NotificationProvider({ children }) {
   });
   const channelRef = useRef(null);
 
+  // ── Señal de refresco para conversaciones (persiste fuera del Chat) ──
+  // Incrementa cuando se detecta un nuevo mensaje o cambio en chat_participants
+  // para que Chat.jsx pueda refrescar su lista aunque esté desmontado.
+  const conversationRefreshRef = useRef(0);
+  const [conversationRefreshVersion, setConversationRefreshVersion] = useState(0);
+
   // ── Throttled helper: unread chat count (max 1 call per 2s) ──
   const fetchUnreadChatCountThrottledRef = useRef(0);
   const fetchUnreadChatCount = useCallback(async () => {
@@ -391,6 +397,10 @@ export function NotificationProvider({ children }) {
           // Update unread chat count FIRST
           fetchUnreadChatCount();
 
+          // ── Señalizar a Chat.jsx que debe refrescar sus conversaciones ──
+          conversationRefreshRef.current += 1;
+          setConversationRefreshVersion(conversationRefreshRef.current);
+
           // Tab hidden or unfocused → try OS Push Notification (fall through to toast)
           const isHidden = document.visibilityState === 'hidden' || !document.hasFocus();
           if (isHidden) {
@@ -436,7 +446,12 @@ export function NotificationProvider({ children }) {
           table: 'chat_participants',
           filter: `user_id=eq.${userId}`,
         },
-        () => fetchUnreadChatCount()
+        () => {
+          fetchUnreadChatCount();
+          // ── Señalizar cambio en chat_participants ──
+          conversationRefreshRef.current += 1;
+          setConversationRefreshVersion(conversationRefreshRef.current);
+        }
       )
       .subscribe();
 
@@ -527,6 +542,7 @@ export function NotificationProvider({ children }) {
         notifications,
         unreadCount,
         unreadChatCount,
+        conversationRefreshVersion,
         loading,
         markAsRead: handleMarkAsRead,
         markAllAsRead: handleMarkAllAsRead,

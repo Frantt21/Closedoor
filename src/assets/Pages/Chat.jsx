@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useLayoutEffect, useContext } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { NotificationContext } from '../../context/NotificationContext';
 import { useI18n } from '../services/i18n/useI18n';
 import {
   getConversations,
@@ -441,6 +442,11 @@ export default function Chat() {
     loadingMoreRef.current = false; // sync ref must also reset to prevent stale blocking
   }, [activeConvId]);
 
+  // ── Señal de refresco global desde NotificationContext ──
+  // Incrementa cuando llegan nuevos mensajes mientras Chat está desmontado,
+  // permitiendo refrescar las conversaciones al volver a la ruta.
+  const { conversationRefreshVersion } = useContext(NotificationContext);
+
   // ── Load conversations ──
   const loadConvs = useCallback(async () => {
     if (!user?.id) return;
@@ -466,6 +472,22 @@ export default function Chat() {
       setConvsLoading(false);
     }
   }, [loadConvs]);
+
+  // ── Refresh conversations when NotificationContext detects new messages ──
+  // NotificationContext tiene una suscripción persistente (vive fuera del Chat)
+  // que incrementa conversationRefreshVersion al recibir mensajes/cambios.
+  // Este efecto detecta esos cambios incluso si Chat estaba desmontado.
+  const prevRefreshRef = useRef(conversationRefreshVersion);
+  useEffect(() => {
+    if (!user?.id) return;
+    // Solo refrescar si la versión cambió mientras Chat estaba montado.
+    // El fetch inicial ya lo maneja el effect de [loadConvs] arriba.
+    if (conversationRefreshVersion !== prevRefreshRef.current) {
+      console.log('[CHAT] Refresh signal — reloading conversations');
+      loadConvs();
+    }
+    prevRefreshRef.current = conversationRefreshVersion;
+  }, [loadConvs, conversationRefreshVersion, user?.id]);
 
   // Real-time subscription to conversation updates
   useEffect(() => {
