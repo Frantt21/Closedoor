@@ -1,24 +1,31 @@
 import React from 'react';
 import { DEFAULT_AVATAR } from '../../services/helpers';
 import { getCdnUrl } from '../../services/cdnService';
+import { useRegisterUserStatus } from '../../../context/UserStatusContext';
 
 /**
  * Avatar — Wrapper para mostrar avatares de usuario.
  * Normaliza automáticamente URLs del CDN para evitar Mixed Content.
  * Si se pasa `status`, muestra un punto indicador de estado.
+ * Si se pasa `userId` (sin `status` explícito), obtiene el estado
+ * automáticamente del UserStatusContext global, funcionando en
+ * cualquier ruta sin necesidad de pasar `status` manualmente.
  *
  * NOTA: className se aplica al <img>, no al wrapper div.
  * El wrapper div solo existe para posicionar el status dot.
  */
-export default function Avatar({ src, alt = 'avatar', className, style, onClick, onError: customOnError, status }) {
+export default function Avatar({ src, alt = 'avatar', className, style, onClick, onError: customOnError, status, userId }) {
   const normalizedSrc = getCdnUrl(src) || DEFAULT_AVATAR;
+  // Si no se pasa status explícitamente pero hay userId, obtener del contexto global
+  const contextStatus = useRegisterUserStatus(!status ? userId : null);
+  const effectiveStatus = status || contextStatus;
 
   const handleError = (e) => {
     e.target.src = DEFAULT_AVATAR;
     customOnError?.(e);
   };
 
-  const showStatus = status && ['online', 'dnd', 'idle', 'disconnected'].includes(status);
+  const showStatus = effectiveStatus && ['online', 'dnd', 'idle', 'disconnected'].includes(effectiveStatus);
 
   // If no status, render a plain <img> to avoid breaking any existing layout
   if (!showStatus) {
@@ -52,7 +59,7 @@ export default function Avatar({ src, alt = 'avatar', className, style, onClick,
           onError={handleError}
         />
       </div>
-      <span className={`status-dot status-dot--lg status-dot--${status}`} />
+      <span className={`status-dot status-dot--lg status-dot--${effectiveStatus}`} />
     </div>
   );
 }

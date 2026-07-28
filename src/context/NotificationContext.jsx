@@ -11,9 +11,9 @@ import {
   setCachedNotifications,
   getCachedNotifications,
 } from '../assets/services/notificationService';
-import { decryptMessage, getTotalUnreadChatCount } from '../assets/services/chatService';
+import { decryptMessage, getTotalUnreadChatCount, getConversations } from '../assets/services/chatService';
 import { useAuth } from '../hooks/useAuth';
-import { getItem } from '../assets/services/secureStorage';
+import { getItem, setSessionItem, removeSessionItem } from '../assets/services/secureStorage';
 
 // ── Helpers para notificaciones en vivo ──
 
@@ -187,6 +187,36 @@ export function NotificationProvider({ children }) {
   // para que Chat.jsx pueda refrescar su lista aunque esté desmontado.
   const conversationRefreshRef = useRef(0);
   const [conversationRefreshVersion, setConversationRefreshVersion] = useState(0);
+
+  // ── Throttled: refrescar conversaciones y guardar en sessionStorage ──
+  // Esto mantiene el caché de conversaciones actualizado aunque Chat esté
+  // desmontado, evitando un fetch completo al volver a entrar.
+  const refreshConversationsCacheThrottledRef = useRef(0);
+  const refreshConversationsCache = useCallback(async () => {
+    if (!userId) return;
+    // Si Chat está montado, subscribeToConversations ya actualiza el caché
+    // via loadConvs() → saveConvsToSession(). Evitar duplicar el fetch.
+    if (isChatRoute()) { console.log('[CACHE] notifCtx skip — isChatRoute'); return; }
+    const now = Date.now();
+    if (now - refreshConversationsCacheThrottledRef.current < 3000) { console.log('[CACHE] notifCtx skip — throttled'); return; }
+    refreshConversationsCacheThrottledRef.current = now;
+
+    try {
+      const convs = await getConversations(userId);
+      const key = `chatConvsCache_${userId}`;
+      setSessionItem(key, convs);
+      console.log('[CACHE] notifCtx — saved', convs.length, 'conversaciones a sessionStorage');
+    } catch (err) {
+      // sessionStorage quota exceeded — limpiar caché
+      if (err?.name === 'QuotaExceededError' || err?.code === 22) {
+        try {
+          const key = `chatConvsCache_${userId}`;
+          removeSessionItem(key);
+        } catch {}
+      }
+      console.warn('[NotifCtx] Error refreshing conversations cache:', err);
+    }
+  }, [userId]);
 
   // ── Throttled helper: unread chat count (max 1 call per 2s) ──
   const fetchUnreadChatCountThrottledRef = useRef(0);
@@ -400,6 +430,8 @@ export function NotificationProvider({ children }) {
           // ── Señalizar a Chat.jsx que debe refrescar sus conversaciones ──
           conversationRefreshRef.current += 1;
           setConversationRefreshVersion(conversationRefreshRef.current);
+          // ── Mantener caché de conversaciones actualizado para cuando Chat monte ──
+          refreshConversationsCache();
 
           // Tab hidden or unfocused → try OS Push Notification (fall through to toast)
           const isHidden = document.visibilityState === 'hidden' || !document.hasFocus();
@@ -451,6 +483,8 @@ export function NotificationProvider({ children }) {
           // ── Señalizar cambio en chat_participants ──
           conversationRefreshRef.current += 1;
           setConversationRefreshVersion(conversationRefreshRef.current);
+          // ── Mantener caché de conversaciones actualizado ──
+          refreshConversationsCache();
         }
       )
       .subscribe();

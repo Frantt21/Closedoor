@@ -67,6 +67,7 @@ import FloatingActionButton from "../Resources/Components/FloatingActionButton";
 import { toast } from 'react-toastify';
 import { getCdnUrl } from '../services/cdnService';
 import { useUserStatus } from '../services/useUserStatus';
+import { useRegisterUserStatus } from '../../context/UserStatusContext';
 
 function Profile() {
     const { t, showAccent, accentVisibility, showLikes, filterEncrypted, showBadges, locale } = useI18n();
@@ -153,6 +154,8 @@ function Profile() {
 
   // ── User status ──
   const { myStatus, setMyStatus } = useUserStatus(isOwnProfile ? user?.id : null);
+  // ── Observar estado del perfil visitado en el contexto global (persiste entre rutas) ──
+  useRegisterUserStatus(!isOwnProfile ? activeProfile?.id : null);
   // Observar el estado del perfil visitado via Realtime (canal redundante)
   const { status: observedStatus } = useUserStatus(null, !isOwnProfile ? activeProfile?.id : null, true);
   // Estado del perfil visitado — combina observedStatus (Realtime) con fallback de activeProfile

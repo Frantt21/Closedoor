@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router'
 import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext'
 import { NotificationProvider } from './context/NotificationContext'
+import { UserStatusProvider } from './context/UserStatusContext'
 import './assets/Resources/Styles/global.css'
 
 // ── Hide the pre-rendered hero placeholder as soon as JS executes ──
@@ -40,7 +41,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <AuthProvider>
         <NotificationProvider>
-          <App />
+          <UserStatusProvider>
+            <App />
+          </UserStatusProvider>
         </NotificationProvider>
       </AuthProvider>
     </BrowserRouter>

@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../assets/services/supabaseclient';
 import {
   checkUsernameExists,
@@ -17,6 +17,7 @@ import { clearDecryptedCache } from '../assets/services/alphabetEncryption';
 import { clearBlockedListsCache } from '../assets/services/blockService';
 import { clearCachedFollowCounts } from '../assets/services/followService';
 import { initPresence, disposePresence } from '../assets/services/presenceService';
+import { getItem } from '../assets/services/secureStorage';
 
 export const AuthContext = createContext();
 
@@ -27,6 +28,28 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const myStatusRef = useRef('online');
+  const sessionTokenRef = useRef(null);
+  const heartbeatRef = useRef(null);
+
+  // ── Persistir mi estado a la DB ──
+  const persistMyStatus = useCallback(async (status, userId) => {
+    if (!userId) return;
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          user_status: status,
+          user_status_updated_at: new Date().toISOString(),
+        })
+        .eq('id', userId);
+      if (error) console.warn('[AuthStatus] DB update error:', error);
+    } catch (err) {
+      console.warn('[AuthStatus] Error updating status:', err);
+    }
+  }, []);
+
+  // ── Inicializar estado del usuario (global, nunca se desmonta) ──
   useEffect(() => {
     const initializeAuth = async () => {
       try {
@@ -64,6 +87,9 @@ export function AuthProvider({ children }) {
 
             // ── Inicializar Presence global ──
             initPresence(currentUser.id, 'online');
+
+            // ── Restaurar estado guardado + heartbeat global ──
+            startMyStatusTracker(currentUser.id);
           } else {
             setProfile(null);
             setProfileLoading(false);
@@ -91,6 +117,7 @@ export function AuthProvider({ children }) {
         setProfile(null);
         setProfileLoading(false);
         disposePresence();
+        stopMyStatusTracker();
         return;
       }
 
@@ -111,11 +138,107 @@ export function AuthProvider({ children }) {
       } finally {
         setProfileLoading(false);
       }
+
+      // Reiniciar tracker de estado al cambiar de usuario
+      stopMyStatusTracker();
+      startMyStatusTracker(currentUser.id);
     });
 
     return () => {
       subscription?.unsubscribe();
+      stopMyStatusTracker();
     };
+  }, []);
+
+  // ── Status tracker: init, heartbeat, beforeunload ──
+  const startMyStatusTracker = useCallback((userId) => {
+    if (!userId) return;
+
+    (async () => {
+      // Restaurar estado guardado
+      let initialStatus = 'online';
+      try {
+        const saved = getItem('fc_user_status');
+        if (saved === 'dnd' || saved === 'idle') {
+          initialStatus = saved;
+        }
+      } catch {}
+
+      myStatusRef.current = initialStatus;
+
+      // Sesión token para beforeunload fetch
+      try {
+        const { data } = await supabase.auth.getSession();
+        sessionTokenRef.current = data?.session?.access_token || null;
+      } catch {}
+
+      // Heartbeat cada 30s — lee de secureStorage para sincronizar con
+      // cambios de estado hechos desde useUserStatus.setMyStatus
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+      heartbeatRef.current = setInterval(() => {
+        let s = myStatusRef.current;
+        try {
+          const saved = getItem('fc_user_status');
+          if (saved === 'dnd' || saved === 'idle' || saved === 'online') {
+            s = saved;
+            myStatusRef.current = s;
+          }
+        } catch {}
+        if (s === 'online' || s === 'idle' || s === 'dnd') {
+          persistMyStatus(s, userId);
+        }
+      }, 30000);
+
+      // beforeunload/pagehide: poner disconnected
+      const SB_URL = import.meta.env.VITE_SUPABASE_URL || '';
+      const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+      const restOrigin = (() => { try { return new URL(SB_URL).origin; } catch { return ''; } })();
+
+      const handleDisconnect = () => {
+        if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+        const token = sessionTokenRef.current;
+        if (SB_URL && SB_KEY && token) {
+          try {
+            fetch(`${restOrigin}/rest/v1/profiles?id=eq.${userId}`, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                'apikey': SB_KEY,
+              },
+              body: JSON.stringify({
+                user_status: 'disconnected',
+                user_status_updated_at: new Date().toISOString(),
+              }),
+              keepalive: true,
+            }).catch(() => {});
+          } catch {}
+        }
+        persistMyStatus('disconnected', userId).catch(() => {});
+      };
+      window.addEventListener('beforeunload', handleDisconnect);
+      window.addEventListener('pagehide', handleDisconnect);
+
+      // Guardar cleanup
+      window.__fc_statusCleanup = () => {
+        window.removeEventListener('beforeunload', handleDisconnect);
+        window.removeEventListener('pagehide', handleDisconnect);
+        if (heartbeatRef.current) {
+          clearInterval(heartbeatRef.current);
+          heartbeatRef.current = null;
+        }
+      };
+
+      // Sync inicial: restaurar estado en DB
+      persistMyStatus(initialStatus, userId);
+    })();
+  }, [persistMyStatus]);
+
+  const stopMyStatusTracker = useCallback(() => {
+    if (typeof window.__fc_statusCleanup === 'function') {
+      window.__fc_statusCleanup();
+      window.__fc_statusCleanup = null;
+    }
   }, []);
 
   // ── Realtime subscription para cambios en profiles ──

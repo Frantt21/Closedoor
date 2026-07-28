@@ -1,8 +1,7 @@
-import React, { useState, useEffect, useCallback, useRef, useLayoutEffect, useContext } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { NotificationContext } from '../../context/NotificationContext';
 import { useI18n } from '../services/i18n/useI18n';
 import {
   getConversations,
@@ -46,6 +45,7 @@ import '../Resources/Styles/post.css';
 import '../Resources/Components/css/modal.css';
 import { getItem, setItem, removeItem, getSessionItem, setSessionItem, removeSessionItem } from '../services/secureStorage';
 import { useUserStatus } from '../services/useUserStatus';
+import { useRegisterMultipleUserStatus } from '../../context/UserStatusContext';
 
 // ── Helper: corrige estados obsoletos usando user_status_updated_at ──
 const STALE_STATUS_MS = 60 * 1000; // 1 minuto — debe coincidir con useUserStatus.js
@@ -237,6 +237,7 @@ export default function Chat() {
   const messagesCacheRef = useRef({});
   const skipCacheWipeRef = useRef(false);  // prevents useLayoutEffect from wiping messages when resolving pending conv
   const skipMsgLoadRef = useRef(false);   // prevents useEffect from fetching messages when sendContent resolves pending conv
+  const staleBackgroundFetchRef = useRef(false); // true cuando se muestran datos stale mientras se fetchea en bg
   const draftsRef = useRef({}); // borradores del input por conversation ID
   const prevConvIdRef = useRef(null);
   const messagesOwnerRef = useRef(null); // tracks which conversation the current `messages` state belongs to
@@ -337,8 +338,10 @@ export default function Chat() {
   if (!convsSessionRestoredRef.current && user?.id) {
     convsSessionRestoredRef.current = true;
     const cached = loadConvsFromSession();
+    console.log('[CACHE] render-phase — cached convs:', cached.length, 'conversations state:', conversations.length);
     if (cached.length > 0 && conversations.length === 0) {
       // React 18 allows setState during render — triggers re-render before commit
+      console.log('[CACHE] render-phase — restored', cached.length, 'conversaciones from sessionStorage');
       setConversations(cached);
       setConvsLoading(false);
     }
@@ -405,11 +408,14 @@ export default function Chat() {
       console.log('[BUG] layout — CACHE HIT:', activeConvId.slice(0,8), 'len:', cached.length, 'stale:', !!isStale);
 
       if (isStale) {
-        console.log('[BUG] layout — stale, clearing for refetch');
-        setMessages([]);
-        setMsgsLoading(true);
+        console.log('[BUG] layout — STALE, showing cached messages while refetching in bg');
+        // Mostrar mensajes cacheados inmediatamente SIN skeleton
+        setMessages(cached);
+        setMsgsLoading(false); // false para NO mostrar el skeleton
+        staleBackgroundFetchRef.current = true; // evita que sync effect guarde datos stale
         setHasMoreMessages(true);
         setOldestMessageDate(null);
+        // skipMsgLoadRef se deja en false para que msgEffect haga el fetch
       } else {
         console.log('[BUG] layout — restoring from cache, skipMsgLoad=true');
         setMessages(cached);
@@ -442,11 +448,6 @@ export default function Chat() {
     loadingMoreRef.current = false; // sync ref must also reset to prevent stale blocking
   }, [activeConvId]);
 
-  // ── Señal de refresco global desde NotificationContext ──
-  // Incrementa cuando llegan nuevos mensajes mientras Chat está desmontado,
-  // permitiendo refrescar las conversaciones al volver a la ruta.
-  const { conversationRefreshVersion } = useContext(NotificationContext);
-
   // ── Load conversations ──
   const loadConvs = useCallback(async () => {
     if (!user?.id) return;
@@ -463,31 +464,17 @@ export default function Chat() {
   }, [user?.id]);
 
   useEffect(() => {
-    // If cache was restored during render phase, just clear the loading state
-    // (the render-phase block already called setConvsLoading(false)).
-    // Otherwise, fetch from DB — loadConvs() manages convsLoading in its finally block.
-    if (conversations.length === 0) {
-      loadConvs();
-    } else {
-      setConvsLoading(false);
-    }
-  }, [loadConvs]);
-
-  // ── Refresh conversations when NotificationContext detects new messages ──
-  // NotificationContext tiene una suscripción persistente (vive fuera del Chat)
-  // que incrementa conversationRefreshVersion al recibir mensajes/cambios.
-  // Este efecto detecta esos cambios incluso si Chat estaba desmontado.
-  const prevRefreshRef = useRef(conversationRefreshVersion);
-  useEffect(() => {
+    // NotificationContext mantiene el caché de conversaciones actualizado
+    // en sessionStorage incluso cuando Chat está desmontado.
+    // El caché se restaura en render-phase para evitar el skeleton flash.
+    // Pero SIEMPRE hacemos un fetch en background al montar para capturar
+    // cualquier mensaje que haya llegado durante el throttle de 3s de
+    // refreshConversationsCache.
     if (!user?.id) return;
-    // Solo refrescar si la versión cambió mientras Chat estaba montado.
-    // El fetch inicial ya lo maneja el effect de [loadConvs] arriba.
-    if (conversationRefreshVersion !== prevRefreshRef.current) {
-      console.log('[CHAT] Refresh signal — reloading conversations');
-      loadConvs();
-    }
-    prevRefreshRef.current = conversationRefreshVersion;
-  }, [loadConvs, conversationRefreshVersion, user?.id]);
+
+    console.log('[CACHE] mount-effect — conversations.length:', conversations.length, '→ background FETCH');
+    loadConvs();
+  }, [loadConvs]);
 
   // Real-time subscription to conversation updates
   useEffect(() => {
@@ -535,8 +522,9 @@ export default function Chat() {
               return;
             }
             hasMore = (raw.length > INITIAL_BATCH_LIMIT);
-            // If we requested extra, drop the extra marker when mapping
-            if (raw.length > INITIAL_BATCH_LIMIT) raw = raw.slice(0, INITIAL_BATCH_LIMIT);
+            // If we requested extra, drop the OLDEST message (index 0 in ascending order)
+            // NOT the newest (which would be at the end of the array)
+            if (raw.length > INITIAL_BATCH_LIMIT) raw = raw.slice(1);
 
             filtered = raw.filter(m => !m.deleted_for?.includes(user.id));
             // Decrypt visible messages
@@ -562,6 +550,10 @@ export default function Chat() {
           }
 
           console.log('[BUG] msgEffect — fetch OK for', convForThisEffect.slice(0,8), 'got', decrypted.length, 'messages');
+          console.log('[DEBUG] msg IDs:', decrypted.map(m => m.id.slice(0,8)).join(','));
+          console.log('[DEBUG] msg sender_ids:', decrypted.map(m => m.sender_id.slice(0,8)).join(','));
+          console.log('[DEBUG] msg deleted_for:', decrypted.filter(m => m.deleted_for?.includes(user.id)).map(m => m.id.slice(0,8)).join(',') || 'none');
+          console.log('[DEBUG] msg user_in_enc_for:', decrypted.map(m => m.encrypted_for?.includes(user.id)).join(','));
 
           // Pre-fetch shared post data BEFORE setMessages
           const sharedPostIds = [...new Set(decrypted.filter(m => m.shared_post_id).map(m => m.shared_post_id))];
@@ -585,6 +577,7 @@ export default function Chat() {
         } catch (err) {
           if (!aborted) console.warn('[BUG] msgEffect — Error loading messages:', err);
         } finally {
+          staleBackgroundFetchRef.current = false;
           if (!aborted) {
             console.log('[BUG] msgEffect — done, msgsLoading=false for', convForThisEffect.slice(0,8));
             setMsgsLoading(false);
@@ -594,6 +587,7 @@ export default function Chat() {
         }
       })();
     } else {
+      staleBackgroundFetchRef.current = false;
       console.log('[BUG] msgEffect — SKIP db fetch for', activeConvId.slice(0,8), '(cache was fresh)');
       setMsgsLoading(false);
     }
@@ -695,8 +689,9 @@ export default function Chat() {
       console.log('[BUG] sync — SKIP owner mismatch, conv:', activeConvId.slice(0,8), 'owner:', messagesOwnerRef.current?.slice(0,8));
       return;
     }
-    if (msgsLoading) {
-      console.log('[BUG] sync — SKIP msgsLoading=true para', activeConvId.slice(0,8));
+    if (msgsLoading || staleBackgroundFetchRef.current) {
+      if (msgsLoading) console.log('[BUG] sync — SKIP msgsLoading=true para', activeConvId.slice(0,8));
+      if (staleBackgroundFetchRef.current) console.log('[BUG] sync — SKIP staleBackgroundFetch para', activeConvId.slice(0,8));
       return;
     }
     messagesCacheRef.current[activeConvId] = messages;
@@ -1364,6 +1359,8 @@ export default function Chat() {
   }, [visibleConversations]);
 
   const { statuses: otherUserStatuses } = useUserStatus(user?.id, visibleConversationUserIds, true);
+  // ── Registrar participantes en el observador global (persiste entre rutas) ──
+  useRegisterMultipleUserStatus(visibleConversationUserIds);
   const activeConversationStatus = otherUser?.id
     ? (otherUserStatuses?.[otherUser.id] ?? computeEffectiveStatus(otherUser))
     : null;
