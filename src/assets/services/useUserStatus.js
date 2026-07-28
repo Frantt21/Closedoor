@@ -301,7 +301,10 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
         } catch {}
       }
 
-      // ── Polling cada 3s (siempre corre, puede sobreescribir Presence si DB dice disconnected) ──
+      // ── Polling cada 3s (solo sobreescribe cuando DB dice 'disconnected') ──
+      // Presence es la autoridad para online/idle/dnd (en tiempo real).
+      // El poll solo corrige cuando la DB indica desconexión explícita
+      // (escrita por keepalive fetch en beforeunload).
       const pollStatus = async () => {
         if (cancelled) return;
 
@@ -312,15 +315,25 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
             .eq('id', targetId)
             .maybeSingle();
           if (!cancelled && !error && data?.user_status !== undefined) {
-            const normalizedStatus = (() => {
-              const rawStatus = data.user_status;
-              const updatedAt = data.user_status_updated_at;
-              if (rawStatus === 'disconnected') return 'disconnected';
-              if (!updatedAt) return rawStatus;
-              const ageMs = Date.now() - new Date(updatedAt).getTime();
-              return ageMs > STALE_STATUS_THRESHOLD_MS ? 'disconnected' : rawStatus;
-            })();
-            updateStatusForUser(targetId, normalizedStatus);
+            const rawStatus = data.user_status;
+            // Solo sobreescribir si DB explícitamente dice 'disconnected'
+            // (escrito por keepalive fetch al cerrar pestaña)
+            if (rawStatus === 'disconnected') {
+              updateStatusForUser(targetId, 'disconnected');
+            } else {
+              // Para online/idle/dnd: verificar stale (timestamp muy antiguo)
+              // y solo corregir si Presence no tiene datos
+              const presenceData = getPresence(targetId);
+              if (!presenceData?.user_status) {
+                const updatedAt = data.user_status_updated_at;
+                if (updatedAt) {
+                  const ageMs = Date.now() - new Date(updatedAt).getTime();
+                  if (ageMs > STALE_STATUS_THRESHOLD_MS) {
+                    updateStatusForUser(targetId, 'disconnected');
+                  }
+                }
+              }
+            }
           }
         } catch {}
       };
