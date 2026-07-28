@@ -1,19 +1,21 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from './supabaseclient';
 import { getCachedFollowStatus } from './followService';
+import { subscribePresence, updateTrackedStatus, getPresence } from './presenceService';
 
 /**
  * useUserStatus — Hook para manejar el estado online/dnd/idle/disconnected
  * del usuario actual y suscribirse al estado de otros usuarios.
  *
- * Mecanismos de sincronización:
- * 1. postgres_changes Realtime (vía DB replication)
- * 2. Polling cada 10s + resync al volver al tab activo
+ * Mecanismos de sincronización (3 capas):
+ * 1. ⭐ Presence (Supabase Realtime) — instantáneo, detecta desconexión automáticamente
+ * 2. ⭐ DB polling cada 3s — fallback para usuarios sin Presence
+ * 3. ⭐ Staleness check — corrige estados obsoletos por tiempo en `user_status_updated_at`
  *
  * @param {string} userId — ID del usuario actual
  * @param {string} otherUserId — ID del usuario a observar
  * @param {boolean} checkMutualFollow — Si true, solo muestra status si hay follow mutuo
- * @returns {{ status: string|null, myStatus: string, setMyStatus: fn }}
+ * @returns {{ status: string|null, statuses: object, myStatus: string, setMyStatus: fn }}
  */
 export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
   const [status, setStatus] = useState(null);
@@ -48,7 +50,7 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
     }
   }, [userId]);
 
-  // ── Actualizar mi estado ──
+  // ── Actualizar mi estado (DB + Presence + secureStorage) ──
   const setMyStatus = useCallback(async (newStatus) => {
     if (!userId) { console.log('[STATUS] setMyStatus skipped — no userId'); return; }
     if (!['online', 'dnd', 'idle', 'disconnected'].includes(newStatus)) return;
@@ -58,12 +60,16 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
     myStatusRef.current = newStatus;
     setMyStatusState(newStatus);
 
-    // Guardar en secureStorage
+    // 1. Guardar en secureStorage
     try {
       const { setItem } = await import('./secureStorage');
       setItem('fc_user_status', newStatus);
     } catch {}
 
+    // 2. Actualizar Presence (instantáneo, real-time)
+    updateTrackedStatus(newStatus);
+
+    // 3. Persistir en DB (fallback legacy)
     await persistPresence(newStatus);
   }, [persistPresence, userId]);
 
@@ -146,6 +152,8 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
   }, [userId, setMyStatus]);
 
   // ── Suscribirse al estado de otro usuario ──
+  // Capa 1: Presence (Supabase Realtime) — instantáneo, detecta desconexión
+  // Capa 2: DB polling cada 3s — fallback para usuarios sin Presence
   useEffect(() => {
     const targetIds = (Array.isArray(otherUserId) ? otherUserId : [otherUserId]).filter(Boolean);
     const isMultiTarget = Array.isArray(otherUserId);
@@ -178,6 +186,19 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
       }
     };
 
+    // ── Capa 1: Presence — se actualiza en cada sync (≈100ms tras conectar) ──
+    const unsubPresence = subscribePresence((presences) => {
+      if (cancelled) return;
+      for (const targetId of normalizedIds) {
+        const p = presences[targetId];
+        if (p?.user_status) {
+          updateStatusForUser(targetId, p.user_status);
+        }
+      }
+    });
+    cleanupFns.push(unsubPresence);
+
+    // ── Capa 2: DB polling (fallback) ──
     const subscribeToUserStatus = async (targetId) => {
       if (!targetId || cancelled) return;
 
@@ -221,7 +242,7 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
         return;
       }
 
-      // ── 1. Fetch initial status ──
+      // ── Fetch inicial desde DB (lo sobrescribe Presence si está disponible) ──
       try {
         const { data, error } = await supabase
           .from('profiles')
@@ -240,14 +261,17 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
           })();
           console.log('[STATUS] Obs — initial fetch result:', normalizedStatus, 'for', targetId);
           updateStatusForUser(targetId, normalizedStatus);
-        } else if (!cancelled) {
-          console.log('[STATUS] Obs — initial fetch no data/error:', error?.message);
         }
       } catch {}
 
-      // ── 2. Polling cada 3s (sin Realtime para evitar desincronizaciones) ──
+      // ── Polling cada 3s (solo cuando Presence NO tiene datos para este usuario) ──
       const pollStatus = async () => {
         if (cancelled) return;
+
+        // Si Presence ya nos dio un estado para este usuario, saltear
+        const presenceData = getPresence(targetId);
+        if (presenceData?.user_status) return;
+
         try {
           const { data, error } = await supabase
             .from('profiles')

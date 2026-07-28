@@ -46,6 +46,16 @@ import '../Resources/Components/css/modal.css';
 import { getItem, setItem, removeItem, getSessionItem, setSessionItem, removeSessionItem } from '../services/secureStorage';
 import { useUserStatus } from '../services/useUserStatus';
 
+// ── Helper: corrige estados obsoletos usando user_status_updated_at ──
+const STALE_STATUS_MS = 2 * 60 * 1000; // 2 minutos
+function computeEffectiveStatus(user) {
+  if (!user?.user_status) return null;
+  if (user.user_status === 'disconnected') return 'disconnected';
+  if (!user.user_status_updated_at) return user.user_status;
+  const ageMs = Date.now() - new Date(user.user_status_updated_at).getTime();
+  return ageMs > STALE_STATUS_MS ? 'disconnected' : user.user_status;
+}
+
 export default function Chat() {
   const { t, locale } = useI18n();
   const { user, profile, loading: authLoading } = useAuth();
@@ -1233,9 +1243,9 @@ export default function Chat() {
       .filter(Boolean);
   }, [visibleConversations]);
 
-  const { status: activeOtherUserStatus, statuses: otherUserStatuses } = useUserStatus(user?.id, visibleConversationUserIds, true);
+  const { statuses: otherUserStatuses } = useUserStatus(user?.id, visibleConversationUserIds, true);
   const activeConversationStatus = otherUser?.id
-    ? (otherUserStatuses?.[otherUser.id] ?? activeOtherUserStatus ?? otherUser?.user_status)
+    ? (otherUserStatuses?.[otherUser.id] ?? computeEffectiveStatus(otherUser))
     : null;
 
   // ── Blocked status detection (check cache + server) ──
@@ -1782,7 +1792,7 @@ export default function Chat() {
                 alt={conv.otherUser?.username || '?'}
                 className="chat-list-item-avatar"
                 style={getAvatarTransformStyle(conv.otherUser?.avatar_position)}
-                status={otherUserStatuses?.[conv.otherUser?.id] ?? conv.otherUser?.user_status}
+                status={otherUserStatuses?.[conv.otherUser?.id] ?? computeEffectiveStatus(conv.otherUser)}
               />
               <div className="chat-list-item-info">
                 <div className="chat-list-item-top">
@@ -1829,7 +1839,7 @@ export default function Chat() {
             className="chat-messages-header-avatar"
             style={{ cursor: 'pointer', ...getAvatarTransformStyle(otherUser?.avatar_position) }}
             onClick={goToProfile}
-            status={activeConversationStatus ?? otherUser?.user_status}
+            status={activeConversationStatus}
           />
           <div className="chat-messages-header-info" style={{ cursor: 'pointer' }} onClick={goToProfile}>
             <span className="chat-messages-header-name">{otherUser?.displayname || otherUser?.username || t('common.unknown')}</span>

@@ -16,6 +16,7 @@ import { clearAllAppCaches } from '../assets/services/postService';
 import { clearDecryptedCache } from '../assets/services/alphabetEncryption';
 import { clearBlockedListsCache } from '../assets/services/blockService';
 import { clearCachedFollowCounts } from '../assets/services/followService';
+import { initPresence, disposePresence } from '../assets/services/presenceService';
 
 export const AuthContext = createContext();
 
@@ -60,6 +61,9 @@ export function AuthProvider({ children }) {
             } finally {
               setProfileLoading(false);
             }
+
+            // ── Inicializar Presence global ──
+            initPresence(currentUser.id, 'online');
           } else {
             setProfile(null);
             setProfileLoading(false);
@@ -86,6 +90,7 @@ export function AuthProvider({ children }) {
       if (!currentUser) {
         setProfile(null);
         setProfileLoading(false);
+        disposePresence();
         return;
       }
 
@@ -251,6 +256,9 @@ export function AuthProvider({ children }) {
         } catch (profileErr) {
           console.warn('Could not ensure profile on login:', profileErr);
         }
+
+        // ── Inicializar Presence global en login ──
+        initPresence(loggedUser.id, 'online');
       }
 
       setUser(loggedUser);
@@ -381,6 +389,9 @@ export function AuthProvider({ children }) {
 
       setUser(null);
       setProfile(null);
+
+      // ── Liberar Presence global ──
+      disposePresence();
 
       // ── Limpiar todo el caché de la sesión ──
       clearAllAppCaches();          // Elimina todos los localStorage fc_*
