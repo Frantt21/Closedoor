@@ -582,11 +582,12 @@ const PostCard = React.memo(function PostCard({
     [galleryUrls, galleryIndex]
   );
 
-  // ── Share to chat ──
+  // ── Share to chat (multi-select) ──
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareFollowing, setShareFollowing] = useState([]);
   const [shareLoading, setShareLoading] = useState(false);
-  const [shareSending, setShareSending] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState(new Set());
+  const [shareSendingTo, setShareSendingTo] = useState(new Set());
   const shareModalRef = useRef(null);
 
   const openShareModal = useCallback(async (e) => {
@@ -598,6 +599,8 @@ const PostCard = React.memo(function PostCard({
       return;
     }
     setShowShareModal(true);
+    setSelectedUsers(new Set());
+    setShareSendingTo(new Set());
     setShareLoading(true);
     try {
       const data = await getFollowing(user.id);
@@ -616,40 +619,53 @@ const PostCard = React.memo(function PostCard({
     }
   }, [user, navigate, t]);
 
-  const handleShareToUser = useCallback(async (targetUser) => {
-    if (!user?.id || !targetUser?.id || shareSending) return;
+  // Toggle selection of a user for multi-send
+  const toggleUserSelection = useCallback((userId) => {
+    setSelectedUsers((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) {
+        next.delete(userId);
+      } else {
+        next.add(userId);
+      }
+      return next;
+    });
+  }, []);
 
-    // ── Block check ──
-    const cachedBlocked = getCachedBlockStatus(user.id, targetUser.id);
-    if (cachedBlocked === true) {
-      toast.error(t('chat.blocked_cannot_send') || 'You cannot send messages to this user');
-      return;
+  // Send to all selected users
+  const handleSendToSelected = useCallback(async () => {
+    if (selectedUsers.size === 0 || !user?.id) return;
+    const targets = shareFollowing.filter(u => selectedUsers.has(u.id));
+    setShareSendingTo(new Set(selectedUsers));
+    let errors = 0;
+    for (const targetUser of targets) {
+      // Block check per user
+      const cachedBlocked = getCachedBlockStatus(user.id, targetUser.id);
+      if (cachedBlocked === true) { errors++; continue; }
+      const cachedBlockedByThem = getCachedBlockStatus(targetUser.id, user.id);
+      if (cachedBlockedByThem === true) { errors++; continue; }
+      try {
+        const convId = await getOrCreateConversation(user.id, targetUser.id);
+        const { data: participants } = await supabase
+          .from('chat_participants')
+          .select('user_id')
+          .eq('conversation_id', convId);
+        const participantIds = (participants || []).map(p => p.user_id).filter(id => id !== user.id);
+        await sendMessage(convId, user.id, '', participantIds, null, post.id);
+      } catch (err) {
+        console.error('Error sharing post to', targetUser.username, ':', err);
+        errors++;
+      }
     }
-    const cachedBlockedByThem = getCachedBlockStatus(targetUser.id, user.id);
-    if (cachedBlockedByThem === true) {
-      toast.error(t('chat.blocked_by_them') || 'This user cannot receive messages from you right now');
-      return;
-    }
-
-    setShareSending(true);
-    try {
-      const convId = await getOrCreateConversation(user.id, targetUser.id);
-      const { data: participants } = await supabase
-        .from('chat_participants')
-        .select('user_id')
-        .eq('conversation_id', convId);
-      const participantIds = (participants || []).map(p => p.user_id).filter(id => id !== user.id);
-      await sendMessage(convId, user.id, '', participantIds, null, post.id);
+    setShareSendingTo(new Set());
+    if (errors === 0) {
       setShowShareModal(false);
+      setSelectedUsers(new Set());
       setShareFollowing([]);
       toast.success(t('post.shared_to_chat') || 'Post shared!');
-    } catch (err) {
-      console.error('Error sharing post:', err);
+    } else {
       toast.error(t('post.share_error') || 'Error sharing post');
-    } finally {
-      setShareSending(false);
-    }
-  }, [user?.id, post.id, shareSending, navigate, t]);
+    }    }, [selectedUsers, shareFollowing, user?.id, post.id, t]);
 
   // Close share modal on outside click
   useEffect(() => {
@@ -1294,24 +1310,47 @@ const PostCard = React.memo(function PostCard({
                 <p>{t('post.share_no_following') || 'No users to share with'}</p>
               </div>
             ) : (
-              <div className="post-card-share-modal-grid">
-                {shareFollowing.map((u) => (
-                  <button
-                    key={u.id}
-                    className="post-card-share-modal-user"
-                    onClick={() => handleShareToUser(u)}
-                    disabled={shareSending}
-                  >
-                    <Avatar
-                      src={u.avatar_url}
-                      alt={u.username}
-                      className="post-card-share-modal-avatar"
-                    />
-                    <span className="post-card-share-modal-username">{u.username}</span>
-                    {shareSending && <FaCheck className="post-card-share-modal-sent" />}
-                  </button>
-                ))}
-              </div>
+              <>
+                <div className="post-card-share-modal-grid">
+                  {shareFollowing.map((u) => {
+                    const isSelected = selectedUsers.has(u.id);
+                    const isSending = shareSendingTo.has(u.id);
+                    return (
+                      <button
+                        key={u.id}
+                        className={`post-card-share-modal-user ${isSelected ? 'post-card-share-modal-user--selected' : ''}`}
+                        onClick={() => toggleUserSelection(u.id)}
+                        disabled={shareSendingTo.size > 0}
+                      >
+                        <Avatar
+                          src={u.avatar_url}
+                          alt={u.username}
+                          className="post-card-share-modal-avatar"
+                        />
+                        <span className="post-card-share-modal-username">{u.username}</span>
+                        {isSending ? (
+                          <span className="post-card-share-modal-spinner" />
+                        ) : isSelected ? (
+                          <FaCheck className="post-card-share-modal-sent" />
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedUsers.size > 0 && (
+                  <div className="post-card-share-modal-footer">
+                    <button
+                      className="post-card-share-modal-send-btn"
+                      onClick={handleSendToSelected}
+                      disabled={shareSendingTo.size > 0}
+                    >
+                      {shareSendingTo.size > 0
+                        ? (t('common.sending') || 'Sending...')
+                        : (t('post.share_send_to', { n: selectedUsers.size }) || `Send to ${selectedUsers.size}`)}
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>,

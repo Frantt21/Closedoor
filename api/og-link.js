@@ -7,12 +7,33 @@
  * Returns:  JSON { success, title, description, image, url, favicon }
  *           or JSON { success: false, error: "..." }
  *
+ * Caching: In-memory cache with 1h TTL to avoid re-fetching the same URL.
+ *   Cache persists across warm lambda invocations but not cold starts.
+ *   This is the best we can do without paid external cache (Upstash/Redis).
+ *
  * Security:
  *   - Only http/https URLs allowed
  *   - 5-second timeout
  *   - Returns only first 200KB of response body
  *   - No redirect following to file://, ftp://, etc.
  */
+
+// ── In-memory cache with TTL ──
+const ogLinkCache = new Map();
+const OG_LINK_CACHE_TTL = 60 * 60 * 1000; // 1 hour (link metadata rarely changes)
+function ogGet(key) {
+  const entry = ogLinkCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiry) {
+    ogLinkCache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+function ogSet(key, data) {
+  ogLinkCache.set(key, { data, expiry: Date.now() + OG_LINK_CACHE_TTL });
+}
+
 export default async function handler(req, res) {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -64,9 +85,17 @@ export default async function handler(req, res) {
     return;
   }
 
+  // ── Check cache first ──
+  const cacheKey = `og_${targetUrl}`;
+  const cached = ogGet(cacheKey);
+  if (cached) {
+    return res.status(200).json({ success: true, ...cached, url: targetUrl });
+  }
+
   // ── Try known oEmbed providers first (more reliable than scraping OG tags) ──
   const oembedResult = await tryOembed(targetUrl, parsed);
   if (oembedResult) {
+    ogSet(cacheKey, oembedResult);
     return res.status(200).json({
       success: true,
       ...oembedResult,
@@ -120,6 +149,8 @@ export default async function handler(req, res) {
     );
 
     const og = extractOG(html, targetUrl);
+    // Cache the result (excluding favicon which is deterministic)
+    ogSet(cacheKey, og);
 
     return res.status(200).json({
       success: true,

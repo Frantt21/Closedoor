@@ -41,6 +41,23 @@ const supabaseUrl = normalizeUrl(SUPABASE_URL);
 const supabaseKey = SUPABASE_KEY;
 const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
 
+// ── In-memory cache with TTL for OG data ──
+const ogCache = new Map();
+const OG_CACHE_TTL = {
+  profile: 5 * 60 * 1000,   // 5 min for profiles
+  post: 5 * 60 * 1000,       // 5 min for posts
+  link: 60 * 60 * 1000,      // 1 hour for external link metadata
+};
+function cacheGet(key) {
+  const entry = ogCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiry) { ogCache.delete(key); return null; }
+  return entry.data;
+}
+function cacheSet(key, data, ttl) {
+  ogCache.set(key, { data, expiry: Date.now() + ttl });
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -206,6 +223,14 @@ app.use(
 // ── OG Link preview endpoint (local dev) ──
 // Matches the Vercel serverless function at /api/og-link.js
 app.get('/api/og-link', async (req, res) => {
+  // ── Check cache ──
+  const cacheKey = `link_${req.query?.url}`;
+  if (req.query?.url) {
+    const cached = cacheGet(cacheKey);
+    if (cached) {
+      return res.status(200).json({ success: true, ...cached, url: req.query.url });
+    }
+  }
   const targetUrl = req.query?.url;
   if (!targetUrl) {
     res.status(400).json({ success: false, error: 'Missing ?url parameter' });
@@ -229,6 +254,7 @@ app.get('/api/og-link', async (req, res) => {
   // ── Try known oEmbed providers first ──
   const oembedResult = await tryOembed(targetUrl, parsed);
   if (oembedResult) {
+    cacheSet(cacheKey, oembedResult, OG_CACHE_TTL.link);
     return res.status(200).json({
       success: true,
       ...oembedResult,
@@ -249,6 +275,7 @@ app.get('/api/og-link', async (req, res) => {
     });
     const html = await response.text();
     const og = extractOG(html, targetUrl);
+    cacheSet(cacheKey, og, OG_CACHE_TTL.link);
     return res.json({
       success: true,
       ...og,
@@ -407,6 +434,14 @@ function getOGForRoute(req) {
 app.get('/profile/:username', async (req, res) => {
   const { username } = req.params;
 
+  // ── Check cache ──
+  const cacheKey = `profile_${username.toLowerCase()}`;
+  const cached = cacheGet(cacheKey);
+  if (cached) {
+    return sendOGPage(req, res, cached);
+  }
+  const { username } = req.params;
+
   let ogData = {
     title: `@${username}`,
     description: `Check out @${username} on Closedoor!`,
@@ -436,16 +471,24 @@ app.get('/profile/:username', async (req, res) => {
           username: data.username || username,
           type: 'profile',
         };
+        cacheSet(cacheKey, ogData, OG_CACHE_TTL.profile);
       }
     } catch (err) {
       console.warn('Error fetching profile for OG tags:', err.message);
     }
   }
 
+  sendOGPage(req, res, ogData);
+});
+
+function sendOGPage(req, res, ogData) {
+  const host = req.get('host');
+  const protocol = req.protocol;
+  ogData.url = `${protocol}://${host}${req.path}`;
   const html = injectOGTags(htmlTemplate, ogData);
   res.set('Content-Type', 'text/html; charset=utf-8');
   res.send(html);
-});
+}
 
 // ── Post route: fetch post data for rich OG tags ──
 app.get('/post/:id', async (req, res) => {
@@ -459,6 +502,13 @@ app.get('/post/:id', async (req, res) => {
     username: null,
     type: 'article',
   };
+
+  // ── Check cache ──
+  const cacheKey = `post_${id}`;
+  const cached = cacheGet(cacheKey);
+  if (cached) {
+    return sendOGPage(req, res, cached);
+  }
 
   if (supabase) {
     try {
@@ -484,15 +534,14 @@ app.get('/post/:id', async (req, res) => {
           username: null,
           type: 'article',
         };
+        cacheSet(cacheKey, ogData, OG_CACHE_TTL.post);
       }
     } catch (err) {
       console.warn('Error fetching post for OG tags:', err.message);
     }
   }
 
-  const html = injectOGTags(htmlTemplate, ogData);
-  res.set('Content-Type', 'text/html; charset=utf-8');
-  res.send(html);
+  sendOGPage(req, res, ogData);
 });
 
 // ── All other routes: serve index.html with route-specific OG tags ──

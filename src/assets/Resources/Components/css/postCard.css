@@ -1100,6 +1100,71 @@
     color: #22c55e;
 }
 
+/* ── Selected user (multi-select) ── */
+.post-card-share-modal-user--selected {
+    background: color-mix(in srgb, var(--accent-color, #6b7280) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent-color, #6b7280) 40%, transparent);
+    transform: translateY(-1px);
+}
+
+.post-card-share-modal-user--selected:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--accent-color, #6b7280) 20%, transparent);
+    border-color: color-mix(in srgb, var(--accent-color, #6b7280) 60%, transparent);
+}
+
+/* ── Footer with Send button ── */
+.post-card-share-modal-footer {
+    flex-shrink: 0;
+    padding: 12px 20px;
+    border-top: 1px solid var(--color-border, #2a2a2a);
+    display: flex;
+    justify-content: flex-end;
+}
+
+.post-card-share-modal-send-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-family: inherit;
+    color: #ffffff;
+    background: var(--accent-color, #6b7280);
+    border: none;
+    border-radius: var(--radius, 10px);
+    cursor: pointer;
+    transition: opacity 0.15s ease, transform 0.1s ease;
+    white-space: nowrap;
+}
+
+.post-card-share-modal-send-btn:hover:not(:disabled) {
+    opacity: 0.85;
+    transform: translateY(-1px);
+}
+
+.post-card-share-modal-send-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.post-card-share-modal-send-btn:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
+/* ── Spinner for sending state ── */
+.post-card-share-modal-spinner {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--accent-color, #6b7280);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: fcSpinner 0.6s linear infinite;
+}
+
 /* Lightbox fallback */
 .post-card-lightbox-content .safe-image-fallback {
   width: 400px;

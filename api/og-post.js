@@ -15,6 +15,19 @@ const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabase
 
 const FALLBACK_IMAGE = 'https://placehold.co/1200x630/1a1a2e/6b7280?text=Closedoor';
 
+// ── In-memory cache with TTL ──
+const postOgCache = new Map();
+const POST_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+function cacheGet(key) {
+  const entry = postOgCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiry) { postOgCache.delete(key); return null; }
+  return entry.data;
+}
+function cacheSet(key, data) {
+  postOgCache.set(key, { data, expiry: Date.now() + POST_CACHE_TTL });
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     res.status(405).end('Method not allowed');
@@ -28,6 +41,13 @@ export default async function handler(req, res) {
   }
 
   const postId = match[1];
+
+  // ── Check cache ──
+  const cacheKey = `post_${postId}`;
+  const cached = cacheGet(cacheKey);
+  if (cached) {
+    return sendOG(req, res, postId, cached);
+  }
 
   // ── Fetch post data from Supabase ──
   let og = {
@@ -61,13 +81,17 @@ export default async function handler(req, res) {
           image: data.image_url || data.profiles?.avatar_url || FALLBACK_IMAGE,
           type: 'article',
         };
+        cacheSet(cacheKey, og);
       }
     } catch (err) {
       console.warn('[og-post] Fetch error:', err.message);
     }
   }
 
-  // ── Read the built index.html and inject OG tags ──
+  sendOG(req, res, postId, og);
+}
+
+function sendOG(req, res, postId, og) {
   try {
     const htmlPath = join(process.cwd(), 'dist', 'index.html');
     const html = readFileSync(htmlPath, 'utf-8');

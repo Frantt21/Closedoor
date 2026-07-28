@@ -15,6 +15,19 @@ const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabase
 
 const FALLBACK_IMAGE = 'https://placehold.co/1200x630/1a1a2e/6b7280?text=Closedoor';
 
+// ── In-memory cache with TTL ──
+const profileOgCache = new Map();
+const PROFILE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+function cacheGet(key) {
+  const entry = profileOgCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiry) { profileOgCache.delete(key); return null; }
+  return entry.data;
+}
+function cacheSet(key, data) {
+  profileOgCache.set(key, { data, expiry: Date.now() + PROFILE_CACHE_TTL });
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     res.status(405).end('Method not allowed');
@@ -28,6 +41,13 @@ export default async function handler(req, res) {
   }
 
   const username = match[1];
+
+  // ── Check cache ──
+  const cacheKey = `profile_${username.toLowerCase()}`;
+  const cached = cacheGet(cacheKey);
+  if (cached) {
+    return sendOG(req, res, username, cached);
+  }
 
   // ── Fetch profile data from Supabase ──
   let og = {
@@ -52,13 +72,17 @@ export default async function handler(req, res) {
             : `Check out @${data.username || username} on Closedoor!`,
           image: data.avatar_url || data.banner_url || FALLBACK_IMAGE,
         };
+        cacheSet(cacheKey, og);
       }
     } catch (err) {
       console.warn('[og-profile] Fetch error:', err.message);
     }
   }
 
-  // ── Read the built index.html and inject OG tags ──
+  sendOG(req, res, username, og);
+}
+
+function sendOG(req, res, username, og) {
   try {
     const htmlPath = join(process.cwd(), 'dist', 'index.html');
     const html = readFileSync(htmlPath, 'utf-8');

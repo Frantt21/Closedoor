@@ -465,6 +465,17 @@ export default function Chat() {
     try {
       const convs = await getConversations(user.id);
       setConversations(convs);
+      // Limpiar overrides locales para conversaciones donde la DB tiene mensajes más nuevos
+      for (const conv of convs) {
+        const override = localConvOverridesRef.current[conv.id];
+        if (override && conv.last_message_at) {
+          // Comparar contra deletedMsgAt (timestamp del mensaje borrado), NO contra override.at
+          // Para distinguir entre "no hay mensajes nuevos" vs "llegaron mensajes nuevos"
+          if (new Date(conv.last_message_at) > new Date(override.deletedMsgAt || 0)) {
+            delete localConvOverridesRef.current[conv.id];
+          }
+        }
+      }
       // Persist to sessionStorage after successful fetch
       saveConvsToSession(convs);
     } catch (err) {
@@ -606,6 +617,8 @@ export default function Chat() {
             }
             return [...prev, { ...newMsg, decryptedContent: content }];
           });
+          // Nuevo mensaje recibido → limpiar override local para que el preview real se muestre
+          delete localConvOverridesRef.current[convForThisEffect];
           updateConvPreview(
             convForThisEffect,
             content || '',
@@ -1465,7 +1478,7 @@ export default function Chat() {
         updateConvPreview(convId, newPreviewText, newLastAt);
         // Guardar override local para que persista a loadConvs()
         if (newPreviewText !== null) {
-          localConvOverridesRef.current[convId] = { text: newPreviewText, at: newLastAt };
+          localConvOverridesRef.current[convId] = { text: newPreviewText, at: newLastAt, deletedMsgAt: msg.created_at };
         } else {
           delete localConvOverridesRef.current[convId];
         }
