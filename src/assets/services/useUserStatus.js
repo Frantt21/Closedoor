@@ -1,31 +1,38 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useContext } from 'react';
 import { supabase } from './supabaseclient';
-import { getCachedFollowStatus } from './followService';
 import { updateTrackedStatus } from './presenceService';
+import { UserStatusContext } from '../../context/UserStatusContext';
 
 /**
  * useUserStatus — Hook para manejar el estado online/dnd/idle/disconnected
- * del usuario actual y suscribirse al estado de otros usuarios.
+ * del usuario actual. La observación de OTROS usuarios se delega al
+ * UserStatusContext global, que hace polling cada 3s en un solo query batch.
  *
- * Mecanismos de sincronización (3 capas):
- * 1. ⭐ Presence (Supabase Realtime) — instantáneo, detecta desconexión automáticamente
- * 2. ⭐ DB polling cada 3s — fallback para usuarios sin Presence
- * 3. ⭐ Staleness check — corrige estados obsoletos por tiempo en `user_status_updated_at`
- *
- * @param {string} userId — ID del usuario actual
- * @param {string} otherUserId — ID del usuario a observar
- * @param {boolean} checkMutualFollow — Si true, solo muestra status si hay follow mutuo
+ * @param {string} userId — ID del usuario actual (para init + heartbeat + setMyStatus)
+ * @param {string|string[]} [otherUserId] — Ya no hace polling propio; solo usa UserStatusContext
  * @returns {{ status: string|null, statuses: object, myStatus: string, setMyStatus: fn }}
  */
-export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
-  const [status, setStatus] = useState(null);
-  const [statuses, setStatuses] = useState({});
+export function useUserStatus(userId, otherUserId) {
   const [myStatus, setMyStatusState] = useState('online');
   const myStatusRef = useRef('online');
   const sessionTokenRef = useRef(null);
   const mountedCleanupRef = useRef(null);
-  const lastObservedTargetKeyRef = useRef('');
-  const STALE_STATUS_THRESHOLD_MS = 60 * 1000; // 1 minuto — detecta desconexión más rápido
+
+  // ── Estados de otros usuarios desde el contexto global ──
+  const globalStatuses = useContext(UserStatusContext);
+
+  // Construir status/es a partir del contexto global (sin polling propio)
+  let computedStatus = null;
+  let computedStatuses = {};
+  if (otherUserId) {
+    const targetIds = (Array.isArray(otherUserId) ? otherUserId : [otherUserId]).filter(Boolean);
+    for (const id of targetIds) {
+      computedStatuses[id] = globalStatuses?.[id] || null;
+    }
+    if (!Array.isArray(otherUserId) && targetIds.length > 0) {
+      computedStatus = computedStatuses[targetIds[0]];
+    }
+  }
 
   const persistPresence = useCallback(async (newStatus) => {
     if (!userId) return null;
@@ -41,10 +48,10 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
         .update(payload)
         .eq('id', userId);
 
-      if (error) console.warn('[STATUS] DB update error:', error);
+      if (error) {/* empty */}
       return newStatus;
     } catch (err) {
-      console.warn('[STATUS] Error updating user_status:', err);
+      // ignore
       return newStatus;
     }
   }, [userId]);
@@ -173,186 +180,6 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
     };
   }, [userId, setMyStatus]);
 
-  // ── Suscribirse al estado de otro usuario ──
-  // Capa 1: Presence (Supabase Realtime) — instantáneo, detecta desconexión
-  // Capa 2: DB polling cada 3s — fallback para usuarios sin Presence
-  useEffect(() => {
-    const targetIds = (Array.isArray(otherUserId) ? otherUserId : [otherUserId]).filter(Boolean);
-    const isMultiTarget = Array.isArray(otherUserId);
-
-    if (targetIds.length === 0) {
-      setStatus(null);
-      setStatuses({});
-      return;
-    }
-
-    const normalizedIds = [...new Set(targetIds)];
-    const targetKey = normalizedIds.join('|');
-    const targetsChanged = lastObservedTargetKeyRef.current !== targetKey;
-
-    if (targetsChanged) {
-      setStatus(null);
-      // NO resetear statuses — evita el parpadeo. Los valores viejos persisten
-      // hasta que Presence sync o el DB poll los actualice.
-    }
-    lastObservedTargetKeyRef.current = targetKey;
-
-    let cancelled = false;
-    const cleanupFns = [];
-
-    const updateStatusForUser = (targetId, value) => {
-      if (cancelled) return;
-      if (isMultiTarget) {
-        setStatuses(prev => {
-          if (prev[targetId] === value) return prev;
-          return { ...prev, [targetId]: value };
-        });
-      } else {
-        setStatus(value);
-      }
-    };
-
-    // NOTA: No usar Presence para observar estados de otros usuarios.
-    // Presence es ÚNICAMENTE para que el usuario actual emita su estado.
-    // El servidor Presence puede mantener usuarios atascados en el canal
-    // incluso después de desconectarse (especialmente si se llamó a
-    // updateTrackedStatus durante beforeunload), causando un ciclo
-    // infinito de override entre Presence y DB poll.
-    //
-    // DB polling cada 3s es la ÚNICA fuente de verdad para observar.
-    // El keepalive fetch en beforeunload garantiza que la DB tenga
-    // el estado correcto al cerrar la pestaña.
-
-    // ── Capa 2: DB polling (fallback) ──
-    const subscribeToUserStatus = async (targetId) => {
-      if (!targetId || cancelled) return;
-
-      // ── Verificar follow mutuo ──
-      const checkVisibility = async () => {
-        if (!userId || !checkMutualFollow) return true;
-
-        const iFollowThem = getCachedFollowStatus(userId, targetId);
-        const theyFollowMe = getCachedFollowStatus(targetId, userId);
-
-        if (iFollowThem !== null && theyFollowMe !== null) {
-          return iFollowThem === true && theyFollowMe === true;
-        }
-
-        try {
-          const [iFollow, theyFollow] = await Promise.all([
-            supabase
-              .from('follows')
-              .select('follower_id', { count: 'exact', head: true })
-              .eq('follower_id', userId)
-              .eq('following_id', targetId)
-              .eq('status', 'accepted'),
-            supabase
-              .from('follows')
-              .select('follower_id', { count: 'exact', head: true })
-              .eq('follower_id', targetId)
-              .eq('following_id', userId)
-              .eq('status', 'accepted'),
-          ]);
-          return (iFollow.count ?? 0) > 0 && (theyFollow.count ?? 0) > 0;
-        } catch (err) {
-          console.warn('Error checking mutual follow:', err);
-          return false;
-        }
-      };
-
-      const visible = await checkVisibility();
-      if (cancelled) return;
-      if (!visible) {
-        updateStatusForUser(targetId, null);
-        return;
-      }
-
-      // ── Fetch inicial desde DB ──
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('user_status, user_status_updated_at')
-          .eq('id', targetId)
-          .maybeSingle();
-
-        if (!cancelled && !error && data?.user_status !== undefined) {
-          const normalizedStatus = (() => {
-            const rawStatus = data.user_status;
-            if (rawStatus === 'disconnected') return 'disconnected';
-            const updatedAt = data.user_status_updated_at;
-            if (!updatedAt) return rawStatus;
-            const ageMs = Date.now() - new Date(updatedAt).getTime();
-            return ageMs > STALE_STATUS_THRESHOLD_MS ? 'disconnected' : rawStatus;
-          })();
-          updateStatusForUser(targetId, normalizedStatus);
-        }
-      } catch {}
-
-      // ── Polling cada 3s ──
-      // La DB es la ÚNICA fuente de verdad. No se usa Presence para observar
-      // porque el servidor Presence puede mantener usuarios atascados en el
-      // canal después de desconectarse, causando ciclos de override.
-      const pollStatus = async () => {
-        if (cancelled) return;
-
-        try {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('user_status, user_status_updated_at')
-            .eq('id', targetId)
-            .maybeSingle();
-          if (!cancelled && !error && data?.user_status !== undefined) {
-            const rawStatus = data.user_status;
-            // Aplicar stale check para estados no-disconnected
-            let effectiveStatus = rawStatus;
-            if (rawStatus !== 'disconnected') {
-              const updatedAt = data.user_status_updated_at;
-              if (updatedAt) {
-                const ageMs = Date.now() - new Date(updatedAt).getTime();
-                if (ageMs > STALE_STATUS_THRESHOLD_MS) {
-                  effectiveStatus = 'disconnected';
-                }
-              }
-            }
-            updateStatusForUser(targetId, effectiveStatus);
-          }
-        } catch {}
-      };
-      void pollStatus();
-      const pollInterval = setInterval(pollStatus, 3000);
-      const onVisible = () => { if (!document.hidden) pollStatus(); };
-      document.addEventListener('visibilitychange', onVisible);
-      cleanupFns.push(() => {
-        clearInterval(pollInterval);
-        document.removeEventListener('visibilitychange', onVisible);
-      });
-    };
-
-    Promise.all(normalizedIds.map(subscribeToUserStatus));
-
-    return () => {
-      cancelled = true;
-      cleanupFns.forEach((cleanup) => cleanup());
-      if (lastObservedTargetKeyRef.current === targetKey) {
-        lastObservedTargetKeyRef.current = '';
-      }
-      // NO resetear statuses aquí — evita que al cambiar de targets
-      // (por ejemplo al cambiar de chat) se borren los estados y parpadeen.
-    };
-  }, [userId, otherUserId, checkMutualFollow]);
-
-  return { status, statuses, myStatus, setMyStatus };
+  return { status: computedStatus, statuses: computedStatuses, myStatus, setMyStatus };
 }
 
-/**
- * Format status to a display string with the correct locale key prefix.
- */
-export function getStatusKey(status) {
-  switch (status) {
-    case 'online': return 'status.online';
-    case 'dnd': return 'status.dnd';
-    case 'idle': return 'status.idle';
-    case 'disconnected': return 'status.disconnected';
-    default: return 'status.offline';
-  }
-}

@@ -196,16 +196,16 @@ export function NotificationProvider({ children }) {
     if (!userId) return;
     // Si Chat está montado, subscribeToConversations ya actualiza el caché
     // via loadConvs() → saveConvsToSession(). Evitar duplicar el fetch.
-    if (isChatRoute()) { console.log('[CACHE] notifCtx skip — isChatRoute'); return; }
+    if (isChatRoute()) return;
     const now = Date.now();
-    if (now - refreshConversationsCacheThrottledRef.current < 3000) { console.log('[CACHE] notifCtx skip — throttled'); return; }
+    if (now - refreshConversationsCacheThrottledRef.current < 3000) return;
     refreshConversationsCacheThrottledRef.current = now;
 
     try {
       const convs = await getConversations(userId);
       const key = `chatConvsCache_${userId}`;
       setSessionItem(key, convs);
-      console.log('[CACHE] notifCtx — saved', convs.length, 'conversaciones a sessionStorage');
+      // saved to sessionStorage
     } catch (err) {
       // sessionStorage quota exceeded — limpiar caché
       if (err?.name === 'QuotaExceededError' || err?.code === 22) {

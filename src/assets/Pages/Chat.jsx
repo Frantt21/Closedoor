@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useLayoutEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useLayoutEffect, useContext } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -45,10 +45,10 @@ import '../Resources/Styles/post.css';
 import '../Resources/Components/css/modal.css';
 import { getItem, setItem, removeItem, getSessionItem, setSessionItem, removeSessionItem } from '../services/secureStorage';
 import { useUserStatus } from '../services/useUserStatus';
-import { useRegisterMultipleUserStatus } from '../../context/UserStatusContext';
+import { useRegisterMultipleUserStatus, UserStatusContext } from '../../context/UserStatusContext';
 
 // ── Helper: corrige estados obsoletos usando user_status_updated_at ──
-const STALE_STATUS_MS = 60 * 1000; // 1 minuto — debe coincidir con useUserStatus.js
+const STALE_STATUS_MS = 60 * 1000;
 function computeEffectiveStatus(user) {
   if (!user?.user_status) return null;
   if (user.user_status === 'disconnected') return 'disconnected';
@@ -238,6 +238,27 @@ export default function Chat() {
   const skipCacheWipeRef = useRef(false);  // prevents useLayoutEffect from wiping messages when resolving pending conv
   const skipMsgLoadRef = useRef(false);   // prevents useEffect from fetching messages when sendContent resolves pending conv
   const staleBackgroundFetchRef = useRef(false); // true cuando se muestran datos stale mientras se fetchea en bg
+  const messagesRef = useRef(messages); // ref sincronizada para evitar race conditions con Realtime
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
+  // ── Overrides locales para preview de conversaciones (persisten a loadConvs) ──
+  const localConvOverridesRef = useRef({});
+  const overridesRestoredRef = useRef(false);
+  if (!overridesRestoredRef.current && user?.id) {
+    overridesRestoredRef.current = true;
+    try {
+      const saved = getSessionItem(`chatConvOverrides_${user.id}`);
+      if (saved && typeof saved === 'object') localConvOverridesRef.current = saved;
+    } catch {}
+  }
+  // ── Flush overrides a sessionStorage en unmount/pagehide ──
+  useEffect(() => {
+    const flush = () => {
+      if (!user?.id) return;
+      setSessionItem(`chatConvOverrides_${user.id}`, localConvOverridesRef.current);
+    };
+    window.addEventListener('pagehide', flush);
+    return () => { flush(); window.removeEventListener('pagehide', flush); };
+  }, [user?.id]);
   const draftsRef = useRef({}); // borradores del input por conversation ID
   const prevConvIdRef = useRef(null);
   const messagesOwnerRef = useRef(null); // tracks which conversation the current `messages` state belongs to
@@ -296,16 +317,12 @@ export default function Chat() {
       window.__fc_cacheClearedOnReload = true;
       try { removeSessionItem(getSessionCacheKey()); } catch (e) {}
       messagesCacheRef.current = {};
-      console.log('[CACHE] Reload — caché limpiado (1 vez por sesión)');
+      // Limpiar caché 1 vez por sesión
     } else {
-      // 2ª vez+ (SPA navigation) o navegación normal → restaurar desde sessionStorage
+      // SPA navigation → restaurar desde sessionStorage
       const restored = loadCacheFromSession();
-      const convCount = Object.keys(restored).filter(k => k !== '_meta').length;
       if (Object.keys(restored).length > 0) {
         messagesCacheRef.current = restored;
-        console.log('[CACHE] Restaurado —', convCount, 'conversaciones');
-      } else {
-        console.log('[CACHE] Sin caché en sessionStorage');
       }
     }
 
@@ -338,10 +355,8 @@ export default function Chat() {
   if (!convsSessionRestoredRef.current && user?.id) {
     convsSessionRestoredRef.current = true;
     const cached = loadConvsFromSession();
-    console.log('[CACHE] render-phase — cached convs:', cached.length, 'conversations state:', conversations.length);
     if (cached.length > 0 && conversations.length === 0) {
       // React 18 allows setState during render — triggers re-render before commit
-      console.log('[CACHE] render-phase — restored', cached.length, 'conversaciones from sessionStorage');
       setConversations(cached);
       setConvsLoading(false);
     }
@@ -364,18 +379,21 @@ export default function Chat() {
   const [newMsgCount, setNewMsgCount] = useState(0);
   // ── Track if user has scrolled up (show scroll-to-bottom button) ──
   const [isScrolledUp, setIsScrolledUp] = useState(false);
+  // ── Acumula URLs de imágenes de TODOS los mensajes cargados (incluyendo paginación) ──
+  const allChatMediaUrlsRef = useRef([]);
+  const prevConvForMediaRef = useRef(null);
   // ── Blocked status: null=unknown, 'blocked_by_me', 'blocked_by_them' ──
   const [isBlockedConv, setIsBlockedConv] = useState(null);
   const scrollToBottom = useCallback(() => {
-    messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'instant' });
     setNewMsgCount(0);
+    setIsScrolledUp(false);
   }, []);
 
   // ── useLayoutEffect: runs BEFORE browser paint — garantiza que no haya flash de mensajes viejos ──
   useLayoutEffect(() => {
     if (!activeConvId) return;
     if (prevConvIdRef.current === activeConvId) {
-      console.log('[BUG] layout — mismo conv, skip');
       return;
     }
 
@@ -389,7 +407,6 @@ export default function Chat() {
       skipCacheWipeRef.current = false;
       prevConvIdRef.current = activeConvId;
       messagesOwnerRef.current = activeConvId;
-      console.log('[BUG] layout — skipCacheWipe, set owner to', activeConvId.slice(0,8));
       return;
     }
 
@@ -405,10 +422,7 @@ export default function Chat() {
       const lastMsgAt = activeConv?.last_message_at;
       const fetchedAt = cachedMeta?.fetchedAt;
       const isStale = lastMsgAt && fetchedAt && new Date(lastMsgAt) > new Date(fetchedAt);
-      console.log('[BUG] layout — CACHE HIT:', activeConvId.slice(0,8), 'len:', cached.length, 'stale:', !!isStale);
-
       if (isStale) {
-        console.log('[BUG] layout — STALE, showing cached messages while refetching in bg');
         // Mostrar mensajes cacheados inmediatamente SIN skeleton
         setMessages(cached);
         setMsgsLoading(false); // false para NO mostrar el skeleton
@@ -417,7 +431,6 @@ export default function Chat() {
         setOldestMessageDate(null);
         // skipMsgLoadRef se deja en false para que msgEffect haga el fetch
       } else {
-        console.log('[BUG] layout — restoring from cache, skipMsgLoad=true');
         setMessages(cached);
         setMsgsLoading(false);
         if (cached.length > 0 && cachedMeta?.hasMoreMessages === false) {
@@ -431,13 +444,11 @@ export default function Chat() {
         skipMsgLoadRef.current = true;
       }
     } else {
-      console.log('[BUG] layout — NO CACHE for', activeConvId.slice(0,8), ', setting msgsLoading=true');
       setMessages([]);
       setMsgsLoading(true);
       setHasMoreMessages(true);
       setOldestMessageDate(null);
     }
-    console.log('[BUG] layout — setting owner to', activeConvId.slice(0,8));
     messagesOwnerRef.current = activeConvId;
     prevConvIdRef.current = activeConvId;
   }, [activeConvId, conversations]);
@@ -472,7 +483,6 @@ export default function Chat() {
     // refreshConversationsCache.
     if (!user?.id) return;
 
-    console.log('[CACHE] mount-effect — conversations.length:', conversations.length, '→ background FETCH');
     loadConvs();
   }, [loadConvs]);
 
@@ -494,7 +504,6 @@ export default function Chat() {
 
     // Determine whether to skip the DB fetch (fresh cache restored by layout effect)
     const skipFetch = skipMsgLoadRef.current;
-    console.log('[BUG] msgEffect — activeConvId:', activeConvId.slice(0,8), 'skipFetch:', skipFetch, 'msgsLoading:', msgsLoading);
     skipMsgLoadRef.current = false;
     let aborted = false;
     const convForThisEffect = activeConvId;
@@ -503,7 +512,6 @@ export default function Chat() {
 
     // ══ DB fetch — skipped when layout effect restored from fresh cache ══
     if (!skipFetch) {
-      console.log('[BUG] msgEffect — starting DB fetch for', convForThisEffect.slice(0,8));
       (async () => {
         try {
           let attempts = 0;
@@ -517,10 +525,7 @@ export default function Chat() {
           do {
             attempts += 1;
             raw = await getMessages(convForThisEffect, fetchLimit, cursor);
-            if (aborted) {
-              console.log('[BUG] msgEffect — ABORTED after fetch for', convForThisEffect.slice(0,8));
-              return;
-            }
+            if (aborted) return;
             hasMore = (raw.length > INITIAL_BATCH_LIMIT);
             // If we requested extra, drop the OLDEST message (index 0 in ascending order)
             // NOT the newest (which would be at the end of the array)
@@ -544,16 +549,7 @@ export default function Chat() {
             break;
           } while (attempts < 3);
 
-          if (aborted) {
-            console.log('[BUG] msgEffect — ABORTED after loop for', convForThisEffect.slice(0,8));
-            return;
-          }
-
-          console.log('[BUG] msgEffect — fetch OK for', convForThisEffect.slice(0,8), 'got', decrypted.length, 'messages');
-          console.log('[DEBUG] msg IDs:', decrypted.map(m => m.id.slice(0,8)).join(','));
-          console.log('[DEBUG] msg sender_ids:', decrypted.map(m => m.sender_id.slice(0,8)).join(','));
-          console.log('[DEBUG] msg deleted_for:', decrypted.filter(m => m.deleted_for?.includes(user.id)).map(m => m.id.slice(0,8)).join(',') || 'none');
-          console.log('[DEBUG] msg user_in_enc_for:', decrypted.map(m => m.encrypted_for?.includes(user.id)).join(','));
+          if (aborted) return;
 
           // Pre-fetch shared post data BEFORE setMessages
           const sharedPostIds = [...new Set(decrypted.filter(m => m.shared_post_id).map(m => m.shared_post_id))];
@@ -574,21 +570,16 @@ export default function Chat() {
             setOldestMessageDate(decrypted[0].created_at);
           }
           setHasMoreMessages(hasMore);
-        } catch (err) {
-          if (!aborted) console.warn('[BUG] msgEffect — Error loading messages:', err);
+        } catch {
         } finally {
           staleBackgroundFetchRef.current = false;
           if (!aborted) {
-            console.log('[BUG] msgEffect — done, msgsLoading=false for', convForThisEffect.slice(0,8));
             setMsgsLoading(false);
-          } else {
-            console.log('[BUG] msgEffect — skip msgsLoading=false (aborted) for', convForThisEffect.slice(0,8));
           }
         }
       })();
     } else {
       staleBackgroundFetchRef.current = false;
-      console.log('[BUG] msgEffect — SKIP db fetch for', activeConvId.slice(0,8), '(cache was fresh)');
       setMsgsLoading(false);
     }
 
@@ -622,8 +613,9 @@ export default function Chat() {
             newMsg.sender_id !== user.id
           );
           // Only auto-scroll if user is near the bottom of the chat
+          // En column-reverse, scrollTop ≈ 0 al fondo, negativo al tope
           const el = messagesContainerRef.current;
-          const isNearBottom = el && (el.scrollTop > -80 || el.scrollHeight - el.clientHeight + el.scrollTop < 80);
+          const isNearBottom = el && el.scrollTop > -80;
           if (isNearBottom) {
             setTimeout(() => messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' }), 50);
             setNewMsgCount(0);
@@ -636,13 +628,25 @@ export default function Chat() {
       // onDelete: called when a message is deleted by the other user
       (deletedId) => {
         if (aborted) return;
-        setMessages((prev) => prev.filter(m => m.id !== deletedId));
+        setMessages((prev) => {
+          const filtered = prev.filter(m => m.id !== deletedId);
+          // If deleted message was the last one, update the conversation preview
+          const wasLast = prev.length > 0 && prev[prev.length - 1].id === deletedId;
+          if (wasLast) {
+            const newLast = filtered[filtered.length - 1];
+            updateConvPreview(
+              convForThisEffect,
+              newLast?.decryptedContent || null,
+              newLast?.created_at || null
+            );
+          }
+          return filtered;
+        });
         markAsRead(convForThisEffect, user.id);
       }
     );
 
     return () => {
-      console.log('[BUG] msgEffect — CLEANUP, setting aborted=true for', convForThisEffect.slice(0,8), '| current activeConvId:', activeConvId.slice(0,8));
       aborted = true;
       unsub?.unsubscribe();
     };
@@ -684,16 +688,8 @@ export default function Chat() {
   //   completes. Without this guard, the cache for the old conversation gets
   //   overwritten with [], destroying valid cached data.
   useEffect(() => {
-    if (!activeConvId) { console.log('[BUG] sync — no activeConvId'); return; }
-    if (messagesOwnerRef.current !== activeConvId) {
-      console.log('[BUG] sync — SKIP owner mismatch, conv:', activeConvId.slice(0,8), 'owner:', messagesOwnerRef.current?.slice(0,8));
-      return;
-    }
-    if (msgsLoading || staleBackgroundFetchRef.current) {
-      if (msgsLoading) console.log('[BUG] sync — SKIP msgsLoading=true para', activeConvId.slice(0,8));
-      if (staleBackgroundFetchRef.current) console.log('[BUG] sync — SKIP staleBackgroundFetch para', activeConvId.slice(0,8));
-      return;
-    }
+    if (!activeConvId || messagesOwnerRef.current !== activeConvId) return;
+    if (msgsLoading || staleBackgroundFetchRef.current) return;
     messagesCacheRef.current[activeConvId] = messages;
     // Update fetchedAt + pagination state for staleness check on next conversation switch
     if (!messagesCacheRef.current._meta) messagesCacheRef.current._meta = {};
@@ -703,7 +699,6 @@ export default function Chat() {
       oldestMessageDate,
     };
     // Persist to sessionStorage so cache survives page reload
-    console.log('[BUG] sync — guardando', messages.length, 'mensajes en cache para', activeConvId.slice(0,8));
     saveCacheToSession(messagesCacheRef.current);
   }, [messages, activeConvId, msgsLoading]);
 
@@ -721,13 +716,9 @@ export default function Chat() {
       };
       saveCacheToSession(messagesCacheRef.current);
     };
-    const handlePageHide = () => {
-      console.log('[CACHE] pagehide — flusheando caché');
-      flushCache();
-    };
+    const handlePageHide = () => flushCache();
     window.addEventListener('pagehide', handlePageHide);
     return () => {
-      console.log('[CACHE] cleanup — flusheando caché antes de desmontar');
       flushCache(); // flush on unmount (route change)
       window.removeEventListener('pagehide', handlePageHide);
     };
@@ -766,9 +757,7 @@ export default function Chat() {
       const lastMsgAt = conv?.last_message_at;
       const fetchedAt = meta?.fetchedAt;
       const isStale = lastMsgAt && fetchedAt && new Date(lastMsgAt) > new Date(fetchedAt);
-      console.log('[BUG] selectConv — cache HIT:', convId.slice(0,8), 'len:', cached.length, 'stale:', !!isStale, 'lastMsgAt:', lastMsgAt, 'fetchedAt:', fetchedAt);
       if (!isStale) {
-        console.log('[BUG] selectConv — restoring, skipMsgLoad=true');
         setMessages(cached);
         setMsgsLoading(false);
         skipMsgLoadRef.current = true;
@@ -776,11 +765,7 @@ export default function Chat() {
           setHasMoreMessages(meta.hasMoreMessages ?? true);
           setOldestMessageDate(meta.oldestMessageDate ?? null);
         }
-      } else {
-        console.log('[CACHE] selectConversation — caché obsoleto, se recargará de DB');
       }
-    } else {
-      console.log('[CACHE] selectConversation — sin caché para', convId.slice(0,8));
     }
 
     setActiveConvId(convId);
@@ -1358,7 +1343,7 @@ export default function Chat() {
       .filter(Boolean);
   }, [visibleConversations]);
 
-  const { statuses: otherUserStatuses } = useUserStatus(user?.id, visibleConversationUserIds, true);
+  const otherUserStatuses = useContext(UserStatusContext);
   // ── Registrar participantes en el observador global (persiste entre rutas) ──
   useRegisterMultipleUserStatus(visibleConversationUserIds);
   const activeConversationStatus = otherUser?.id
@@ -1424,21 +1409,33 @@ export default function Chat() {
     setMsgMenu({ open: false, x: 0, y: 0, msg: null });
     if (!msg || !convId) return;
     try {
+      // Leer desde messagesRef antes de deleteMessage para evitar race con Realtime
+      const currentMsgs = messagesRef.current;
+      const wasLast = msg.id === currentMsgs[currentMsgs.length - 1]?.id;
+      let newPreviewText = null;
+      let newLastAt = null;
+      if (wasLast) {
+        const filtered = currentMsgs.filter(m => m.id !== msg.id);
+        const newLast = filtered[filtered.length - 1];
+        newPreviewText = newLast?.content || newLast?.decryptedContent || null;
+        newLastAt = newLast?.created_at || null;
+      }
       await deleteMessage(msg.id);
-      setMessages((prev) => {
-        const filtered = prev.filter(m => m.id !== msg.id);
-        // If deleted message was the last one, update the conversation preview
-        const wasLast = msg.id === prev[prev.length - 1]?.id;
-        if (wasLast) {
-          const newLast = filtered[filtered.length - 1];
-          updateConvPreview(
-            convId,
-            newLast?.content || newLast?.decryptedContent || null,
-            newLast?.created_at || null
-          );
+      setMessages((prev) => prev.filter(m => m.id !== msg.id));
+      if (wasLast) {
+        updateConvPreview(convId, newPreviewText, newLastAt);
+        if (newPreviewText !== null) {
+          const obfuscated = newPreviewText.length > 80 ? newPreviewText.slice(0, 80) + '...' : newPreviewText;
+          await supabase
+            .from('conversations')
+            .update({
+              last_message_text: obfuscated,
+              last_message_at: newLastAt,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', convId);
         }
-        return filtered;
-      });
+      }
     } catch (err) {
       console.error('Error deleting message:', err);
     }
@@ -1450,20 +1447,29 @@ export default function Chat() {
     setMsgMenu({ open: false, x: 0, y: 0, msg: null });
     if (!msg || !user?.id || !convId) return;
     try {
+      // Leer desde messagesRef antes de deleteMessageForMe para evitar race con Realtime
+      const currentMsgs = messagesRef.current;
+      const wasLast = msg.id === currentMsgs[currentMsgs.length - 1]?.id;
+      let newPreviewText = null;
+      let newLastAt = null;
+      if (wasLast) {
+        const filtered = currentMsgs.filter(m => m.id !== msg.id);
+        const newLast = filtered[filtered.length - 1];
+        newPreviewText = newLast?.content || newLast?.decryptedContent || null;
+        newLastAt = newLast?.created_at || null;
+      }
       await deleteMessageForMe(msg.id, user.id);
-      setMessages((prev) => {
-        const filtered = prev.filter(m => m.id !== msg.id);
-        const wasLast = msg.id === prev[prev.length - 1]?.id;
-        if (wasLast) {
-          const newLast = filtered[filtered.length - 1];
-          updateConvPreview(
-            convId,
-            newLast?.content || newLast?.decryptedContent || null,
-            newLast?.created_at || null
-          );
+      setMessages((prev) => prev.filter(m => m.id !== msg.id));
+      // Solo actualizar estado LOCAL (la DB NO debe cambiar porque el otro usuario aun ve el mensaje)
+      if (wasLast) {
+        updateConvPreview(convId, newPreviewText, newLastAt);
+        // Guardar override local para que persista a loadConvs()
+        if (newPreviewText !== null) {
+          localConvOverridesRef.current[convId] = { text: newPreviewText, at: newLastAt };
+        } else {
+          delete localConvOverridesRef.current[convId];
         }
-        return filtered;
-      });
+      }
     } catch (err) {
       console.error('Error hiding message:', err);
     }
@@ -1597,6 +1603,33 @@ export default function Chat() {
     }
   }, [activeConvId, otherUser, user?.id, replyingTo, loadConvs, t]);
 
+  // ── Actualizar allChatMediaUrlsRef cuando cambian los mensajes ──
+  useEffect(() => {
+    // Resetear al cambiar de conversación
+    if (activeConvId !== prevConvForMediaRef.current) {
+      allChatMediaUrlsRef.current = [];
+      prevConvForMediaRef.current = activeConvId;
+    }
+    if (!activeConvId) return;
+    const urls = messages
+      .map(m => {
+        if (!m.decryptedContent) return null;
+        const { imageUrl } = detectMediaFromContent(m.decryptedContent);
+        return imageUrl && IMG_RE.test(imageUrl) ? imageUrl : null;
+      })
+      .filter(Boolean);
+    // Merge preserving order, deduplicating
+    const existing = new Set(urls);
+    const merged = [...urls];
+    for (const url of allChatMediaUrlsRef.current) {
+      if (!existing.has(url)) {
+        merged.push(url);
+        existing.add(url);
+      }
+    }
+    allChatMediaUrlsRef.current = merged;
+  }, [messages, activeConvId]);
+
   // ── Load older messages (infinite scroll / pagination) ──
   const loadOlderMessages = useCallback(async () => {
     // SYNCHRONOUS check — prevents cascade from multiple scroll events in same event loop tick
@@ -1689,7 +1722,20 @@ export default function Chat() {
   // ── Scroll handler to detect when user reaches the visual top (oldest messages) ──
   const handleMessagesScroll = useCallback(() => {
     const el = messagesContainerRef.current;
-    if (!el || loadingMoreRef.current || !hasMoreMessages) return;
+    if (!el) return;
+
+    // Track scroll position for scroll-to-bottom button (SIEMPRE, incluso durante carga)
+    // En column-reverse, scrollTop ≈ 0 al fondo (nuevos) y negativo grande al tope (viejos)
+    const nearBottom = el.scrollTop > -80;
+    setIsScrolledUp(!nearBottom);
+
+    // Reset new messages counter when user scrolls near bottom
+    if (newMsgCount > 0 && nearBottom) {
+      setNewMsgCount(0);
+    }
+
+    // ── Pagination: cargar mensajes antiguos al llegar al tope ──
+    if (loadingMoreRef.current || !hasMoreMessages) return;
 
     // Cooldown: prevent cascade — ignore scroll events within 500ms of a load
     if (Date.now() - lastLoadTimeRef.current < 500) return;
@@ -1705,13 +1751,6 @@ export default function Chat() {
       // Call via ref to avoid recreating the scroll handler when the function identity changes
       try { loadOlderMessagesRef.current(); } catch (e) { console.warn('loadOlderMessagesRef failed', e); }
     }
-    // Reset new messages counter when user scrolls near bottom
-    if (newMsgCount > 0 && (el.scrollTop > -80 || el.scrollHeight - el.clientHeight + el.scrollTop < 80)) {
-      setNewMsgCount(0);
-    }
-    // Track scroll position for scroll-to-bottom button
-    const nearBottom = el.scrollTop > -80 || el.scrollHeight - el.clientHeight + el.scrollTop < 80;
-    setIsScrolledUp(!nearBottom);
   }, [hasMoreMessages, loadOlderMessages, newMsgCount]);
 
   // Use a ref to call loadOlderMessages from the scroll handler so the handler
@@ -1922,18 +1961,31 @@ export default function Chat() {
               <div className="chat-list-item-info">
                 <div className="chat-list-item-top">
                   <span className="chat-list-item-name">{conv.otherUser?.displayname || conv.otherUser?.username || t('common.unknown')}</span>
-                  {conv.last_message_at && (
-                    <span className="chat-list-item-time">
-                      {getTimeAgo(t, locale, conv.last_message_at)}
-                    </span>
-                  )}
+                  {(() => {
+                    const o = localConvOverridesRef.current[conv.id];
+                    const previewAt = o?.at ?? conv.last_message_at;
+                    return (
+                      <>
+                        {previewAt && (
+                          <span className="chat-list-item-time">
+                            {getTimeAgo(t, locale, previewAt)}
+                          </span>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="chat-list-item-bottom">
                   <span className="chat-list-item-preview">
-                    {conv.last_message_text && (IMG_RE.test(conv.last_message_text) || /(giphy|tenor|klipy)\.com|(\.|\/)gif/i.test(conv.last_message_text))
-                      ? <><FaImage className="chat-list-item-preview-icon" /> {/(giphy|tenor|klipy)\.com/i.test(conv.last_message_text) ? 'GIF' : 'Image'}</>
-                      : (conv.last_message_text || '')
-                    }
+                    {(() => {
+                      const o = localConvOverridesRef.current[conv.id];
+                      const previewText = o?.text ?? conv.last_message_text;
+                      if (!previewText) return '';
+                      if (IMG_RE.test(previewText) || /(giphy|tenor|klipy)\.com|(\.|\/)gif/i.test(previewText)) {
+                        return <><FaImage className="chat-list-item-preview-icon" /> {/(giphy|tenor|klipy)\.com/i.test(previewText) ? 'GIF' : 'Image'}</>;
+                      }
+                      return previewText;
+                    })()}
                   </span>
                   {conv.unreadCount > 0 && (
                     <span className="chat-list-item-badge">
@@ -2700,26 +2752,22 @@ export default function Chat() {
           </div>
           <div className="chat-media-gallery-grid">
             {(() => {
-              const allImages = messages
-                .map(m => {
-                  const c = m.decryptedContent || '';
-                  const { imageUrl } = detectMediaFromContent(c);
-                  return imageUrl && IMG_RE.test(imageUrl) ? imageUrl : null;
-                })
-                .filter(Boolean);
+              const allImages = allChatMediaUrlsRef.current;
               if (allImages.length === 0) {
                 return <p className="chat-float-panel-empty">{t('chat.no_messages')}</p>;
-              }               return allImages.map((url, i) => (
-                <SafeImage
-                  key={url}
-                  src={url}
-                  alt=""
-                  className="chat-media-gallery-img"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openChatGallery(e, allImages, i);
-                  }}
-                />
+              }
+              return allImages.map((url, i) => (
+                <div key={url} className="chat-media-gallery-item">
+                  <SafeImage
+                    src={url}
+                    alt=""
+                    className="chat-media-gallery-img"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openChatGallery(e, allImages, i);
+                    }}
+                  />
+                </div>
               ));
             })()}
           </div>

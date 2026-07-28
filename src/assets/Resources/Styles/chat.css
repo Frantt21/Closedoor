@@ -2559,21 +2559,24 @@ dialog.fc-modal.chat-followers-modal {
 .chat-media-gallery-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-    gap: 6px;
+    gap: 4px;
+    grid-auto-rows: 90px;
 }
 
 .chat-media-gallery-item {
-    aspect-ratio: 1;
     border-radius: var(--radius-sm, 6px);
     overflow: hidden;
     cursor: pointer;
     border: 1px solid var(--color-border, #2a2a2a);
-    transition: border-color 0.15s ease, transform 0.15s ease;
+    position: relative;
+    height: 90px;
+    transition: border-color 0.12s ease, transform 0.12s ease;
 }
 
 .chat-media-gallery-item:hover {
     border-color: var(--color-text-muted, #6b7280);
     transform: scale(1.04);
+    z-index: 1;
 }
 
 .chat-media-gallery-thumb {
@@ -2586,13 +2589,7 @@ dialog.fc-modal.chat-followers-modal {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    border-radius: var(--radius-sm, 6px);
-    cursor: pointer;
-    transition: transform 0.15s ease;
-}
-
-.chat-media-gallery-img:hover {
-    transform: scale(1.04);
+    display: block;
 }
 
 /* Pinned messages list */

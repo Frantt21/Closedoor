@@ -4,7 +4,7 @@ import usePageTitle from '../../hooks/usePageTitle';
 import { useAuth } from '../../hooks/useAuth';
 import { updateUserProfile } from '../services/userService';
 import { clearAllAppCaches } from '../services/postService';
-import { getBlockedUsers, getCachedBlockedUsers, unblockUser, cacheBlockStatus, subscribeBlockChanges } from '../services/blockService';
+import { getBlockedUsers, getCachedBlockedUsers, unblockUser, cacheBlockStatus, subscribeBlockChanges, clearBlockedListsCache } from '../services/blockService';
 import { useNavigate } from 'react-router-dom';
 import { getItem } from '../services/secureStorage';
 import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaHeartBroken, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaFire, FaChartBar, FaBell, FaBrush, FaBan, FaClock, FaAt, FaTrashAlt, FaTimes, FaDiscord } from 'react-icons/fa';
@@ -157,6 +157,7 @@ export default function Settings() {
     try {
       await unblockUser(user.id, blockedId);
       cacheBlockStatus(user.id, blockedId, false);
+      clearBlockedListsCache(user.id);
       setBlockedUsers((prev) => prev.filter((u) => u.id !== blockedId));
     } catch (err) {
       console.error('Error unblocking user:', err);

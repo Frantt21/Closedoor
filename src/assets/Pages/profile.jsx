@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef, useMemo, useContext } from "react";
 import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
@@ -67,7 +67,7 @@ import FloatingActionButton from "../Resources/Components/FloatingActionButton";
 import { toast } from 'react-toastify';
 import { getCdnUrl } from '../services/cdnService';
 import { useUserStatus } from '../services/useUserStatus';
-import { useRegisterUserStatus } from '../../context/UserStatusContext';
+import { useRegisterUserStatus, UserStatusContext } from '../../context/UserStatusContext';
 
 function Profile() {
     const { t, showAccent, accentVisibility, showLikes, filterEncrypted, showBadges, locale } = useI18n();
@@ -156,9 +156,9 @@ function Profile() {
   const { myStatus, setMyStatus } = useUserStatus(isOwnProfile ? user?.id : null);
   // ── Observar estado del perfil visitado en el contexto global (persiste entre rutas) ──
   useRegisterUserStatus(!isOwnProfile ? activeProfile?.id : null);
-  // Observar el estado del perfil visitado via Realtime (canal redundante)
-  const { status: observedStatus } = useUserStatus(null, !isOwnProfile ? activeProfile?.id : null, true);
-  // Estado del perfil visitado — combina observedStatus (Realtime) con fallback de activeProfile
+  // Estado del perfil visitado — del contexto global (polling 3s batch) + Realtime
+  const globalStatuses = useContext(UserStatusContext);
+  const contextStatus = !isOwnProfile && activeProfile?.id ? (globalStatuses[activeProfile.id] || null) : null;
   const [profileStatus, setProfileStatus] = useState(() => activeProfile?.user_status || null);
   // Sync profileStatus when activeProfile changes (initial load / cache restore)
   useEffect(() => {
@@ -166,53 +166,12 @@ function Profile() {
       setProfileStatus(activeProfile.user_status);
     }
   }, [activeProfile?.user_status]);
-  // Actualizar profileStatus desde observedStatus (useUserStatus hook + su canal Realtime)
+  // Actualizar profileStatus desde el contexto global (UserStatusContext polling 3s)
   useEffect(() => {
-    if (observedStatus !== null && observedStatus !== profileStatus) {
-      setProfileStatus(observedStatus);
+    if (contextStatus !== null && contextStatus !== profileStatus) {
+      setProfileStatus(contextStatus);
     }
-  }, [observedStatus]);
-
-  // ── Polling fallback cada 10s + resync al volver al tab activo ──
-  useEffect(() => {
-    const targetId = activeProfile?.id;
-    if (!targetId || isOwnProfile) return;
-    console.log('[STATUS] Poll — starting 10s interval for', targetId);
-    const poll = async () => {
-      try {
-        console.log('[STATUS] Poll — fetching...');
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('user_status')
-          .eq('id', targetId)
-          .maybeSingle();
-        if (error) console.warn('[STATUS] Poll error:', error.message);
-        else if (data?.user_status !== undefined) {
-          console.log('[STATUS] Poll — got:', data.user_status);
-          setProfileStatus(data.user_status);
-        } else {
-          console.log('[STATUS] Poll — no data');
-        }
-      } catch (err) {
-        console.warn('[STATUS] Poll exception:', err);
-      }
-    };
-    // Poll cada 10s
-    const interval = setInterval(poll, 10000);
-    // Re-sincronizar al volver al tab activo
-    const onVisible = () => {
-      if (!document.hidden) {
-        console.log('[STATUS] Poll — visibilitychange → poll');
-        poll();
-      }
-    };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => {
-      console.log('[STATUS] Poll — cleanup interval');
-      clearInterval(interval);
-      document.removeEventListener('visibilitychange', onVisible);
-    };
-  }, [activeProfile?.id, isOwnProfile]);
+  }, [contextStatus]);
 
   // ── Block / context menu state ──
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
@@ -1469,8 +1428,7 @@ function Profile() {
                             src={avatarUrl}
                             alt="User Avatar"
                             className="profile-avatar"
-                            style={getImgTransformStyle(activeProfile?.avatar_position)}
-                            status={isOwnProfile ? myStatus : (isFollower === true && isFollowedBy === true ? (observedStatus ?? profileStatus) : null)}
+                            style={getImgTransformStyle(activeProfile?.avatar_position)}                             status={isOwnProfile ? myStatus : (isFollower === true && isFollowedBy === true ? (contextStatus ?? profileStatus) : null)}
                         />
                     </div>
 

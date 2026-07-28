@@ -62,10 +62,10 @@ export function initPresence(userId, status = 'online') {
     // secureStorage puede no estar disponible
   }
 
-  console.log('[PRESENCE] init — restored status:', effectiveStatus);
+  // restored status
 
   if (typeof supabase?.channel !== 'function') {
-    console.warn('[PRESENCE] supabase.channel not available');
+    // channel not available
     return;
   }
 
@@ -94,9 +94,9 @@ export function initPresence(userId, status = 'online') {
             user_status: effectiveStatus,
             online_at: new Date().toISOString(),
           });
-          console.log('[PRESENCE] Tracked as:', effectiveStatus);
+          // Tracked
         } catch (err) {
-          console.warn('[PRESENCE] Track error:', err);
+          // Track error
         }
       }
     });
