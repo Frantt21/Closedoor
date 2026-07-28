@@ -6,6 +6,7 @@ import { getFollowers, getFollowing, getCachedFollowers, getCachedFollowing, set
 import FollowButton from "./FollowButton";
 import Avatar from "./Avatar";
 import Badge from "./Badge";
+import "./css/modal.css";
 import "./css/followersModal.css";
 
 function FollowersModalItem({ user, onClose }) {

@@ -18,6 +18,7 @@ import Tooltip from './Tooltip';
 import { encode as encryptEncode, encryptForUsers, decryptForUser } from '../../services/alphabetEncryption';
 import { supabase } from '../../services/supabaseclient';
 import useMentionAutocomplete from '../../hooks/useMentionAutocomplete';
+import './css/modal.css';
 import './css/createPostModal.css';
 
 const IMAGE_EXTENSIONS = IMG_RE;
