@@ -272,11 +272,16 @@ export default function Chat() {
     }
   };
 
+  // ── Flag de sesión: evita borrar el caché en cada navegación SPA ──
+  // `performance.getEntriesByType('navigation')` retorna el tipo de carga ORIGINAL
+  // de la página. Si el usuario recargó (F5), type = 'reload'. Pero al navegar
+  // a otra ruta y volver (SPA), el componente se monta de nuevo y el tipo SIGUE
+  // siendo 'reload' — causando que el caché se borre en cada ruta.
+  // window.__fc_cacheClearedOnReload persiste a través de montajes/desmontajes.
+
   // Restore cache from sessionStorage — only when user is available (not during auth loading)
   const sessionRestoredRef = useRef(false);
   if (!sessionRestoredRef.current && user?.id) {
-    // Detect if this page load is a full reload. If so, clear the chat session cache
-    // to avoid restoring a large message set that can cause scroll bugs.
     let isReload = false;
     try {
       const navEntries = performance.getEntriesByType ? performance.getEntriesByType('navigation') : null;
@@ -284,13 +289,21 @@ export default function Chat() {
       isReload = navType === 'reload';
     } catch (e) { /* ignore */ }
 
-    if (isReload) {
+    if (isReload && !window.__fc_cacheClearedOnReload) {
+      // 1ª vez: reload real → limpiar caché
+      window.__fc_cacheClearedOnReload = true;
       try { removeSessionItem(getSessionCacheKey()); } catch (e) {}
       messagesCacheRef.current = {};
+      console.log('[CACHE] Reload — caché limpiado (1 vez por sesión)');
     } else {
+      // 2ª vez+ (SPA navigation) o navegación normal → restaurar desde sessionStorage
       const restored = loadCacheFromSession();
+      const convCount = Object.keys(restored).filter(k => k !== '_meta').length;
       if (Object.keys(restored).length > 0) {
         messagesCacheRef.current = restored;
+        console.log('[CACHE] Restaurado —', convCount, 'conversaciones');
+      } else {
+        console.log('[CACHE] Sin caché en sessionStorage');
       }
     }
 
@@ -318,9 +331,16 @@ export default function Chat() {
 
   // Restore conversations from sessionStorage on mount
   const convsSessionRestoredRef = useRef(false);
-  // Only set the ref during render; actual restoration happens in a useEffect below
+  // Restore from cache DURING RENDER phase (before first paint)
+  // This prevents the skeleton flash on SPA navigation
   if (!convsSessionRestoredRef.current && user?.id) {
     convsSessionRestoredRef.current = true;
+    const cached = loadConvsFromSession();
+    if (cached.length > 0 && conversations.length === 0) {
+      // React 18 allows setState during render — triggers re-render before commit
+      setConversations(cached);
+      setConvsLoading(false);
+    }
   }
 
   // ── Pagination state (infinite scroll / load older messages) ──
@@ -350,7 +370,10 @@ export default function Chat() {
   // ── useLayoutEffect: runs BEFORE browser paint — garantiza que no haya flash de mensajes viejos ──
   useLayoutEffect(() => {
     if (!activeConvId) return;
-    if (prevConvIdRef.current === activeConvId) return; // misma conversación, no hacer nada
+    if (prevConvIdRef.current === activeConvId) {
+      console.log('[BUG] layout — mismo conv, skip');
+      return;
+    }
 
     // Save current messages to the OLD conversation's cache before switching
     if (prevConvIdRef.current && messagesOwnerRef.current === prevConvIdRef.current) {
@@ -362,6 +385,7 @@ export default function Chat() {
       skipCacheWipeRef.current = false;
       prevConvIdRef.current = activeConvId;
       messagesOwnerRef.current = activeConvId;
+      console.log('[BUG] layout — skipCacheWipe, set owner to', activeConvId.slice(0,8));
       return;
     }
 
@@ -376,40 +400,37 @@ export default function Chat() {
       const activeConv = conversations.find(c => c.id === activeConvId);
       const lastMsgAt = activeConv?.last_message_at;
       const fetchedAt = cachedMeta?.fetchedAt;
+      const isStale = lastMsgAt && fetchedAt && new Date(lastMsgAt) > new Date(fetchedAt);
+      console.log('[BUG] layout — CACHE HIT:', activeConvId.slice(0,8), 'len:', cached.length, 'stale:', !!isStale);
 
-      if (lastMsgAt && fetchedAt && new Date(lastMsgAt) > new Date(fetchedAt)) {
-        // Cache is stale — reset pagination and reload from DB
+      if (isStale) {
+        console.log('[BUG] layout — stale, clearing for refetch');
         setMessages([]);
         setMsgsLoading(true);
         setHasMoreMessages(true);
         setOldestMessageDate(null);
       } else {
-        // Fresh cache — restore messages + pagination state, skip DB fetch
+        console.log('[BUG] layout — restoring from cache, skipMsgLoad=true');
         setMessages(cached);
         setMsgsLoading(false);
-        // ══ CRITICAL: Always reset hasMoreMessages to true when restoring from cache with any messages.
-        // The DB filter (deleted_for) can reduce the count below INITIAL_BATCH_LIMIT even though
-        // older messages exist. The first scroll-to-top queries the DB; if 0 results, it
-        // self-corrects to false.
         if (cached.length > 0 && cachedMeta?.hasMoreMessages === false) {
           setHasMoreMessages(true);
         } else {
           const newVal = cachedMeta?.hasMoreMessages ?? true;
           setHasMoreMessages(newVal);
         }
-        // Compute oldestMessageDate from cached messages if meta doesn't have it (legacy format)
         const restoredDate = cachedMeta?.oldestMessageDate ?? (cached.length > 0 ? cached[0].created_at : null);
         setOldestMessageDate(restoredDate);
-        // Signal the message loading useEffect to skip the DB fetch
         skipMsgLoadRef.current = true;
       }
     } else {
-      // No cached messages — reset pagination and load from DB
+      console.log('[BUG] layout — NO CACHE for', activeConvId.slice(0,8), ', setting msgsLoading=true');
       setMessages([]);
       setMsgsLoading(true);
       setHasMoreMessages(true);
       setOldestMessageDate(null);
     }
+    console.log('[BUG] layout — setting owner to', activeConvId.slice(0,8));
     messagesOwnerRef.current = activeConvId;
     prevConvIdRef.current = activeConvId;
   }, [activeConvId, conversations]);
@@ -436,16 +457,9 @@ export default function Chat() {
   }, [user?.id]);
 
   useEffect(() => {
-    // Try sessionStorage cache first — avoids loading flash on route changes
-    if (conversations.length === 0) {
-      const cached = loadConvsFromSession();
-      if (cached.length > 0) {
-        setConversations(cached);
-        setConvsLoading(false);
-        return; // Realtime subscription keeps it fresh
-      }
-    }
-    // If already restored or no cache, fetch from DB
+    // If cache was restored during render phase, just clear the loading state
+    // (the render-phase block already called setConvsLoading(false)).
+    // Otherwise, fetch from DB — loadConvs() manages convsLoading in its finally block.
     if (conversations.length === 0) {
       loadConvs();
     } else {
@@ -471,6 +485,7 @@ export default function Chat() {
 
     // Determine whether to skip the DB fetch (fresh cache restored by layout effect)
     const skipFetch = skipMsgLoadRef.current;
+    console.log('[BUG] msgEffect — activeConvId:', activeConvId.slice(0,8), 'skipFetch:', skipFetch, 'msgsLoading:', msgsLoading);
     skipMsgLoadRef.current = false;
     let aborted = false;
     const convForThisEffect = activeConvId;
@@ -479,6 +494,7 @@ export default function Chat() {
 
     // ══ DB fetch — skipped when layout effect restored from fresh cache ══
     if (!skipFetch) {
+      console.log('[BUG] msgEffect — starting DB fetch for', convForThisEffect.slice(0,8));
       (async () => {
         try {
           let attempts = 0;
@@ -492,7 +508,10 @@ export default function Chat() {
           do {
             attempts += 1;
             raw = await getMessages(convForThisEffect, fetchLimit, cursor);
-            if (aborted) return;
+            if (aborted) {
+              console.log('[BUG] msgEffect — ABORTED after fetch for', convForThisEffect.slice(0,8));
+              return;
+            }
             hasMore = (raw.length > INITIAL_BATCH_LIMIT);
             // If we requested extra, drop the extra marker when mapping
             if (raw.length > INITIAL_BATCH_LIMIT) raw = raw.slice(0, INITIAL_BATCH_LIMIT);
@@ -515,7 +534,12 @@ export default function Chat() {
             break;
           } while (attempts < 3);
 
-          if (aborted) return;
+          if (aborted) {
+            console.log('[BUG] msgEffect — ABORTED after loop for', convForThisEffect.slice(0,8));
+            return;
+          }
+
+          console.log('[BUG] msgEffect — fetch OK for', convForThisEffect.slice(0,8), 'got', decrypted.length, 'messages');
 
           // Pre-fetch shared post data BEFORE setMessages
           const sharedPostIds = [...new Set(decrypted.filter(m => m.shared_post_id).map(m => m.shared_post_id))];
@@ -537,12 +561,18 @@ export default function Chat() {
           }
           setHasMoreMessages(hasMore);
         } catch (err) {
-          if (!aborted) console.warn('Error loading messages:', err);
+          if (!aborted) console.warn('[BUG] msgEffect — Error loading messages:', err);
         } finally {
-          if (!aborted) setMsgsLoading(false);
+          if (!aborted) {
+            console.log('[BUG] msgEffect — done, msgsLoading=false for', convForThisEffect.slice(0,8));
+            setMsgsLoading(false);
+          } else {
+            console.log('[BUG] msgEffect — skip msgsLoading=false (aborted) for', convForThisEffect.slice(0,8));
+          }
         }
       })();
     } else {
+      console.log('[BUG] msgEffect — SKIP db fetch for', activeConvId.slice(0,8), '(cache was fresh)');
       setMsgsLoading(false);
     }
 
@@ -596,6 +626,7 @@ export default function Chat() {
     );
 
     return () => {
+      console.log('[BUG] msgEffect — CLEANUP, setting aborted=true for', convForThisEffect.slice(0,8), '| current activeConvId:', activeConvId.slice(0,8));
       aborted = true;
       unsub?.unsubscribe();
     };
@@ -632,9 +663,20 @@ export default function Chat() {
 
   // Sync messages cache on every update (realtime, delete, edit, etc.)
   // Only writes to cache if the messages actually belong to activeConvId
+  // IMPORTANT: Skip saving while loading (msgsLoading) to avoid a race condition:
+  //   When switching chats, the layout effect sets messages=[] before the DB fetch
+  //   completes. Without this guard, the cache for the old conversation gets
+  //   overwritten with [], destroying valid cached data.
   useEffect(() => {
-    if (!activeConvId) return;
-    if (messagesOwnerRef.current !== activeConvId) return; // don't write stale data
+    if (!activeConvId) { console.log('[BUG] sync — no activeConvId'); return; }
+    if (messagesOwnerRef.current !== activeConvId) {
+      console.log('[BUG] sync — SKIP owner mismatch, conv:', activeConvId.slice(0,8), 'owner:', messagesOwnerRef.current?.slice(0,8));
+      return;
+    }
+    if (msgsLoading) {
+      console.log('[BUG] sync — SKIP msgsLoading=true para', activeConvId.slice(0,8));
+      return;
+    }
     messagesCacheRef.current[activeConvId] = messages;
     // Update fetchedAt + pagination state for staleness check on next conversation switch
     if (!messagesCacheRef.current._meta) messagesCacheRef.current._meta = {};
@@ -644,8 +686,35 @@ export default function Chat() {
       oldestMessageDate,
     };
     // Persist to sessionStorage so cache survives page reload
+    console.log('[BUG] sync — guardando', messages.length, 'mensajes en cache para', activeConvId.slice(0,8));
     saveCacheToSession(messagesCacheRef.current);
-  }, [messages, activeConvId]);
+  }, [messages, activeConvId, msgsLoading]);
+
+  // ── Flush messages cache on pagehide & unmount (navegación entre rutas) ──
+  useEffect(() => {
+    const flushCache = () => {
+      if (!activeConvId) return;
+      if (messagesOwnerRef.current !== activeConvId) return;
+      messagesCacheRef.current[activeConvId] = messages;
+      if (!messagesCacheRef.current._meta) messagesCacheRef.current._meta = {};
+      messagesCacheRef.current._meta[activeConvId] = {
+        fetchedAt: new Date().toISOString(),
+        hasMoreMessages,
+        oldestMessageDate,
+      };
+      saveCacheToSession(messagesCacheRef.current);
+    };
+    const handlePageHide = () => {
+      console.log('[CACHE] pagehide — flusheando caché');
+      flushCache();
+    };
+    window.addEventListener('pagehide', handlePageHide);
+    return () => {
+      console.log('[CACHE] cleanup — flusheando caché antes de desmontar');
+      flushCache(); // flush on unmount (route change)
+      window.removeEventListener('pagehide', handlePageHide);
+    };
+  }, [activeConvId, messages, hasMoreMessages, oldestMessageDate]);
 
   // Persist conversations to sessionStorage on every change
   useEffect(() => {
@@ -670,6 +739,33 @@ export default function Chat() {
     const draft = draftsRef.current[convId] || '';
     setInputValue(draft);
 
+    // ── Restaurar mensajes desde caché inmediatamente (síncrono) ──
+    // Así, al cambiar de ruta y volver, los mensajes aparecen al instante
+    // sin pasar por el estado de carga (spinner/skeleton).
+    const cached = messagesCacheRef.current[convId];
+    if (cached && Array.isArray(cached) && cached.length > 0) {
+      const meta = messagesCacheRef.current._meta?.[convId];
+      const conv = conversations.find(c => c.id === convId);
+      const lastMsgAt = conv?.last_message_at;
+      const fetchedAt = meta?.fetchedAt;
+      const isStale = lastMsgAt && fetchedAt && new Date(lastMsgAt) > new Date(fetchedAt);
+      console.log('[BUG] selectConv — cache HIT:', convId.slice(0,8), 'len:', cached.length, 'stale:', !!isStale, 'lastMsgAt:', lastMsgAt, 'fetchedAt:', fetchedAt);
+      if (!isStale) {
+        console.log('[BUG] selectConv — restoring, skipMsgLoad=true');
+        setMessages(cached);
+        setMsgsLoading(false);
+        skipMsgLoadRef.current = true;
+        if (meta) {
+          setHasMoreMessages(meta.hasMoreMessages ?? true);
+          setOldestMessageDate(meta.oldestMessageDate ?? null);
+        }
+      } else {
+        console.log('[CACHE] selectConversation — caché obsoleto, se recargará de DB');
+      }
+    } else {
+      console.log('[CACHE] selectConversation — sin caché para', convId.slice(0,8));
+    }
+
     setActiveConvId(convId);
     setShowList(false);
     // Cerrar paneles flotantes al cambiar de chat
@@ -677,7 +773,9 @@ export default function Chat() {
     setShowMediaGallery(false);
     setShowPinnedPanel(false);
     setShowProfileCard(false);
+    // Resetear scroll al fondo (top: 0 en column-reverse = mensajes nuevos)
     setTimeout(() => {
+      messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'instant' });
       if (inputRef.current) {
         inputRef.current.focus();
         const len = inputRef.current.value.length;
@@ -1708,10 +1806,8 @@ export default function Chat() {
         <button type="button" className="chat-followers-modal-close" onClick={() => setShowFollowersModal(false)}>
           <FaTimes />
         </button>
-      </div>
-
-      {followersLoading ? (
-        <div className="chat-followers-modal-status">{t('common.loading')}</div>
+      </div>        {followersLoading ? (
+          <div className="chat-followers-modal-status"><FaSpinner className="fc-spin" /></div>
       ) : followers.length === 0 ? (
         <div className="chat-followers-modal-status">
           <FaUsers className="chat-followers-modal-empty-icon" />
@@ -1772,7 +1868,17 @@ export default function Chat() {
       {/* Conversations */}
       <div className="chat-list-items">
         {convsLoading ? (
-          <div className="chat-list-loading">{t('common.loading')}</div>
+          <div className="chat-list-loading">
+            {[1,2,3,4,5].map((i) => (
+              <div key={i} className="chat-list-skeleton-item">
+                <div className="chat-list-skeleton-avatar" />
+                <div className="chat-list-skeleton-lines">
+                  <div className="chat-list-skeleton-line" />
+                  <div className="chat-list-skeleton-line chat-list-skeleton-line--short" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : visibleConversations.length === 0 ? (
           <div className="chat-list-empty">
             <div className="chat-list-empty-icon"><FaComment /></div>
@@ -1937,7 +2043,13 @@ export default function Chat() {
       {/* Messages — key=activeConvId fuerza remount completo al cambiar de chat */}
       <div className="chat-messages-body" ref={messagesContainerRef}>
         {msgsLoading ? (
-          <div className="chat-messages-loading">{t('common.loading')}</div>
+          <div className="chat-messages-loading">
+            {[1,2,3,4].map((i) => (
+              <div key={i} className={`chat-messages-skeleton-msg ${i % 2 === 0 ? 'chat-messages-skeleton-msg--own' : 'chat-messages-skeleton-msg--other'}`}>
+                <div className={`chat-messages-skeleton-bubble ${i % 2 === 0 ? 'chat-messages-skeleton-bubble--own' : 'chat-messages-skeleton-bubble--other'} ${i === 3 ? 'chat-messages-skeleton-bubble--short' : ''} ${i === 1 ? 'chat-messages-skeleton-bubble--long' : ''}`} />
+              </div>
+            ))}
+          </div>
         ) : dedupedMessages.length === 0 ? (
           <div className="chat-messages-empty">
             <FaComment className="chat-messages-empty-icon" />
@@ -2199,7 +2311,13 @@ export default function Chat() {
           })
         )}
         {loadingMore && (
-          <div className="chat-messages-loading">{t('common.loading')}</div>
+          <div className="chat-messages-loading">
+            {[1,2].map((i) => (
+              <div key={i} className={`chat-messages-skeleton-msg ${i % 2 === 0 ? 'chat-messages-skeleton-msg--own' : 'chat-messages-skeleton-msg--other'}`}>
+                <div className={`chat-messages-skeleton-bubble ${i % 2 === 0 ? 'chat-messages-skeleton-bubble--own' : 'chat-messages-skeleton-bubble--other'} chat-messages-skeleton-bubble--short`} />
+              </div>
+            ))}
+          </div>
         )}
         {loadingMore && (
           <div className="chat-load-more-spinner">

@@ -42,7 +42,6 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
         .eq('id', userId);
 
       if (error) console.warn('[STATUS] DB update error:', error);
-      else console.log('[STATUS] DB updated OK →', newStatus);
       return newStatus;
     } catch (err) {
       console.warn('[STATUS] Error updating user_status:', err);
@@ -52,10 +51,9 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
 
   // ── Actualizar mi estado (DB + Presence + secureStorage) ──
   const setMyStatus = useCallback(async (newStatus) => {
-    if (!userId) { console.log('[STATUS] setMyStatus skipped — no userId'); return; }
+    if (!userId) return;
     if (!['online', 'dnd', 'idle', 'disconnected'].includes(newStatus)) return;
 
-    console.log('[STATUS] setMyStatus →', newStatus);
 
     myStatusRef.current = newStatus;
     setMyStatusState(newStatus);
@@ -82,13 +80,11 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
       try {
         const { getItem } = await import('./secureStorage');
         const saved = getItem('fc_user_status');
-        console.log('[STATUS] Mount — saved:', saved);
         if (saved === 'dnd' || saved === 'idle') {
           initialStatus = saved;
         }
       } catch {}
 
-      console.log('[STATUS] Mount — initialStatus:', initialStatus);
       myStatusRef.current = initialStatus;
       setMyStatusState(initialStatus);
 
@@ -166,7 +162,6 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
       };
 
       // Sync inicial con la DB
-      console.log('[STATUS] Mount — syncing DB with:', initialStatus);
       persistPresence(initialStatus).catch(() => {});
     })();
 
@@ -210,11 +205,9 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
       if (isMultiTarget) {
         setStatuses(prev => {
           if (prev[targetId] === value) return prev;
-          console.log('[STATUS] setStatuses', targetId.slice(0,8), prev[targetId] || '∅', '→', value);
           return { ...prev, [targetId]: value };
         });
       } else {
-        console.log('[STATUS] setStatus', '→', value);
         setStatus(value);
       }
     };
@@ -291,7 +284,6 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
             const ageMs = Date.now() - new Date(updatedAt).getTime();
             return ageMs > STALE_STATUS_THRESHOLD_MS ? 'disconnected' : rawStatus;
           })();
-          console.log('[STATUS] Obs — initial fetch result:', normalizedStatus, 'for', targetId);
           updateStatusForUser(targetId, normalizedStatus);
         }
       } catch {}
@@ -322,7 +314,6 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
                 }
               }
             }
-            console.log('[STATUS] POLL', targetId.slice(0,8), 'DB:', rawStatus, '→ effective:', effectiveStatus);
             updateStatusForUser(targetId, effectiveStatus);
           }
         } catch {}
