@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from './supabaseclient';
 import { getCachedFollowStatus } from './followService';
-import { subscribePresence, updateTrackedStatus, getPresence } from './presenceService';
+import { subscribePresence, updateTrackedStatus } from './presenceService';
 
 /**
  * useUserStatus — Hook para manejar el estado online/dnd/idle/disconnected
@@ -25,7 +25,7 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
   const sessionTokenRef = useRef(null);
   const mountedCleanupRef = useRef(null);
   const lastObservedTargetKeyRef = useRef('');
-  const STALE_STATUS_THRESHOLD_MS = 2 * 60 * 1000;
+  const STALE_STATUS_THRESHOLD_MS = 60 * 1000; // 1 minuto — detecta desconexión más rápido
 
   const persistPresence = useCallback(async (newStatus) => {
     if (!userId) return null;
@@ -170,7 +170,8 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
 
     if (targetsChanged) {
       setStatus(null);
-      setStatuses({});
+      // NO resetear statuses — evita el parpadeo. Los valores viejos persisten
+      // hasta que Presence sync o el DB poll los actualice.
     }
     lastObservedTargetKeyRef.current = targetKey;
 
@@ -264,13 +265,9 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
         }
       } catch {}
 
-      // ── Polling cada 3s (solo cuando Presence NO tiene datos para este usuario) ──
+      // ── Polling cada 3s (siempre corre, incluso si Presence tiene datos) ──
       const pollStatus = async () => {
         if (cancelled) return;
-
-        // Si Presence ya nos dio un estado para este usuario, saltear
-        const presenceData = getPresence(targetId);
-        if (presenceData?.user_status) return;
 
         try {
           const { data, error } = await supabase
@@ -309,8 +306,8 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
       if (lastObservedTargetKeyRef.current === targetKey) {
         lastObservedTargetKeyRef.current = '';
       }
-      setStatuses({});
-      setStatus(null);
+      // NO resetear statuses aquí — evita que al cambiar de targets
+      // (por ejemplo al cambiar de chat) se borren los estados y parpadeen.
     };
   }, [userId, otherUserId, checkMutualFollow]);
 

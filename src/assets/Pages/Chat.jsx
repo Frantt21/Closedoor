@@ -47,7 +47,7 @@ import { getItem, setItem, removeItem, getSessionItem, setSessionItem, removeSes
 import { useUserStatus } from '../services/useUserStatus';
 
 // ── Helper: corrige estados obsoletos usando user_status_updated_at ──
-const STALE_STATUS_MS = 2 * 60 * 1000; // 2 minutos
+const STALE_STATUS_MS = 60 * 1000; // 1 minuto — debe coincidir con useUserStatus.js
 function computeEffectiveStatus(user) {
   if (!user?.user_status) return null;
   if (user.user_status === 'disconnected') return 'disconnected';

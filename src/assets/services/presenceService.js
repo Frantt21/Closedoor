@@ -1,4 +1,5 @@
 import { supabase } from './supabaseclient';
+import { getItem } from './secureStorage';
 
 /**
  * presenceService — Gestor global de Presence vía Supabase Realtime.
@@ -39,13 +40,29 @@ function notifyListeners() {
  * Solo crea el canal una vez (singleton). Llamar desde AuthContext
  * cuando el usuario inicia sesión.
  *
+ * Lee automáticamente el estado guardado en secureStorage (fc_user_status)
+ * para que al reconectar se restaure DND/idle en lugar de mostrar 'online'.
+ *
  * @param {string} userId — ID del usuario actual
- * @param {string} status — Estado inicial ('online' | 'dnd' | 'idle')
+ * @param {string} [status] — Estado por defecto si no hay saved status
  */
 export function initPresence(userId, status = 'online') {
   if (!userId || channel) return;
 
   currentUserId = userId;
+
+  // ── Restaurar estado guardado en secureStorage ──
+  let effectiveStatus = status;
+  try {
+    const saved = getItem('fc_user_status');
+    if (saved === 'dnd' || saved === 'idle') {
+      effectiveStatus = saved;
+    }
+  } catch {
+    // secureStorage puede no estar disponible
+  }
+
+  console.log('[PRESENCE] init — restored status:', effectiveStatus);
 
   if (typeof supabase?.channel !== 'function') {
     console.warn('[PRESENCE] supabase.channel not available');
@@ -74,9 +91,10 @@ export function initPresence(userId, status = 'online') {
         try {
           await channel.track({
             user_id: userId,
-            user_status: status,
+            user_status: effectiveStatus,
             online_at: new Date().toISOString(),
           });
+          console.log('[PRESENCE] Tracked as:', effectiveStatus);
         } catch (err) {
           console.warn('[PRESENCE] Track error:', err);
         }
