@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from './supabaseclient';
 import { getCachedFollowStatus } from './followService';
-import { subscribePresence, updateTrackedStatus, getPresence } from './presenceService';
+import { updateTrackedStatus, getPresence } from './presenceService';
 
 /**
  * useUserStatus — Hook para manejar el estado online/dnd/idle/disconnected
@@ -25,7 +25,6 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
   const sessionTokenRef = useRef(null);
   const mountedCleanupRef = useRef(null);
   const lastObservedTargetKeyRef = useRef('');
-  const seenInPresenceRef = useRef(new Set()); // usuarios que han estado en Presence al menos una vez
   const STALE_STATUS_THRESHOLD_MS = 60 * 1000; // 1 minuto — detecta desconexión más rápido
 
   const persistPresence = useCallback(async (newStatus) => {
@@ -128,12 +127,8 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
       const handleDisconnect = () => {
         if (heartbeatRef.current) clearInterval(heartbeatRef.current);
 
-        // 1. Presence vía WebSocket
-        updateTrackedStatus('disconnected');
-
-        // 2. DB vía fetch con keepalive: true — garantiza que llegue aunque
-        //    el navegador cierre la pestaña (a diferencia de persistPresence que
-        //    usa un fetch normal que el navegador puede cancelar)
+        // 1. DB vía fetch con keepalive: true — garantiza que llegue aunque
+        //    el navegador cierre la pestaña
         const token = sessionTokenRef.current;
         if (SB_URL && SB_KEY && token) {
           try {
@@ -153,8 +148,12 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
           } catch {}
         }
 
-        // 3. Fallback persistPresence
+        // 2. Fallback persistPresence
         persistPresence('disconnected').catch(() => {});
+
+        // NOTA: NO llamar a updateTrackedStatus aquí. El channel.track() durante
+        // beforeunload puede dejar al usuario atascado en el canal Presence con
+        // el último estado, impidiendo que otros clientes detecten la desconexión.
       };
       window.addEventListener('beforeunload', handleDisconnect);
       window.addEventListener('pagehide', handleDisconnect);
@@ -209,28 +208,27 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
     const updateStatusForUser = (targetId, value) => {
       if (cancelled) return;
       if (isMultiTarget) {
-        setStatuses(prev => (prev[targetId] === value ? prev : { ...prev, [targetId]: value }));
+        setStatuses(prev => {
+          if (prev[targetId] === value) return prev;
+          console.log('[STATUS] setStatuses', targetId.slice(0,8), prev[targetId] || '∅', '→', value);
+          return { ...prev, [targetId]: value };
+        });
       } else {
+        console.log('[STATUS] setStatus', '→', value);
         setStatus(value);
       }
     };
 
-    // ── Capa 1: Presence — se actualiza en cada sync (≈100ms tras conectar) ──
-    // Cuando un usuario sale del canal Presence (desconexión), se marca como disconnected
-    const unsubPresence = subscribePresence((presences) => {
-      if (cancelled) return;
-      for (const targetId of normalizedIds) {
-        const p = presences[targetId];
-        if (p?.user_status) {
-          seenInPresenceRef.current.add(targetId);
-          updateStatusForUser(targetId, p.user_status);
-        } else if (seenInPresenceRef.current.has(targetId)) {
-          // Este usuario estaba en Presence pero ya no → desconectado
-          updateStatusForUser(targetId, 'disconnected');
-        }
-      }
-    });
-    cleanupFns.push(unsubPresence);
+    // NOTA: No usar Presence para observar estados de otros usuarios.
+    // Presence es ÚNICAMENTE para que el usuario actual emita su estado.
+    // El servidor Presence puede mantener usuarios atascados en el canal
+    // incluso después de desconectarse (especialmente si se llamó a
+    // updateTrackedStatus durante beforeunload), causando un ciclo
+    // infinito de override entre Presence y DB poll.
+    //
+    // DB polling cada 3s es la ÚNICA fuente de verdad para observar.
+    // El keepalive fetch en beforeunload garantiza que la DB tenga
+    // el estado correcto al cerrar la pestaña.
 
     // ── Capa 2: DB polling (fallback) ──
     const subscribeToUserStatus = async (targetId) => {
@@ -316,19 +314,23 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
             .maybeSingle();
           if (!cancelled && !error && data?.user_status !== undefined) {
             const rawStatus = data.user_status;
-            // Solo sobreescribir si DB explícitamente dice 'disconnected'
+            const presenceData = getPresence(targetId);
+            console.log('[STATUS] POLL', targetId.slice(0,8), 'DB:', rawStatus, 'Presence:', presenceData?.user_status || '∅');
+
+            // DB dice 'disconnected' → sobreescribir SIEMPRE
             // (escrito por keepalive fetch al cerrar pestaña)
             if (rawStatus === 'disconnected') {
+              console.log('[STATUS] POLL DB=disconnected → overriding');
               updateStatusForUser(targetId, 'disconnected');
             } else {
               // Para online/idle/dnd: verificar stale (timestamp muy antiguo)
               // y solo corregir si Presence no tiene datos
-              const presenceData = getPresence(targetId);
               if (!presenceData?.user_status) {
                 const updatedAt = data.user_status_updated_at;
                 if (updatedAt) {
                   const ageMs = Date.now() - new Date(updatedAt).getTime();
                   if (ageMs > STALE_STATUS_THRESHOLD_MS) {
+                    console.log('[STATUS] POLL stale → disconnected (age:', Math.round(ageMs/1000)+'s)');
                     updateStatusForUser(targetId, 'disconnected');
                   }
                 }
