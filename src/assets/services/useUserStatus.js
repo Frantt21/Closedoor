@@ -127,9 +127,33 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
 
       const handleDisconnect = () => {
         if (heartbeatRef.current) clearInterval(heartbeatRef.current);
-        // 1. Presence vía WebSocket (inmediato, confiable en beforeunload)
+
+        // 1. Presence vía WebSocket
         updateTrackedStatus('disconnected');
-        // 2. Fallback DB (puede no completarse antes de cerrar la pestaña)
+
+        // 2. DB vía fetch con keepalive: true — garantiza que llegue aunque
+        //    el navegador cierre la pestaña (a diferencia de persistPresence que
+        //    usa un fetch normal que el navegador puede cancelar)
+        const token = sessionTokenRef.current;
+        if (SB_URL && SB_KEY && token) {
+          try {
+            fetch(`${restOrigin}/rest/v1/profiles?id=eq.${userId}`, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+                'apikey': SB_KEY,
+              },
+              body: JSON.stringify({
+                user_status: 'disconnected',
+                user_status_updated_at: new Date().toISOString(),
+              }),
+              keepalive: true,
+            }).catch(() => {});
+          } catch {}
+        }
+
+        // 3. Fallback persistPresence
         persistPresence('disconnected').catch(() => {});
       };
       window.addEventListener('beforeunload', handleDisconnect);
@@ -277,13 +301,9 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
         } catch {}
       }
 
-      // ── Polling cada 3s (SOLO cuando Presence NO tiene datos para este usuario) ──
+      // ── Polling cada 3s (siempre corre, puede sobreescribir Presence si DB dice disconnected) ──
       const pollStatus = async () => {
         if (cancelled) return;
-
-        // Si Presence ya tiene datos para este usuario, no sobreescribir
-        const presenceData = getPresence(targetId);
-        if (presenceData?.user_status) return;
 
         try {
           const { data, error } = await supabase
