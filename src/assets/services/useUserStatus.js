@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from './supabaseclient';
 import { getCachedFollowStatus } from './followService';
-import { subscribePresence, updateTrackedStatus } from './presenceService';
+import { subscribePresence, updateTrackedStatus, getPresence } from './presenceService';
 
 /**
  * useUserStatus — Hook para manejar el estado online/dnd/idle/disconnected
@@ -25,6 +25,7 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
   const sessionTokenRef = useRef(null);
   const mountedCleanupRef = useRef(null);
   const lastObservedTargetKeyRef = useRef('');
+  const seenInPresenceRef = useRef(new Set()); // usuarios que han estado en Presence al menos una vez
   const STALE_STATUS_THRESHOLD_MS = 60 * 1000; // 1 minuto — detecta desconexión más rápido
 
   const persistPresence = useCallback(async (newStatus) => {
@@ -126,6 +127,9 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
 
       const handleDisconnect = () => {
         if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+        // 1. Presence vía WebSocket (inmediato, confiable en beforeunload)
+        updateTrackedStatus('disconnected');
+        // 2. Fallback DB (puede no completarse antes de cerrar la pestaña)
         persistPresence('disconnected').catch(() => {});
       };
       window.addEventListener('beforeunload', handleDisconnect);
@@ -188,12 +192,17 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
     };
 
     // ── Capa 1: Presence — se actualiza en cada sync (≈100ms tras conectar) ──
+    // Cuando un usuario sale del canal Presence (desconexión), se marca como disconnected
     const unsubPresence = subscribePresence((presences) => {
       if (cancelled) return;
       for (const targetId of normalizedIds) {
         const p = presences[targetId];
         if (p?.user_status) {
+          seenInPresenceRef.current.add(targetId);
           updateStatusForUser(targetId, p.user_status);
+        } else if (seenInPresenceRef.current.has(targetId)) {
+          // Este usuario estaba en Presence pero ya no → desconectado
+          updateStatusForUser(targetId, 'disconnected');
         }
       }
     });
@@ -243,31 +252,38 @@ export function useUserStatus(userId, otherUserId, checkMutualFollow = false) {
         return;
       }
 
-      // ── Fetch inicial desde DB (lo sobrescribe Presence si está disponible) ──
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('user_status, user_status_updated_at')
-          .eq('id', targetId)
-          .maybeSingle();
+      // ── Fetch inicial desde DB (SOLO si Presence NO tiene datos para este usuario) ──
+      const alreadyHasPresence = getPresence(targetId)?.user_status;
+      if (!alreadyHasPresence) {
+        try {
+          const { data, error } = await supabase
+            .from('profiles')
+            .select('user_status, user_status_updated_at')
+            .eq('id', targetId)
+            .maybeSingle();
 
-        if (!cancelled && !error && data?.user_status !== undefined) {
-          const normalizedStatus = (() => {
-            const rawStatus = data.user_status;
-            const updatedAt = data.user_status_updated_at;
-            if (rawStatus === 'disconnected') return 'disconnected';
-            if (!updatedAt) return rawStatus;
-            const ageMs = Date.now() - new Date(updatedAt).getTime();
-            return ageMs > STALE_STATUS_THRESHOLD_MS ? 'disconnected' : rawStatus;
-          })();
-          console.log('[STATUS] Obs — initial fetch result:', normalizedStatus, 'for', targetId);
-          updateStatusForUser(targetId, normalizedStatus);
-        }
-      } catch {}
+          if (!cancelled && !error && data?.user_status !== undefined) {
+            const normalizedStatus = (() => {
+              const rawStatus = data.user_status;
+              const updatedAt = data.user_status_updated_at;
+              if (rawStatus === 'disconnected') return 'disconnected';
+              if (!updatedAt) return rawStatus;
+              const ageMs = Date.now() - new Date(updatedAt).getTime();
+              return ageMs > STALE_STATUS_THRESHOLD_MS ? 'disconnected' : rawStatus;
+            })();
+            console.log('[STATUS] Obs — initial fetch result:', normalizedStatus, 'for', targetId);
+            updateStatusForUser(targetId, normalizedStatus);
+          }
+        } catch {}
+      }
 
-      // ── Polling cada 3s (siempre corre, incluso si Presence tiene datos) ──
+      // ── Polling cada 3s (SOLO cuando Presence NO tiene datos para este usuario) ──
       const pollStatus = async () => {
         if (cancelled) return;
+
+        // Si Presence ya tiene datos para este usuario, no sobreescribir
+        const presenceData = getPresence(targetId);
+        if (presenceData?.user_status) return;
 
         try {
           const { data, error } = await supabase
