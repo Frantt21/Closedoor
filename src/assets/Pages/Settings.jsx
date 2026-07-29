@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useI18n } from '../services/i18n/useI18n';
 import usePageTitle from '../../hooks/usePageTitle';
 import { useAuth } from '../../hooks/useAuth';
@@ -7,6 +7,8 @@ import { clearAllAppCaches } from '../services/postService';
 import { getBlockedUsers, getCachedBlockedUsers, unblockUser, cacheBlockStatus, subscribeBlockChanges, clearBlockedListsCache } from '../services/blockService';
 import { useNavigate } from 'react-router-dom';
 import { getItem } from '../services/secureStorage';
+import { supabase } from '../services/supabaseclient';
+import { getNicknames, setNickname, removeNickname } from '../services/chatService';
 import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaHeartBroken, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaFire, FaChartBar, FaBell, FaBrush, FaBan, FaClock, FaAt, FaTrashAlt, FaTimes, FaDiscord } from 'react-icons/fa';
 import { MdLogout } from 'react-icons/md';
 import { toast } from 'react-toastify';
@@ -92,6 +94,11 @@ export default function Settings() {
   const [statsExpanded, setStatsExpanded] = useState(false);
   const [badgesExpanded, setBadgesExpanded] = useState(false);
   const [showBlockedModal, setShowBlockedModal] = useState(false);
+  const [showNicknamesModal, setShowNicknamesModal] = useState(false);
+  const [nicknameList, setNicknameList] = useState([]);
+  const [nicknameListLoading, setNicknameListLoading] = useState(false);
+  const [editingNickname, setEditingNickname] = useState({ userId: null, current: '' });
+  const [removingNicknameId, setRemovingNicknameId] = useState(null);
   const [blockedUsers, setBlockedUsers] = useState(() => {
     if (!user?.id) return [];
     return getCachedBlockedUsers(user.id) || [];
@@ -150,6 +157,76 @@ export default function Settings() {
         setBlockedUsersLoading(false);
       });
   }, [showBlockedModal, user?.id, blockRevision]);
+
+  // ── Nickname management ──
+  const loadNicknamesForSettings = useCallback(async () => {
+    if (!user?.id) return;
+    setNicknameListLoading(true);
+    try {
+      const nickMap = await getNicknames(user.id);
+      const targetIds = Object.keys(nickMap);
+      if (targetIds.length === 0) {
+        setNicknameList([]);
+        return;
+      }
+      // Fetch profiles for display
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, username, displayname, avatar_url')
+        .in('id', targetIds);
+      const profileMap = {};
+      for (const p of profiles || []) profileMap[p.id] = p;
+      const list = targetIds.map(id => ({
+        userId: id,
+        nickname: nickMap[id],
+        profile: profileMap[id] || null,
+      })).filter(item => item.nickname);
+      setNicknameList(list);
+    } catch (err) {
+      console.warn('Error loading nicknames:', err);
+    } finally {
+      setNicknameListLoading(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (showNicknamesModal && user?.id) loadNicknamesForSettings();
+  }, [showNicknamesModal, user?.id, loadNicknamesForSettings]);
+
+  const handleSaveNicknameSetting = async (targetUserId, newNickname) => {
+    if (!user?.id) return;
+    const trimmed = (newNickname || '').trim();
+    try {
+      if (trimmed) {
+        await setNickname(user.id, targetUserId, trimmed);
+      } else {
+        await removeNickname(user.id, targetUserId);
+      }
+      // Refresh list
+      loadNicknamesForSettings();
+      setEditingNickname({ userId: null, current: '' });
+      toast.success(t('chat.nickname_saved') || 'Nickname saved');
+    } catch (err) {
+      console.error('Error saving nickname:', err);
+      toast.error(t('common.error') || 'Error');
+    }
+  };
+
+  const handleRemoveNickname = async (targetUserId) => {
+    if (!user?.id) return;
+    setRemovingNicknameId(targetUserId);
+    try {
+      await removeNickname(user.id, targetUserId);
+      loadNicknamesForSettings();
+      setEditingNickname({ userId: null, current: '' });
+      toast.success(t('chat.nickname_removed') || 'Nickname removed');
+    } catch (err) {
+      console.error('Error removing nickname:', err);
+      toast.error(t('common.error') || 'Error');
+    } finally {
+      setRemovingNicknameId(null);
+    }
+  };
 
   const handleUnblock = async (blockedId) => {
     if (!user?.id || unblockingId) return;
@@ -1147,6 +1224,27 @@ export default function Settings() {
                   {t('settings.blocked_users')}
                 </button>
               </div>
+
+              <div className="settings-row-divider" />
+
+              {/* ── Apodos ── */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaEdit /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.nicknames') || 'Nicknames'}</h2>
+                    <p className="settings-section-desc">{t('settings.nicknames_desc') || 'Manage nicknames you have set for other users in chat.'}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="settings-edit-btn"
+                  onClick={() => setShowNicknamesModal(true)}
+                >
+                  <FaEdit style={{ marginRight: 6 }} />
+                  {t('settings.nicknames') || 'Nicknames'}
+                </button>
+              </div>
             </>
           )}
         </div>
@@ -1207,6 +1305,94 @@ export default function Settings() {
                 >
                   {unblockingId === u.id ? '...' : t('block.unblock')}
                 </button>
+              </div>
+            ))
+          )}
+        </div>
+      </ModalShell>
+
+      {/* ── Nicknames Modal ── */}
+      <ModalShell
+        isOpen={showNicknamesModal}
+        onClose={() => setShowNicknamesModal(false)}
+        onEscape={() => setShowNicknamesModal(false)}
+        disableBackdropClose={false}
+        className="settings-blocked-modal"
+      >
+        <div className="settings-blocked-header">
+          <h3 className="fc-modal-title">{t('settings.nicknames') || 'Nicknames'}</h3>
+          <button
+            type="button"
+            className="settings-blocked-close"
+            onClick={() => setShowNicknamesModal(false)}
+            aria-label={t('common.close')}
+          >
+            <FaTimes />
+          </button>
+        </div>
+        <div className="settings-blocked-list">
+          {nicknameListLoading ? (
+            <div className="settings-blocked-loading">{t('common.loading')}</div>
+          ) : nicknameList.length === 0 ? (
+            <div className="settings-blocked-empty">
+              <FaEdit className="settings-blocked-empty-icon" />
+              <p>{t('settings.nicknames_empty') || 'No nicknames set yet.'}</p>
+            </div>
+          ) : (
+            nicknameList.map((item) => (
+              <div key={item.userId} className="settings-blocked-item">
+                <img
+                  className="settings-blocked-avatar"
+                  src={item.profile?.avatar_url || 'https://i.pinimg.com/736x/ac/13/74/ac137456b996efec340292a585eb6dc7.jpg'}
+                  alt={item.profile?.username || 'user'}
+                />
+                <div className="settings-blocked-info">
+                  <span className="settings-blocked-username">@{item.profile?.username || 'unknown'}</span>
+                  {editingNickname.userId === item.userId ? (
+                    <div className="settings-nickname-edit-row">
+                      <input
+                        className="settings-nickname-input"
+                        type="text"
+                        value={editingNickname.current}
+                        onChange={(e) => setEditingNickname(prev => ({ ...prev, current: e.target.value }))}
+                        maxLength={50}
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleSaveNicknameSetting(item.userId, editingNickname.current);
+                          if (e.key === 'Escape') setEditingNickname({ userId: null, current: '' });
+                        }}
+                      />
+                      <button
+                        className="settings-nickname-save-btn"
+                        onClick={() => handleSaveNicknameSetting(item.userId, editingNickname.current)}
+                        title={t('common.save')}
+                      >
+                        <FaCheck />
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="settings-nickname-label">{item.nickname}</span>
+                  )}
+                </div>
+                <div className="settings-nickname-actions">
+                  <button
+                    type="button"
+                    className="settings-nickname-edit-btn"
+                    onClick={() => setEditingNickname({ userId: item.userId, current: item.nickname })}
+                    title={t('common.edit')}
+                  >
+                    <FaEdit />
+                  </button>
+                  <button
+                    type="button"
+                    className="settings-nickname-remove-btn"
+                    onClick={() => handleRemoveNickname(item.userId)}
+                    disabled={removingNicknameId === item.userId}
+                    title={t('common.delete')}
+                  >
+                    {removingNicknameId === item.userId ? t('common.loading') : <FaTimes />}
+                  </button>
+                </div>
               </div>
             ))
           )}

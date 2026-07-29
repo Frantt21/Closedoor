@@ -61,10 +61,10 @@ export async function getOrCreateConversation(currentUserId, otherUserId) {
 export async function getConversations(userId) {
   if (!userId) return [];
 
-  // 1. Get all conversation IDs where user is a participant
+  // 1. Get all conversation IDs + pin status where user is a participant
   const { data: myParts, error: partError } = await supabase
     .from('chat_participants')
-    .select('conversation_id')
+    .select('conversation_id, is_pinned, pinned_at')
     .eq('user_id', userId);
 
   if (partError) {
@@ -133,14 +133,23 @@ export async function getConversations(userId) {
     }
   }
 
-  // 6. Build results
+  // 6. Build pin map: conversation_id → { is_pinned, pinned_at }
+  const pinMap = {};
+  for (const p of myParts || []) {
+    pinMap[p.conversation_id] = { is_pinned: p.is_pinned || false, pinned_at: p.pinned_at || null };
+  }
+
+  // 7. Build results + apply sort: pinned first (oldest→newest), then unpinned
   const convResults = convs.map((conv) => {
     const otherUserId = otherUserIds[conv.id];
     const otherProfile = otherUserId ? (profilesMap[otherUserId] || null) : null;
+    const pin = pinMap[conv.id] || { is_pinned: false, pinned_at: null };
     const unread = getUnreadCount(conv.id, userId);
 
     return {
       ...conv,
+      is_pinned: pin.is_pinned,
+      pinned_at: pin.pinned_at,
       otherUser: otherProfile ? {
         ...otherProfile,
         followerCount: followerCounts[otherUserId] || 0,
@@ -154,6 +163,19 @@ export async function getConversations(userId) {
     ...c,
     unreadCount: await c.unreadCount,
   })));
+
+  // Sort: pinned first (oldest pinned_at first), then unpinned (by updated_at desc)
+  resolved.sort((a, b) => {
+    if (a.is_pinned && !b.is_pinned) return -1;
+    if (!a.is_pinned && b.is_pinned) return 1;
+    if (a.is_pinned && b.is_pinned) {
+      const dateA = new Date(a.pinned_at || 0).getTime();
+      const dateB = new Date(b.pinned_at || 0).getTime();
+      return dateA - dateB; // oldest first
+    }
+    return new Date(b.updated_at) - new Date(a.updated_at);
+  });
+
   return resolved;
 }
 
@@ -554,6 +576,38 @@ export async function deleteConversation(conversationId, userId) {
 }
 
 /**
+ * Toggle pin status on a conversation (per-user).
+ * Max 3 pinned conversations.
+ * Returns the new pin state, or throws if limit reached.
+ */
+export async function togglePinConversation(conversationId, userId, currentlyPinned) {
+  if (!userId) throw new Error('User ID required');
+
+  if (!currentlyPinned) {
+    // Check current pin count
+    const { count, error: countError } = await supabase
+      .from('chat_participants')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('is_pinned', true);
+
+    if (countError) throw countError;
+    if (count >= 3) throw new Error('Maximum 3 pinned conversations');
+  }
+
+  const { error } = await supabase
+    .from('chat_participants')
+    .update({
+      is_pinned: !currentlyPinned,
+      pinned_at: !currentlyPinned ? new Date().toISOString() : null,
+    })
+    .eq('conversation_id', conversationId)
+    .eq('user_id', userId);
+
+  if (error) throw error;
+}
+
+/**
  * Subscribe to conversation list updates.
  * Watches both chat_participants (for new conversations) and messages INSERT
  * (for new messages in existing conversations) to keep the conversation list
@@ -673,5 +727,66 @@ export function subscribeToTyping(conversationId, currentUserId, onTyping, onSto
     supabase.removeChannel(channel);
     delete typingChannels[channelKey];
   };
+}
+
+// ── Nicknames ──
+
+/**
+ * Get all nicknames set by the current user.
+ * Returns a map: { [target_user_id]: "nickname" }
+ */
+export async function getNicknames(userId) {
+  if (!userId) return {};
+  const { data, error } = await supabase
+    .from('chat_nicknames')
+    .select('target_user_id, nickname')
+    .eq('user_id', userId);
+  if (error) {
+    console.warn('[Nicknames] Error fetching:', error);
+    return {};
+  }
+  const map = {};
+  for (const row of data || []) {
+    map[row.target_user_id] = row.nickname;
+  }
+  return map;
+}
+
+/**
+ * Set or update a nickname for a target user.
+ */
+export async function setNickname(userId, targetUserId, nickname) {
+  if (!userId || !targetUserId) throw new Error('Both user IDs required');
+  const trimmed = (nickname || '').trim();
+  if (trimmed.length > 50) throw new Error('Nickname too long (max 50 chars)');
+
+  if (!trimmed) {
+    // Empty → remove nickname
+    await removeNickname(userId, targetUserId);
+    return;
+  }
+
+  const { error } = await supabase
+    .from('chat_nicknames')
+    .upsert({
+      user_id: userId,
+      target_user_id: targetUserId,
+      nickname: trimmed,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,target_user_id' });
+  if (error) throw error;
+}
+
+/**
+ * Remove a nickname for a target user.
+ */
+export async function removeNickname(userId, targetUserId) {
+  if (!userId || !targetUserId) return;
+  const { error } = await supabase
+    .from('chat_nicknames')
+    .delete()
+    .eq('user_id', userId)
+    .eq('target_user_id', targetUserId);
+  if (error) throw error;
 }
 

@@ -209,6 +209,33 @@
     color: var(--color-text, #ffffff);
 }
 
+.explore-card-nickname-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 50%;
+    background: var(--overlay-bg-subtle);
+    color: var(--color-text-muted, #6b7280);
+    cursor: pointer;
+    font-size: 0.55rem;
+    transition: background 0.12s ease, color 0.12s ease;
+    flex-shrink: 0;
+    opacity: 0.6;
+    margin-left: auto;
+}
+
+.explore-card-name-row:hover .explore-card-nickname-btn {
+    opacity: 1;
+}
+
+.explore-card-nickname-btn:hover {
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+}
+
 .explore-card-private-icon {
     display: inline-flex;
     align-items: center;

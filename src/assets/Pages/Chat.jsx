@@ -15,10 +15,14 @@ import {
   editMessage,
   pinMessage,
   addReaction,
+  togglePinConversation,
   subscribeToMessages,
   subscribeToConversations,
   broadcastTyping,
   subscribeToTyping,
+  getNicknames,
+  setNickname,
+  removeNickname,
 } from '../services/chatService';
 import { getFollowing } from '../services/followService';
 import { isBlocked, getCachedBlockStatus, cacheBlockStatus } from '../services/blockService';
@@ -29,7 +33,7 @@ import Avatar from '../Resources/Components/Avatar';
 import Badge from '../Resources/Components/Badge';
 import Tooltip from '../Resources/Components/Tooltip';
 import GifPicker from '../Resources/Components/GifPicker';
-import { getTimeAgo, IMG_RE, detectMediaFromContent, getImgTransformStyle, getAvatarTransformStyle } from '../services/helpers';
+import { getTimeAgo, IMG_RE, detectMediaFromContent, getImgTransformStyle, getAvatarTransformStyle, DEFAULT_AVATAR } from '../services/helpers';
 import { getPost } from '../services/postService';
 import RichText from '../Resources/Components/RichText';
 import SafeImage from '../Resources/Components/SafeImage';
@@ -89,6 +93,19 @@ export default function Chat() {
 
   // Mobile: show conversation list or messages
   const [showList, setShowList] = useState(true);
+
+  // Nicknames: map of target_user_id → nickname
+  const [nicknames, setNicknames] = useState({});
+  // Nickname modal state
+  const [nicknameModal, setNicknameModal] = useState({ open: false, targetUserId: null, currentName: '', userData: null });
+  const [nicknameInput, setNicknameInput] = useState('');
+
+  // Helper: get display name with nickname override
+  const getDisplayName = useCallback((otherUser) => {
+    if (!otherUser) return t('common.unknown');
+    const nick = nicknames[otherUser.id];
+    return nick || otherUser.displayname || otherUser.username || t('common.unknown');
+  }, [nicknames]);
 
   // Context menu state (conversation list)
   const [contextMenu, setContextMenu] = useState({ open: false, x: 0, y: 0, convId: null });
@@ -465,6 +482,8 @@ export default function Chat() {
     try {
       const convs = await getConversations(user.id);
       setConversations(convs);
+      // Load nicknames
+      getNicknames(user.id).then(setNicknames).catch(() => {});
       // Limpiar overrides locales para conversaciones donde la DB tiene mensajes más nuevos
       for (const conv of convs) {
         const override = localConvOverridesRef.current[conv.id];
@@ -503,6 +522,47 @@ export default function Chat() {
     const unsub = subscribeToConversations(user.id, loadConvs);
     return () => unsub?.unsubscribe();
   }, [user?.id, loadConvs]);
+
+  // ── Nickname channel ref: evita recrear la suscripción en re-renders ──
+  const nicknameChannelRef = useRef(null);
+
+  // Real-time subscription to nickname changes (syncs across tabs)
+  // El ref evita recrear el canal en re-renders. El cleanup en unmount
+  // previene fugas al navegar entre rutas SPA.
+  useEffect(() => {
+    if (!user?.id) return;
+    // Ya hay un canal activo para este usuario → no recrear
+    if (nicknameChannelRef.current) return;
+
+    nicknameChannelRef.current = supabase
+      .channel(`nicknames-${user.id}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'chat_nicknames', filter: `user_id=eq.${user.id}` },
+        async (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const { target_user_id, nickname } = payload.new;
+            if (target_user_id && nickname) {
+              setNicknames(prev => ({ ...prev, [target_user_id]: nickname }));
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const target_user_id = payload.old?.target_user_id;
+            if (target_user_id) {
+              setNicknames(prev => {
+                const next = { ...prev };
+                delete next[target_user_id];
+                return next;
+              });
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(nicknameChannelRef.current);
+      nicknameChannelRef.current = null;
+    };
+  }, [user?.id]);
 
   // ── Load messages when active conversation changes ──
   useEffect(() => {
@@ -925,7 +985,7 @@ export default function Chat() {
   // ── Context menu handlers (conversation list) ──
   const handleContextMenu = useCallback((e, convId) => {
     e.preventDefault();
-    const pos = getSmartMenuPosition(e.clientX, e.clientY, 160, 80);
+    const pos = getSmartMenuPosition(e.clientX, e.clientY, 160, 170);
     setContextMenu({ open: true, x: pos.x, y: pos.y, convId });
   }, [getSmartMenuPosition]);
 
@@ -965,6 +1025,78 @@ export default function Chat() {
       setActiveConvId(null);
     }
   }, [contextMenu.convId, activeConvId]);
+
+  // ── Set nickname for a conversation partner ──
+  const handleSetNickname = useCallback(() => {
+    const convId = contextMenu.convId;
+    const conv = conversations.find(c => c.id === convId);
+    if (!conv?.otherUser?.id) return;
+    const currentNick = nicknames[conv.otherUser.id] || '';
+    setNicknameModal({ open: true, targetUserId: conv.otherUser.id, currentName: currentNick, userData: conv.otherUser });
+    setNicknameInput(currentNick);
+    setContextMenu({ open: false, x: 0, y: 0, convId: null });
+  }, [contextMenu.convId, conversations, nicknames]);
+
+  // ── Open nickname modal for any user (followers card, profile card, etc.) ──
+  const openNicknameModal = useCallback((targetUserId, userData) => {
+    if (!targetUserId) return;
+    const currentNick = nicknames[targetUserId] || '';
+    setNicknameModal({ open: true, targetUserId, currentName: currentNick, userData: userData || null });
+    setNicknameInput(currentNick);
+  }, [nicknames]);
+
+  const handleSaveNickname = useCallback(async () => {
+    if (!nicknameModal.targetUserId || !user?.id) return;
+    const trimmed = nicknameInput.trim();
+    try {
+      if (trimmed) {
+        await setNickname(user.id, nicknameModal.targetUserId, trimmed);
+      } else {
+        await removeNickname(user.id, nicknameModal.targetUserId);
+      }
+      setNicknames(prev => {
+        const next = { ...prev };
+        if (trimmed) {
+          next[nicknameModal.targetUserId] = trimmed;
+        } else {
+          delete next[nicknameModal.targetUserId];
+        }
+        return next;
+      });
+      setNicknameModal({ open: false, targetUserId: null, currentName: '' });
+      setNicknameInput('');
+      toast.success(t('chat.nickname_saved') || 'Nickname saved');
+    } catch (err) {
+      console.error('Error saving nickname:', err);
+      toast.error(t('common.error') || 'Error');
+    }
+  }, [nicknameModal.targetUserId, nicknameInput, user?.id]);
+
+  // ── Pin/unpin conversation ──
+  const handlePinConversation = useCallback(async () => {
+    const convId = contextMenu.convId;
+    const conv = conversations.find(c => c.id === convId);
+    if (!convId || !conv) return;
+    setContextMenu({ open: false, x: 0, y: 0, convId: null });
+    try {
+      await togglePinConversation(convId, user.id, conv.is_pinned);
+      // Update local state optimistically + refetch to get updated sort order
+      setConversations(prev => prev.map(c =>
+        c.id === convId
+          ? { ...c, is_pinned: !c.is_pinned, pinned_at: !c.is_pinned ? new Date().toISOString() : null }
+          : c
+      ));
+      loadConvs(); // re-sort from DB
+    } catch (err) {
+      // Revert optimistic update on error
+      loadConvs();
+      if (err.message?.includes('Maximum 3')) {
+        toast.warning(t('chat.max_pinned') || 'Maximum 3 pinned conversations');
+      } else {
+        console.error('Error pinning conversation:', err);
+      }
+    }
+  }, [contextMenu.convId, conversations, user?.id, loadConvs]);
 
   // ── Message context menu handlers ──
   const handleMsgContextMenu = useCallback((e, msg) => {
@@ -1887,16 +2019,25 @@ export default function Chat() {
       ) : (
         <div className="chat-followers-modal-grid">
           {followers.map((u) => (
-            <button key={u.id} className="chat-followers-modal-card" onClick={() => { setShowFollowersModal(false); startConversation(u); }}>
-              <Avatar src={u.avatar_url} alt={u.username} className="chat-followers-modal-card-avatar" />
-              <span className="chat-followers-modal-card-name">{u.displayname || u.username}</span>
-              <span style={{ fontSize: '0.68rem', fontWeight: 400, opacity: 0.5 }}>@{u.username}</span>
-              {Array.isArray(u.roles) && u.roles.some(r => r !== 'user') && (
-                <span className="chat-followers-modal-card-badges">
-                  <Badge roles={u.roles} />
-                </span>
-              )}
-            </button>
+            <div key={u.id} className="chat-followers-modal-card-wrapper">
+              <button className="chat-followers-modal-card" onClick={() => { setShowFollowersModal(false); startConversation(u); }}>
+                <Avatar src={u.avatar_url} alt={u.username} className="chat-followers-modal-card-avatar" />
+                <span className="chat-followers-modal-card-name">{getDisplayName(u)}</span>
+                <span style={{ fontSize: '0.68rem', fontWeight: 400, opacity: 0.5 }}>@{u.username}</span>
+                {Array.isArray(u.roles) && u.roles.some(r => r !== 'user') && (
+                  <span className="chat-followers-modal-card-badges">
+                    <Badge roles={u.roles} />
+                  </span>
+                )}
+              </button>
+              <button
+                className="chat-followers-modal-nickname-btn"
+                title={nicknames[u.id] ? (t('chat.edit_nickname') || 'Edit nickname') : (t('chat.set_nickname') || 'Set nickname')}
+                onClick={(e) => { e.stopPropagation(); openNicknameModal(u.id, u); }}
+              >
+                <FaEdit />
+              </button>
+            </div>
           ))}
         </div>
       )}
@@ -1973,7 +2114,7 @@ export default function Chat() {
               />
               <div className="chat-list-item-info">
                 <div className="chat-list-item-top">
-                  <span className="chat-list-item-name">{conv.otherUser?.displayname || conv.otherUser?.username || t('common.unknown')}</span>
+                  <span className="chat-list-item-name">{getDisplayName(conv.otherUser)}</span>
                   {(() => {
                     const o = localConvOverridesRef.current[conv.id];
                     const previewAt = o?.at ?? conv.last_message_at;
@@ -2000,6 +2141,9 @@ export default function Chat() {
                       return previewText;
                     })()}
                   </span>
+                  {conv.is_pinned && (
+                    <FaThumbtack className="chat-list-item-pin-icon" />
+                  )}
                   {conv.unreadCount > 0 && (
                     <span className="chat-list-item-badge">
                       {conv.unreadCount > 99 ? '99+' : conv.unreadCount}
@@ -2032,7 +2176,7 @@ export default function Chat() {
             status={activeConversationStatus}
           />
           <div className="chat-messages-header-info" style={{ cursor: 'pointer' }} onClick={goToProfile}>
-            <span className="chat-messages-header-name">{otherUser?.displayname || otherUser?.username || t('common.unknown')}</span>
+            <span className="chat-messages-header-name">{getDisplayName(otherUser)}</span>
           </div>
         </div>
         <div className="chat-messages-header-actions">
@@ -2464,7 +2608,7 @@ export default function Chat() {
               <span className="chat-typing-dot"></span>
               <span className="chat-typing-dot"></span>
             </div>
-            <span className="chat-typing-label">{otherUser?.displayname || otherUser?.username || t('common.unknown')} {t('chat.typing') || 'typing...'}</span>
+            <span className="chat-typing-label">{getDisplayName(otherUser)} {t('chat.typing') || 'typing...'}</span>
           </div>
         )}
         {/* Media preview — muestra la imagen o un spinner mientras se sube */}
@@ -2628,6 +2772,21 @@ export default function Chat() {
           style={{ left: contextMenu.x, top: contextMenu.y }}
           onClick={(e) => e.stopPropagation()}
         >
+          {contextMenu.convId && (() => {
+            const conv = conversations.find(c => c.id === contextMenu.convId);
+            const targetUser = conv?.otherUser;
+            const currentNick = targetUser ? nicknames[targetUser.id] || '' : '';
+            return (<>
+              <button className="chat-context-menu-btn" onClick={handlePinConversation}>
+                <FaThumbtack />
+                <span>{conv?.is_pinned ? (t('chat.unpin') || 'Unpin') : (t('chat.pin') || 'Pin')}</span>
+              </button>
+              <button className="chat-context-menu-btn" onClick={handleSetNickname}>
+                <FaEdit />
+                <span>{currentNick ? t('chat.edit_nickname') || 'Edit nickname' : t('chat.set_nickname') || 'Set nickname'}</span>
+              </button>
+            </>);
+          })()}
           <button className="chat-context-menu-btn chat-context-menu-btn--danger" onClick={handleDeleteConversation}>
             <FaTrash />
             <span>{t('post.delete')}</span>
@@ -2861,7 +3020,7 @@ export default function Chat() {
               />
               <div className="explore-card-info">
                 <div className="explore-card-name-row">
-                  <span className="explore-card-name">{otherUser.displayname || otherUser.username || t('common.unknown')}</span>
+                  <span className="explore-card-name">{getDisplayName(otherUser)}</span>
                               <span style={{ fontSize: '0.68rem', fontWeight: 400, opacity: 0.5 }}> · @{otherUser.username || ''}</span>
                   {otherUser.is_private === true && (
                     <span className="explore-card-private-icon" title={t('profile.private_profile')}>
@@ -2871,6 +3030,13 @@ export default function Chat() {
                   {Array.isArray(otherUser.roles) && otherUser.roles.some(r => r !== 'user') && (
                     <Badge roles={otherUser.roles} />
                   )}
+                  <button
+                    className="explore-card-nickname-btn"
+                    title={nicknames[otherUser.id] ? (t('chat.edit_nickname') || 'Edit nickname') : (t('chat.set_nickname') || 'Set nickname')}
+                    onClick={(e) => { e.stopPropagation(); openNicknameModal(otherUser.id, otherUser); }}
+                  >
+                    <FaEdit />
+                  </button>
                 </div>
                 <span className="explore-card-followers">
                   {otherUser.followerCount || 0} {otherUser.followerCount === 1 ? t('explore.followers_singular') : t('explore.followers_plural')}
@@ -3138,6 +3304,196 @@ export default function Chat() {
           onConfirm={executeExternalLink}
           onCancel={handleCancelExternalLink}
         />,
+        document.body
+      )}
+
+      {nicknameModal.open && createPortal(
+        <div className="chat-nickname-overlay" onClick={() => setNicknameModal({ open: false, targetUserId: null, currentName: '', userData: null })}>
+          <div className="chat-nickname-modal" onClick={(e) => e.stopPropagation()}>
+            {/* ── Header ── */}
+            <div className="chat-nickname-modal-header">
+              <h3 className="chat-nickname-modal-title">{nicknameModal.currentName ? (t('chat.edit_nickname') || 'Edit nickname') : (t('chat.set_nickname') || 'Set nickname')}</h3>
+              <button className="chat-nickname-modal-close" onClick={() => setNicknameModal({ open: false, targetUserId: null, currentName: '', userData: null })}>
+                <FaTimes />
+              </button>
+            </div>
+
+            <div className="chat-nickname-modal-body">
+              {nicknameModal.userData ? (
+                <>
+                  {/* ── Banner preview (like fc-preview-card from edit profile modal) ── */}
+                  <div className="chat-nickname-preview-card"
+                    style={{
+                      '--accent-color': nicknameModal.userData?.accent_color || 'transparent',
+                      '--accent-color-2': nicknameModal.userData?.accent_color_secondary || nicknameModal.userData?.accent_color || 'transparent',
+                    }}
+                  >
+                    <div className="chat-nickname-preview-banner">
+                      {nicknameModal.userData?.banner_url && (
+                        <div
+                          className="chat-nickname-preview-banner-bg"
+                          style={{
+                            backgroundImage: `url(${nicknameModal.userData.banner_url})`,
+                            backgroundPosition: nicknameModal.userData?.banner_position || '50% 50%',
+                          }}
+                        />
+                      )}
+                      <div className="chat-nickname-preview-overlay"></div>
+
+                      <div className="chat-nickname-preview-avatar">
+                        <img
+                          src={nicknameModal.userData?.avatar_url || DEFAULT_AVATAR}
+                          alt=""
+                        />
+                      </div>
+
+                      <div className="chat-nickname-preview-info">
+                        <div className="chat-nickname-preview-name-row">
+                          <span className="chat-nickname-preview-name">
+                            {nicknameInput.trim() || nicknameModal.userData?.displayname || nicknameModal.userData?.username || t('common.unknown')}
+                          </span>
+                          {nicknameInput.trim() && (
+                            <span className="chat-nickname-preview-nickname-badge">{t('chat.nickname') || 'Nickname'}</span>
+                          )}
+                          <span className="chat-nickname-preview-username">
+                            @{nicknameModal.userData?.username || ''}
+                          </span>
+                          {Array.isArray(nicknameModal.userData?.roles) && nicknameModal.userData.roles.some(r => r !== 'user') && (
+                            <Badge roles={nicknameModal.userData.roles} />
+                          )}
+                        </div>
+                        <span className="chat-nickname-preview-followers">
+                          {nicknameModal.userData?.followerCount || 0} {nicknameModal.userData?.followerCount === 1 ? t('explore.followers_singular') : t('explore.followers_plural')}
+                        </span>
+                        {(nicknameModal.userData?.bio || nicknameModal.userData?.pronouns) && (
+                          <p className="chat-nickname-preview-bio">
+                            {nicknameModal.userData?.bio || ''}
+                            {nicknameModal.userData?.bio && nicknameModal.userData?.pronouns && <span> · {nicknameModal.userData?.pronouns}</span>}
+                            {!nicknameModal.userData?.bio && nicknameModal.userData?.pronouns && <span>{nicknameModal.userData?.pronouns}</span>}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── Explore card preview ── */}
+                  <div className={`chat-nickname-explore-card${(nicknameModal.userData?.accent_color || nicknameModal.userData?.accent_color_secondary) ? ' explore-card--accent' : ''}`}
+                    style={{
+                      '--accent-color': nicknameModal.userData?.accent_color || 'transparent',
+                      '--accent-color-2': nicknameModal.userData?.accent_color_secondary || nicknameModal.userData?.accent_color || 'transparent',
+                    }}
+                  >
+                    <div className="explore-card-banner">
+                      {nicknameModal.userData?.banner_url ? (
+                        <img
+                          className="explore-card-banner-img"
+                          src={nicknameModal.userData.banner_url}
+                          alt=""
+                          style={{ objectPosition: nicknameModal.userData?.banner_position || '50% 50%' }}
+                        />
+                      ) : (
+                        <div className="chat-nickname-explore-banner-placeholder" />
+                      )}
+                      <div className="explore-card-overlay" />
+                    </div>
+                    <div className="explore-card-body">
+                      <img
+                        className="explore-card-avatar"
+                        src={nicknameModal.userData?.avatar_url || DEFAULT_AVATAR}
+                        alt=""
+                      />
+                      <div className="explore-card-info">
+                        <div className="explore-card-name-row">
+                          <span className="explore-card-name">
+                            {nicknameInput.trim() || nicknameModal.userData?.displayname || nicknameModal.userData?.username || t('common.unknown')}
+                          </span>
+                          {nicknameInput.trim() && (
+                            <span className="chat-nickname-explore-badge">{t('chat.nickname') || 'Nickname'}</span>
+                          )}
+                          <span style={{ fontSize: '0.68rem', fontWeight: 400, opacity: 0.5 }}>@{nicknameModal.userData?.username || ''}</span>
+                          {Array.isArray(nicknameModal.userData?.roles) && nicknameModal.userData.roles.some(r => r !== 'user') && (
+                            <Badge roles={nicknameModal.userData.roles} />
+                          )}
+                        </div>
+                        <span className="explore-card-followers">
+                          {nicknameModal.userData?.followerCount || 0} {nicknameModal.userData?.followerCount === 1 ? t('explore.followers_singular') : t('explore.followers_plural')}
+                        </span>
+                        {(nicknameModal.userData?.bio || nicknameModal.userData?.pronouns) && (
+                          <p className="explore-card-bio">
+                            {nicknameModal.userData?.bio || ''}
+                            {nicknameModal.userData?.bio && nicknameModal.userData?.pronouns && <span> · {nicknameModal.userData?.pronouns}</span>}
+                            {!nicknameModal.userData?.bio && nicknameModal.userData?.pronouns && <span>{nicknameModal.userData?.pronouns}</span>}
+                          </p>
+                        )}
+                      </div>
+                      <div className="explore-card-action">
+                        <button type="button" className="follow-btn follow-btn--follow" disabled>
+                          {t('follow.follow')}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="chat-nickname-no-data">
+                  <FaUser className="chat-nickname-no-data-icon" />
+                  <p>{t('chat.nickname_for_user') || 'Set a nickname for this user'}</p>
+                </div>
+              )}
+
+              {/* ── Nickname input ── */}
+              <div className="chat-nickname-input-section">
+                <label className="chat-nickname-input-label">
+                  {t('chat.nickname_placeholder') || 'Enter a nickname...'}
+                </label>
+                <input
+                  className="chat-nickname-modal-input"
+                  type="text"
+                  value={nicknameInput}
+                  onChange={(e) => setNicknameInput(e.target.value)}
+                  placeholder={t('chat.nickname_placeholder') || 'Enter a nickname...'}
+                  maxLength={50}
+                  autoFocus
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSaveNickname(); if (e.key === 'Escape') setNicknameModal({ open: false, targetUserId: null, currentName: '', userData: null }); }}
+                />
+                <span className="chat-nickname-char-count">{nicknameInput.length}/50</span>
+              </div>
+            </div>
+
+            {/* ── Footer ── */}
+            <div className="chat-nickname-modal-footer">
+              <button
+                className="chat-nickname-modal-btn chat-nickname-modal-btn--save"
+                onClick={handleSaveNickname}
+              >
+                {t('common.save') || 'Save'}
+              </button>
+              {nicknameModal.currentName && (
+                <button
+                  className="chat-nickname-modal-btn chat-nickname-modal-btn--remove"
+                  onClick={async () => {
+                    setNicknameInput('');
+                    if (!nicknameModal.targetUserId || !user?.id) return;
+                    try {
+                      await removeNickname(user.id, nicknameModal.targetUserId);
+                      setNicknames(prev => {
+                        const next = { ...prev };
+                        delete next[nicknameModal.targetUserId];
+                        return next;
+                      });
+                      setNicknameModal({ open: false, targetUserId: null, currentName: '' });
+                      toast.success(t('chat.nickname_removed') || 'Nickname removed');
+                    } catch (err) {
+                      console.error('Error removing nickname:', err);
+                    }
+                  }}
+                >
+                  {t('common.delete') || 'Remove'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>,
         document.body
       )}
     </div>
