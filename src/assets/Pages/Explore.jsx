@@ -16,6 +16,7 @@ import Avatar from "../Resources/Components/Avatar";
 import Badge from "../Resources/Components/Badge";
 import { FaLock } from 'react-icons/fa';
 import { getBlockedUserIds, getUsersWhoBlockedMeIds, clearBlockedListsCache, subscribeBlockChanges } from "../services/blockService";
+import { getNicknames, getCachedNicknames, cacheNicknames } from "../services/chatService";
 import { countInterestOverlap } from "../services/interestDictionary";
 import "../Resources/Styles/explore.css";
 import "../Resources/Styles/skeleton.css";
@@ -172,6 +173,28 @@ function Explore() {
 
     fetchAll();
   }, [user?.id, authLoading]);
+
+  // ── Nicknames (cache-first) ──
+  const [nicknames, setNicknames] = useState(() => {
+    if (user?.id) {
+      const cached = getCachedNicknames(user.id);
+      if (cached) return cached;
+    }
+    return {};
+  });
+  useEffect(() => {
+    if (!user?.id) return;
+    getNicknames(user.id).then((map) => {
+      setNicknames(map);
+      cacheNicknames(user.id, map);
+    }).catch(() => {});
+  }, [user?.id]);
+
+  const getDisplayName = useCallback((otherUser) => {
+    if (!otherUser) return t('common.unknown');
+    const nick = nicknames[otherUser.id];
+    return nick || otherUser.displayname || otherUser.username || t('common.unknown');
+  }, [nicknames, t]);
 
   // ── Ref para acceder a profiles desde Realtime sin stale closures ──
   const profilesRef = useRef(profiles);
@@ -401,6 +424,7 @@ function Explore() {
                       counts={countsMap[profile.id]}
                       isOwnProfile={isOwn}
                       showAccent={accentVisible}
+                      getDisplayName={getDisplayName}
                     />
                   );
                 })}
@@ -441,7 +465,7 @@ function Explore() {
   );
 }
 
-function ExploreCard({ profile, counts, isOwnProfile, showAccent }) {
+function ExploreCard({ profile, counts, isOwnProfile, showAccent, getDisplayName }) {
   const { t } = useI18n();
   const navigate = useNavigate();
   const bio = profile.bio || "";
@@ -485,7 +509,7 @@ function ExploreCard({ profile, counts, isOwnProfile, showAccent }) {
 
         <div className="explore-card-info">
           <div className="explore-card-name-row">
-            <span className="explore-card-name">{profile.displayname || profile.username}</span>
+            <span className="explore-card-name">{getDisplayName ? getDisplayName(profile) : (profile.displayname || profile.username)}</span>
             <span style={{ fontSize: '0.68rem', fontWeight: 400, opacity: 0.5 }}> · @{profile.username}</span>
             {profile.is_private === true && (
               <span className="explore-card-private-icon" title={t('profile.private_profile')}>

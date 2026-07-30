@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { ToastContainer } from 'react-toastify';
+import './css/modal.css';
 
 /**
  * ModalShell — wraps content in a native <dialog> element called via showModal().

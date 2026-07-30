@@ -173,10 +173,14 @@ export function getAvatarTransformStyle(positionStr) {
  * Given a position string, return the style object for an <img> element
  * with object-fit: cover.
  *
- * ⚠️ NO usa transform: scale(Z) porque combinado con object-fit: cover
- *    produce clipping/distorsión impredecible en distintos navegadores.
- *    En su lugar, aplica el zoom mediante `width` y `height` en %,
- *    que scalea el área visible del img dentro del contenedor.
+ * Aplica el zoom mediante `width` y `height` en % en vez de
+ * `transform: scale(Z)`, porque scale() combinado con object-fit: cover
+ * produce clipping/distorsión impredecible en distintos navegadores.
+ *
+ * Para que el img agrandado no se desborde solo por derecha/abajo
+ * (y se recorte mal desde arriba-izquierda), se agrega un translate
+ * que centra el img dentro del contenedor:
+ *   translate(-(Z-1)/(2*Z)*100%, ...)
  *
  * Incluye objectPosition (focal point X/Y) y CSS transform para
  * rotation y flip (scaleX/scaleY).
@@ -187,15 +191,23 @@ export function getAvatarTransformStyle(positionStr) {
 export function getImgTransformStyle(positionStr) {
   const p = parseImagePosition(positionStr || '');
   const transforms = [];
-  // ❌ Eliminado: transform: scale() — usar width/height en % abajo
+  // ⚠️ CSS aplica transforms de DERECHA a IZQUIERDA.
+  // El translate debe ir al FINAL (derecha) para que se aplique PRIMERO,
+  // antes de rotation/flip, así opera en el espacio de coordenadas original
+  // y centra correctamente el img agrandado.
   if (p.rotation !== 0) transforms.push(`rotate(${p.rotation}deg)`);
   if (p.flipX) transforms.push('scaleX(-1)');
   if (p.flipY) transforms.push('scaleY(-1)');
+  // translate al final → se aplica primero (derecha en la cadena CSS)
+  // antes de cualquier rotación, por lo que centra en coordenadas originales
+  if (p.zoom !== 1) {
+    const t = -((p.zoom - 1) / (2 * p.zoom)) * 100;
+    transforms.push(`translate(${t}%, ${t}%)`);
+  }
 
   const style = {
     objectPosition: `${p.x}% ${p.y}%`,
   };
-  // Zoom mediante dimensiones reales del img (no transform) para respetar object-fit
   if (p.zoom !== 1) {
     style.width = `${p.zoom * 100}%`;
     style.height = `${p.zoom * 100}%`;

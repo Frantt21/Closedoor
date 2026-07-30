@@ -68,6 +68,7 @@ import { toast } from 'react-toastify';
 import { getCdnUrl } from '../services/cdnService';
 import { useUserStatus } from '../services/useUserStatus';
 import { useRegisterUserStatus, UserStatusContext } from '../../context/UserStatusContext';
+import { getNicknames, getCachedNicknames, cacheNicknames } from "../services/chatService";
 
 function Profile() {
     const { t, showAccent, accentVisibility, showLikes, filterEncrypted, showBadges, locale } = useI18n();
@@ -1122,9 +1123,31 @@ function Profile() {
         }
     }, [ownProfile, user, isOwnProfile]);
 
+    // ── Nicknames (display name override from chat_nicknames, cache-first) ──
+    const [nicknames, setNicknames] = useState(() => {
+        if (user?.id) {
+            const cached = getCachedNicknames(user.id);
+            if (cached) return cached;
+        }
+        return {};
+    });
+    useEffect(() => {
+        if (!user?.id) return;
+        getNicknames(user.id).then((map) => {
+            setNicknames(map);
+            cacheNicknames(user.id, map);
+        }).catch(() => {});
+    }, [user?.id]);
+
+    const getDisplayName = (otherProfile) => {
+        if (!otherProfile) return t('common.unknown');
+        const nick = nicknames[otherProfile.id];
+        return nick || otherProfile.displayname || otherProfile.username || t('common.unknown');
+    };
+
     const avatarUrl = activeProfile?.avatar_url || null;
     const bannerUrl = activeProfile?.banner_url || null;
-    const profileDisplayName =
+    const rawDisplayName =
         activeProfile?.displayname ||
         activeProfile?.username ||
         user?.user_metadata?.display_name ||
@@ -1132,6 +1155,9 @@ function Profile() {
         user?.user_metadata?.username ||
         user?.email?.split("@")[0] ||
         "Guest";
+    const profileDisplayName = isOwnProfile
+        ? rawDisplayName
+        : (getDisplayName(activeProfile) || rawDisplayName);
 
     const roles = activeProfile?.roles || ["user"];
 

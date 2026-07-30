@@ -1,4 +1,5 @@
 import { supabase } from './supabaseclient';
+import { getItem, setItem, removeItem } from './secureStorage';
 import { encryptForUsers, decryptForUser } from './alphabetEncryption';
 
 // ── Conversation ──
@@ -788,5 +789,49 @@ export async function removeNickname(userId, targetUserId) {
     .eq('user_id', userId)
     .eq('target_user_id', targetUserId);
   if (error) throw error;
+}
+
+// ── localStorage cache ──
+
+const NICKNAMES_CACHE_PREFIX = 'fc_nicks_';
+const NICKNAMES_CACHE_TTL = 1000 * 60 * 30; // 30 minutes
+
+/**
+ * Cache the nicknames map for a user in localStorage.
+ * Allows instant restore on next visit without waiting for DB.
+ */
+export function cacheNicknames(userId, nicknamesMap) {
+  if (!userId) return;
+  try {
+    const payload = { ts: Date.now(), ttl: NICKNAMES_CACHE_TTL, data: nicknamesMap };
+    setItem(NICKNAMES_CACHE_PREFIX + userId, payload);
+  } catch {}
+}
+
+/**
+ * Read cached nicknames from localStorage.
+ * Returns the map { target_user_id: nickname } or null if expired/missing.
+ */
+export function getCachedNicknames(userId) {
+  if (!userId) return null;
+  try {
+    const p = getItem(NICKNAMES_CACHE_PREFIX + userId);
+    if (!p || !p.ts) return null;
+    if (Date.now() - p.ts > (p.ttl || NICKNAMES_CACHE_TTL)) {
+      removeItem(NICKNAMES_CACHE_PREFIX + userId);
+      return null;
+    }
+    return p.data || null;
+  } catch { return null; }
+}
+
+/**
+ * Clear cached nicknames for a user.
+ */
+export function clearCachedNicknames(userId) {
+  if (!userId) return;
+  try {
+    removeItem(NICKNAMES_CACHE_PREFIX + userId);
+  } catch {}
 }
 

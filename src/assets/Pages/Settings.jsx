@@ -8,7 +8,7 @@ import { getBlockedUsers, getCachedBlockedUsers, unblockUser, cacheBlockStatus, 
 import { useNavigate } from 'react-router-dom';
 import { getItem } from '../services/secureStorage';
 import { supabase } from '../services/supabaseclient';
-import { getNicknames, setNickname, removeNickname } from '../services/chatService';
+import { getNicknames, getCachedNicknames, cacheNicknames, setNickname, removeNickname } from '../services/chatService';
 import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaHeartBroken, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaFire, FaChartBar, FaBell, FaBrush, FaBan, FaClock, FaAt, FaTrashAlt, FaTimes, FaDiscord, FaEdit } from 'react-icons/fa';
 import { MdLogout } from 'react-icons/md';
 import { toast } from 'react-toastify';
@@ -161,9 +161,34 @@ export default function Settings() {
   // ── Nickname management ──
   const loadNicknamesForSettings = useCallback(async () => {
     if (!user?.id) return;
-    setNicknameListLoading(true);
+    // Cache-first: restore immediately from localStorage (no flash)
+    const cached = getCachedNicknames(user.id);
+    if (cached) {
+      const targetIds = Object.keys(cached);
+      if (targetIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, username, displayname, avatar_url')
+          .in('id', targetIds);
+        const profileMap = {};
+        for (const p of profiles || []) profileMap[p.id] = p;
+        const list = targetIds.map(id => ({
+          userId: id,
+          nickname: cached[id],
+          profile: profileMap[id] || null,
+        })).filter(item => item.nickname);
+        setNicknameList(list);
+        // Don't show spinner — data is already cached, fetch silently in background
+      } else {
+        setNicknameList([]);
+      }
+    } else {
+      setNicknameListLoading(true); // No cache → show spinner while fetching
+    }
+    // DB fetch in background (updates cache)
     try {
       const nickMap = await getNicknames(user.id);
+      cacheNicknames(user.id, nickMap);
       const targetIds = Object.keys(nickMap);
       if (targetIds.length === 0) {
         setNicknameList([]);

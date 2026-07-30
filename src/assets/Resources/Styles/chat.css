@@ -2718,6 +2718,7 @@ dialog.fc-modal.chat-followers-modal {
         width: auto;
         max-height: 30vh;
     }
+}
 
 /* ── Nickname modal ── */
 .chat-nickname-overlay {
@@ -2788,19 +2789,20 @@ dialog.fc-modal.chat-followers-modal {
     gap: 16px;
 }
 
-/* ── Banner preview (like fc-preview-card) ── */
+/* ── Banner preview — identical to real profile banner ── */
 .chat-nickname-preview-card {
     position: relative;
     border-radius: var(--radius, 10px);
     overflow: hidden;
     min-height: 140px;
-    background: var(--color-surface, #1a1a1a);
 }
 
 .chat-nickname-preview-banner {
     position: relative;
     height: 140px;
     width: 100%;
+    overflow: hidden;
+    background: var(--color-surface, #1a1a1a);
 }
 
 .chat-nickname-preview-banner-bg {
@@ -2813,20 +2815,21 @@ dialog.fc-modal.chat-followers-modal {
 .chat-nickname-preview-overlay {
     position: absolute;
     inset: 0;
-    background: linear-gradient(180deg, rgba(0,0,0,0.15) 0%, rgba(0,0,0,0.65) 100%);
+    background: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.65) 100%);
     pointer-events: none;
     z-index: 1;
 }
 
 .chat-nickname-preview-avatar {
     position: absolute;
-    left: 16px;
-    bottom: 52px;
+    left: 12%;
+    top: 50%;
+    transform: translate(-50%, -50%);
     width: 56px;
     height: 56px;
     border-radius: 50%;
     overflow: hidden;
-    border: 3px solid var(--color-surface, #1a1a1a);
+    border: 3px solid color-mix(in srgb, var(--accent-color, transparent) 40%, transparent);
     background: var(--color-bg, #000);
     z-index: 2;
 }
@@ -2840,9 +2843,10 @@ dialog.fc-modal.chat-followers-modal {
 
 .chat-nickname-preview-info {
     position: absolute;
-    left: 16px;
+    left: calc(12% + 56px / 2 + 1.5rem);
     right: 16px;
-    bottom: 10px;
+    top: 50%;
+    transform: translateY(-50%);
     z-index: 2;
     display: flex;
     flex-direction: column;
@@ -2852,7 +2856,7 @@ dialog.fc-modal.chat-followers-modal {
 .chat-nickname-preview-name-row {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 6px;
     flex-wrap: wrap;
 }
 
@@ -2861,17 +2865,6 @@ dialog.fc-modal.chat-followers-modal {
     font-weight: 700;
     color: #fff;
     text-shadow: 0 1px 3px rgba(0,0,0,0.6);
-}
-
-.chat-nickname-preview-nickname-badge {
-    font-size: 0.6rem;
-    font-weight: 600;
-    padding: 2px 7px;
-    border-radius: 999px;
-    background: var(--accent-color, #3b82f6);
-    color: #fff;
-    text-shadow: none;
-    letter-spacing: 0.03em;
 }
 
 .chat-nickname-preview-username {
@@ -2906,6 +2899,39 @@ dialog.fc-modal.chat-followers-modal {
     opacity: 0.5;
 }
 
+/* ── Fix badge sizes inside nickname previews ── */
+.chat-nickname-preview-card .role-badges {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.chat-nickname-preview-card .role-badge-img {
+    width: 16px;
+    height: 16px;
+}
+
+.chat-nickname-preview-card .role-badge {
+    font-size: 0.55rem;
+    padding: 1px 5px;
+}
+
+.chat-nickname-explore-card .role-badges {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.chat-nickname-explore-card .role-badge-img {
+    width: 14px;
+    height: 14px;
+}
+
+.chat-nickname-explore-card .role-badge {
+    font-size: 0.5rem;
+    padding: 1px 4px;
+}
+
 /* ── No user data fallback ── */
 .chat-nickname-no-data {
     display: flex;
@@ -2929,9 +2955,14 @@ dialog.fc-modal.chat-followers-modal {
 
 /* ── Explore card preview inside nickname modal ── */
 .chat-nickname-explore-card {
+    position: relative;
     border-radius: var(--radius, 10px);
     overflow: hidden;
     background: var(--color-surface, #1a1a1a);
+}
+
+.chat-nickname-explore-card.explore-card--accent {
+    background: var(--color-bg, #000000);
 }
 
 .chat-nickname-explore-banner-placeholder {
@@ -2940,37 +2971,21 @@ dialog.fc-modal.chat-followers-modal {
     background: var(--color-surface-hover, #252525);
 }
 
-.chat-nickname-explore-card img {
+.chat-nickname-explore-card .explore-card-banner-img {
     width: 100%;
     height: 100%;
     object-fit: cover;
     display: block;
 }
 
-.chat-nickname-explore-card .explore-card-body {
-    padding: 12px;
-    padding-top: 0;
-}
-
-.chat-nickname-explore-card .explore-card-avatar {
-    width: 52px;
-    height: 52px;
-    margin-top: -26px;
-    margin-bottom: 6px;
-    border-width: 2px;
-}
-
-.chat-nickname-explore-card .explore-card-name {
-    font-size: 0.9rem;
-}
-
-.chat-nickname-explore-card .explore-card-bio {
-    font-size: 0.75rem;
-    -webkit-line-clamp: 1;
+.chat-nickname-explore-card .explore-card-action .follow-btn {
+    font-size: 0.78rem;
+    padding: 4px 14px;
 }
 
 .chat-nickname-explore-card .explore-card-action .follow-btn {
     font-size: 0.78rem;
+    padding: 4px 14px;
     padding: 4px 14px;
     pointer-events: none;
     opacity: 0.7;

@@ -107,7 +107,7 @@ export async function getPosts({ userId, profileUserId, limit = 20, offset = 0 }
   const feedSelect = [
     'id', 'user_id', 'content', 'image_url', 'image_urls', 'video_url',
     'is_pinned', 'pinned_at', 'is_encrypted', 'is_sensitive',
-    'likes_count', 'comments_count', 'reposts_count', 'views_count',
+    'likes_count', 'dislikes_count', 'comments_count', 'reposts_count', 'views_count',
     'created_at', 'updated_at', 'mentions',
     'allowed_users', 'obfuscated_display', 'comments_allowed', 'poll_data',
     'profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position)'
@@ -145,7 +145,7 @@ export async function getPost(postId) {
   const explicitSelect = [
     'id', 'user_id', 'content', 'image_url', 'image_urls', 'video_url',
     'is_pinned', 'pinned_at', 'is_encrypted', 'is_sensitive',
-    'likes_count', 'comments_count', 'reposts_count', 'views_count',
+    'likes_count', 'dislikes_count', 'comments_count', 'reposts_count', 'views_count',
     'created_at', 'updated_at', 'mentions',
     'allowed_users', 'obfuscated_display', 'comments_allowed', 'poll_data',
     'profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position)'
@@ -243,7 +243,7 @@ export async function getProfileContent(profileUserId, currentUserId, filterEncr
         id, created_at, user_id,
         posts!reposts_post_id_fkey (
           id, user_id, content, image_url, image_urls, video_url, is_pinned, pinned_at, mentions,
-          likes_count, comments_count, reposts_count, views_count, created_at, updated_at,
+          likes_count, dislikes_count, comments_count, reposts_count, views_count, created_at, updated_at,
           profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)
         )
       `)
@@ -1248,7 +1248,7 @@ export async function getScheduledPosts(userId, { limit = 50, offset = 0 } = {})
   const explicitSelect = [
     'id', 'user_id', 'content', 'image_url', 'image_urls', 'video_url',
     'is_pinned', 'pinned_at', 'is_encrypted', 'is_sensitive',
-    'likes_count', 'comments_count', 'reposts_count', 'views_count',
+    'likes_count', 'dislikes_count', 'comments_count', 'reposts_count', 'views_count',
     'created_at', 'updated_at', 'mentions',
     'allowed_users', 'obfuscated_display', 'comments_allowed', 'poll_data',
     'profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position)'
@@ -1282,7 +1282,7 @@ export async function getLikedPosts(userId, { limit = 50, offset = 0 } = {}) {
       id, created_at,
       posts!likes_post_id_fkey (
         id, user_id, content, image_url, image_urls, video_url, mentions,
-        likes_count, comments_count, reposts_count, views_count, created_at, updated_at,
+        likes_count, dislikes_count, comments_count, reposts_count, views_count, created_at, updated_at,
         profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)
       )
     `)
@@ -1421,7 +1421,7 @@ export async function getSavedPosts(userId, { limit = 50, offset = 0 } = {}) {
     .select(`
       id, created_at,
       posts!saved_posts_post_id_fkey (
-        id, user_id, content, image_url, image_urls, video_url, mentions,          likes_count, comments_count, reposts_count, views_count, created_at, updated_at,
+        id, user_id, content, image_url, image_urls, video_url, mentions,          likes_count, dislikes_count, comments_count, reposts_count, views_count, created_at, updated_at,
         profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)
       )
     `)
