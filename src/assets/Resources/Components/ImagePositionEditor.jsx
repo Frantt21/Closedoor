@@ -24,6 +24,19 @@ import { FaSearchPlus, FaSearchMinus, FaUndo, FaArrowsAltH, FaArrowsAltV, FaRedo
 function parseEncodedPosition(pos) {
   if (!pos) return { x: 50, y: 50, zoom: 1, rotation: 0, flipX: false, flipY: false };
 
+  // If the incoming position is already an object (e.g. returned from DB as jsonb), use it
+  if (typeof pos === 'object') {
+    const parsed = pos;
+    return {
+      x: typeof parsed.x === 'number' ? parsed.x : 50,
+      y: typeof parsed.y === 'number' ? parsed.y : 50,
+      zoom: typeof parsed.zoom === 'number' ? parsed.zoom : 1,
+      rotation: typeof parsed.rotation === 'number' ? parsed.rotation : 0,
+      flipX: !!parsed.flipX,
+      flipY: !!parsed.flipY,
+    };
+  }
+
   try {
     const parsed = JSON.parse(pos);
     if (parsed && typeof parsed === 'object' && 'x' in parsed) {

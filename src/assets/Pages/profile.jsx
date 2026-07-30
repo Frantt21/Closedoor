@@ -409,6 +409,22 @@ function Profile() {
     const [hasMorePosts, setHasMorePosts] = useState(true);
     const [loadingMorePosts, setLoadingMorePosts] = useState(false);
     const sentinelRef = useRef(null);
+    // ── Clear profile post cache on browser reload (like Chat.jsx) ──
+    useEffect(() => {
+        const FLAG = 'fc_profile_reload_clear_done';
+        if (!sessionStorage.getItem(FLAG)) {
+            sessionStorage.setItem(FLAG, '1');
+            try {
+                const toRemove = [];
+                for (let i = 0; i < sessionStorage.length; i++) {
+                    const key = sessionStorage.key(i);
+                    if (key && key.startsWith('fc_feed_profile_posts_')) toRemove.push(key);
+                }
+                toRemove.forEach(k => sessionStorage.removeItem(k));
+            } catch (e) { /* silent */ }
+        }
+    }, []);
+
     const [showCreatePost, setShowCreatePost] = useState(false);
     const [editingPost, setEditingPost] = useState(null);
     const [tab, setTab] = useState('posts'); // 'posts' | 'likes' | 'saved' | 'scheduled' | 'replies'
@@ -574,26 +590,35 @@ function Profile() {
                     if (more.length === 0) {
                         setHasMorePosts(false);
                     } else {
-                        setProfilePosts(prev => {
-                            const existingIds = new Set(prev.map(p => p.id));
-                            const unique = more.filter(p => !existingIds.has(p.id));
-                            return [...prev, ...unique];
-                        });
+                        // Computar merged fuera del setState para compartir con cache save
+                        const existingIds = new Set(profilePosts.map(p => p.id));
+                        const unique = more.filter(p => !existingIds.has(p.id));
+                        const mergedUnique = [...profilePosts, ...unique];
+                        setProfilePosts(mergedUnique);
                         setPostsOffset(prev => prev + PROFILE_PAGE_SIZE);
                         setHasMorePosts(more.length >= PROFILE_PAGE_SIZE);
                         // Batch check likes/reposts for new posts
+                        let newLikedIds = [], newRepostedIds = [], newSavedIds = [], newDislikedIds = [];
                         if (user?.id && more.length > 0) {
                             const postIds = more.map((p) => p.id);
-                            const [likedIds, repostedIds, savedIds, dislikedIds] = await Promise.all([
+                            [newLikedIds, newRepostedIds, newSavedIds, newDislikedIds] = await Promise.all([
                                 getLikedPostIds(postIds, user.id),
                                 getRepostedPostIds(postIds, user.id),
                                 getSavedPostIds(postIds, user.id),
                                 getDislikedPostIds(postIds, user.id),
                             ]);
-                            setLikedPostIds(prev => [...new Set([...prev, ...likedIds])]);
-                            setRepostedPostIds(prev => [...new Set([...prev, ...repostedIds])]);
-                            setSavedPostIds(prev => [...new Set([...prev, ...savedIds])]);
-                            setDislikedPostIds(prev => [...new Set([...prev, ...dislikedIds])]);
+                            setLikedPostIds(prev => [...new Set([...prev, ...newLikedIds])]);
+                            setRepostedPostIds(prev => [...new Set([...prev, ...newRepostedIds])]);
+                            setSavedPostIds(prev => [...new Set([...prev, ...newSavedIds])]);
+                            setDislikedPostIds(prev => [...new Set([...prev, ...newDislikedIds])]);
+                        }
+                        // Guardar acumulado en caché (con IDs frescos)
+                        if (mergedUnique && activeProfile?.id) {
+                            const mergedLiked = [...new Set([...likedPostIds, ...newLikedIds])];
+                            const mergedReposted = [...new Set([...repostedPostIds, ...newRepostedIds])];
+                            const mergedSaved = [...new Set([...savedPostIds, ...newSavedIds])];
+                            const mergedDisliked = [...new Set([...dislikedPostIds, ...newDislikedIds])];
+                            setCachedFeed(`profile_posts_${activeProfile.id}`, mergedUnique, mergedLiked, mergedReposted, mergedSaved, mergedDisliked);
                         }
                     }
                 } catch (err) {

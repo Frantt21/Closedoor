@@ -123,6 +123,19 @@ export function isVideoUrl(url) {
 export function parseImagePosition(pos) {
   if (!pos) return { x: 50, y: 50, zoom: 1, rotation: 0, flipX: false, flipY: false };
 
+  // If DB returned a JSON object (jsonb column), accept it directly
+  if (typeof pos === 'object') {
+    const parsed = pos;
+    return {
+      x: typeof parsed.x === 'number' ? parsed.x : 50,
+      y: typeof parsed.y === 'number' ? parsed.y : 50,
+      zoom: typeof parsed.zoom === 'number' ? parsed.zoom : 1,
+      rotation: typeof parsed.rotation === 'number' ? parsed.rotation : 0,
+      flipX: !!parsed.flipX,
+      flipY: !!parsed.flipY,
+    };
+  }
+
   try {
     const parsed = JSON.parse(pos);
     if (parsed && typeof parsed === 'object' && 'x' in parsed) {
