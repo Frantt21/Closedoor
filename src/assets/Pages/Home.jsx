@@ -108,7 +108,7 @@ function Home() {
         loadFeed();
     }, [user?.id, filterEncrypted]);
 
-    // ── Realtime: actualizar contadores de likes/reposts/comments en vivo ──
+    // ── Realtime: actualizar contadores + insertar nuevos posts en vivo ──
     useEffect(() => {
         const channel = supabase
             .channel('home-feed-updates')
@@ -126,10 +126,65 @@ function Home() {
                     );
                 }
             )
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'posts' },
+                async (payload) => {
+                    // Ignorar posts propios (ya los agrega handlePostCreated)
+                    const newPost = payload.new;
+                    if (newPost.user_id === user?.id) return;
+
+                    // Ignorar posts programados (scheduled_at en futuro)
+                    if (newPost.scheduled_at && new Date(newPost.scheduled_at) > new Date()) return;
+
+                    // Ignorar posts encriptados de otros usuarios
+                    if (newPost.is_encrypted && newPost.user_id !== user?.id) return;
+
+                    try {
+                        // Fetch post completo con perfil del autor
+                        const { data, error } = await supabase
+                            .from('posts')
+                            .select('*, profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position)')
+                            .eq('id', newPost.id)
+                            .single();
+
+                        if (error || !data) return;
+
+                        // Normalizar URLs del CDN (imagenes, avatar)
+                        const { getCdnUrl } = await import('../services/cdnService');
+                        if (data.image_url) data.image_url = getCdnUrl(data.image_url);
+                        if (Array.isArray(data.image_urls)) {
+                            data.image_urls = data.image_urls.map(u => getCdnUrl(u));
+                        }
+                        if (data.profiles?.avatar_url) {
+                            data.profiles.avatar_url = getCdnUrl(data.profiles.avatar_url);
+                        }
+
+                        // Verificar si el autor está bloqueado
+                        if (user?.id) {
+                            const [blockedIds, blockedMeIds] = await Promise.all([
+                                getBlockedUserIds(user.id).catch(() => []),
+                                getUsersWhoBlockedMeIds(user.id).catch(() => []),
+                            ]);
+                            const excludedIds = new Set([...blockedIds, ...blockedMeIds]);
+                            if (excludedIds.has(data.user_id)) return;
+                        }
+
+                        setPosts((prev) => {
+                            // Evitar duplicados (si ya está en el feed)
+                            if (prev.some((p) => p.id === data.id)) return prev;
+                            // Insertar al inicio
+                            return [data, ...prev];
+                        });
+                    } catch (err) {
+                        // Silencioso — Realtime no debe romper la UI
+                    }
+                }
+            )
             .subscribe();
 
         return () => { supabase.removeChannel(channel); };
-    }, []);
+    }, [user?.id]);
 
     // ── Re-filtrar posts cuando cambia el estado de bloqueo ──
     useEffect(() => {

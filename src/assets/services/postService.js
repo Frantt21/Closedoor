@@ -811,6 +811,9 @@ export async function isReposted(postId, userId) {
 
 const VIEWED_POSTS_KEY = 'fc_viewed_';
 
+// Whether the increment_post_views RPC function is available (checked once, cached)
+let _rpcAvailable = true;
+
 /**
  * Track a post view (once per user per post, dedup via localStorage)
  * Increments views_count on the post if not already viewed.
@@ -824,14 +827,39 @@ export async function trackPostView(postId, userId) {
     const viewed = getItem(key) || [];
     if (viewed.includes(postId)) return false; // Already viewed
 
-    // Atomic increment via RPC — no race condition
-    // Requires running migrations/046_increment_views_function.sql
-    const { error } = await supabase.rpc('increment_post_views', {
-      post_id: postId,
-    });
+    if (_rpcAvailable) {
+      // Atomic increment via RPC — no race condition
+      const { error } = await supabase.rpc('increment_post_views', {
+        post_id: postId,
+      });
 
-    if (error) {
-      // Fallback: RPC function not deployed yet → use SELECT+UPDATE (race condition possible)
+      if (error) {
+        // Check if the function doesn't exist → cache and fallback permanently
+        // Cache RPC failure — si el error es 404 o "function not found", no reintentar
+        if (error?.code === '404' || error?.code === 'P0001' || error?.code === '42883') {
+          _rpcAvailable = false;
+        } else {
+          const msg = error.message || '';
+          if (msg.includes('function') && (msg.includes('not found') || msg.includes('does not exist'))) {
+            _rpcAvailable = false;
+          }
+        }
+        // Fallback: use SELECT+UPDATE (race condition possible without RPC)
+        const { data: post } = await supabase
+          .from('posts')
+          .select('views_count')
+          .eq('id', postId)
+          .single();
+
+        if (post) {
+          await supabase
+            .from('posts')
+            .update({ views_count: (post.views_count || 0) + 1 })
+            .eq('id', postId);
+        }
+      }
+    } else {
+      // RPC not available (cached from previous failure) — fallback directly
       const { data: post } = await supabase
         .from('posts')
         .select('views_count')
