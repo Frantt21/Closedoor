@@ -145,12 +145,26 @@ export function parseImagePosition(pos) {
 /**
  * Returns CSS styles to render a positioned image (avatar or banner).
  * Compatible with Avatar component (via style prop) and <img> elements.
+ *
+ * ⚠️ NO usa object-position porque con object-fit: cover y aspect ratios
+ * iguales, el image content llena completamente el element box y no hay
+ * espacio que reposicionar. En su lugar, usa transform: translate() para
+ * mover el ELEMENTO ENTERO (no solo el contenido dentro del element box)
+ * combinado con scale() para el zoom.
+ *
+ * zoom mínimo 1.05x para asegurar overflow visible siempre.
  */
 export function getImageStyle(positionStr) {
   const p = parseImagePosition(positionStr || '');
+  // Zoom mínimo 1.05x para que siempre haya overflow visible
+  const z = Math.max(p.zoom, 1.05);
+  // translate en porcentaje: (50 - pos) * (z - 1) / z
+  // Funciona porque translate(%) se basa en el ancho del propio elemento,
+  // que es igual al contenedor (width: 100%).
+  const panX = ((50 - p.x) * (z - 1)) / z;
+  const panY = ((50 - p.y) * (z - 1)) / z;
   return {
-    objectPosition: `${p.x}% ${p.y}%`,
-    transform: p.zoom !== 1 ? `scale(${p.zoom})` : 'none',
+    transform: `translate(${panX}%, ${panY}%) scale(${z})`,
     transformOrigin: 'center center',
   };
 }
@@ -160,9 +174,11 @@ export function getImageStyle(positionStr) {
  */
 export function getBackgroundStyle(positionStr) {
   const p = parseImagePosition(positionStr || '');
+  const z = Math.max(p.zoom, 1.05);
   return {
     backgroundPosition: `${p.x}% ${p.y}%`,
-    backgroundSize: p.zoom !== 1 ? `${p.zoom * 100}%` : 'cover',
+    backgroundSize: `${z * 100}%`,
+    backgroundRepeat: 'no-repeat',
   };
 }
 

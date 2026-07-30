@@ -5,12 +5,22 @@ import { FaSearchPlus, FaSearchMinus } from 'react-icons/fa';
  * ImagePositionEditor
  *
  * Editor de posicion y zoom para imagenes SIN librerias externas.
- * Soporta drag con mouse para posicion (x,y) y slider para zoom (1x-3x).
+ *
+ * El drag manipula el DOM directamente (sin pasar por React state) para
+ * lograr respuesta instantánea.
+ *
+ * CRITICO: NO usamos object-position para posicionar porque con
+ * object-fit: cover y aspect ratios iguales, el image content llena
+ * el element box completamente — no hay espacio para reposicionar.
+ *
+ * En cambio, usamos transform: translate() para mover el ELEMENTO
+ * ENTERO (no solo el contenido dentro de él), combinado con scale()
+ * para el zoom. Así el posicionamiento funciona SIEMPRE.
  *
  * Props:
  *   imageUrl        – URL de la imagen a editar
  *   initialPosition – String JSON: {"x":50,"y":50,"zoom":1} o legacy "50% 50%"
- *   aspectRatio     – Ratio del contenedor (ej: 1 para avatar, 3/1 para banner)
+ *   aspectRatio     – Ratio del contenedor (ej: 1 para avatar, 3 para banner)
  *   circular        – true para mascara circular (avatar)
  *   onPositionChange – callback(positionString) donde positionString es JSON
  *   style           – estilo adicional para el contenedor
@@ -18,17 +28,17 @@ import { FaSearchPlus, FaSearchMinus } from 'react-icons/fa';
 export default function ImagePositionEditor({
   imageUrl,
   initialPosition,
-  aspectRatio = 3 / 1,
+  aspectRatio = 3,
   circular = false,
   onPositionChange,
   style,
 }) {
-  // Parsear posicion inicial
-  const parseInitial = () => {
-    if (!initialPosition) return { x: 50, y: 50, zoom: 1 };
-    if (initialPosition.startsWith('{')) {
+  // ── Parse initial position ──
+  const parsePos = (str) => {
+    if (!str) return { x: 50, y: 50, zoom: 1 };
+    if (typeof str === 'string' && str.startsWith('{')) {
       try {
-        const p = JSON.parse(initialPosition);
+        const p = JSON.parse(str);
         return {
           x: typeof p.x === 'number' ? p.x : 50,
           y: typeof p.y === 'number' ? p.y : 50,
@@ -36,19 +46,17 @@ export default function ImagePositionEditor({
         };
       } catch {}
     }
-    const legacy = String(initialPosition).match(/(\d+(?:\.\d+)?)\s*%\s*(\d+(?:\.\d+)?)\s*%/);
-    if (legacy) {
-      return { x: parseFloat(legacy[1]), y: parseFloat(legacy[2]), zoom: 1 };
-    }
+    const m = String(str).match(/(\d+(?:\.\d+)?)\s*%\s*(\d+(?:\.\d+)?)\s*%/);
+    if (m) return { x: parseFloat(m[1]), y: parseFloat(m[2]), zoom: 1 };
     return { x: 50, y: 50, zoom: 1 };
   };
 
-  const init = parseInitial();
+  const init = parsePos(initialPosition);
   const [x, setX] = useState(init.x);
   const [y, setY] = useState(init.y);
   const [zoom, setZoom] = useState(init.zoom);
 
-  // Refs para valores actuales (evita closures stale en event listeners)
+  // Sincronizar refs con state
   const xRef = useRef(x);
   const yRef = useRef(y);
   const zoomRef = useRef(zoom);
@@ -57,41 +65,74 @@ export default function ImagePositionEditor({
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
 
   const dragging = useRef(false);
-  // dragStart: almacena posiciones iniciales + currentX/currentY actualizados en RAF
-  const dragStart = useRef({ clientX: 0, clientY: 0, startX: 0, startY: 0, currentX: 50, currentY: 50, width: 1, height: 1 });
+  const dragStart = useRef({ clientX: 0, clientY: 0, startX: 0, startY: 0, width: 1, height: 1 });
   const containerRef = useRef(null);
-  const rafRef = useRef(null);
+  const imgRef = useRef(null);
   const onPositionChangeRef = useRef(onPositionChange);
   useEffect(() => { onPositionChangeRef.current = onPositionChange; }, [onPositionChange]);
 
+  // Tamaño del contenedor (medido vía ref callback, inmediato)
+  const containerSizeRef = useRef({ width: 1, height: 1 });
+  const containerCallbackRef = useCallback((node) => {
+    containerRef.current = node;
+    if (node) {
+      const rect = node.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        containerSizeRef.current = { width: rect.width, height: rect.height };
+      }
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sincronizar transform inicial después de que todos los refs estén listos
+  useEffect(() => {
+    panTo(xRef.current, yRef.current, Math.max(zoomRef.current, 1.05));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // panTo no está en deps porque se actualiza con containerSizeRef
+
+  // Zoom de visualización: mínimo 1.05x para que siempre haya overflow
+  const displayZoom = Math.max(zoom, 1.05);
+
+  // Calcular translate en píxeles para una posición (x,y) y zoom dados
+  const panTo = useCallback((posX, posY, z) => {
+    if (!imgRef.current) return;
+    const { width: cw, height: ch } = containerSizeRef.current;
+    const panX = (50 - posX) * (z - 1) * cw / (100 * z);
+    const panY = (50 - posY) * (z - 1) * ch / (100 * z);
+    imgRef.current.style.transform = `translate(${panX}px, ${panY}px) scale(${z})`;
+  }, []);
+
   // Notificar cambios al padre
-  const notify = useCallback((newX, newY, newZoom) => {
+  const notify = useCallback(() => {
     const payload = JSON.stringify({
-      x: Math.round(newX),
-      y: Math.round(newY),
-      zoom: Math.round(newZoom * 10) / 10,
+      x: Math.round(xRef.current),
+      y: Math.round(yRef.current),
+      zoom: Math.round(zoomRef.current * 10) / 10,
     });
     onPositionChangeRef.current?.(payload);
   }, []);
 
-  // ── Mouse drag (window-level listeners) ──
+  // ── Actualizar DOM durante el drag ──
   const updateDrag = useCallback((clientX, clientY) => {
     const d = dragStart.current;
     const deltaX = ((clientX - d.clientX) / d.width) * 100;
     const deltaY = ((clientY - d.clientY) / d.height) * 100;
-    const newX = Math.max(0, Math.min(100, d.startX - deltaX));
-    const newY = Math.max(0, Math.min(100, d.startY - deltaY));
-    // Actualizar state + ref sincrónicamente para evitar valores stale
-    setX(newX);
-    setY(newY);
-    d.currentX = newX;
-    d.currentY = newY;
+    const newX = Math.round(Math.max(0, Math.min(100, d.startX - deltaX)));
+    const newY = Math.round(Math.max(0, Math.min(100, d.startY - deltaY)));
+    const z = Math.max(zoomRef.current, 1.05);
+
+    // Posicionar vía translate + scale sobre el DOM directamente
+    const panX = (50 - newX) * (z - 1) * d.width / (100 * z);
+    const panY = (50 - newY) * (z - 1) * d.height / (100 * z);
+    imgRef.current.style.transform = `translate(${panX}px, ${panY}px) scale(${z})`;
+
+    xRef.current = newX;
+    yRef.current = newY;
   }, []);
 
+  // ── Mouse ──
   const handleMouseMove = useCallback((e) => {
     if (!dragging.current) return;
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(() => updateDrag(e.clientX, e.clientY));
+    updateDrag(e.clientX, e.clientY);
   }, [updateDrag]);
 
   const handleMouseUp = useCallback(() => {
@@ -99,24 +140,20 @@ export default function ImagePositionEditor({
     dragging.current = false;
     window.removeEventListener('mousemove', handleMouseMove);
     window.removeEventListener('mouseup', handleMouseUp);
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    // Leer desde dragStart.current que tiene los valores más recientes
-    const d = dragStart.current;
-    notify(d.currentX, d.currentY, zoomRef.current);
+    setX(xRef.current);
+    setY(yRef.current);
+    notify();
   }, [handleMouseMove, notify]);
 
   const handleMouseDown = useCallback((e) => {
     e.preventDefault();
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const cx = xRef.current, cy = yRef.current;
     dragStart.current = {
       clientX: e.clientX,
       clientY: e.clientY,
-      startX: cx,
-      startY: cy,
-      currentX: cx,
-      currentY: cy,
+      startX: xRef.current,
+      startY: yRef.current,
       width: rect.width,
       height: rect.height,
     };
@@ -125,13 +162,11 @@ export default function ImagePositionEditor({
     window.addEventListener('mouseup', handleMouseUp);
   }, [handleMouseMove, handleMouseUp]);
 
-  // ── Touch drag ──
+  // ── Touch ──
   const handleTouchMove = useCallback((e) => {
     if (!dragging.current || e.touches.length !== 1) return;
     e.preventDefault();
-    const touch = e.touches[0];
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(() => updateDrag(touch.clientX, touch.clientY));
+    updateDrag(e.touches[0].clientX, e.touches[0].clientY);
   }, [updateDrag]);
 
   const handleTouchEnd = useCallback(() => {
@@ -139,24 +174,21 @@ export default function ImagePositionEditor({
     dragging.current = false;
     window.removeEventListener('touchmove', handleTouchMove);
     window.removeEventListener('touchend', handleTouchEnd);
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    const d = dragStart.current;
-    notify(d.currentX, d.currentY, zoomRef.current);
+    setX(xRef.current);
+    setY(yRef.current);
+    notify();
   }, [handleTouchMove, notify]);
 
   const handleTouchStart = useCallback((e) => {
     if (e.touches.length !== 1) return;
-    const touch = e.touches[0];
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const cx = xRef.current, cy = yRef.current;
+    const touch = e.touches[0];
     dragStart.current = {
       clientX: touch.clientX,
       clientY: touch.clientY,
-      startX: cx,
-      startY: cy,
-      currentX: cx,
-      currentY: cy,
+      startX: xRef.current,
+      startY: yRef.current,
       width: rect.width,
       height: rect.height,
     };
@@ -165,10 +197,9 @@ export default function ImagePositionEditor({
     window.addEventListener('touchend', handleTouchEnd);
   }, [handleTouchMove, handleTouchEnd]);
 
-  // Cleanup window listeners on unmount
+  // Cleanup al desmontar
   useEffect(() => {
     return () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
       window.removeEventListener('touchmove', handleTouchMove);
@@ -176,13 +207,17 @@ export default function ImagePositionEditor({
     };
   }, [handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
 
-  // Zoom handler
+  // ── Zoom ──
   const handleZoomChange = useCallback((e) => {
-    setZoom(parseFloat(e.target.value));
-  }, []);
+    const z = parseFloat(e.target.value);
+    setZoom(z);
+    zoomRef.current = z;
+    // Re-posicionar con el nuevo zoom
+    panTo(xRef.current, yRef.current, Math.max(z, 1.05));
+  }, [panTo]);
 
   const handleZoomCommit = useCallback(() => {
-    notify(xRef.current, yRef.current, zoomRef.current);
+    notify();
   }, [notify]);
 
   // Reset
@@ -190,8 +225,12 @@ export default function ImagePositionEditor({
     setX(50);
     setY(50);
     setZoom(1);
-    notify(50, 50, 1);
-  }, [notify]);
+    xRef.current = 50;
+    yRef.current = 50;
+    zoomRef.current = 1;
+    panTo(50, 50, 1.05);
+    notify();
+  }, [panTo, notify]);
 
   if (!imageUrl) return null;
 
@@ -201,7 +240,7 @@ export default function ImagePositionEditor({
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, ...style }}>
       {/* ── Image container ── */}
       <div
-        ref={containerRef}
+        ref={containerCallbackRef}
         style={{
           position: 'relative',
           width: '100%',
@@ -209,31 +248,32 @@ export default function ImagePositionEditor({
           overflow: 'hidden',
           borderRadius,
           background: 'var(--color-surface-hover, #252525)',
-          cursor: dragging.current ? 'grabbing' : 'grab',
+          cursor: 'grab',
           userSelect: 'none',
           touchAction: 'none',
         }}
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
       >
-        {imageUrl && (
-          <img
-            src={imageUrl}
-            alt="Position preview"
-            draggable={false}
-            style={{
-              display: 'block',
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              objectPosition: `${x}% ${y}%`,
-              transform: zoom !== 1 ? `scale(${zoom})` : 'none',
-              transformOrigin: 'center center',
-              pointerEvents: 'none',
-            }}
-            onError={(e) => { e.target.style.display = 'none'; }}
-          />
-        )}
+        <img
+          ref={imgRef}
+          src={imageUrl}
+          alt="Position preview"
+          draggable={false}
+          style={{
+            display: 'block',
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            // object-position no se usa porque no funciona cuando el
+            // image content llena el element box completamente.
+            // En su lugar, transform: translate() + scale() posiciona
+            // el ELEMENTO ENTERO, que siempre tiene efecto.
+            transformOrigin: 'center center',
+            pointerEvents: 'none',
+          }}
+          onError={(e) => { e.target.style.display = 'none'; }}
+        />
       </div>
 
       {/* ── Controls row ── */}

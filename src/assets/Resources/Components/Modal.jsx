@@ -1461,8 +1461,8 @@ export default function Modal({
         )}
         {/* ── Image position editor ── */}
         {urlInput.trim() && (
-          <div style={{ marginTop: 10 }}>
-            <ImagePositionEditor
+          <div style={{ marginTop: 10 }}>              <ImagePositionEditor
+              key={showUrlModal}
               imageUrl={urlInput.trim()}
               initialPosition={showUrlModal === 'avatar' ? avatarPosition : bannerPosition}
               aspectRatio={showUrlModal === 'avatar' ? 1 : 3}
