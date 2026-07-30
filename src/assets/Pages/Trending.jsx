@@ -6,6 +6,7 @@ import { getTrendingHashtags, getTrendingWords, getCachedTrendingWords, getCache
 import { getTrendingCategory } from '../services/trendingDictionary';
 import { FaFire, FaHashtag, FaArrowLeft } from 'react-icons/fa';
 import '../Resources/Styles/trending.css';
+import '../Resources/Styles/skeleton.css';
 
 const REFRESH_INTERVAL = 1000 * 60 * 5;
 

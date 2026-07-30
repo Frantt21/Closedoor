@@ -403,6 +403,12 @@ function Profile() {
     const [dislikedPostIds, setDislikedPostIds] = useState(() => getCachedPosts()?.dislikedIds || []);
     const [savedPostIds, setSavedPostIds] = useState(() => getCachedPosts()?.savedIds || []);
     const [postsLoading, setPostsLoading] = useState(() => !getCachedPosts());
+    // ── Infinite scroll pagination ──
+    const PROFILE_PAGE_SIZE = 20;
+    const [postsOffset, setPostsOffset] = useState(PROFILE_PAGE_SIZE);
+    const [hasMorePosts, setHasMorePosts] = useState(true);
+    const [loadingMorePosts, setLoadingMorePosts] = useState(false);
+    const sentinelRef = useRef(null);
     const [showCreatePost, setShowCreatePost] = useState(false);
     const [editingPost, setEditingPost] = useState(null);
     const [tab, setTab] = useState('posts'); // 'posts' | 'likes' | 'saved' | 'scheduled' | 'replies'
@@ -515,11 +521,16 @@ function Profile() {
         } else {
             setPostsLoading(true);
         }
+        // Reset pagination state on profile change
+        setPostsOffset(PROFILE_PAGE_SIZE);
+        setHasMorePosts(true);
+        setLoadingMorePosts(false);
 
         const loadPosts = async () => {
             try {
-                const items = await getProfileContent(userId, user?.id, filterEncrypted);
+                const items = await getProfileContent(userId, user?.id, filterEncrypted, { limit: PROFILE_PAGE_SIZE, offset: 0 });
                 setProfilePosts(items);
+                setHasMorePosts(items.length >= PROFILE_PAGE_SIZE);
                 // Batch check likes/reposts/saves for current user
                 let likedIds = [], repostedIds = [], savedIds = [], dislikedIds = [];
                 if (user?.id && items.length > 0) {
@@ -546,6 +557,63 @@ function Profile() {
         loadPosts();
     }, [activeProfile?.id, activeProfile?.username, user?.id, canViewContent]);
 
+    // ── Infinite scroll: load more posts when sentinel enters viewport ──
+    useEffect(() => {
+        const userId = activeProfile?.id;
+        if (!userId || !canViewContent) return;
+        if (!hasMorePosts || loadingMorePosts) return;
+
+        const observer = new IntersectionObserver(([entry]) => {
+            if (!entry.isIntersecting) return;
+            observer.disconnect();
+
+            setLoadingMorePosts(true);
+            (async () => {
+                try {
+                    const more = await getProfileContent(userId, user?.id, filterEncrypted, { limit: PROFILE_PAGE_SIZE, offset: postsOffset });
+                    if (more.length === 0) {
+                        setHasMorePosts(false);
+                    } else {
+                        setProfilePosts(prev => {
+                            const existingIds = new Set(prev.map(p => p.id));
+                            const unique = more.filter(p => !existingIds.has(p.id));
+                            return [...prev, ...unique];
+                        });
+                        setPostsOffset(prev => prev + PROFILE_PAGE_SIZE);
+                        setHasMorePosts(more.length >= PROFILE_PAGE_SIZE);
+                        // Batch check likes/reposts for new posts
+                        if (user?.id && more.length > 0) {
+                            const postIds = more.map((p) => p.id);
+                            const [likedIds, repostedIds, savedIds, dislikedIds] = await Promise.all([
+                                getLikedPostIds(postIds, user.id),
+                                getRepostedPostIds(postIds, user.id),
+                                getSavedPostIds(postIds, user.id),
+                                getDislikedPostIds(postIds, user.id),
+                            ]);
+                            setLikedPostIds(prev => [...new Set([...prev, ...likedIds])]);
+                            setRepostedPostIds(prev => [...new Set([...prev, ...repostedIds])]);
+                            setSavedPostIds(prev => [...new Set([...prev, ...savedIds])]);
+                            setDislikedPostIds(prev => [...new Set([...prev, ...dislikedIds])]);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error loading more posts:', err);
+                } finally {
+                    setLoadingMorePosts(false);
+                }
+            })();
+        }, { rootMargin: '200px' });
+
+        const sentinel = sentinelRef.current;
+        if (sentinel) observer.observe(sentinel);
+
+        return () => observer.disconnect();
+    }, [activeProfile?.id, canViewContent, hasMorePosts, loadingMorePosts, postsOffset, user?.id, filterEncrypted]);
+
+    // ── Observer resets when new posts are loaded (triggered by loadingMorePosts changing back to false) ──
+    // The observer hooks already includes hasMorePosts and loadingMorePosts, so when loadingMorePosts
+    // flips to false after fetching, the effect re-runs and observes the sentinel again.
+
     // ── Realtime unificado: sigue cambios en follows, perfil y posts ──
     useEffect(() => {
         const profileId = activeProfile?.id;
@@ -565,8 +633,10 @@ function Profile() {
         const refreshAfterChange = async () => {
             if (!canViewContent) return;
             try {
-                const items = await getProfileContent(profileId, user?.id, filterEncrypted);
+                const items = await getProfileContent(profileId, user?.id, filterEncrypted, { limit: PROFILE_PAGE_SIZE, offset: 0 });
                 setProfilePosts(items);
+                setPostsOffset(PROFILE_PAGE_SIZE);
+                setHasMorePosts(items.length >= PROFILE_PAGE_SIZE);
                 let likedIds = [], repostedIds = [], savedIds = [], dislikedIds = [];
                 if (user?.id && items.length > 0) {
                     const postIds = items.map((p) => p.id);
@@ -969,22 +1039,25 @@ function Profile() {
         if (!userId) return;
         try {
             // Refrescar posts normales
-            const items = await getProfileContent(userId, user?.id, filterEncrypted);                setProfilePosts(items);
-                        let likedIds = [], repostedIds = [], savedIds = [], dislikedIds = [];
-                        if (user?.id && items.length > 0) {
-                            const postIds = items.map((p) => p.id);
-                            [likedIds, repostedIds, savedIds, dislikedIds] = await Promise.all([
-                                getLikedPostIds(postIds, user.id),
-                                getRepostedPostIds(postIds, user.id),
-                                getSavedPostIds(postIds, user.id),
-                                getDislikedPostIds(postIds, user.id),
-                            ]);
-                            setLikedPostIds(likedIds);
-                            setRepostedPostIds(repostedIds);
-                            setSavedPostIds(savedIds);
-                            setDislikedPostIds(dislikedIds);
-                        }
-                        setCachedFeed(`profile_posts_${userId}`, items, likedIds, repostedIds, savedIds, dislikedIds);
+            const items = await getProfileContent(userId, user?.id, filterEncrypted, { limit: PROFILE_PAGE_SIZE, offset: 0 });
+            setProfilePosts(items);
+            setPostsOffset(PROFILE_PAGE_SIZE);
+            setHasMorePosts(items.length >= PROFILE_PAGE_SIZE);
+            let likedIds = [], repostedIds = [], savedIds = [], dislikedIds = [];
+            if (user?.id && items.length > 0) {
+                const postIds = items.map((p) => p.id);
+                [likedIds, repostedIds, savedIds, dislikedIds] = await Promise.all([
+                    getLikedPostIds(postIds, user.id),
+                    getRepostedPostIds(postIds, user.id),
+                    getSavedPostIds(postIds, user.id),
+                    getDislikedPostIds(postIds, user.id),
+                ]);
+                setLikedPostIds(likedIds);
+                setRepostedPostIds(repostedIds);
+                setSavedPostIds(savedIds);
+                setDislikedPostIds(dislikedIds);
+            }
+            setCachedFeed(`profile_posts_${userId}`, items, likedIds, repostedIds, savedIds, dislikedIds);
             // Refrescar posts programados (aparecen al instante en la tab "Programados")
             if (user?.id) {
                 const schedItems = await getScheduledPosts(user.id);
@@ -1964,7 +2037,8 @@ function Profile() {
                             <p className="posts-empty-text">{t('profile.no_reposts') || 'No hay reposts'}</p>
                         </div>
                     ) : (
-                        filteredProfilePosts.map((post) => (
+                        <>
+                        {filteredProfilePosts.map((post) => (
                             <PostCard
                                 key={post.id}
                                 post={post}
@@ -1980,7 +2054,17 @@ function Profile() {
                                 onRepostToggle={handleRepostToggle}
                                 repostInfo={post._repostInfo ? { ...post._repostInfo, repostedBy: activeProfile?.username } : null}
                             />
-                        ))
+                        ))}
+                        {/* ── Sentinel for infinite scroll ── */}
+                        {hasMorePosts && (
+                            <div ref={sentinelRef} className="profile-posts-sentinel" style={{ height: 1 }} />
+                        )}
+                        {loadingMorePosts && (
+                            <div className="profile-posts-loading">
+                                <FaSpinner className="fc-spin" />
+                            </div>
+                        )}
+                        </>
                     )
                 ) : tab === 'saved' ? (
                     savedPostsLoading ? (

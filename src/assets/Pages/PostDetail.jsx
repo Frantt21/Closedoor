@@ -42,6 +42,7 @@ import { getTimeAgo, IMG_RE, VID_RE, getAvatarTransformStyle } from '../services
 import { uploadImage, uploadWithLocalPreview } from '../services/cdnService';
 import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/post.css';
+import '../Resources/Styles/skeleton.css';
 
 export default function PostDetail() {
   const { postId } = useParams();

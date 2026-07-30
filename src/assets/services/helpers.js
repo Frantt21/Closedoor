@@ -201,8 +201,10 @@ export function getImgTransformStyle(positionStr) {
   // translate al final → se aplica primero (derecha en la cadena CSS)
   // antes de cualquier rotación, por lo que centra en coordenadas originales
   if (p.zoom !== 1) {
-    const t = -((p.zoom - 1) / (2 * p.zoom)) * 100;
-    transforms.push(`translate(${t}%, ${t}%)`);
+    const baseT = -((p.zoom - 1) / (2 * p.zoom)) * 100;
+    const tX = (p.x / 50) * baseT; // p.x=50 -> tX=baseT, p.x=0 -> tX=0
+    const tY = (p.y / 50) * baseT;
+    transforms.push(`translate(${tX}%, ${tY}%)`);
   }
 
   const style = {
@@ -242,6 +244,16 @@ export function getBgFullStyle(positionStr) {
   if (p.rotation !== 0) transforms.push(`rotate(${p.rotation}deg)`);
   if (p.flipX) transforms.push('scaleX(-1)');
   if (p.flipY) transforms.push('scaleY(-1)');
+
+  // When using background-size > 100% we need to translate the inner
+  // element so the focal point (x%, y%) matches the same visual result
+  // as the <img> centering logic. The translate must be the last item in
+  // the CSS transform string so it is applied first (CSS applies from
+  // right-to-left).
+  if (p.zoom !== 1) {
+    const t = -((p.zoom - 1) / (2 * p.zoom)) * 100;
+    transforms.push(`translate(${t}%, ${t}%)`);
+  }
 
   return {
     backgroundPosition: `${p.x}% ${p.y}%`,

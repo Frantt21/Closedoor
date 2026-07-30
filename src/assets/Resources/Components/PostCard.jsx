@@ -22,6 +22,7 @@ import {
   setCachedPollVoters,
   getCachedPollVoters,
   clearCachedPollVoters,
+  trackPostView,
 } from '../../services/postService';
 import { FaHeart, FaRegHeart, FaHeartBroken, FaComment, FaRetweet, FaThumbtack, FaEdit, FaTrash, FaEllipsisV, FaBookmark, FaRegBookmark, FaEye, FaLock, FaCheckCircle, FaRegCheckCircle, FaClock, FaBan, FaUserFriends, FaExclamationTriangle, FaShareAlt, FaCheck, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-toastify';
@@ -569,6 +570,35 @@ const PostCard = React.memo(function PostCard({
     }
   };
 
+  // ── Track post view (once) when card becomes visible in viewport ──
+  const viewTrackedRef = useRef(false);
+  const cardRef = useRef(null);
+
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el || !post?.id || viewTrackedRef.current) return;
+
+    // Don't track if PostDetail also tracks it (avoid double-count on detail page)
+    // The detail page already calls trackPostView on mount — this effect is for feeds.
+    const isOnDetailPage = window.location.pathname.includes(`/post/${post.id}`);
+    if (isOnDetailPage) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !viewTrackedRef.current) {
+          viewTrackedRef.current = true;
+          observer.disconnect();
+          // Fire and forget — trackPostView deduplicates via localStorage
+          trackPostView(post.id, user?.id).catch(() => {});
+        }
+      },
+      { threshold: 0.3 }
+    );
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [post?.id, user?.id]);
+
   // Cerrar galería con Escape y navegar con flechas
   useEffect(() => {
     if (!galleryUrls) return;
@@ -757,6 +787,7 @@ const PostCard = React.memo(function PostCard({
 
   return (
     <article
+      ref={cardRef}
       className={`post-card ${deleting ? 'post-card--deleting' : ''} ${compact ? 'post-card--compact' : ''}`}
       onClick={handleCardClick}
       role="button"

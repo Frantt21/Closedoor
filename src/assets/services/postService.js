@@ -232,11 +232,11 @@ export async function togglePinPost(postId, userId, currentPinned) {
 
 // ── PROFILE CONTENT (posts + reposts) ──
 
-export async function getProfileContent(profileUserId, currentUserId, filterEncrypted = true) {
+export async function getProfileContent(profileUserId, currentUserId, filterEncrypted = true, { offset = 0, limit = 20 } = {}) {
   if (!profileUserId) return [];
 
   const [posts, repostsResult] = await Promise.all([
-    getPosts({ profileUserId }),
+    getPosts({ profileUserId, offset, limit }),
     supabase
       .from('reposts')
       .select(`
@@ -813,7 +813,9 @@ const VIEWED_POSTS_KEY = 'fc_viewed_';
 
 /**
  * Track a post view (once per user per post, dedup via localStorage)
- * Increments views_count on the post if not already viewed
+ * Increments views_count on the post if not already viewed.
+ * Uses a PostgreSQL RPC function for atomic increment (no race condition).
+ * Requires running migrations/046_increment_views_function.sql in the DB.
  */
 export async function trackPostView(postId, userId) {
   if (!postId) return false;
@@ -822,18 +824,26 @@ export async function trackPostView(postId, userId) {
     const viewed = getItem(key) || [];
     if (viewed.includes(postId)) return false; // Already viewed
 
-    // Increment views_count on the post
-    const { data: post } = await supabase
-      .from('posts')
-      .select('views_count')
-      .eq('id', postId)
-      .single();
+    // Atomic increment via RPC — no race condition
+    // Requires running migrations/046_increment_views_function.sql
+    const { error } = await supabase.rpc('increment_post_views', {
+      post_id: postId,
+    });
 
-    if (post) {
-      await supabase
+    if (error) {
+      // Fallback: RPC function not deployed yet → use SELECT+UPDATE (race condition possible)
+      const { data: post } = await supabase
         .from('posts')
-        .update({ views_count: (post.views_count || 0) + 1 })
-        .eq('id', postId);
+        .select('views_count')
+        .eq('id', postId)
+        .single();
+
+      if (post) {
+        await supabase
+          .from('posts')
+          .update({ views_count: (post.views_count || 0) + 1 })
+          .eq('id', postId);
+      }
     }
 
     // Add to viewed set

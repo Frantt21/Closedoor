@@ -3481,14 +3481,14 @@ export default function Chat() {
             {/* ── Footer ── */}
             <div className="chat-nickname-modal-footer">
               <button
-                className="chat-nickname-modal-btn chat-nickname-modal-btn--save"
+                className="fc-modal-save"
                 onClick={handleSaveNickname}
               >
                 {t('common.save') || 'Save'}
               </button>
               {nicknameModal.currentName && (
                 <button
-                  className="chat-nickname-modal-btn chat-nickname-modal-btn--remove"
+                  className="fc-modal-save--danger"
                   onClick={async () => {
                     setNicknameInput('');
                     if (!nicknameModal.targetUserId || !user?.id) return;

@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import './css/gifPicker.css';
 
 // ── KLIPY API ──
 // Get a free key at https://klipy.com (Developer section)
