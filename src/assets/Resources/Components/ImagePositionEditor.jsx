@@ -1,17 +1,16 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
+import Cropper from 'react-easy-crop';
 import { FaSearchPlus, FaSearchMinus, FaUndo, FaArrowsAltH, FaArrowsAltV, FaRedo } from 'react-icons/fa';
 
 /**
  * ImagePositionEditor
  *
- * Usa un <img> con object-fit: cover para que el zoom=1.0x llene el
- * contenedor exactamente igual que el perfil real. Zoom, rotación y flip
- * se aplican mediante CSS transform.
- *
- * Almacena la configuración como JSON string:
+ * Usa react-easy-crop (<Cropper>) para ofrecer interacción suave de
+ * arrastrar, zoom con rueda/pellizco y rotación. Internamente mantiene
+ * el formato de posición propio de la app:
  *   { x, y, zoom, rotation, flipX, flipY }
  *
- * Compatible hacia atrás con el formato legacy "X% Y%".
+ * Compatible hacia atrás con el formato legacy "X% Y%" y el JSON string.
  *
  * Props:
  *  - imageUrl: string | null
@@ -61,6 +60,40 @@ function encodePosition(data) {
   });
 }
 
+/**
+ * Convierte nuestra focal-point percentage (x%, y%) al crop en píxeles
+ * que react-easy-crop necesita (translate del centro de la imagen).
+ *
+ * Fórmula:
+ *   cropX = (50 - x%) / 50 * (containerW * (zoom - 1) / 2)
+ *   cropY = (50 - y%) / 50 * (containerH * (zoom - 1) / 2)
+ *
+ * Cuando zoom === 1, la imagen llena exactamente el viewport y no hay
+ * traducción posible → { x: 0, y: 0 }.
+ */
+function percentToCrop(xPct, yPct, zoomVal, containerW, containerH) {
+  if (zoomVal <= 1 || containerW <= 0 || containerH <= 0) return { x: 0, y: 0 };
+  const excessW = containerW * (zoomVal - 1);
+  const excessH = containerH * (zoomVal - 1);
+  return {
+    x: ((50 - xPct) / 50) * (excessW / 2),
+    y: ((50 - yPct) / 50) * (excessH / 2),
+  };
+}
+
+/**
+ * Inversa: del crop en píxeles de react-easy-crop a nuestras percentages.
+ */
+function cropToPercent(cropX, cropY, zoomVal, containerW, containerH) {
+  if (zoomVal <= 1 || containerW <= 0 || containerH <= 0) return { x: 50, y: 50 };
+  const excessW = containerW * (zoomVal - 1);
+  const excessH = containerH * (zoomVal - 1);
+  return {
+    x: Math.max(0, Math.min(100, 50 - (cropX * 50) / (excessW / 2))),
+    y: Math.max(0, Math.min(100, 50 - (cropY * 50) / (excessH / 2))),
+  };
+}
+
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 3;
 const ZOOM_STEP = 0.1;
@@ -73,136 +106,113 @@ export default function ImagePositionEditor({
   onPositionChange,
   overlay = null,
 }) {
-  const [pos, setPos] = useState(() => parseEncodedPosition(initialPosition));
+  const initialPosRef = useRef(parseEncodedPosition(initialPosition));
 
-  // ── Resetear flip/rotation cuando cambia la imagen (preserva x, y, zoom) ──
-  const imageUrlRef = useRef(imageUrl);
+  // ── Estados para react-easy-crop ──
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(initialPosRef.current.zoom);
+  const [rotation, setRotation] = useState(initialPosRef.current.rotation);
+  const [flipX, setFlipX] = useState(initialPosRef.current.flipX);
+  const [flipY, setFlipY] = useState(initialPosRef.current.flipY);
+
+  const containerRef = useRef(null);
+  const [containerSize, setContainerSize] = useState({ w: 300, h: 200 });
+  const initDoneRef = useRef(false);
+
+  // ── Medir el contenedor tras montar ──
   useEffect(() => {
-    if (imageUrl && imageUrl !== imageUrlRef.current) {
-      let next;
-      setPos(prev => {
-        next = { ...prev, flipX: false, flipY: false, rotation: 0 };
-        return next;
-      });
-      if (next) notify(next);
+    if (!containerRef.current || initDoneRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const w = rect.width || 300;
+    const h = rect.height || 200;
+    setContainerSize({ w, h });
+    const p = initialPosRef.current;
+    const initialCrop = percentToCrop(p.x, p.y, p.zoom, w, h);
+    setCrop(initialCrop);
+    setZoom(p.zoom);
+    setRotation(p.rotation);
+    setFlipX(p.flipX);
+    setFlipY(p.flipY);
+    initDoneRef.current = true;
+  }, []);
+
+  // ── Re-medir si la imagen cambia (nueva imagen → re-centrar) ──
+  const prevImageRef = useRef(imageUrl);
+  useEffect(() => {
+    if (!imageUrl || imageUrl === prevImageRef.current) return;
+    prevImageRef.current = imageUrl;
+    // Reset flip/rotation cuando cambia la imagen
+    setFlipX(false);
+    setFlipY(false);
+    setRotation(0);
+    // Re-centrar crop
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const w = rect.width || 300;
+      const h = rect.height || 200;
+      setContainerSize({ w, h });
+      const p = initialPosRef.current;
+      const initialCrop = percentToCrop(p.x, p.y, zoom, w, h);
+      setCrop(initialCrop);
+      setZoom(p.zoom);
     }
-    imageUrlRef.current = imageUrl;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageUrl]);
 
-  const containerRef = useRef(null);
-  const dragging = useRef(false);
-  const lastMouse = useRef({ x: 0, y: 0 });
-
-  const notify = useCallback((newData) => {
-    // Guard: si newData es undefined (p.ej. React StrictMode re-ejecutando el updater),
-    // no llamar a encodePosition que rompería con "Cannot read properties of undefined"
-    if (!newData) return;
-    onPositionChange?.(encodePosition(newData));
+  // ── Notificar al padre ──
+  const lastEncodedRef = useRef('');
+  const notify = useCallback((pos) => {
+    onPositionChange?.(encodePosition(pos));
   }, [onPositionChange]);
 
-  // updatePos ahora solo actualiza el estado local pos.
-  // La propagación al padre se hace via el useEffect de abajo,
-  // que sincroniza pos con onPositionChange de forma fiable.
-  const updatePos = useCallback((updater) => {
-    setPos((prev) => {
-      return typeof updater === 'function' ? updater(prev) : updater;
-    });
-  }, []);
-
-  // ── Sincronizar pos → onPositionChange vía useEffect ──
-  // El patrón anterior (capturar next dentro de setPos + notify fuera)
-  // falla en React 18 durante eventos rápidos como mousemove porque
-  // el updater no siempre se ejecuta sincrónicamente (eager optimization
-  // solo funciona si la cola está vacía). Al comparar el string encoded
-  // nos aseguramos de que notify se llame SIEMPRE que pos cambie.
-  const lastEncodedRef = useRef(encodePosition(pos));
   useEffect(() => {
+    const xy = cropToPercent(crop.x, crop.y, zoom, containerSize.w, containerSize.h);
+    const pos = { x: xy.x, y: xy.y, zoom, rotation, flipX, flipY };
     const encoded = encodePosition(pos);
     if (encoded !== lastEncodedRef.current) {
       lastEncodedRef.current = encoded;
       notify(pos);
     }
-  }, [pos, notify]);
+  }, [crop, zoom, rotation, flipX, flipY, containerSize, notify]);
 
-  // ── Drag ──
-  const handleMouseDown = useCallback((e) => {
-    dragging.current = true;
-    lastMouse.current = { x: e.clientX, y: e.clientY };
-    e.preventDefault();
+  // ── Callbacks de Cropper ──
+  const handleCropChange = useCallback((newCrop) => {
+    setCrop(newCrop);
   }, []);
 
-  const doDrag = useCallback((clientX, clientY) => {
-    if (!dragging.current || !containerRef.current) return;
-    const dx = clientX - lastMouse.current.x;
-    const dy = clientY - lastMouse.current.y;
-    lastMouse.current = { x: clientX, y: clientY };
-
-    const rect = containerRef.current.getBoundingClientRect();
-    // El arrastre es libre: mapea el movimiento del mouse a porcentaje
-    // de la imagen. Sin constraints — el usuario puede arrastrar a cualquier
-    // posición (incluso negativa o >100) para un control total.
-    const deltaX = (dx / rect.width) * 100;
-    const deltaY = (dy / rect.height) * 100;
-
-    updatePos((prev) => ({
-      ...prev,
-      x: prev.x - deltaX,
-      y: prev.y - deltaY,
-    }));
-  }, [updatePos]);
-
-  const handleMouseMove = useCallback((e) => doDrag(e.clientX, e.clientY), [doDrag]);
-  const handleMouseUp = useCallback(() => { dragging.current = false; }, []);
-  const handleTouchStart = useCallback((e) => {
-    const t = e.touches[0];
-    if (!t) return;
-    dragging.current = true;
-    lastMouse.current = { x: t.clientX, y: t.clientY };
+  const handleZoomChange = useCallback((newZoom) => {
+    setZoom(newZoom);
   }, []);
-  const handleTouchMove = useCallback((e) => {
-    const t = e.touches[0];
-    if (!t) return;
-    doDrag(t.clientX, t.clientY);
-  }, [doDrag]);
-  const handleTouchEnd = useCallback(() => { dragging.current = false; }, []);
 
-  useEffect(() => {
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    window.addEventListener('touchmove', handleTouchMove, { passive: false });
-    window.addEventListener('touchend', handleTouchEnd);
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('touchmove', handleTouchMove);
-      window.removeEventListener('touchend', handleTouchEnd);
-    };
-  }, [handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
+  const handleRotationChange = useCallback((newRotation) => {
+    setRotation(newRotation);
+  }, []);
 
-  // ── Controls ──
-  const handleZoomIn = () => updatePos((p) => ({ ...p, zoom: Math.min(ZOOM_MAX, +(p.zoom + ZOOM_STEP).toFixed(1)) }));
-  const handleZoomOut = () => updatePos((p) => ({ ...p, zoom: Math.max(ZOOM_MIN, +(p.zoom - ZOOM_STEP).toFixed(1)) }));
-  const handleRotateLeft = () => updatePos((p) => ({ ...p, rotation: ((p.rotation - 90) % 360 + 360) % 360 }));
-  const handleRotateRight = () => updatePos((p) => ({ ...p, rotation: (p.rotation + 90) % 360 }));
-  const handleFlipX = () => updatePos((p) => ({ ...p, flipX: !p.flipX }));
-  const handleFlipY = () => updatePos((p) => ({ ...p, flipY: !p.flipY }));
+  // ── Controles manuales ──
+  const handleZoomIn = () => setZoom((v) => Math.min(ZOOM_MAX, +(v + ZOOM_STEP).toFixed(1)));
+  const handleZoomOut = () => setZoom((v) => Math.max(ZOOM_MIN, +(v - ZOOM_STEP).toFixed(1)));
+  const handleRotateLeft = () => setRotation((v) => ((v - 90) % 360 + 360) % 360);
+  const handleRotateRight = () => setRotation((v) => (v + 90) % 360);
+  const handleFlipX = () => setFlipX((v) => !v);
+  const handleFlipY = () => setFlipY((v) => !v);
+
   const handleReset = () => {
     const r = { x: 50, y: 50, zoom: 1, rotation: 0, flipX: false, flipY: false };
-    setPos(r);
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      setContainerSize({ w: rect.width, h: rect.height });
+      setCrop(percentToCrop(50, 50, 1, rect.width, rect.height));
+    } else {
+      setCrop({ x: 0, y: 0 });
+    }
+    setZoom(1);
+    setRotation(0);
+    setFlipX(false);
+    setFlipY(false);
     notify(r);
   };
 
-  const buildTransform = () => {
-    const t = [];
-    // Zoom se maneja con width/height + object-fit: cover, no con
-    // transform: scale(), para evitar clipping del borde del contenedor.
-    if (pos.rotation !== 0) t.push(`rotate(${pos.rotation}deg)`);
-    if (pos.flipX) t.push(`scaleX(-1)`);
-    if (pos.flipY) t.push(`scaleY(-1)`);
-    return t.join(' ');
-  };
-
+  // ── No image state ──
   if (!imageUrl) {
     return (
       <div style={{
@@ -216,6 +226,7 @@ export default function ImagePositionEditor({
     );
   }
 
+  // ── Botones inline ──
   const btn = {
     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
     width: 32, height: 32,
@@ -226,48 +237,51 @@ export default function ImagePositionEditor({
   const btnActive = { ...btn, background: 'var(--color-text, #ffffff)', color: 'var(--color-bg, #000000)', borderColor: 'var(--color-text, #ffffff)' };
   const btnHover = (e) => { e.currentTarget.style.background = 'var(--color-surface-hover, #252525)'; e.currentTarget.style.color = 'var(--color-text, #ffffff)'; };
   const btnLeave = (e) => { e.currentTarget.style.background = 'var(--color-surface, #1a1a1a)'; e.currentTarget.style.color = 'var(--color-text-secondary, #9ca3af)'; };
-  const btnHoverActive = (e) => { if (!pos.flipX) btnHover(e); };
-  const btnLeaveActive = (e) => { if (!pos.flipX) btnLeave(e); };
 
   return (
     <div className="image-position-editor" style={{ width: '100%', userSelect: 'none' }}>
-      {/* ── Contenedor con <img> + object-fit: cover ── */}
+      {/* ── Cropper ── */}
       <div
         ref={containerRef}
-        onMouseDown={handleMouseDown}
-        onTouchStart={handleTouchStart}
         style={{
+          position: 'relative',
           width: '100%',
           aspectRatio: `${aspectRatio} / 1`,
-          overflow: 'hidden',
           borderRadius: circular ? '50%' : 'var(--radius-sm, 6px)',
-          cursor: dragging.current ? 'grabbing' : 'grab',
-          position: 'relative',
+          overflow: 'hidden',
           background: '#000',
         }}
       >
-        <img
-          src={imageUrl}
-          alt=""
-          draggable={false}
-          style={{
-            // Zoom via tamaño real de la imagen + object-fit: cover
-            // El contenedor overflow:hidden recorta lo que sobresale sin distorsionar
-            width: `${100 * pos.zoom}%`,
-            height: `${100 * pos.zoom}%`,
-            objectFit: 'cover',
-            objectPosition: `${pos.x}% ${pos.y}%`,
-            transform: buildTransform(),
-            willChange: 'transform',
-            display: 'block',
-          }}
-        />
+        {/* Wrapper para flip — Cropper no soporta flip nativamente,
+            así que lo aplicamos como transform CSS en un wrapper. */}
+        <div style={{
+          width: '100%',
+          height: '100%',
+          transform: `scaleX(${flipX ? -1 : 1}) scaleY(${flipY ? -1 : 1})`,
+        }}>
+          <Cropper
+            image={imageUrl}
+            crop={crop}
+            zoom={zoom}
+            rotation={rotation}
+            aspect={aspectRatio}
+            onCropChange={handleCropChange}
+            onZoomChange={handleZoomChange}
+            objectFit="cover"
+            style={{
+              containerStyle: {
+                borderRadius: circular ? '50%' : 'inherit',
+              },
+            }}
+          />
+        </div>
         {overlay}
         <div
           style={{
             position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
             background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: '0.72rem',
             padding: '3px 10px', borderRadius: 999, pointerEvents: 'none', whiteSpace: 'nowrap',
+            zIndex: 10,
           }}
         >
           Drag to reposition
@@ -287,10 +301,10 @@ export default function ImagePositionEditor({
           <button type="button" style={btn} onClick={handleRotateRight} title="Rotate right (+90°)" 
             onMouseEnter={btnHover} onMouseLeave={btnLeave}><FaRedo /></button>
           <div style={{ width: 1, height: 20, background: 'var(--color-border, #2a2a2a)' }} />
-          <button type="button" style={pos.flipX ? btnActive : btn} onClick={handleFlipX} title="Flip horizontally"
-            onMouseEnter={btnHoverActive} onMouseLeave={btnLeaveActive}><FaArrowsAltH /></button>
-          <button type="button" style={pos.flipY ? btnActive : btn} onClick={handleFlipY} title="Flip vertically"
-            onMouseEnter={(e) => { if (!pos.flipY) btnHover(e); }} onMouseLeave={(e) => { if (!pos.flipY) btnLeave(e); }}><FaArrowsAltV /></button>
+          <button type="button" style={flipX ? btnActive : btn} onClick={handleFlipX} title="Flip horizontally"
+            onMouseEnter={(e) => { if (!flipX) btnHover(e); }} onMouseLeave={(e) => { if (!flipX) btnLeave(e); }}><FaArrowsAltH /></button>
+          <button type="button" style={flipY ? btnActive : btn} onClick={handleFlipY} title="Flip vertically"
+            onMouseEnter={(e) => { if (!flipY) btnHover(e); }} onMouseLeave={(e) => { if (!flipY) btnLeave(e); }}><FaArrowsAltV /></button>
           <div style={{ flex: 1 }} />
           <button type="button" onClick={handleReset} title="Reset"
             style={{ ...btn, width: 'auto', padding: '0 10px', fontSize: '0.72rem' }}
@@ -300,26 +314,22 @@ export default function ImagePositionEditor({
         {/* Zoom slider */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted, #6b7280)', minWidth: 30, textAlign: 'right' }}>{ZOOM_MIN}x</span>
-          <input type="range" min={ZOOM_MIN} max={ZOOM_MAX} step={ZOOM_STEP} value={pos.zoom}
-            onChange={(e) => updatePos((p) => ({ ...p, zoom: +parseFloat(e.target.value).toFixed(1) }))}
+          <input type="range" min={ZOOM_MIN} max={ZOOM_MAX} step={ZOOM_STEP} value={zoom}
+            onChange={(e) => handleZoomChange(+parseFloat(e.target.value).toFixed(1))}
             style={{ width: '100%', height: 4, accentColor: 'var(--color-text, #ffffff)' }} />
           <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted, #6b7280)', minWidth: 30 }}>{ZOOM_MAX}x</span>
-          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary, #9ca3af)', minWidth: 40, textAlign: 'center' }}>{pos.zoom.toFixed(1)}x</span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary, #9ca3af)', minWidth: 40, textAlign: 'center' }}>{zoom.toFixed(1)}x</span>
         </div>
 
         {/* Rotation slider */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted, #6b7280)', minWidth: 30, textAlign: 'right' }}>0°</span>
-          <input type="range" min={0} max={360} step={1} value={pos.rotation}
-            onChange={(e) => updatePos((p) => ({ ...p, rotation: parseInt(e.target.value, 10) }))}
+          <input type="range" min={0} max={360} step={1} value={rotation}
+            onChange={(e) => handleRotationChange(parseInt(e.target.value, 10))}
             style={{ width: '100%', height: 4, accentColor: 'var(--color-text, #ffffff)' }} />
           <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted, #6b7280)', minWidth: 30 }}>360°</span>
-          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary, #9ca3af)', minWidth: 40, textAlign: 'center' }}>{pos.rotation}°</span>
+          <span style={{ fontSize: '0.75rem', color: 'var(--color-text-secondary, #9ca3af)', minWidth: 40, textAlign: 'center' }}>{rotation}°</span>
         </div>
-      </div>
-
-      <div style={{ fontSize: '0.7rem', color: 'var(--color-text-muted, #6b7280)', marginTop: 4, textAlign: 'center' }}>
-        {pos.x.toFixed(0)}% {pos.y.toFixed(0)} · {pos.zoom.toFixed(1)}x · {pos.rotation}°{pos.flipX ? ' · H' : ''}{pos.flipY ? ' · V' : ''}
       </div>
     </div>
   );

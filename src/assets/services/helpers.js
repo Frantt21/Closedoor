@@ -171,13 +171,23 @@ export function getAvatarTransformStyle(positionStr) {
 
 /**
  * Given a position string, return the style object for an <img> element
- * with object-fit: cover. Includes objectPosition (X/Y) and CSS transform
- * (zoom, rotation, flip).
+ * with object-fit: cover.
+ *
+ * ⚠️ NO usa transform: scale(Z) porque combinado con object-fit: cover
+ *    produce clipping/distorsión impredecible en distintos navegadores.
+ *    En su lugar, aplica el zoom mediante `width` y `height` en %,
+ *    que scalea el área visible del img dentro del contenedor.
+ *
+ * Incluye objectPosition (focal point X/Y) y CSS transform para
+ * rotation y flip (scaleX/scaleY).
+ *
+ * El contenedor PADRE debe tener overflow: hidden para recortar
+ * el exceso de imagen cuando zoom > 1.
  */
 export function getImgTransformStyle(positionStr) {
   const p = parseImagePosition(positionStr || '');
   const transforms = [];
-  if (p.zoom !== 1) transforms.push(`scale(${p.zoom})`);
+  // ❌ Eliminado: transform: scale() — usar width/height en % abajo
   if (p.rotation !== 0) transforms.push(`rotate(${p.rotation}deg)`);
   if (p.flipX) transforms.push('scaleX(-1)');
   if (p.flipY) transforms.push('scaleY(-1)');
@@ -185,6 +195,12 @@ export function getImgTransformStyle(positionStr) {
   const style = {
     objectPosition: `${p.x}% ${p.y}%`,
   };
+  // Zoom mediante dimensiones reales del img (no transform) para respetar object-fit
+  if (p.zoom !== 1) {
+    style.width = `${p.zoom * 100}%`;
+    style.height = `${p.zoom * 100}%`;
+    style.maxWidth = 'none';
+  }
   if (transforms.length > 0) {
     style.transform = transforms.join(' ');
   }
