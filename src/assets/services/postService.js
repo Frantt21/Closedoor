@@ -232,7 +232,7 @@ export async function togglePinPost(postId, userId, currentPinned) {
 
 // ── PROFILE CONTENT (posts + reposts) ──
 
-export async function getProfileContent(profileUserId, currentUserId, filterEncrypted = true, { offset = 0, limit = 20 } = {}) {
+export async function getProfileContent(profileUserId, currentUserId, filterEncrypted = true, { offset = 0, limit = 999999 } = {}) {
   if (!profileUserId) return [];
 
   const [posts, repostsResult] = await Promise.all([

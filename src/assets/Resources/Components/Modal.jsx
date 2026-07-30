@@ -5,13 +5,14 @@ import '../Styles/explore.css';
 import Badge from './Badge';
 import ConfirmModal from './ConfirmModal';
 import Avatar from './Avatar';
-import { DEFAULT_AVATAR, getBgFullStyle, getImgTransformStyle, getAvatarTransformStyle } from '../../services/helpers';
+import { DEFAULT_AVATAR, getImageStyle } from '../../services/helpers';
+import ImagePositionEditor from './ImagePositionEditor';
 import { detectPlatform, getPlatformIcon, getPlatformName } from '../../services/socialPlatforms';
 import { extractColors } from '../../services/colorExtractor';
 import { useI18n } from '../../services/i18n/useI18n';
 import { FaCamera, FaUpload, FaSpinner } from 'react-icons/fa';
 import { toast } from 'react-toastify';
-import ImagePositionEditor from './ImagePositionEditor';
+
 import { uploadImage, uploadWithLocalPreview } from '../../services/cdnService';
 import { useAuth } from '../../../hooks/useAuth';
 
@@ -53,11 +54,12 @@ export default function Modal({
   initialAccentColor = '',
   initialAccentColorSecondary = '',
   initialInterests = [],
-  initialBannerPosition = '50% 50%',
-  initialAvatarPosition = '50% 50%',
+
   initialAccentSurface = '',
   initialAccentSurfaceGlass = false,
   initialProfileBg = '',
+  initialAvatarPosition = '',
+  initialBannerPosition = '',
   initialProfileBgPosition = '50% 50%',
   initialProfileBgBlur = 0,
   initialProfileBgDim = 50,
@@ -83,6 +85,8 @@ export default function Modal({
   const [bannerCredits, setBannerCredits] = useState(initialBannerCredits || '');
   const [avatarCredits, setAvatarCredits] = useState(initialAvatarCredits || '');
   const [saving, setSaving] = useState(false);
+  const [bannerPosition, setBannerPosition] = useState(initialBannerPosition);
+  const [avatarPosition, setAvatarPosition] = useState(initialAvatarPosition);
   const [socialLinks, setSocialLinks] = useState([]);
   const [newSocial, setNewSocial] = useState('');
   const [socialError, setSocialError] = useState('');
@@ -117,7 +121,7 @@ export default function Modal({
   const [selectedAccentSurface, setSelectedAccentSurface] = useState(initialAccentSurface);
   const [useGlassSurface, setUseGlassSurface] = useState(initialAccentSurfaceGlass);
   const [profileBg, setProfileBg] = useState(initialProfileBg);
-  const [profileBgPosition, setProfileBgPosition] = useState(initialProfileBgPosition);
+  const [profileBgPosition] = useState('50% 50%');
   const [profileBgBlur, setProfileBgBlur] = useState(initialProfileBgBlur);
   const [profileBgDim, setProfileBgDim] = useState(initialProfileBgDim);
   const [bannerDim, setBannerDim] = useState(initialBannerDim);
@@ -126,9 +130,7 @@ export default function Modal({
   const [interestInput, setInterestInput] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
   const [extracting, setExtracting] = useState(false);
-  // Image position state
-  const [bannerPosition, setBannerPosition] = useState(initialBannerPosition);
-  const [avatarPosition, setAvatarPosition] = useState(initialAvatarPosition);
+
 
   // Submodal state: null | { type: 'avatar' | 'banner', value: string }
   const [showUrlModal, setShowUrlModal] = useState(null);
@@ -205,6 +207,8 @@ export default function Modal({
     setDisplayname(initialDisplayname || '');
     setBanner(initialBanner || '');
     setAvatar(initialAvatar || '');
+    setBannerPosition(initialBannerPosition);
+    setAvatarPosition(initialAvatarPosition);
     setBio(initialBio || '');
     setPronouns(initialPronouns || '');
     setSocialLinks(Array.isArray(initialSocialLinks) ? initialSocialLinks : []);
@@ -226,12 +230,9 @@ export default function Modal({
     setSelectedAccentSurface(initialAccentSurface || '');
     setSelectedProfileTextColor(initialProfileTextColor || '');
     setProfileBg(initialProfileBg || '');
-    setProfileBgPosition(initialProfileBgPosition);
     setProfileBgBlur(initialProfileBgBlur);
     setProfileBgDim(initialProfileBgDim);
     setBannerDim(initialBannerDim);
-    setBannerPosition(initialBannerPosition);
-    setAvatarPosition(initialAvatarPosition);
     // Restore cached colors immediately (no flash)
     const cached = initialBanner ? colorCache[initialBanner.trim()] : null;
     if (cached) {
@@ -247,9 +248,10 @@ export default function Modal({
     const changed =
       username !== (initialUsername || '') ||
       displayname !== (initialDisplayname || '') ||
-      banner !== (initialBanner || '') ||
-      avatar !== (initialAvatar || '') ||
-      bio !== (initialBio || '') ||
+      banner !== (initialBanner || '') ||          avatar !== (initialAvatar || '') ||
+          avatarPosition !== initialAvatarPosition ||
+          bannerPosition !== initialBannerPosition ||
+          bio !== (initialBio || '') ||
       pronouns !== (initialPronouns || '') ||
       bannerCredits !== (initialBannerCredits || '') ||
       avatarCredits !== (initialAvatarCredits || '') ||
@@ -259,22 +261,19 @@ export default function Modal({
       selectedAccentSurface !== (initialAccentSurface || '') ||
       useGlassSurface !== !!initialAccentSurfaceGlass ||
       profileBg !== (initialProfileBg || '') ||
-      profileBgPosition !== initialProfileBgPosition ||
+
       profileBgBlur !== initialProfileBgBlur ||
       profileBgDim !== initialProfileBgDim ||
       bannerDim !== initialBannerDim ||
       selectedProfileTextColor !== (initialProfileTextColor || '') ||
       JSON.stringify(interests) !== JSON.stringify(initialInterests || []) ||
-      bannerPosition !== initialBannerPosition ||
-      avatarPosition !== initialAvatarPosition;
+      false;
     setHasChanges(changed);
   }, [
     username, displayname, banner, avatar, bio, pronouns, bannerCredits, avatarCredits, socialLinks,    selectedAccent, selectedAccentSecondary, interests,
-    bannerPosition, avatarPosition,
     initialUsername, initialDisplayname, initialBanner, initialAvatar, initialBio, initialPronouns,
     initialBannerCredits, initialAvatarCredits,
-    initialSocialLinks, initialAccentColor, initialAccentColorSecondary, initialAccentSurface, initialAccentSurfaceGlass, initialProfileBg, initialProfileBgPosition, initialProfileBgBlur,    initialProfileBgDim, initialBannerDim, initialInterests,
-    initialBannerPosition, initialAvatarPosition
+    initialSocialLinks, initialAccentColor, initialAccentColorSecondary, initialAccentSurface, initialAccentSurfaceGlass, initialProfileBg, initialProfileBgPosition, initialProfileBgBlur,    initialProfileBgDim, initialBannerDim, initialInterests, initialAvatarPosition, initialBannerPosition,
   ]);
 
   // Extract colors when banner URL changes (with cache + debounce)
@@ -350,7 +349,9 @@ export default function Modal({
         username: username.trim(),
         displayname: displayname.trim() || null,
         avatar_url: avatar.trim() || null,
+        avatar_position: avatarPosition || null,
         banner_url: banner.trim() || null,
+        banner_position: bannerPosition || null,
         banner_credits: bannerCredits.trim() || null,
         avatar_credits: avatarCredits.trim() || null,
         bio: bio.trim(),
@@ -362,8 +363,6 @@ export default function Modal({
         accent_surface_glass: useGlassSurface,
         profile_text_color: selectedProfileTextColor || null,
         interests: interests,
-        banner_position: bannerPosition,
-        avatar_position: avatarPosition,
         profile_background_url: profileBg.trim() || null,
         profile_background_position:      profileBgPosition,
         profile_background_blur: profileBgBlur,
@@ -464,7 +463,6 @@ export default function Modal({
       if (isBg) {
         setProfileBg(localUrl);
         setProfileBgUrlInput(localUrl);
-        if (localUrl && !profileBgPosition) setProfileBgPosition('50% 50%');
       } else if (showUrlModal === 'avatar') {
         setAvatar(localUrl);
         setUrlInput(localUrl);
@@ -508,8 +506,11 @@ export default function Modal({
 
   const handleUrlModalSave = () => {
     const url = urlInput.trim();
-    if (showUrlModal === 'avatar') setAvatar(url);
-    else if (showUrlModal === 'banner') setBanner(url);
+    if (showUrlModal === 'avatar') {
+      setAvatar(url);
+    } else if (showUrlModal === 'banner') {
+      setBanner(url);
+    }
     setShowUrlModal(null);
     setUrlInput('');
   };
@@ -519,8 +520,13 @@ export default function Modal({
       setUrlSubPendingClose(true);
     } else {
       // Restaurar valor original al cancelar
-      if (showUrlModal === 'avatar') setAvatar(urlInitialRef.current);
-      else if (showUrlModal === 'banner') setBanner(urlInitialRef.current);
+      if (showUrlModal === 'avatar') {
+        setAvatar(urlInitialRef.current);
+        setAvatarPosition(initialAvatarPosition);
+      } else if (showUrlModal === 'banner') {
+        setBanner(urlInitialRef.current);
+        setBannerPosition(initialBannerPosition);
+      }
       setShowUrlModal(null);
       setUrlInput('');
     }
@@ -529,8 +535,13 @@ export default function Modal({
   const confirmUrlDiscard = () => {
     setUrlSubPendingClose(false);
     // Restaurar valor original al descartar cambios
-    if (showUrlModal === 'avatar') setAvatar(urlInitialRef.current);
-    else if (showUrlModal === 'banner') setBanner(urlInitialRef.current);
+    if (showUrlModal === 'avatar') {
+      setAvatar(urlInitialRef.current);
+      setAvatarPosition(initialAvatarPosition);
+    } else if (showUrlModal === 'banner') {
+      setBanner(urlInitialRef.current);
+      setBannerPosition(initialBannerPosition);
+    }
     setShowUrlModal(null);
     setUrlInput('');
   };
@@ -619,17 +630,21 @@ export default function Modal({
               }}
             >
               <div className="fc-preview-card-banner" style={{ position: 'relative', overflow: 'hidden' }}>
-                {banner && (
-                  <div
+                {banner ? (
+                  <img
+                    src={banner}
+                    alt=""
                     style={{
                       position: 'absolute',
                       inset: 0,
-                      backgroundImage: `url(${banner})`,
-                      backgroundRepeat: 'no-repeat',
-                      ...getBgFullStyle(bannerPosition),
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      ...getImageStyle(bannerPosition),
                     }}
+                    onError={(e) => { e.target.style.display = 'none'; }}
                   />
-                )}
+                ) : null}
                 <div className="fc-preview-card-overlay"></div>
                 {/* Edit banner icon — top right */}
                 <button
@@ -645,7 +660,7 @@ export default function Modal({
                   <img
                     src={avatar || defaultAvatar}
                     alt="Preview"
-                    style={getImgTransformStyle(avatarPosition)}
+                    style={getImageStyle(avatarPosition)}
                     onError={(e) => { e.target.src = defaultAvatar; }}
                   />
                   {/* Edit avatar icon — centered on avatar */}
@@ -973,7 +988,7 @@ export default function Modal({
                     className="explore-card-banner-img"
                     src={banner.trim()}
                     alt=""
-                    style={getImgTransformStyle(bannerPosition)}
+                    style={{ objectFit: 'cover', width: '100%', height: '100%', ...getImageStyle(bannerPosition) }}
                     onError={(e) => { e.target.style.display = 'none'; }}
                   />
                 ) : (
@@ -983,12 +998,11 @@ export default function Modal({
               </div>
 
               <div className="explore-card-body">
-                <img
+              <Avatar
                   className="explore-card-avatar"
                   src={avatar || defaultAvatar}
                   alt=""
-                  style={getAvatarTransformStyle(avatarPosition)}
-                  onError={(e) => { e.target.src = defaultAvatar; }}
+                  style={getImageStyle(avatarPosition)}
                 />
 
                 <div className="explore-card-info">
@@ -1385,7 +1399,7 @@ export default function Modal({
           <div className="fc-modal-upload-row">
             <label className="fc-modal-upload-btn">
               {uploadingToCdn ? <FaSpinner className="fc-spin" /> : <FaUpload />}
-              <span>{uploadingToCdn ? t('common.loading') : t('modal.upload_image') || 'Subir imagen'}</span>
+              <span>{uploadingToCdn ? t('common.loading') : (t('modal.upload_image') || 'Subir imagen')}</span>
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/gif,image/webp"
@@ -1425,56 +1439,44 @@ export default function Modal({
           }}
           placeholder={t('modal.credits_placeholder')}
           style={{ marginTop: 8 }}
-        />
+        />        {/* ── Banner dim slider (only for banner) ── */}
+        {showUrlModal === 'banner' && (
+          <div style={{ marginTop: 12 }}>
+            <div className="fc-modal-range-row">
+              <span className="fc-modal-range-label">{t('modal.banner_dim') || 'Banner darkness'}</span>
+              <div className="fc-modal-range-control">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={bannerDim}
+                  onChange={(e) => setBannerDim(Number(e.target.value))}
+                  className="fc-modal-range"
+                />
+                <span className="fc-modal-range-value">{bannerDim}%</span>
+              </div>
+            </div>
+          </div>
+        )}
         {/* ── Image position editor ── */}
         {urlInput.trim() && (
           <div style={{ marginTop: 10 }}>
-              <ImagePositionEditor
-                key={`pos-editor-${showUrlModal}`}
-                imageUrl={urlInput.trim()}
-                initialPosition={showUrlModal === 'avatar' ? avatarPosition : bannerPosition}
-                aspectRatio={showUrlModal === 'avatar' ? 1 : 40 / 11}
-                circular={showUrlModal === 'avatar'}
-                onPositionChange={(pos) => {
-                  if (showUrlModal === 'avatar') setAvatarPosition(pos);
-                  else setBannerPosition(pos);
-                }}
-                overlay={showUrlModal === 'banner' ? (
-                  <div style={{
-                    position: 'absolute',
-                    inset: 0,
-                    zIndex: 5,
-                    pointerEvents: 'none',
-                    background: `linear-gradient(180deg, rgba(0,0,0,${bannerDim / 100 * 0.6}) 0%, rgba(0,0,0,${Math.min(bannerDim / 100 * 1.3, 1.0)}) 100%)`,
-                    borderRadius: 'inherit',
-                  }} />
-                ) : null}
-              />
-            {/* ── Banner dim slider (only for banner) ── */}
-            {showUrlModal === 'banner' && (
-              <div style={{ marginTop: 12 }}>
-                <div className="fc-modal-range-row">
-                  <span className="fc-modal-range-label">{t('modal.banner_dim') || 'Banner darkness'}</span>
-                  <div className="fc-modal-range-control">
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="5"
-                      value={bannerDim}
-                      onChange={(e) => setBannerDim(Number(e.target.value))}
-                      className="fc-modal-range"
-                    />
-                    <span className="fc-modal-range-value">{bannerDim}%</span>
-                  </div>
-                </div>
-              </div>
-            )}
+            <ImagePositionEditor
+              imageUrl={urlInput.trim()}
+              initialPosition={showUrlModal === 'avatar' ? avatarPosition : bannerPosition}
+              aspectRatio={showUrlModal === 'avatar' ? 1 : 3}
+              circular={showUrlModal === 'avatar'}
+              onPositionChange={(pos) => {
+                if (showUrlModal === 'avatar') setAvatarPosition(pos);
+                else if (showUrlModal === 'banner') setBannerPosition(pos);
+              }}
+            />
           </div>
         )}
         <div className="fc-modal-sub-actions">
           <button type="button" className="fc-modal-sub-save" onClick={handleUrlModalSave} disabled={uploadingToCdn}>
-            {t('modal.apply')}
+            {uploadingToCdn ? (t('common.loading') || 'Cropping...') : t('modal.apply')}
           </button>            <button type="button" className="fc-modal-sub-cancel" onClick={closeUrlSubmodal}>
               {t('modal.cancel')}
             </button>
@@ -1538,15 +1540,7 @@ export default function Modal({
           )}
         </div>
         {profileBgUrlInput.trim() && (
-          <div style={{ marginTop: 10 }}>
-            <ImagePositionEditor
-              key={`bg-pos-${showProfileBgSubmodal}`}
-              imageUrl={profileBgUrlInput.trim()}
-              initialPosition={profileBgPosition}
-              aspectRatio={16 / 9}
-              onPositionChange={(pos) => setProfileBgPosition(pos)}
-            />
-          </div>
+          <div />
         )}
         <div className="fc-modal-sub-actions">
           <button type="button" className="fc-modal-sub-save" onClick={handleProfileBgModalSave} disabled={uploadingBgToCdn}>

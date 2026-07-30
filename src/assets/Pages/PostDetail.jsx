@@ -38,7 +38,7 @@ import ConfirmModal from '../Resources/Components/ConfirmModal';
 import Tooltip from '../Resources/Components/Tooltip';
 import CreatePostModal from '../Resources/Components/CreatePostModal';
 import useMentionAutocomplete from '../hooks/useMentionAutocomplete';
-import { getTimeAgo, IMG_RE, VID_RE, getAvatarTransformStyle } from '../services/helpers';
+import { getTimeAgo, IMG_RE, VID_RE, getImageStyle } from '../services/helpers';
 import { uploadImage, uploadWithLocalPreview } from '../services/cdnService';
 import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/post.css';
@@ -713,7 +713,7 @@ export default function PostDetail() {
             className="comment-card-avatar"
             src={reply.profiles?.avatar_url}
             alt={reply.profiles?.username || 'user'}
-            style={getAvatarTransformStyle(reply.profiles?.avatar_position)}
+            style={getImageStyle(reply.profiles?.avatar_position)}
           />
         </a>
         <div className="comment-card-content">
@@ -953,7 +953,7 @@ export default function PostDetail() {
             className="comment-card-avatar"
             src={comment.profiles?.avatar_url}
             alt={comment.profiles?.username || 'user'}
-            style={getAvatarTransformStyle(comment.profiles?.avatar_position)}
+            style={getImageStyle(comment.profiles?.avatar_position)}
           />
         </a>
         <div className="comment-card-content">
@@ -1244,7 +1244,7 @@ export default function PostDetail() {
               className="comment-form-avatar"
               src={profile?.avatar_url}
               alt="Your avatar"
-              style={getAvatarTransformStyle(profile?.avatar_position)}
+              style={getImageStyle(profile?.avatar_position)}
             />
             <div className="comment-form-input-wrapper">
               <textarea

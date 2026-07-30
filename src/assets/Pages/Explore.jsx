@@ -4,7 +4,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { useI18n } from "../services/i18n/useI18n";
 import usePageTitle from "../../hooks/usePageTitle";
 import { supabase } from "../services/supabaseclient";
-import { listProfiles } from "../services/userService";import { getImgTransformStyle, getAvatarTransformStyle } from '../services/helpers';
+import { listProfiles } from "../services/userService";
 import { getFollowCounts,
   setCachedFollowStatus,
   getCachedExploreData,
@@ -16,6 +16,7 @@ import Avatar from "../Resources/Components/Avatar";
 import Badge from "../Resources/Components/Badge";
 import { FaLock } from 'react-icons/fa';
 import { getBlockedUserIds, getUsersWhoBlockedMeIds, clearBlockedListsCache, subscribeBlockChanges } from "../services/blockService";
+import { getImageStyle } from "../services/helpers";
 import { getNicknames, getCachedNicknames, cacheNicknames } from "../services/chatService";
 import { countInterestOverlap } from "../services/interestDictionary";
 import "../Resources/Styles/explore.css";
@@ -493,7 +494,7 @@ function ExploreCard({ profile, counts, isOwnProfile, showAccent, getDisplayName
             className="explore-card-banner-img"
             src={profile.banner_url}
             alt=""
-            style={getImgTransformStyle(profile.banner_position)}
+            style={getImageStyle(profile.banner_position)}
           />
         )}
         <div className="explore-card-overlay" />
@@ -504,7 +505,7 @@ function ExploreCard({ profile, counts, isOwnProfile, showAccent, getDisplayName
           className="explore-card-avatar"
           src={profile.avatar_url}
           alt={profile.username}
-          style={getAvatarTransformStyle(profile.avatar_position)}
+          style={getImageStyle(profile.avatar_position)}
         />
 
         <div className="explore-card-info">

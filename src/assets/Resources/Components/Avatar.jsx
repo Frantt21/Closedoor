@@ -27,26 +27,10 @@ export default function Avatar({ src, alt = 'avatar', className, style, onClick,
 
   const showStatus = effectiveStatus && ['online', 'dnd', 'idle', 'disconnected'].includes(effectiveStatus);
 
-  // If no status, render a plain <img> to avoid breaking any existing layout
-  if (!showStatus) {
-    return (
-      <img
-        className={className}
-        src={normalizedSrc}
-        alt={alt}
-        style={style}
-        onClick={onClick}
-        onError={handleError}
-      />
-    );
-  }
-
-  // With status, wrap in a div for the dot positioning.
-  // The style (transform/objectPosition) goes on the inner <img>
-  // so the status dot isn't affected by rotation, flip, or zoom.
-  // An inner clipping div wraps the img so the status dot (sibling of that div)
-  // is NOT clipped by the circular overflow:hidden — critical for profile avatar
-  // where the parent container clips to border-radius.
+  // The className is applied to the outer wrapper so avatar CSS classes (which
+  // set width, height, border-radius, etc.) still target the container.
+  // The inner <img> always has avatar-img class + explicit object-fit:cover.
+  // The status dot (when shown) lives outside the clipping div so it's never clipped.
   return (
     <div className={`avatar-wrapper ${className || ''}`.trim()} style={{ position: 'relative', display: 'inline-flex' }}>
       <div style={{ width: '100%', height: '100%', borderRadius: 'inherit', overflow: 'hidden' }}>
@@ -59,7 +43,7 @@ export default function Avatar({ src, alt = 'avatar', className, style, onClick,
           onError={handleError}
         />
       </div>
-      <span className={`status-dot status-dot--lg status-dot--${effectiveStatus}`} />
+      {showStatus && <span className={`status-dot status-dot--lg status-dot--${effectiveStatus}`} />}
     </div>
   );
 }

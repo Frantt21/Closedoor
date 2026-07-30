@@ -114,163 +114,55 @@ export function isVideoUrl(url) {
   return videoExts.some((ext) => lower.includes(ext)) || lower.includes('youtube.com') || lower.includes('youtu.be') || lower.includes('vimeo.com');
 }
 
-// ── Image position helpers (avatar/banner transforms) ──
+// ── Image position helpers ──
+// Format: JSON string { x: 0-100, y: 0-100, zoom: 1-3 }
+// Legacy: "X% Y%" string (no zoom, defaults to zoom=1)
 
-/**
- * Parse a position string (legacy "X% Y%" or JSON "{"x":50,"y":50,"zoom":1,"rotation":0,"flipX":false,"flipY":false}")
- * and return a normalized position object.
- */
 export function parseImagePosition(pos) {
-  if (!pos) return { x: 50, y: 50, zoom: 1, rotation: 0, flipX: false, flipY: false };
+  if (!pos) return { x: 50, y: 50, zoom: 1 };
 
-  // If DB returned a JSON object (jsonb column), accept it directly
-  if (typeof pos === 'object') {
-    const parsed = pos;
-    return {
-      x: typeof parsed.x === 'number' ? parsed.x : 50,
-      y: typeof parsed.y === 'number' ? parsed.y : 50,
-      zoom: typeof parsed.zoom === 'number' ? parsed.zoom : 1,
-      rotation: typeof parsed.rotation === 'number' ? parsed.rotation : 0,
-      flipX: !!parsed.flipX,
-      flipY: !!parsed.flipY,
-    };
-  }
-
-  try {
-    const parsed = JSON.parse(pos);
-    if (parsed && typeof parsed === 'object' && 'x' in parsed) {
+  // Try JSON format
+  if (pos.startsWith('{')) {
+    try {
+      const parsed = JSON.parse(pos);
       return {
         x: typeof parsed.x === 'number' ? parsed.x : 50,
         y: typeof parsed.y === 'number' ? parsed.y : 50,
         zoom: typeof parsed.zoom === 'number' ? parsed.zoom : 1,
-        rotation: typeof parsed.rotation === 'number' ? parsed.rotation : 0,
-        flipX: !!parsed.flipX,
-        flipY: !!parsed.flipY,
       };
-    }
-  } catch { /* not JSON */ }
+    } catch {}
+  }
 
-  const parts = pos.split(/\s+/);
+  // Legacy "X% Y%" format
+  const legacy = String(pos).match(/(\d+(?:\.\d+)?)\s*%\s*(\d+(?:\.\d+)?)\s*%/);
+  if (legacy) {
+    return { x: parseFloat(legacy[1]), y: parseFloat(legacy[2]), zoom: 1 };
+  }
+
+  return { x: 50, y: 50, zoom: 1 };
+}
+
+/**
+ * Returns CSS styles to render a positioned image (avatar or banner).
+ * Compatible with Avatar component (via style prop) and <img> elements.
+ */
+export function getImageStyle(positionStr) {
+  const p = parseImagePosition(positionStr || '');
   return {
-    x: parseFloat(parts[0]) || 50,
-    y: parseFloat(parts[1]) || 50,
-    zoom: 1,
-    rotation: 0,
-    flipX: false,
-    flipY: false,
-  };
-}
-
-/**
- * Like getImgTransformStyle but WITHOUT scale/zoom — for use on <Avatar>
- * elements where the scale transform would make the avatar look larger.
- * Only applies objectPosition for positioning + rotation/flip (no zoom).
- */
-export function getAvatarTransformStyle(positionStr) {
-  const p = parseImagePosition(positionStr || '');
-  const transforms = [];
-  if (p.rotation !== 0) transforms.push(`rotate(${p.rotation}deg)`);
-  if (p.flipX) transforms.push('scaleX(-1)');
-  if (p.flipY) transforms.push('scaleY(-1)');
-
-  const style = {
     objectPosition: `${p.x}% ${p.y}%`,
+    transform: p.zoom !== 1 ? `scale(${p.zoom})` : 'none',
+    transformOrigin: 'center center',
   };
-  if (transforms.length > 0) {
-    style.transform = transforms.join(' ');
-  }
-  return style;
 }
 
 /**
- * Given a position string, return the style object for an <img> element
- * with object-fit: cover.
- *
- * Aplica el zoom mediante `width` y `height` en % en vez de
- * `transform: scale(Z)`, porque scale() combinado con object-fit: cover
- * produce clipping/distorsión impredecible en distintos navegadores.
- *
- * Para que el img agrandado no se desborde solo por derecha/abajo
- * (y se recorte mal desde arriba-izquierda), se agrega un translate
- * que centra el img dentro del contenedor:
- *   translate(-(Z-1)/(2*Z)*100%, ...)
- *
- * Incluye objectPosition (focal point X/Y) y CSS transform para
- * rotation y flip (scaleX/scaleY).
- *
- * El contenedor PADRE debe tener overflow: hidden para recortar
- * el exceso de imagen cuando zoom > 1.
+ * Returns background CSS style for a positioned profile background image.
  */
-export function getImgTransformStyle(positionStr) {
+export function getBackgroundStyle(positionStr) {
   const p = parseImagePosition(positionStr || '');
-  const transforms = [];
-  // ⚠️ CSS aplica transforms de DERECHA a IZQUIERDA.
-  // El translate debe ir al FINAL (derecha) para que se aplique PRIMERO,
-  // antes de rotation/flip, así opera en el espacio de coordenadas original
-  // y centra correctamente el img agrandado.
-  if (p.rotation !== 0) transforms.push(`rotate(${p.rotation}deg)`);
-  if (p.flipX) transforms.push('scaleX(-1)');
-  if (p.flipY) transforms.push('scaleY(-1)');
-  // translate al final → se aplica primero (derecha en la cadena CSS)
-  // antes de cualquier rotación, por lo que centra en coordenadas originales
-  if (p.zoom !== 1) {
-    const baseT = -((p.zoom - 1) / (2 * p.zoom)) * 100;
-    const tX = (p.x / 50) * baseT; // p.x=50 -> tX=baseT, p.x=0 -> tX=0
-    const tY = (p.y / 50) * baseT;
-    transforms.push(`translate(${tX}%, ${tY}%)`);
-  }
-
-  const style = {
-    objectPosition: `${p.x}% ${p.y}%`,
-  };
-  if (p.zoom !== 1) {
-    style.width = `${p.zoom * 100}%`;
-    style.height = `${p.zoom * 100}%`;
-    style.maxWidth = 'none';
-  }
-  if (transforms.length > 0) {
-    style.transform = transforms.join(' ');
-  }
-  return style;
-}
-
-/**
- * Given a position string, return just the background-position value
- * (for use with CSS background-image on a div).
- */
-export function getBgPositionStyle(positionStr) {
-  const p = parseImagePosition(positionStr || '');
-  return `${p.x}% ${p.y}%`;
-}
-
-/**
- * Given a position string, return the full set of styles for a <div>
- * that renders an image via background-image. Includes background-position,
- * background-size (for zoom), and CSS transform (for rotation/flip).
- *
- * Use this on a dedicated inner <div> (not the container) so transforms
- * don't affect sibling elements like overlay, avatar, etc.
- */
-export function getBgFullStyle(positionStr) {
-  const p = parseImagePosition(positionStr || '');
-  const transforms = [];
-  if (p.rotation !== 0) transforms.push(`rotate(${p.rotation}deg)`);
-  if (p.flipX) transforms.push('scaleX(-1)');
-  if (p.flipY) transforms.push('scaleY(-1)');
-
-  // When using background-size > 100% we need to translate the inner
-  // element so the focal point (x%, y%) matches the same visual result
-  // as the <img> centering logic. The translate must be the last item in
-  // the CSS transform string so it is applied first (CSS applies from
-  // right-to-left).
-  if (p.zoom !== 1) {
-    const t = -((p.zoom - 1) / (2 * p.zoom)) * 100;
-    transforms.push(`translate(${t}%, ${t}%)`);
-  }
-
   return {
     backgroundPosition: `${p.x}% ${p.y}%`,
-    backgroundSize: `${(p.zoom * 100).toFixed(1)}%`,
-    ...(transforms.length > 0 ? { transform: transforms.join(' ') } : {}),
+    backgroundSize: p.zoom !== 1 ? `${p.zoom * 100}%` : 'cover',
   };
 }
+

@@ -339,6 +339,7 @@
     height: 32px;
     border-radius: 50%;
     object-fit: cover;
+    overflow: hidden;
     flex-shrink: 0;
     border: 2px solid var(--color-border, #2a2a2a);
 }
@@ -516,6 +517,7 @@
     height: 32px;
     border-radius: 50%;
     object-fit: cover;
+    overflow: hidden;
     flex-shrink: 0;
     border: 2px solid var(--color-border, #2a2a2a);
     transition: border-color 0.2s ease;

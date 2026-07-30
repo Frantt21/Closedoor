@@ -33,7 +33,7 @@ import Avatar from '../Resources/Components/Avatar';
 import Badge from '../Resources/Components/Badge';
 import Tooltip from '../Resources/Components/Tooltip';
 import GifPicker from '../Resources/Components/GifPicker';
-import { getTimeAgo, IMG_RE, detectMediaFromContent, getImgTransformStyle, getAvatarTransformStyle, DEFAULT_AVATAR } from '../services/helpers';
+import { getTimeAgo, IMG_RE, detectMediaFromContent, DEFAULT_AVATAR, getImageStyle } from '../services/helpers';
 import { getPost } from '../services/postService';
 import RichText from '../Resources/Components/RichText';
 import SafeImage from '../Resources/Components/SafeImage';
@@ -2119,7 +2119,6 @@ export default function Chat() {
                 src={conv.otherUser?.avatar_url}
                 alt={conv.otherUser?.username || '?'}
                 className="chat-list-item-avatar"
-                style={getAvatarTransformStyle(conv.otherUser?.avatar_position)}
                 status={otherUserStatuses?.[conv.otherUser?.id] ?? computeEffectiveStatus(conv.otherUser)}
               />
               <div className="chat-list-item-info">
@@ -2181,7 +2180,7 @@ export default function Chat() {
             src={otherUser?.avatar_url}
             alt={otherUser?.username || '?'}
             className="chat-messages-header-avatar"
-            style={{ cursor: 'pointer', ...getAvatarTransformStyle(otherUser?.avatar_position) }}
+            style={{ cursor: 'pointer' }}
             onClick={goToProfile}
             status={activeConversationStatus}
           />
@@ -2325,7 +2324,6 @@ export default function Chat() {
                       src={otherUser?.avatar_url}
                       alt={otherUser?.username || '?'}
                       className="chat-message-avatar"
-                      style={getAvatarTransformStyle(otherUser?.avatar_position)}
                     />
                   )}
                   {!isOwn && !showAvatar && <div className="chat-message-avatar-spacer" />}
@@ -2510,7 +2508,6 @@ export default function Chat() {
                       src={profile?.avatar_url || user?.user_metadata?.avatar_url || user?.avatar_url}
                       alt={profile?.username || user?.username || '?'}
                       className="chat-message-avatar chat-message-avatar--own"
-                      style={getAvatarTransformStyle(profile?.avatar_position)}
                     />
                   )}
                   {isOwn && !showAvatar && <div className="chat-message-avatar-spacer" />}
@@ -3016,7 +3013,7 @@ export default function Chat() {
                   className="explore-card-banner-img"
                   src={otherUser.banner_url}
                   alt=""
-                  style={getImgTransformStyle(otherUser.banner_position)}
+                  style={getImageStyle(otherUser.banner_position)}
                 />
               )}
               <div className="explore-card-overlay" />
@@ -3026,7 +3023,7 @@ export default function Chat() {
                 className="explore-card-avatar"
                 src={otherUser.avatar_url}
                 alt={otherUser.username || '?'}
-                style={getAvatarTransformStyle(otherUser.avatar_position)}
+                style={getImageStyle(otherUser.avatar_position)}
               />
               <div className="explore-card-info">
                 <div className="explore-card-name-row">
@@ -3347,7 +3344,6 @@ export default function Chat() {
                             inset: 0,
                             backgroundImage: `url(${nicknameModal.userData.banner_url})`,
                             backgroundRepeat: 'no-repeat',
-                            ...getImgTransformStyle(nicknameModal.userData?.banner_position || '50% 50%'),
                           }}
                         />
                       ) : null}
@@ -3357,7 +3353,6 @@ export default function Chat() {
                         <img
                           src={nicknameModal.userData?.avatar_url || DEFAULT_AVATAR}
                           alt={nicknameModal.userData?.username || ''}
-                          style={getAvatarTransformStyle(nicknameModal.userData?.avatar_position)}
                         />
                       </div>
 
@@ -3409,7 +3404,7 @@ export default function Chat() {
                           className="explore-card-banner-img"
                           src={nicknameModal.userData.banner_url}
                           alt=""
-                          style={{ objectPosition: nicknameModal.userData?.banner_position || '50% 50%' }}
+                          style={getImageStyle(nicknameModal.userData?.banner_position)}
                         />
                       ) : (
                         <div className="explore-card-banner" style={{ background: 'var(--color-surface, #1a1a1a)' }} />
@@ -3421,7 +3416,7 @@ export default function Chat() {
                         className="explore-card-avatar"
                         src={nicknameModal.userData?.avatar_url || DEFAULT_AVATAR}
                         alt={nicknameModal.userData?.username || ''}
-                        style={getAvatarTransformStyle(nicknameModal.userData?.avatar_position)}
+                        style={getImageStyle(nicknameModal.userData?.avatar_position)}
                       />
                       <div className="explore-card-info">
                         <div className="explore-card-name-row">

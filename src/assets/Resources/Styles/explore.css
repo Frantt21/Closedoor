@@ -178,6 +178,7 @@
     height: 64px;
     border-radius: 50%;
     object-fit: cover;
+    overflow: hidden;
     margin-top: -32px;
     margin-bottom: 8px;
     border: 3px solid var(--color-surface, #1a1a1a);

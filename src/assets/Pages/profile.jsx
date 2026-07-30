@@ -52,11 +52,11 @@ import Badge from "../Resources/Components/Badge";
 import Avatar from "../Resources/Components/Avatar";
 import Tooltip from "../Resources/Components/Tooltip";
 import { getPlatformIcon, getPlatformName } from "../services/socialPlatforms";
-import { FaFeather, FaBookmark, FaLock, FaEllipsisH, FaBan, FaClock, FaHeart, FaRetweet, FaChevronDown, FaShareAlt, FaComment, FaSpinner } from 'react-icons/fa';
+import { FaFeather, FaBookmark, FaLock, FaEllipsisH, FaBan, FaClock, FaHeart, FaRetweet, FaChevronDown, FaShareAlt, FaComment } from 'react-icons/fa';
 import FollowButton from "../Resources/Components/FollowButton";
 import { blockUser, unblockUser, isBlocked, cacheBlockStatus, getCachedBlockStatus, unfollowBothWays } from "../services/blockService";
 import { useI18n } from "../services/i18n/useI18n";
-import { getContrastText, isUUID, getImgTransformStyle, getBgFullStyle, getTimeAgo } from "../services/helpers";
+import { getContrastText, isUUID, getTimeAgo, getImageStyle } from "../services/helpers";
 import usePageMeta from "../../hooks/usePageMeta";
 import useBgContrast from "../../hooks/useBgContrast";
 import FollowersModal from "../Resources/Components/FollowersModal";
@@ -403,12 +403,7 @@ function Profile() {
     const [dislikedPostIds, setDislikedPostIds] = useState(() => getCachedPosts()?.dislikedIds || []);
     const [savedPostIds, setSavedPostIds] = useState(() => getCachedPosts()?.savedIds || []);
     const [postsLoading, setPostsLoading] = useState(() => !getCachedPosts());
-    // ── Infinite scroll pagination ──
-    const PROFILE_PAGE_SIZE = 20;
-    const [postsOffset, setPostsOffset] = useState(PROFILE_PAGE_SIZE);
-    const [hasMorePosts, setHasMorePosts] = useState(true);
-    const [loadingMorePosts, setLoadingMorePosts] = useState(false);
-    const sentinelRef = useRef(null);
+
     // ── Clear profile post cache on browser reload (like Chat.jsx) ──
     useEffect(() => {
         const FLAG = 'fc_profile_reload_clear_done';
@@ -537,16 +532,10 @@ function Profile() {
         } else {
             setPostsLoading(true);
         }
-        // Reset pagination state on profile change
-        setPostsOffset(PROFILE_PAGE_SIZE);
-        setHasMorePosts(true);
-        setLoadingMorePosts(false);
-
         const loadPosts = async () => {
             try {
-                const items = await getProfileContent(userId, user?.id, filterEncrypted, { limit: PROFILE_PAGE_SIZE, offset: 0 });
+                const items = await getProfileContent(userId, user?.id, filterEncrypted);
                 setProfilePosts(items);
-                setHasMorePosts(items.length >= PROFILE_PAGE_SIZE);
                 // Batch check likes/reposts/saves for current user
                 let likedIds = [], repostedIds = [], savedIds = [], dislikedIds = [];
                 if (user?.id && items.length > 0) {
@@ -573,71 +562,7 @@ function Profile() {
         loadPosts();
     }, [activeProfile?.id, activeProfile?.username, user?.id, canViewContent]);
 
-    // ── Infinite scroll: load more posts when sentinel enters viewport ──
-    useEffect(() => {
-        const userId = activeProfile?.id;
-        if (!userId || !canViewContent) return;
-        if (!hasMorePosts || loadingMorePosts) return;
 
-        const observer = new IntersectionObserver(([entry]) => {
-            if (!entry.isIntersecting) return;
-            observer.disconnect();
-
-            setLoadingMorePosts(true);
-            (async () => {
-                try {
-                    const more = await getProfileContent(userId, user?.id, filterEncrypted, { limit: PROFILE_PAGE_SIZE, offset: postsOffset });
-                    if (more.length === 0) {
-                        setHasMorePosts(false);
-                    } else {
-                        // Computar merged fuera del setState para compartir con cache save
-                        const existingIds = new Set(profilePosts.map(p => p.id));
-                        const unique = more.filter(p => !existingIds.has(p.id));
-                        const mergedUnique = [...profilePosts, ...unique];
-                        setProfilePosts(mergedUnique);
-                        setPostsOffset(prev => prev + PROFILE_PAGE_SIZE);
-                        setHasMorePosts(more.length >= PROFILE_PAGE_SIZE);
-                        // Batch check likes/reposts for new posts
-                        let newLikedIds = [], newRepostedIds = [], newSavedIds = [], newDislikedIds = [];
-                        if (user?.id && more.length > 0) {
-                            const postIds = more.map((p) => p.id);
-                            [newLikedIds, newRepostedIds, newSavedIds, newDislikedIds] = await Promise.all([
-                                getLikedPostIds(postIds, user.id),
-                                getRepostedPostIds(postIds, user.id),
-                                getSavedPostIds(postIds, user.id),
-                                getDislikedPostIds(postIds, user.id),
-                            ]);
-                            setLikedPostIds(prev => [...new Set([...prev, ...newLikedIds])]);
-                            setRepostedPostIds(prev => [...new Set([...prev, ...newRepostedIds])]);
-                            setSavedPostIds(prev => [...new Set([...prev, ...newSavedIds])]);
-                            setDislikedPostIds(prev => [...new Set([...prev, ...newDislikedIds])]);
-                        }
-                        // Guardar acumulado en caché (con IDs frescos)
-                        if (mergedUnique && activeProfile?.id) {
-                            const mergedLiked = [...new Set([...likedPostIds, ...newLikedIds])];
-                            const mergedReposted = [...new Set([...repostedPostIds, ...newRepostedIds])];
-                            const mergedSaved = [...new Set([...savedPostIds, ...newSavedIds])];
-                            const mergedDisliked = [...new Set([...dislikedPostIds, ...newDislikedIds])];
-                            setCachedFeed(`profile_posts_${activeProfile.id}`, mergedUnique, mergedLiked, mergedReposted, mergedSaved, mergedDisliked);
-                        }
-                    }
-                } catch (err) {
-                    console.error('Error loading more posts:', err);
-                } finally {
-                    setLoadingMorePosts(false);
-                }
-            })();
-        }, { rootMargin: '200px' });
-
-        const sentinel = sentinelRef.current;
-        if (sentinel) observer.observe(sentinel);
-
-        return () => observer.disconnect();
-    }, [activeProfile?.id, canViewContent, hasMorePosts, loadingMorePosts, postsOffset, user?.id, filterEncrypted]);
-
-    // ── Observer resets when new posts are loaded (triggered by loadingMorePosts changing back to false) ──
-    // The observer hooks already includes hasMorePosts and loadingMorePosts, so when loadingMorePosts
-    // flips to false after fetching, the effect re-runs and observes the sentinel again.
 
     // ── Realtime unificado: sigue cambios en follows, perfil y posts ──
     useEffect(() => {
@@ -654,14 +579,12 @@ function Profile() {
                 .catch((err) => console.warn("Error refreshing follow counts:", err));
         };
 
-        // Refresh posts after insert/delete
+        // Refresh posts after insert/delete (fetch all)
         const refreshAfterChange = async () => {
             if (!canViewContent) return;
             try {
-                const items = await getProfileContent(profileId, user?.id, filterEncrypted, { limit: PROFILE_PAGE_SIZE, offset: 0 });
+                const items = await getProfileContent(profileId, user?.id, filterEncrypted);
                 setProfilePosts(items);
-                setPostsOffset(PROFILE_PAGE_SIZE);
-                setHasMorePosts(items.length >= PROFILE_PAGE_SIZE);
                 let likedIds = [], repostedIds = [], savedIds = [], dislikedIds = [];
                 if (user?.id && items.length > 0) {
                     const postIds = items.map((p) => p.id);
@@ -1063,11 +986,9 @@ function Profile() {
         const userId = activeProfile?.id;
         if (!userId) return;
         try {
-            // Refrescar posts normales
-            const items = await getProfileContent(userId, user?.id, filterEncrypted, { limit: PROFILE_PAGE_SIZE, offset: 0 });
+            // Refrescar posts normales (fetch all)
+            const items = await getProfileContent(userId, user?.id, filterEncrypted);
             setProfilePosts(items);
-            setPostsOffset(PROFILE_PAGE_SIZE);
-            setHasMorePosts(items.length >= PROFILE_PAGE_SIZE);
             let likedIds = [], repostedIds = [], savedIds = [], dislikedIds = [];
             if (user?.id && items.length > 0) {
                 const postIds = items.map((p) => p.id);
@@ -1237,6 +1158,8 @@ function Profile() {
         }).catch(() => {});
     }, [user?.id]);
 
+
+
     const getDisplayName = (otherProfile) => {
         if (!otherProfile) return t('common.unknown');
         const nick = nicknames[otherProfile.id];
@@ -1286,7 +1209,9 @@ function Profile() {
             const updates = {
                 displayname: displayname || null,
                 avatar_url: avatar_url || null,
+                avatar_position: avatar_position || null,
                 banner_url: banner_url || null,
+                banner_position: banner_position || null,
                 banner_credits: banner_credits || null,
                 avatar_credits: avatar_credits || null,
                 bio: bio || null,
@@ -1297,8 +1222,7 @@ function Profile() {
                 accent_surface_color: accent_surface_color || null,
                 accent_surface_glass: accent_surface_glass ?? false,
                 interests: interests || [],
-                banner_position: banner_position || '50% 50%',
-                avatar_position: avatar_position || '50% 50%',
+
                 profile_background_url: profile_background_url || null,
                 profile_background_position: profile_background_position || '50% 50%',
                 profile_background_blur: profile_background_blur ?? 0,
@@ -1426,9 +1350,8 @@ function Profile() {
     const surfGlass = activeProfile?.accent_surface_glass === true;
 
     // ── Background image (blur/position only — url/dim/hasBg/accentVisible already extracted before early returns) ──
-    const bgPosition = activeProfile?.profile_background_position || '50% 50%';
     const bgBlur = (activeProfile?.profile_background_blur ?? 0);
-    const bgFullStyle = hasBg ? getBgFullStyle(activeProfile?.profile_background_position) : null;
+
 
     const styleVars = accentVisible
       ? {
@@ -1465,19 +1388,13 @@ function Profile() {
           }),
           // ── Background image vars ──
           '--profile-bg-image': hasBg ? `url(${bgUrl})` : 'none',
-          '--profile-bg-position': hasBg && bgFullStyle
-            ? `center, ${bgFullStyle.backgroundPosition}`
-            : bgPosition,
+          '--profile-bg-position': 'center center',
           '--profile-bg-blur': hasBg && bgBlur > 0 ? `blur(${bgBlur}px)` : 'none',
           '--profile-bg-dim': hasBg ? String(bgDim) : '0',
           '--banner-dim-top': String((activeProfile?.banner_dim ?? 50) / 100 * 0.6),
           '--banner-dim-bottom': String(Math.min((activeProfile?.banner_dim ?? 50) / 100 * 1.3, 1.0)),
-          '--profile-bg-size': hasBg && bgFullStyle
-            ? `auto, ${bgFullStyle.backgroundSize}`
-            : 'auto, cover',
-          '--profile-bg-transform': hasBg && bgFullStyle?.transform
-            ? bgFullStyle.transform
-            : 'none',
+          '--profile-bg-size': 'auto, cover',
+          '--profile-bg-transform': 'none',
           '--profile-accent-opacity': hasBg ? '8%' : '18%',
           // ── Profile text color (user-configurable) ──
           ...(activeProfile?.profile_text_color ? {
@@ -1501,7 +1418,7 @@ function Profile() {
                             className="profile-banner"
                             src={bannerUrl}
                             alt="Profile Banner"
-                            style={getImgTransformStyle(activeProfile?.banner_position)}
+                            style={getImageStyle(activeProfile?.banner_position)}
                         />
                         {/* ── Credits overlay (banner + avatar) ── */}
                         {(activeProfile?.banner_credits || activeProfile?.avatar_credits) && (
@@ -1552,7 +1469,7 @@ function Profile() {
                             src={avatarUrl}
                             alt="User Avatar"
                             className="profile-avatar"
-                            style={getImgTransformStyle(activeProfile?.avatar_position)}                             status={isOwnProfile ? myStatus : (isFollower === true && isFollowedBy === true ? (contextStatus ?? profileStatus) : null)}
+                            style={getImageStyle(activeProfile?.avatar_position)}                             status={isOwnProfile ? myStatus : (isFollower === true && isFollowedBy === true ? (contextStatus ?? profileStatus) : null)}
                         />
                     </div>
 
@@ -1868,6 +1785,7 @@ function Profile() {
                     initialInterests={modalInterests}
                     initialBannerPosition={ownProfile?.banner_position || '50% 50%'}
                     initialAvatarPosition={ownProfile?.avatar_position || '50% 50%'}
+
                     initialBannerCredits={ownProfile?.banner_credits || ''}
                     initialAvatarCredits={ownProfile?.avatar_credits || ''}                      initialBannerCredits={ownProfile?.banner_credits || ''}
                     initialAvatarCredits={ownProfile?.avatar_credits || ''}
@@ -2081,14 +1999,7 @@ function Profile() {
                             />
                         ))}
                         {/* ── Sentinel for infinite scroll ── */}
-                        {hasMorePosts && (
-                            <div ref={sentinelRef} className="profile-posts-sentinel" style={{ height: 1 }} />
-                        )}
-                        {loadingMorePosts && (
-                            <div className="profile-posts-loading">
-                                <FaSpinner className="fc-spin" />
-                            </div>
-                        )}
+
                         </>
                     )
                 ) : tab === 'saved' ? (
