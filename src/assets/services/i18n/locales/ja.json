@@ -259,6 +259,7 @@
   "notifications.accept": "承認",
   "notifications.comment_liked": "があなたのコメントにいいねしました",
   "notifications.comment_mentioned": "がコメントであなたに言及しました",
+  "notifications.comment_replied": "があなたのコメントに返信しました",
   "notifications.commented": "があなたの投稿にコメントしました",
   "notifications.default": "がアクションをしました",
   "notifications.delete_label": "通知を削除",

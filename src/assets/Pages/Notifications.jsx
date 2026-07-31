@@ -23,6 +23,7 @@ function getIcon(type) {
     case 'dislike':
       return <FaHeartBroken />;
     case 'comment':
+    case 'comment_reply':
       return <FaComment />;
     case 'repost':
       return <FaRetweet />;
@@ -64,6 +65,8 @@ function getNotificationMessage(t, type, username) {
       return <><strong>{username}</strong> {t('notifications.mentioned')}</>;
     case 'comment_mention':
       return <><strong>{username}</strong> {t('notifications.comment_mentioned')}</>;
+    case 'comment_reply':
+      return <><strong>{username}</strong> {t('notifications.comment_replied')}</>;
     case 'encrypted_add':
       return <><strong>{username}</strong> {t('notifications.encrypted_add')}</>;
     case 'poll_vote':
@@ -77,9 +80,11 @@ function getNotificationLink(notification) {
   const actor = notification.actor || {};
   const username = actor.username || '';
 
-  // Notificaciones relacionadas a un post → link al post
-  if (['like', 'dislike', 'comment', 'repost', 'comment_like', 'mention', 'comment_mention', 'encrypted_add', 'poll_vote'].includes(notification.type) && notification.reference_id) {
-    return `/post/${notification.reference_id}`;
+  // Notificaciones relacionadas a un post → link al post (y al comentario si aplica)
+  if (['like', 'dislike', 'comment', 'repost', 'comment_like', 'comment_reply', 'mention', 'comment_mention', 'encrypted_add', 'poll_vote'].includes(notification.type) && notification.reference_id) {
+    const base = `/post/${notification.reference_id}`;
+    // Si la notificación referencia un comentario específico, deep-link a él
+    return notification.comment_id ? `${base}?comment=${notification.comment_id}` : base;
   }
   // Seguidores → link al perfil del actor
   return `/profile/${username}`;

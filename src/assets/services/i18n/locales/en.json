@@ -272,6 +272,7 @@
   "notifications.accept": "Accept",
   "notifications.comment_liked": "liked your comment",
   "notifications.comment_mentioned": "mentioned you in a comment",
+  "notifications.comment_replied": "replied to your comment",
   "notifications.commented": "commented on your post",
   "notifications.default": "did something",
   "notifications.delete_label": "Delete notification",

@@ -512,6 +512,28 @@
     border-bottom: none;
 }
 
+/* ── Comentario remarcado (deep-link desde notificación ?comment=) ── */
+/* Solo color de fondo gris, sin borde ni padding/margen, para no desplazar
+   el comentario (sobre todo las respuestas, con su propio margen).
+   Usa el gris secundario de las variables del tema. */
+.comment-card--highlight {
+    background: color-mix(in srgb, var(--color-text-secondary, #9ca3af) 12%, transparent);
+    border-radius: var(--radius-sm, 6px);
+    animation: comment-highlight-fade 4.5s ease forwards;
+}
+
+@keyframes comment-highlight-fade {
+    0% {
+        background-color: color-mix(in srgb, var(--color-text-secondary, #9ca3af) 22%, transparent);
+    }
+    60% {
+        background-color: color-mix(in srgb, var(--color-text-secondary, #9ca3af) 12%, transparent);
+    }
+    100% {
+        background-color: transparent;
+    }
+}
+
 .comment-card-avatar {
     width: 32px;
     height: 32px;

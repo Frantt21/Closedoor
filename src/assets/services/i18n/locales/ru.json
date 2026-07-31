@@ -259,6 +259,7 @@
   "notifications.accept": "Принять",
   "notifications.comment_liked": "оценил(а) ваш комментарий",
   "notifications.comment_mentioned": "упомянул(а) вас в комментарии",
+  "notifications.comment_replied": "ответил(а) на ваш комментарий",
   "notifications.commented": "прокомментировал(а) ваш пост",
   "notifications.default": "совершил(а) действие",
   "notifications.delete_label": "Удалить уведомление",

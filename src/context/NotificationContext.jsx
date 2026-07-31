@@ -27,7 +27,8 @@ const NOTIF_MESSAGES = {
     comment: (name) => `${name} comentó tu publicación`,
     repost: (name) => `${name} reposteó tu publicación`,
     comment_like: (name) => `${name} le gustó tu comentario`,
-    comment_mention: (name) => `${name} te respondió o mencionó en un comentario`,
+    comment_mention: (name) => `${name} te mencionó en un comentario`,
+    comment_reply: (name) => `${name} respondió a tu comentario`,
     mention: (name) => `${name} te mencionó`,
     encrypted_add: (name) => `${name} te agregó a un post encriptado`,
     poll_vote: (name) => `${name} votó en tu encuesta`,
@@ -42,7 +43,8 @@ const NOTIF_MESSAGES = {
     comment: (name) => `${name} commented on your post`,
     repost: (name) => `${name} reposted your post`,
     comment_like: (name) => `${name} liked your comment`,
-    comment_mention: (name) => `${name} replied to or mentioned you in a comment`,
+    comment_mention: (name) => `${name} mentioned you in a comment`,
+    comment_reply: (name) => `${name} replied to your comment`,
     mention: (name) => `${name} mentioned you`,
     encrypted_add: (name) => `${name} added you to an encrypted post`,
     poll_vote: (name) => `${name} voted on your poll`,
@@ -68,7 +70,9 @@ function getNotifMessage(type, username) {
 function getNotifLink(notif) {
   const username = notif.actor?.username || '';
   if (['like', 'comment', 'repost', 'comment_like', 'comment_mention', 'comment_reply', 'mention', 'encrypted_add', 'poll_vote'].includes(notif.type) && notif.reference_id) {
-    return `/post/${notif.reference_id}`;
+    const base = `/post/${notif.reference_id}`;
+    // Si la notificación referencia un comentario específico, deep-link a él
+    return notif.comment_id ? `${base}?comment=${notif.comment_id}` : base;
   }
   return `/profile/${username}`;
 }
@@ -108,6 +112,22 @@ function isChatRoute() {
   return window.location.pathname.startsWith('/Chat') || window.location.pathname.startsWith('/chat');
 }
 
+// ── Mostrar un toast SIEMPRE. Si el tab está oculto, se aplaza hasta que
+// el tab vuelve a ser visible (en tabs ocultos los timers se congelan y el
+// toast expiraría sin que el usuario lo vea). ──
+function showToastAlways(content, options) {
+  if (document.visibilityState === 'hidden') {
+    const showWhenVisible = () => {
+      if (document.visibilityState === 'hidden') return;
+      document.removeEventListener('visibilitychange', showWhenVisible);
+      toast(content, options);
+    };
+    document.addEventListener('visibilitychange', showWhenVisible);
+  } else {
+    toast(content, options);
+  }
+}
+
 function showLiveNotification(data, navigate) {
   if (!data?.actor) return;
 
@@ -126,7 +146,6 @@ function showLiveNotification(data, navigate) {
   const avatarUrl = data.actor.avatar_url;
 
   // ── Tab oculto o sin foco → OS Notification (si habilitada) ──
-  // NOTA: No hacemos return para que el toast también se muestre como fallback
   const isHidden = document.visibilityState === 'hidden' || !document.hasFocus();
   if (isHidden) {
     try {
@@ -136,12 +155,12 @@ function showLiveNotification(data, navigate) {
     } catch {}
   }
 
-  // ── Tab visible (o hidden con push deshabilitada) → Toast (si habilitada) ──
+  // ── Toast (si habilitada): se muestra SIEMPRE (diferido si el tab está oculto) ──
   try {
     if (getItem('fc_show_toast_notifications') === 'false') return;
   } catch {}
 
-  toast(
+  showToastAlways(
     <div className="fc-notif-toast" onClick={(e) => { e.stopPropagation(); navigate(link); }}>
       {avatarUrl && (
         <img
@@ -433,7 +452,7 @@ export function NotificationProvider({ children }) {
           // ── Mantener caché de conversaciones actualizado para cuando Chat monte ──
           refreshConversationsCache();
 
-          // Tab hidden or unfocused → try OS Push Notification (fall through to toast)
+          // Tab hidden or unfocused → try OS Push Notification
           const isHidden = document.visibilityState === 'hidden' || !document.hasFocus();
           if (isHidden) {
             try {
@@ -445,13 +464,14 @@ export function NotificationProvider({ children }) {
             }
           }
 
-          // No mostrar toast si ya estamos en la ruta de chat
+          // Toast (si habilitada): se muestra SIEMPRE, salvo en la ruta de chat.
+          // Si el tab está oculto, se aplaza hasta que el tab vuelve a ser visible.
           if (!isChatRoute()) {
             try {
               if (getItem('fc_show_toast_notifications') === 'false') return;
             } catch (e) {}
 
-            toast(
+            showToastAlways(
               <div className="fc-notif-toast" onClick={(e) => { e.stopPropagation(); navigate('/Chat'); }}>
                 {avatarUrl && (
                   <img

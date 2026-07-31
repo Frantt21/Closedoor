@@ -579,14 +579,16 @@ export async function createComment({ postId, userId, content, parentId = null, 
   // Nota: La notificación al dueño del post la maneja el DB Trigger
   // `notify_comment()` (ver migrations/004_notifications_triggers.sql)
   if (content) {
-    notifyCommentMentions(userId, postId, content).catch((err) =>
+    notifyCommentMentions(userId, postId, data?.id, content).catch((err) =>
       console.warn('Error notifying comment mentions:', err)
     );
   }
 
-  // Notificar al autor del comentario padre cuando alguien responde a su comentario
+  // Notificar al autor del comentario padre cuando alguien responde a su comentario.
+  // comment_id = el id de la NUEVA respuesta (para que el deep-link lleve a ella,
+  // igual que la notificación 'comment' del trigger notify_comment()).
   if (parentId) {
-    notifyCommentReply(userId, postId, parentId).catch((err) =>
+    notifyCommentReply(userId, postId, data?.id, parentId).catch((err) =>
       console.warn('Error notifying comment reply:', err)
     );
   }
@@ -1032,9 +1034,11 @@ export async function notifyComment(actorId, postId) {
 }
 
 /**
- * Notify the parent comment author when someone replies to their comment
+ * Notify the parent comment author when someone replies to their comment.
+ * comment_id apunta a la NUEVA respuesta (destino del deep-link), igual que
+ * la notificación 'comment' que genera el trigger notify_comment().
  */
-export async function notifyCommentReply(actorId, postId, parentCommentId) {
+export async function notifyCommentReply(actorId, postId, replyCommentId, parentCommentId) {
   if (!actorId || !postId || !parentCommentId) return;
   try {
     const { data: parentComment } = await supabase
@@ -1049,6 +1053,7 @@ export async function notifyCommentReply(actorId, postId, parentCommentId) {
         actor_id: actorId,
         type: 'comment_reply',
         reference_id: postId,
+        comment_id: replyCommentId,
       });
     }
   } catch (err) {
@@ -1074,6 +1079,7 @@ export async function notifyCommentLike(actorId, commentId) {
         actor_id: actorId,
         type: 'comment_like',
         reference_id: comment.post_id,
+        comment_id: commentId,
       });
     }
   } catch (err) {
@@ -1084,7 +1090,7 @@ export async function notifyCommentLike(actorId, commentId) {
 /**
  * Notify users when they are @mentioned in a comment
  */
-export async function notifyCommentMentions(actorId, postId, content) {
+export async function notifyCommentMentions(actorId, postId, commentId, content) {
   const usernames = extractMentions(content);
   if (!usernames.length) return;
 
@@ -1121,6 +1127,7 @@ export async function notifyCommentMentions(actorId, postId, content) {
           user_id: u.id,
           type: 'comment_mention',
           reference_id: postId,
+          comment_id: commentId || null,
         });
       }
     } catch {
@@ -1130,6 +1137,7 @@ export async function notifyCommentMentions(actorId, postId, content) {
         user_id: u.id,
         type: 'comment_mention',
         reference_id: postId,
+        comment_id: commentId || null,
       });
     }
   }

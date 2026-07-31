@@ -259,6 +259,7 @@
   "notifications.accept": "Aceitar",
   "notifications.comment_liked": "curtiu seu comentário",
   "notifications.comment_mentioned": "mencionou você em um comentário",
+  "notifications.comment_replied": "respondeu ao seu comentário",
   "notifications.commented": "comentou sua publicação",
   "notifications.default": "realizou uma ação",
   "notifications.delete_label": "Excluir notificação",

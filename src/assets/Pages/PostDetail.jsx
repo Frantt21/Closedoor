@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useI18n } from '../services/i18n/useI18n';
 import { supabase } from '../services/supabaseclient';
@@ -165,6 +165,84 @@ export default function PostDetail() {
   const [reposted, setReposted] = useState(false);
   const [expandedReplies, setExpandedReplies] = useState({}); // { [commentId]: boolean }
 
+  // ── Deep-link a un comentario específico (?comment=id) ──
+  const [searchParams] = useSearchParams();
+  const targetCommentId = searchParams.get('comment');
+  const [highlightedCommentId, setHighlightedCommentId] = useState(null);
+  const handledCommentRef = useRef(null);
+  const highlightTimerRef = useRef(null);
+  const deepLinkAttemptsRef = useRef(0);
+  const expandedPostRef = useRef(null); // postId al que pertenecen las expansiones activas
+
+  // Cuando llega un ?comment=id, expandir la cadena de ancestros, hacer scroll
+  // al comentario y remarcarlo brevemente.
+  useEffect(() => {
+    if (!targetCommentId || commentsLoading || !postId) return;
+
+    const target = comments.find((c) => c.id === targetCommentId);
+    if (!target) return;
+
+    // Expandir todos los ancestros para que el comentario objetivo sea visible.
+    // Se re-aplica en cada cambio de comments (idempotente) para que el deep-link
+    // sobreviva a cualquier colapso de expansiones.
+    const ancestors = [];
+    let cur = target;
+    while (cur?.parent_id) {
+      ancestors.push(cur.parent_id);
+      cur = comments.find((c) => c.id === cur.parent_id);
+    }
+    if (ancestors.length) {
+      setExpandedReplies((prev) => {
+        if (ancestors.every((id) => prev[id])) return prev;
+        const next = { ...prev };
+        ancestors.forEach((id) => { next[id] = true; });
+        return next;
+      });
+      expandedPostRef.current = postId;
+    }
+
+    // Scroll + highlight solo la primera vez que se maneja este deep-link
+    if (handledCommentRef.current === targetCommentId) return;
+
+    // Esperar al render de las respuestas expandidas y luego scroll + highlight
+    // (marcamos como manejado SOLO si el scroll llegó a realizarse, para poder
+    // reintentar si el DOM aún no tenía el comentario renderizado)
+    const t = setTimeout(() => {
+      const el = document.getElementById(`comment-${targetCommentId}`);
+      if (el) {
+        handledCommentRef.current = targetCommentId;
+        deepLinkAttemptsRef.current = 0;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setHighlightedCommentId(targetCommentId);
+        if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+        highlightTimerRef.current = setTimeout(() => setHighlightedCommentId(null), 4500);
+      } else {
+        // Blindaje: si el comentario nunca llega a renderizarse (p.ej. fue
+        // eliminado), no reintentar indefinidamente en cada cambio de comments.
+        deepLinkAttemptsRef.current += 1;
+        if (deepLinkAttemptsRef.current >= 5) handledCommentRef.current = targetCommentId;
+      }
+    }, 300);
+
+    return () => clearTimeout(t);
+  }, [targetCommentId, comments, commentsLoading, postId]);
+
+  // Resetear el deep-link al cambiar de post (y limpiar el timer pendiente)
+  useEffect(() => {
+    handledCommentRef.current = null;
+    deepLinkAttemptsRef.current = 0;
+    setHighlightedCommentId(null);
+    if (highlightTimerRef.current) {
+      clearTimeout(highlightTimerRef.current);
+      highlightTimerRef.current = null;
+    }
+  }, [postId]);
+
+  // Limpiar el timer de highlight al desmontar (evita setState tras unmount)
+  useEffect(() => () => {
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+  }, []);
+
   // Load post
   useEffect(() => {
     if (!postId) return;
@@ -226,8 +304,13 @@ export default function PostDetail() {
       // Guardar en cache
       setCachedComments(postId, data, likes, dislikes);
 
-      // All replies start hidden by default
-      setExpandedReplies({});
+      // All replies start hidden by default — solo al cargar un post nuevo.
+      // Si el fetch resuelve para el mismo post (cache + refresh), no colapsar
+      // las expansiones activas (deep-link o manuales).
+      if (expandedPostRef.current !== postId) {
+        expandedPostRef.current = postId;
+        setExpandedReplies({});
+      }
     } catch (err) {
       console.error('Error loading comments:', err);
     } finally {
@@ -703,7 +786,11 @@ export default function PostDetail() {
     const canDelete = user?.id && (user.id === reply.user_id || user.id === post?.user_id);
 
     return (
-      <div key={reply.id} className="comment-card comment-card--reply">
+      <div
+        key={reply.id}
+        id={`comment-${reply.id}`}
+        className={`comment-card comment-card--reply ${highlightedCommentId === reply.id ? 'comment-card--highlight' : ''}`}
+      >
         <a
           href={`/profile/${reply.profiles?.username}`}
           onClick={(e) => { e.preventDefault(); navigate(`/profile/${reply.profiles?.username}`); }}
@@ -943,7 +1030,11 @@ export default function PostDetail() {
     const canDelete = user?.id && (user.id === comment.user_id || user.id === post?.user_id);
 
     return (
-      <div key={comment.id} className="comment-card">
+      <div
+        key={comment.id}
+        id={`comment-${comment.id}`}
+        className={`comment-card ${highlightedCommentId === comment.id ? 'comment-card--highlight' : ''}`}
+      >
         <a
           href={`/profile/${comment.profiles?.username}`}
           onClick={(e) => { e.preventDefault(); navigate(`/profile/${comment.profiles?.username}`); }}
