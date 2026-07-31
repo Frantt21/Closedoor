@@ -186,6 +186,76 @@ export default function ImagePositionEditor({
     panTo(xRef.current, yRef.current, zoomRef.current);
   }, [panTo]);
 
+  // ── Re-medir el contenedor cuando se vuelve visible ──
+  // El editor se monta dentro de un <dialog> que arranca con
+  // display:none (ModalShell lo oculta hasta showModal()). En dev,
+  // React.StrictMode monta/desmonta/remonta el componente y el segundo
+  // callback del ref sí mide el contenedor visible. En producción NO hay
+  // doble montaje: la medición inicial da 0×0, containerSizeRef queda en
+  // {1,1} y el arrastre/zoom se rompen (la imagen solo crece del centro).
+  // Aquí reintentamos medir cada frame hasta obtener un tamaño estable
+  // (2 frames iguales, para ignorar la animación de entrada del dialog)
+  // y re-aplicamos el pan con el tamaño real.
+  useEffect(() => {
+    let raf = 0;
+    let observer = null;
+    let lastKey = '';
+    let stableFrames = 0;
+
+    // Medir y aplicar el pan. Usa offsetWidth/offsetHeight (tamaño de
+    // layout, sin transforms) para no capturar la escala de la animación
+    // de entrada del dialog, que sí afecta a getBoundingClientRect.
+    const applyPan = () => {
+      const el = containerRef.current;
+      if (!el) return;
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      if (w > 0 && h > 0) {
+        containerSizeRef.current = { width: w, height: h };
+        panTo(xRef.current, yRef.current, zoomRef.current);
+      }
+    };
+
+    // Esperar un tamaño estable (2 frames iguales) para ignorar la
+    // animación de entrada del dialog y el primer paint.
+    const applyIfStable = () => {
+      const el = containerRef.current;
+      if (!el) return false;
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      if (w > 0 && h > 0) {
+        const key = `${w}x${h}`;
+        if (key === lastKey) {
+          stableFrames += 1;
+          if (stableFrames >= 2) {
+            applyPan();
+            return true;
+          }
+        } else {
+          lastKey = key;
+          stableFrames = 0;
+        }
+      }
+      return false;
+    };
+
+    const tick = () => {
+      if (!applyIfStable()) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+
+    // Re-medir en resizes (ventana / dialog) y re-aplicar el pan
+    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
+      observer = new ResizeObserver(() => applyPan());
+      observer.observe(containerRef.current);
+    }
+
+    return () => {
+      cancelAnimationFrame(raf);
+      observer?.disconnect();
+    };
+  }, [panTo]);
+
   // Notificar al padre
   const notify = useCallback(() => {
     const payload = JSON.stringify({
