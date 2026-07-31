@@ -5,7 +5,7 @@ import '../Styles/explore.css';
 import Badge from './Badge';
 import ConfirmModal from './ConfirmModal';
 import Avatar from './Avatar';
-import { DEFAULT_AVATAR, getImageStyle } from '../../services/helpers';
+import { DEFAULT_AVATAR, getImageStyle, getBackgroundStyle } from '../../services/helpers';
 import ImagePositionEditor from './ImagePositionEditor';
 import { detectPlatform, getPlatformIcon, getPlatformName } from '../../services/socialPlatforms';
 import { extractColors } from '../../services/colorExtractor';
@@ -121,7 +121,7 @@ export default function Modal({
   const [selectedAccentSurface, setSelectedAccentSurface] = useState(initialAccentSurface);
   const [useGlassSurface, setUseGlassSurface] = useState(initialAccentSurfaceGlass);
   const [profileBg, setProfileBg] = useState(initialProfileBg);
-  const [profileBgPosition] = useState('50% 50%');
+  const [profileBgPosition, setProfileBgPosition] = useState(initialProfileBgPosition || '50% 50%');
   const [profileBgBlur, setProfileBgBlur] = useState(initialProfileBgBlur);
   const [profileBgDim, setProfileBgDim] = useState(initialProfileBgDim);
   const [bannerDim, setBannerDim] = useState(initialBannerDim);
@@ -230,6 +230,7 @@ export default function Modal({
     setSelectedAccentSurface(initialAccentSurface || '');
     setSelectedProfileTextColor(initialProfileTextColor || '');
     setProfileBg(initialProfileBg || '');
+    setProfileBgPosition(initialProfileBgPosition || '50% 50%');
     setProfileBgBlur(initialProfileBgBlur);
     setProfileBgDim(initialProfileBgDim);
     setBannerDim(initialBannerDim);
@@ -554,11 +555,13 @@ export default function Modal({
 
   // ── Profile Background submodal ──
   const bgUrlInitialRef = useRef('');
+  const bgPositionInitialRef = useRef(profileBgPosition);
   const [bgSubPendingClose, setBgSubPendingClose] = useState(false);
   const hasBgChanges = showProfileBgSubmodal && profileBgUrlInput.trim() !== bgUrlInitialRef.current;
 
   const handleOpenProfileBgModal = () => {
     bgUrlInitialRef.current = profileBg;
+    bgPositionInitialRef.current = profileBgPosition;
     setProfileBgUrlInput(profileBg);
     setShowProfileBgSubmodal(true);
   };
@@ -566,7 +569,6 @@ export default function Modal({
   const handleProfileBgModalSave = () => {
     const url = profileBgUrlInput.trim();
     setProfileBg(url);
-    if (url && !profileBgPosition) setProfileBgPosition('50% 50%');
     setShowProfileBgSubmodal(null);
     setProfileBgUrlInput('');
   };
@@ -577,6 +579,7 @@ export default function Modal({
     } else {
       // Restaurar valor original al cancelar
       setProfileBg(bgUrlInitialRef.current);
+      setProfileBgPosition(bgPositionInitialRef.current);
       setShowProfileBgSubmodal(null);
       setProfileBgUrlInput('');
     }
@@ -586,6 +589,7 @@ export default function Modal({
     setBgSubPendingClose(false);
     // Restaurar valor original al descartar cambios
     setProfileBg(bgUrlInitialRef.current);
+    setProfileBgPosition(bgPositionInitialRef.current);
     setShowProfileBgSubmodal(null);
     setProfileBgUrlInput('');
   };
@@ -1049,6 +1053,73 @@ export default function Modal({
               </div>
             </div>
 
+            {/* ── Profile Background ── */}
+            <div className="fc-modal-card">
+              <label className="fc-modal-label">{t('modal.profile_background')}</label>
+
+              <div className="fc-modal-bg-preview-row">
+                {profileBg.trim() ? (
+                  <div
+                    className="fc-modal-bg-thumb"
+                    style={{ backgroundImage: `url(${profileBg.trim()})`, ...getBackgroundStyle(profileBgPosition) }}
+                  />
+                ) : (
+                  <div className="fc-modal-bg-thumb fc-modal-bg-thumb--empty">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <polyline points="21 15 16 10 5 21" />
+                    </svg>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className="fc-modal-bg-edit-btn"
+                  onClick={handleOpenProfileBgModal}
+                  title={t('modal.profile_bg_edit')}
+                >
+                  <FaCamera />
+                </button>
+              </div>
+
+              {profileBg.trim() && (
+                <>
+                  {/* Blur slider */}
+                  <div className="fc-modal-range-row">
+                    <span className="fc-modal-range-label">{t('modal.profile_bg_blur')}</span>
+                    <div className="fc-modal-range-control">
+                      <input
+                        type="range"
+                        min="0"
+                        max="20"
+                        step="2"
+                        value={profileBgBlur}
+                        onChange={(e) => setProfileBgBlur(Number(e.target.value))}
+                        className="fc-modal-range"
+                      />
+                      <span className="fc-modal-range-value">{profileBgBlur}px</span>
+                    </div>
+                  </div>
+                  {/* Dim slider */}
+                  <div className="fc-modal-range-row">
+                    <span className="fc-modal-range-label">{t('modal.profile_bg_dim')}</span>
+                    <div className="fc-modal-range-control">
+                      <input
+                        type="range"
+                        min="0"
+                        max="80"
+                        step="5"
+                        value={profileBgDim}
+                        onChange={(e) => setProfileBgDim(Number(e.target.value))}
+                        className="fc-modal-range"
+                      />
+                      <span className="fc-modal-range-value">{profileBgDim}%</span>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
             {/* ── Accent Color — consolidado (principal, secundario, superficie + glass) ── */}
             <div className="fc-modal-card">
               <label className="fc-modal-label">{t('modal.accent_color')}</label>
@@ -1300,72 +1371,7 @@ export default function Modal({
               </div>
             </div>
 
-            {/* ── Profile Background ── */}
-            <div className="fc-modal-card">
-              <label className="fc-modal-label">{t('modal.profile_background')}</label>
 
-              <div className="fc-modal-bg-preview-row">
-                {profileBg.trim() ? (
-                  <div
-                    className="fc-modal-bg-thumb"
-                    style={{ backgroundImage: `url(${profileBg.trim()})`, backgroundPosition: profileBgPosition }}
-                  />
-                ) : (
-                  <div className="fc-modal-bg-thumb fc-modal-bg-thumb--empty">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                      <circle cx="8.5" cy="8.5" r="1.5" />
-                      <polyline points="21 15 16 10 5 21" />
-                    </svg>
-                  </div>
-                )}
-                <button
-                  type="button"
-                  className="fc-modal-bg-edit-btn"
-                  onClick={handleOpenProfileBgModal}
-                  title={t('modal.profile_bg_edit')}
-                >
-                  <FaCamera />
-                </button>
-              </div>
-
-              {profileBg.trim() && (
-                <>
-                  {/* Blur slider */}
-                  <div className="fc-modal-range-row">
-                    <span className="fc-modal-range-label">{t('modal.profile_bg_blur')}</span>
-                    <div className="fc-modal-range-control">
-                      <input
-                        type="range"
-                        min="0"
-                        max="20"
-                        step="2"
-                        value={profileBgBlur}
-                        onChange={(e) => setProfileBgBlur(Number(e.target.value))}
-                        className="fc-modal-range"
-                      />
-                      <span className="fc-modal-range-value">{profileBgBlur}px</span>
-                    </div>
-                  </div>
-                  {/* Dim slider */}
-                  <div className="fc-modal-range-row">
-                    <span className="fc-modal-range-label">{t('modal.profile_bg_dim')}</span>
-                    <div className="fc-modal-range-control">
-                      <input
-                        type="range"
-                        min="0"
-                        max="80"
-                        step="5"
-                        value={profileBgDim}
-                        onChange={(e) => setProfileBgDim(Number(e.target.value))}
-                        className="fc-modal-range"
-                      />
-                      <span className="fc-modal-range-value">{profileBgDim}%</span>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
 
           </div>
         </div>
@@ -1540,7 +1546,16 @@ export default function Modal({
           )}
         </div>
         {profileBgUrlInput.trim() && (
-          <div />
+          <div style={{ marginTop: 10 }}>
+            <ImagePositionEditor
+              key="profile-bg"
+              imageUrl={profileBgUrlInput.trim()}
+              initialPosition={profileBgPosition}
+              aspectRatio={16 / 9}
+              circular={false}
+              onPositionChange={(pos) => setProfileBgPosition(pos)}
+            />
+          </div>
         )}
         <div className="fc-modal-sub-actions">
           <button type="button" className="fc-modal-sub-save" onClick={handleProfileBgModalSave} disabled={uploadingBgToCdn}>

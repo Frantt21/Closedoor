@@ -146,26 +146,41 @@ export function parseImagePosition(pos) {
  * Returns CSS styles to render a positioned image (avatar or banner).
  * Compatible with Avatar component (via style prop) and <img> elements.
  *
- * ⚠️ NO usa object-position porque con object-fit: cover y aspect ratios
- * iguales, el image content llena completamente el element box y no hay
- * espacio que reposicionar. En su lugar, usa transform: translate() para
- * mover el ELEMENTO ENTERO (no solo el contenido dentro del element box)
- * combinado con scale() para el zoom.
+ * Usa object-fit: contain para mostrar la imagen COMPLETA en su ratio
+ * original, igual que el editor. width/height: z*100% agranda el elemento
+ * para el zoom, translate() lo posiciona, y overflow:hidden en el
+ * contenedor padre clipea el excedente.
  *
- * zoom mínimo 1.05x para asegurar overflow visible siempre.
+ * Fórmula: tx = (50 - x * z) / z
  */
 export function getImageStyle(positionStr) {
   const p = parseImagePosition(positionStr || '');
-  // Zoom mínimo 1.05x para que siempre haya overflow visible
-  const z = Math.max(p.zoom, 1.05);
-  // translate en porcentaje: (50 - pos) * (z - 1) / z
-  // Funciona porque translate(%) se basa en el ancho del propio elemento,
-  // que es igual al contenedor (width: 100%).
-  const panX = ((50 - p.x) * (z - 1)) / z;
-  const panY = ((50 - p.y) * (z - 1)) / z;
-  return {
-    transform: `translate(${panX}%, ${panY}%) scale(${z})`,
+  const z = Math.max(p.zoom, 1);
+
+  // Siempre retornar objectFit: 'contain' para evitar que el CSS del
+  // contenedor (object-fit: cover) force a la imagen a rellenar/recortar.
+  const base = {
+    objectFit: 'contain',
     transformOrigin: 'center center',
+  };
+
+  if (z <= 1.001) {
+    return {
+      ...base,
+      transform: 'scale(1)',
+    };
+  }
+
+  const tx = ((50 - p.x * z) / z);
+  const ty = ((50 - p.y * z) / z);
+
+  return {
+    ...base,
+    width: `${z * 100}%`,
+    height: `${z * 100}%`,
+    maxWidth: 'none',
+    maxHeight: 'none',
+    transform: `translate(${tx}%, ${ty}%)`,
   };
 }
 

@@ -6,23 +6,18 @@ import { FaSearchPlus, FaSearchMinus } from 'react-icons/fa';
  *
  * Editor de posicion y zoom para imagenes SIN librerias externas.
  *
- * El drag manipula el DOM directamente (sin pasar por React state) para
- * lograr respuesta instantánea.
- *
- * CRITICO: NO usamos object-position para posicionar porque con
- * object-fit: cover y aspect ratios iguales, el image content llena
- * el element box completamente — no hay espacio para reposicionar.
- *
- * En cambio, usamos transform: translate() para mover el ELEMENTO
- * ENTERO (no solo el contenido dentro de él), combinado con scale()
- * para el zoom. Así el posicionamiento funciona SIEMPRE.
+ * La imagen se muestra con object-fit: contain para que se vea COMPLETA
+ * en su ratio original, sin ser forzada al aspect ratio del contenedor.
+ * El zoom se aplica agrandando el elemento (width/height en vez de
+ * transform: scale), y translate() mueve el elemento agrandado.
+ * El drag es 1:1 en píxeles.
  *
  * Props:
  *   imageUrl        – URL de la imagen a editar
- *   initialPosition – String JSON: {"x":50,"y":50,"zoom":1} o legacy "50% 50%"
+ *   initialPosition – String JSON: {"x":50,"y":50,"zoom":1}
  *   aspectRatio     – Ratio del contenedor (ej: 1 para avatar, 3 para banner)
  *   circular        – true para mascara circular (avatar)
- *   onPositionChange – callback(positionString) donde positionString es JSON
+ *   onPositionChange – callback(positionString)
  *   style           – estilo adicional para el contenedor
  */
 export default function ImagePositionEditor({
@@ -55,23 +50,27 @@ export default function ImagePositionEditor({
   const [x, setX] = useState(init.x);
   const [y, setY] = useState(init.y);
   const [zoom, setZoom] = useState(init.zoom);
+  const [imgNaturalSize, setImgNaturalSize] = useState({ w: 1, h: 1 });
 
-  // Sincronizar refs con state
+  // Refs
   const xRef = useRef(x);
   const yRef = useRef(y);
   const zoomRef = useRef(zoom);
+  const imgNaturalRef = useRef({ w: 1, h: 1 });
   useEffect(() => { xRef.current = x; }, [x]);
   useEffect(() => { yRef.current = y; }, [y]);
   useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+  useEffect(() => { imgNaturalRef.current = imgNaturalSize; }, [imgNaturalSize]);
 
   const dragging = useRef(false);
-  const dragStart = useRef({ clientX: 0, clientY: 0, startX: 0, startY: 0, width: 1, height: 1 });
+  const dragStart = useRef({ clientX: 0, clientY: 0, translateX: 0, translateY: 0 });
+  const translateRef = useRef({ x: 0, y: 0 });
   const containerRef = useRef(null);
   const imgRef = useRef(null);
   const onPositionChangeRef = useRef(onPositionChange);
   useEffect(() => { onPositionChangeRef.current = onPositionChange; }, [onPositionChange]);
 
-  // Tamaño del contenedor (medido vía ref callback, inmediato)
+  // Tamaño del contenedor
   const containerSizeRef = useRef({ width: 1, height: 1 });
   const containerCallbackRef = useCallback((node) => {
     containerRef.current = node;
@@ -81,55 +80,100 @@ export default function ImagePositionEditor({
         containerSizeRef.current = { width: rect.width, height: rect.height };
       }
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Sincronizar transform inicial después de que todos los refs estén listos
-  useEffect(() => {
-    panTo(xRef.current, yRef.current, Math.max(zoomRef.current, 1.05));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  // panTo no está en deps porque se actualiza con containerSizeRef
-
-  // Zoom de visualización: mínimo 1.05x para que siempre haya overflow
-  const displayZoom = Math.max(zoom, 1.05);
-
-  // Calcular translate en píxeles para una posición (x,y) y zoom dados
-  const panTo = useCallback((posX, posY, z) => {
-    if (!imgRef.current) return;
-    const { width: cw, height: ch } = containerSizeRef.current;
-    const panX = (50 - posX) * (z - 1) * cw / (100 * z);
-    const panY = (50 - posY) * (z - 1) * ch / (100 * z);
-    imgRef.current.style.transform = `translate(${panX}px, ${panY}px) scale(${z})`;
   }, []);
 
-  // Notificar cambios al padre
+  // ── getContainedLayout ──
+  // Calcula el tamaño renderizado de la imagen con object-fit: contain
+  // dentro de un elemento de tamaño (elemW, elemH).
+  const getContainedLayout = useCallback((elemW, elemH, natW, natH) => {
+    if (!natW || !natH || natW <= 0 || natH <= 0) {
+      return { w: elemW, h: elemH, ox: 0, oy: 0 };
+    }
+    const fitScale = Math.min(elemW / natW, elemH / natH);
+    return {
+      w: natW * fitScale,
+      h: natH * fitScale,
+      ox: (elemW - natW * fitScale) / 2,
+      oy: (elemH - natH * fitScale) / 2,
+    };
+  }, []);
+
+  // Convertir posición (0-100) a translate en píxeles
+  const posToTranslate = useCallback((posX, posY, z) => {
+    const { width: cw, height: ch } = containerSizeRef.current;
+    const nat = imgNaturalRef.current;
+    const elemW = z * cw;
+    const elemH = z * ch;
+    const layout = getContainedLayout(elemW, elemH, nat.w, nat.h);
+    return {
+      x: (cw / 2) - layout.ox - (posX * layout.w) / 100,
+      y: (ch / 2) - layout.oy - (posY * layout.h) / 100,
+    };
+  }, [getContainedLayout]);
+
+  // Convertir translate en píxeles a posición (0-100)
+  const translateToPos = useCallback((tx, ty, z) => {
+    const { width: cw, height: ch } = containerSizeRef.current;
+    const nat = imgNaturalRef.current;
+    const elemW = z * cw;
+    const elemH = z * ch;
+    const layout = getContainedLayout(elemW, elemH, nat.w, nat.h);
+    const posX = layout.w > 0 ? ((cw / 2) - tx - layout.ox) * 100 / layout.w : 50;
+    const posY = layout.h > 0 ? ((ch / 2) - ty - layout.oy) * 100 / layout.h : 50;
+    return {
+      x: Math.round(Math.max(0, Math.min(100, posX))),
+      y: Math.round(Math.max(0, Math.min(100, posY))),
+    };
+  }, [getContainedLayout]);
+
+  // Aplicar transform al DOM
+  const applyTransform = useCallback((tx, ty) => {
+    if (!imgRef.current) return;
+    imgRef.current.style.transform = `translate(${tx}px, ${ty}px)`;
+    translateRef.current = { x: tx, y: ty };
+  }, []);
+
+  // Posicionar desde posición (0-100) y zoom
+  const panTo = useCallback((posX, posY, z) => {
+    const t = posToTranslate(posX, posY, z);
+    applyTransform(t.x, t.y);
+  }, [posToTranslate, applyTransform]);
+
+  // Inicializar posición cuando la imagen carga
+  const handleImgLoad = useCallback(() => {
+    if (imgRef.current) {
+      const nw = imgRef.current.naturalWidth || 1;
+      const nh = imgRef.current.naturalHeight || 1;
+      setImgNaturalSize({ w: nw, h: nh });
+      imgNaturalRef.current = { w: nw, h: nh };
+    }
+    panTo(xRef.current, yRef.current, zoomRef.current);
+  }, [panTo]);
+
+  // Notificar al padre
   const notify = useCallback(() => {
     const payload = JSON.stringify({
-      x: Math.round(xRef.current),
-      y: Math.round(yRef.current),
+      x: xRef.current,
+      y: yRef.current,
       zoom: Math.round(zoomRef.current * 10) / 10,
     });
     onPositionChangeRef.current?.(payload);
   }, []);
 
-  // ── Actualizar DOM durante el drag ──
+  // ── Drag (1:1 píxel a píxel) ──
   const updateDrag = useCallback((clientX, clientY) => {
     const d = dragStart.current;
-    const deltaX = ((clientX - d.clientX) / d.width) * 100;
-    const deltaY = ((clientY - d.clientY) / d.height) * 100;
-    const newX = Math.round(Math.max(0, Math.min(100, d.startX - deltaX)));
-    const newY = Math.round(Math.max(0, Math.min(100, d.startY - deltaY)));
-    const z = Math.max(zoomRef.current, 1.05);
+    const dx = clientX - d.clientX;
+    const dy = clientY - d.clientY;
+    const newTx = d.translateX + dx;
+    const newTy = d.translateY + dy;
+    applyTransform(newTx, newTy);
 
-    // Posicionar vía translate + scale sobre el DOM directamente
-    const panX = (50 - newX) * (z - 1) * d.width / (100 * z);
-    const panY = (50 - newY) * (z - 1) * d.height / (100 * z);
-    imgRef.current.style.transform = `translate(${panX}px, ${panY}px) scale(${z})`;
+    const pos = translateToPos(newTx, newTy, zoomRef.current);
+    xRef.current = pos.x;
+    yRef.current = pos.y;
+  }, [applyTransform, translateToPos]);
 
-    xRef.current = newX;
-    yRef.current = newY;
-  }, []);
-
-  // ── Mouse ──
   const handleMouseMove = useCallback((e) => {
     if (!dragging.current) return;
     updateDrag(e.clientX, e.clientY);
@@ -147,17 +191,13 @@ export default function ImagePositionEditor({
 
   const handleMouseDown = useCallback((e) => {
     e.preventDefault();
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
+    dragging.current = true;
     dragStart.current = {
       clientX: e.clientX,
       clientY: e.clientY,
-      startX: xRef.current,
-      startY: yRef.current,
-      width: rect.width,
-      height: rect.height,
+      translateX: translateRef.current.x,
+      translateY: translateRef.current.y,
     };
-    dragging.current = true;
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
   }, [handleMouseMove, handleMouseUp]);
@@ -181,23 +221,19 @@ export default function ImagePositionEditor({
 
   const handleTouchStart = useCallback((e) => {
     if (e.touches.length !== 1) return;
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
     const touch = e.touches[0];
+    dragging.current = true;
     dragStart.current = {
       clientX: touch.clientX,
       clientY: touch.clientY,
-      startX: xRef.current,
-      startY: yRef.current,
-      width: rect.width,
-      height: rect.height,
+      translateX: translateRef.current.x,
+      translateY: translateRef.current.y,
     };
-    dragging.current = true;
     window.addEventListener('touchmove', handleTouchMove, { passive: false });
     window.addEventListener('touchend', handleTouchEnd);
   }, [handleTouchMove, handleTouchEnd]);
 
-  // Cleanup al desmontar
+  // Cleanup
   useEffect(() => {
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
@@ -207,13 +243,34 @@ export default function ImagePositionEditor({
     };
   }, [handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
 
+  // ── Reset cuando cambia la imagen ──
+  const prevUrlRef = useRef(imageUrl);
+  useEffect(() => {
+    if (imageUrl !== prevUrlRef.current) {
+      prevUrlRef.current = imageUrl;
+      // Reset a centro y zoom=1 para que la NUEVA imagen se vea completa
+      setX(50);
+      setY(50);
+      setZoom(1);
+      xRef.current = 50;
+      yRef.current = 50;
+      zoomRef.current = 1;
+      // Limpiar translate del DOM para que la nueva imagen no herede
+      // la posicion de la anterior (evita flash visual)
+      if (imgRef.current) {
+        imgRef.current.style.transform = '';
+        translateRef.current = { x: 0, y: 0 };
+      }
+      // El translate lo aplica handleImgLoad cuando la imagen cargue
+    }
+  }, [imageUrl]);
+
   // ── Zoom ──
   const handleZoomChange = useCallback((e) => {
     const z = parseFloat(e.target.value);
     setZoom(z);
     zoomRef.current = z;
-    // Re-posicionar con el nuevo zoom
-    panTo(xRef.current, yRef.current, Math.max(z, 1.05));
+    panTo(xRef.current, yRef.current, z);
   }, [panTo]);
 
   const handleZoomCommit = useCallback(() => {
@@ -228,13 +285,14 @@ export default function ImagePositionEditor({
     xRef.current = 50;
     yRef.current = 50;
     zoomRef.current = 1;
-    panTo(50, 50, 1.05);
+    panTo(50, 50, 1);
     notify();
   }, [panTo, notify]);
 
   if (!imageUrl) return null;
 
   const borderRadius = circular ? '50%' : 'var(--radius-sm, 6px)';
+  const z = zoom;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, ...style }}>
@@ -246,6 +304,7 @@ export default function ImagePositionEditor({
           width: '100%',
           aspectRatio: String(aspectRatio),
           overflow: 'hidden',
+          lineHeight: 0,
           borderRadius,
           background: 'var(--color-surface-hover, #252525)',
           cursor: 'grab',
@@ -262,50 +321,47 @@ export default function ImagePositionEditor({
           draggable={false}
           style={{
             display: 'block',
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            // object-position no se usa porque no funciona cuando el
-            // image content llena el element box completamente.
-            // En su lugar, transform: translate() + scale() posiciona
-            // el ELEMENTO ENTERO, que siempre tiene efecto.
+            width: `${z * 100}%`,
+            height: `${z * 100}%`,
+            maxWidth: 'none',
+            maxHeight: 'none',
+            objectFit: 'contain',
             transformOrigin: 'center center',
             pointerEvents: 'none',
           }}
+          onLoad={handleImgLoad}
           onError={(e) => { e.target.style.display = 'none'; }}
         />
       </div>
 
       {/* ── Controls row ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <FaSearchMinus style={{ fontSize: '0.8rem', opacity: 0.6, flexShrink: 0 }} />
-        <input
-          type="range"
-          min="1"
-          max="3"
-          step="0.1"
-          value={zoom}
-          onChange={handleZoomChange}
-          onMouseUp={handleZoomCommit}
-          onTouchEnd={handleZoomCommit}
-          style={{ flex: 1 }}
-          className="fc-modal-range"
-        />
-        <FaSearchPlus style={{ fontSize: '0.8rem', opacity: 0.6, flexShrink: 0 }} />
-        <span style={{ fontSize: '0.75rem', opacity: 0.6, minWidth: 32, textAlign: 'right' }}>
+      <div className="fc-modal-range-row" style={{ gap: 6 }}>
+        <FaSearchMinus style={{ fontSize: '0.72rem', opacity: 0.5, flexShrink: 0 }} />
+        <div className="fc-modal-range-control" style={{ flex: 1 }}>
+          <input
+            type="range"
+            min="1"
+            max="3"
+            step="0.1"
+            value={zoom}
+            onChange={handleZoomChange}
+            onMouseUp={handleZoomCommit}
+            onTouchEnd={handleZoomCommit}
+            className="fc-modal-range"
+          />
+        </div>
+        <FaSearchPlus style={{ fontSize: '0.72rem', opacity: 0.5, flexShrink: 0 }} />
+        <span className="fc-modal-range-value" style={{ minWidth: 32 }}>
           {zoom.toFixed(1)}x
         </span>
         <button
           type="button"
           onClick={handleReset}
+          className="fc-modal-sub-cancel"
           style={{
-            background: 'none',
-            border: '1px solid var(--color-border, #2a2a2a)',
-            borderRadius: 'var(--radius-sm, 6px)',
-            color: 'var(--color-text-muted, #6b7280)',
             fontSize: '0.7rem',
-            padding: '2px 8px',
-            cursor: 'pointer',
+            padding: '2px 10px',
+            lineHeight: '20px',
             flexShrink: 0,
             whiteSpace: 'nowrap',
           }}
