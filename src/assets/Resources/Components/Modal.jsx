@@ -1471,7 +1471,7 @@ export default function Modal({
               key={showUrlModal}
               imageUrl={urlInput.trim()}
               initialPosition={showUrlModal === 'avatar' ? avatarPosition : bannerPosition}
-              aspectRatio={showUrlModal === 'avatar' ? 1 : 3}
+              aspectRatio={showUrlModal === 'avatar' ? 1 : 40 / 11}
               circular={showUrlModal === 'avatar'}
               onPositionChange={(pos) => {
                 if (showUrlModal === 'avatar') setAvatarPosition(pos);

@@ -98,7 +98,7 @@ export default function ImagePositionEditor({
     };
   }, []);
 
-  // Convertir posición (0-100) a translate en píxeles
+  // Convertir posición a translate en píxeles (sin límite 0-100)
   const posToTranslate = useCallback((posX, posY, z) => {
     const { width: cw, height: ch } = containerSizeRef.current;
     const nat = imgNaturalRef.current;
@@ -111,7 +111,11 @@ export default function ImagePositionEditor({
     };
   }, [getContainedLayout]);
 
-  // Convertir translate en píxeles a posición (0-100)
+  // Convertir translate en píxeles a posición (SIN límite 0-100).
+  // La posición puede ser menor a 0 o mayor a 100 si la imagen se
+  // arrastra dejando espacio alrededor (letterbox). getImageStyle
+  // reproduce cualquier valor porque object-position acepta % fuera
+  // de 0-100.
   const translateToPos = useCallback((tx, ty, z) => {
     const { width: cw, height: ch } = containerSizeRef.current;
     const nat = imgNaturalRef.current;
@@ -121,9 +125,36 @@ export default function ImagePositionEditor({
     const posX = layout.w > 0 ? ((cw / 2) - tx - layout.ox) * 100 / layout.w : 50;
     const posY = layout.h > 0 ? ((ch / 2) - ty - layout.oy) * 100 / layout.h : 50;
     return {
-      x: Math.round(Math.max(0, Math.min(100, posX))),
-      y: Math.round(Math.max(0, Math.min(100, posY))),
+      x: Math.round(posX),
+      y: Math.round(posY),
     };
+  }, [getContainedLayout]);
+
+  // ── clampTranslate ──
+  // El arrastre es LIBRE: la imagen puede moverse a cualquier posición,
+  // incluso dejando espacio alrededor (letterbox, p.ej. a 1.0x donde el
+  // contenido no cubre el contenedor), exactamente igual que lo
+  // reproduce getImageStyle en los contenedores. El único límite es que
+  // al menos un borde del contenido siga tocando el contenedor (nunca
+  // desaparece por completo de la vista).
+  const clampTranslate = useCallback((tx, ty, z) => {
+    const { width: cw, height: ch } = containerSizeRef.current;
+    const nat = imgNaturalRef.current;
+    const layout = getContainedLayout(z * cw, z * ch, nat.w, nat.h);
+    const M = 1; // margen de seguridad: un sliver siempre visible
+    // rango: borde derecho del contenido → borde izquierdo del
+    // contenedor, y borde izquierdo del contenido → borde derecho.
+    const clampX = (v) => {
+      const lo = -layout.ox - layout.w + M;
+      const hi = cw - layout.ox - M;
+      return Math.max(lo, Math.min(hi, v));
+    };
+    const clampY = (v) => {
+      const lo = -layout.oy - layout.h + M;
+      const hi = ch - layout.oy - M;
+      return Math.max(lo, Math.min(hi, v));
+    };
+    return { x: clampX(tx), y: clampY(ty) };
   }, [getContainedLayout]);
 
   // Aplicar transform al DOM
@@ -133,11 +164,16 @@ export default function ImagePositionEditor({
     translateRef.current = { x: tx, y: ty };
   }, []);
 
-  // Posicionar desde posición (0-100) y zoom
+  // Posicionar desde posición y zoom, clampeando solo para que el
+  // contenido no desaparezca por completo del contenedor.
   const panTo = useCallback((posX, posY, z) => {
     const t = posToTranslate(posX, posY, z);
-    applyTransform(t.x, t.y);
-  }, [posToTranslate, applyTransform]);
+    const c = clampTranslate(t.x, t.y, z);
+    applyTransform(c.x, c.y);
+    const pos = translateToPos(c.x, c.y, z);
+    xRef.current = pos.x;
+    yRef.current = pos.y;
+  }, [posToTranslate, clampTranslate, translateToPos, applyTransform]);
 
   // Inicializar posición cuando la imagen carga
   const handleImgLoad = useCallback(() => {
@@ -167,12 +203,17 @@ export default function ImagePositionEditor({
     const dy = clientY - d.clientY;
     const newTx = d.translateX + dx;
     const newTy = d.translateY + dy;
-    applyTransform(newTx, newTy);
 
-    const pos = translateToPos(newTx, newTy, zoomRef.current);
+    // Arrastre libre (sin límite de 0-100): la imagen puede dejar
+    // espacio alrededor; solo se evita que desaparezca por completo.
+    const z = zoomRef.current;
+    const c = clampTranslate(newTx, newTy, z);
+    applyTransform(c.x, c.y);
+
+    const pos = translateToPos(c.x, c.y, z);
     xRef.current = pos.x;
     yRef.current = pos.y;
-  }, [applyTransform, translateToPos]);
+  }, [applyTransform, clampTranslate, translateToPos]);
 
   const handleMouseMove = useCallback((e) => {
     if (!dragging.current) return;

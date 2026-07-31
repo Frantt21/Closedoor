@@ -19,6 +19,12 @@
     position: fixed;
     inset: 0;
     background-color: var(--color-bg);
+    background-image: var(--profile-bg-image, none);
+    background-position: var(--profile-bg-position, center center);
+    background-size: var(--profile-bg-size, cover);
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    filter: blur(var(--profile-bg-blur, 0px));
     pointer-events: none;
     z-index: -2;
 }

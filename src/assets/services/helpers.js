@@ -148,34 +148,25 @@ export function parseImagePosition(pos) {
  *
  * Usa object-fit: contain para mostrar la imagen COMPLETA en su ratio
  * original, igual que el editor. width/height: z*100% agranda el elemento
- * para el zoom, translate() lo posiciona, y overflow:hidden en el
- * contenedor padre clipea el excedente.
+ * para el zoom, y la combinación de object-position: x% y% con
+ * translate((50 - x*z)/z) posiciona el punto x% del CONTENIDO de la
+ * imagen (no del elemento) en el centro del contenedor — exactamente
+ * lo mismo que hace el editor con getContainedLayout, pero sin
+ * necesitar las dimensiones naturales de la imagen.
  *
- * Fórmula: tx = (50 - x * z) / z
+ * overflow:hidden en el contenedor padre clipea el excedente.
  */
 export function getImageStyle(positionStr) {
   const p = parseImagePosition(positionStr || '');
   const z = Math.max(p.zoom, 1);
 
-  // Siempre retornar objectFit: 'contain' para evitar que el CSS del
-  // contenedor (object-fit: cover) force a la imagen a rellenar/recortar.
-  const base = {
-    objectFit: 'contain',
-    transformOrigin: 'center center',
-  };
-
-  if (z <= 1.001) {
-    return {
-      ...base,
-      transform: 'scale(1)',
-    };
-  }
-
   const tx = ((50 - p.x * z) / z);
   const ty = ((50 - p.y * z) / z);
 
   return {
-    ...base,
+    objectFit: 'contain',
+    objectPosition: `${p.x}% ${p.y}%`,
+    transformOrigin: 'center center',
     width: `${z * 100}%`,
     height: `${z * 100}%`,
     maxWidth: 'none',

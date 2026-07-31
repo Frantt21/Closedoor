@@ -1293,50 +1293,14 @@ function Profile() {
       (ownerAccentVisibility === 'others' && !isOwnProfile)
     );
 
-    // ── Parse background position for body styling ──
-    const parseBgPosition = (pos) => {
-      if (!pos) return { bgPos: 'center center', bgSize: 'cover' };
-      try {
-        const p = JSON.parse(pos);
-        return {
-          bgPos: `${p.x ?? 50}% ${p.y ?? 50}%`,
-          bgSize: `${Math.max(p.zoom ?? 1, 1.05) * 100}%`,
-        };
-      } catch {
-        const m = String(pos).match(/(\d+(?:\.\d+)?)\s*%\s*(\d+(?:\.\d+)?)\s*%/);
-        return m ? { bgPos: `${m[1]}% ${m[2]}%`, bgSize: 'cover' } : { bgPos: 'center center', bgSize: 'cover' };
-      }
-    };
-    const bgPosData = parseBgPosition(activeProfile?.profile_background_position);
-
-    // ── Aplicar background directamente al <body> (solo en profile) ──
-    useEffect(() => {
-      const body = document.body;
-      const saved = {
-        bgImage: body.style.backgroundImage,
-        bgPos: body.style.backgroundPosition,
-        bgSize: body.style.backgroundSize,
-        bgRepeat: body.style.backgroundRepeat,
-        bgAttachment: body.style.backgroundAttachment,
-      };
-
-      if (hasBg) {
-        body.style.backgroundImage = `url(${bgUrl})`;
-        body.style.backgroundPosition = bgPosData.bgPos;
-        body.style.backgroundSize = bgPosData.bgSize;
-        body.style.backgroundRepeat = 'no-repeat';
-        body.style.backgroundAttachment = 'fixed';
-      }
-
-      return () => {
-        body.style.backgroundImage = saved.bgImage;
-        body.style.backgroundPosition = saved.bgPos;
-        body.style.backgroundSize = saved.bgSize;
-        body.style.backgroundRepeat = saved.bgRepeat;
-        body.style.backgroundAttachment = saved.bgAttachment;
-      };
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [hasBg, bgUrl, bgPosData.bgPos, bgPosData.bgSize]);
+    // ── Parse background position for ::before styling ──
+    let bgPos = 'center center';
+    let bgSize = 'cover';
+    try {
+      const p = JSON.parse(activeProfile?.profile_background_position || '{}');
+      bgPos = `${p.x ?? 50}% ${p.y ?? 50}%`;
+      bgSize = `${Math.max(p.zoom ?? 1, 1.05) * 100}%`;
+    } catch {}
 
     // ── Render ──
     if (!isAuthenticated && !profileUsername) {
@@ -1398,8 +1362,16 @@ function Profile() {
     const bgBlur = (activeProfile?.profile_background_blur ?? 0);
 
 
-    const styleVars = accentVisible
-      ? {
+    const bgVars = hasBg ? {
+      '--profile-bg-image': `url(${bgUrl})`,
+      '--profile-bg-position': bgPos,
+      '--profile-bg-size': bgSize,
+      '--profile-bg-blur': `${bgBlur}px`,
+    } : {};
+
+    const styleVars = {
+      ...bgVars,
+      ...(accentVisible ? {
           ...(activeProfile?.accent_color ? {
             '--accent-color': activeProfile.accent_color,
             '--accent-color-2': activeProfile?.accent_color_secondary || activeProfile.accent_color,
@@ -1446,21 +1418,19 @@ function Profile() {
             '--overlay-bg-active': 'rgba(0, 0, 0, 0.16)',
             '--overlay-bg': 'rgba(0, 0, 0, 0.08)',
           } : {}),
-        }
-      : {};
+        } : {}),
+    };
 
     return (            <div className="profile-page" style={styleVars}>
             {/* ── Dim & blur overlay for profile background ── */}
-            {hasBg && accentVisible && (
+            {hasBg && (
               <div
                 style={{
                   position: 'fixed',
                   inset: 0,
                   background: `linear-gradient(rgba(0,0,0,${bgDim}), rgba(0,0,0,${bgDim}))`,
-                  backdropFilter: bgBlur > 0 ? `blur(${bgBlur}px)` : 'none',
-                  WebkitBackdropFilter: bgBlur > 0 ? `blur(${bgBlur}px)` : 'none',
                   pointerEvents: 'none',
-                  zIndex: 1,
+                  zIndex: -1,
                 }}
               />
             )}
