@@ -32,7 +32,7 @@ export default function Avatar({ src, alt = 'avatar', className, style, onClick,
   // The inner <img> always has avatar-img class + explicit object-fit:cover.
   // The status dot (when shown) lives outside the clipping div so it's never clipped.
   return (
-    <div className={`avatar-wrapper ${className || ''}`.trim()} style={{ position: 'relative', display: 'inline-flex' }}>
+    <div className={`avatar-wrapper ${className || ''}`.trim()} style={{ position: 'relative', display: 'inline-flex', overflow: 'visible' }}>
       <div style={{ width: '100%', height: '100%', borderRadius: 'inherit', overflow: 'hidden' }}>
         <img
           className="avatar-img"

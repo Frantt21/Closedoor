@@ -676,8 +676,9 @@
     height: 34px;
     border-radius: 50%;
     object-fit: cover;
-    overflow: hidden;
+    overflow: visible;
     flex-shrink: 0;
+    position: relative;
 }
 
 .chat-message-row--own .chat-message-avatar {

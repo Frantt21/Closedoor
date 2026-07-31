@@ -213,6 +213,7 @@ body:has(.sidebar--collapsed) .app-layout--chat {
 .avatar-wrapper {
     position: relative;
     display: inline-flex;
+    overflow: visible;
     /* Inherited styles from className are applied by specific CSS rules below */
 }
 
@@ -227,13 +228,13 @@ body:has(.sidebar--collapsed) .app-layout--chat {
 
 .status-dot {
     position: absolute;
-    bottom: 1px;
-    right: 1px;
+    bottom: 2px;
+    right: 2px;
     width: 12px;
     height: 12px;
     border-radius: 50%;
     border: 2px solid var(--color-bg, #000000);
-    z-index: 2;
+    z-index: 3;
     pointer-events: none;
     flex-shrink: 0;
 }
