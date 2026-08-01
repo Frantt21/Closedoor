@@ -26,8 +26,14 @@ export async function issueLiveKitToken({
   accessToken,
   room,
 }) {
-  if (!supabaseUrl || !supabaseKey || !livekitUrl || !livekitApiKey || !livekitApiSecret) {
-    return { ok: false, status: 500, error: 'LiveKit not configured' };
+  const missingVars = [];
+  if (!supabaseUrl) missingVars.push('VITE_SUPABASE_URL');
+  if (!supabaseKey) missingVars.push('VITE_SUPABASE_ANON_KEY');
+  if (!livekitUrl) missingVars.push('LIVEKIT_URL');
+  if (!livekitApiKey) missingVars.push('LIVEKIT_API_KEY');
+  if (!livekitApiSecret) missingVars.push('LIVEKIT_API_SECRET');
+  if (missingVars.length > 0) {
+    return { ok: false, status: 500, error: `LiveKit not configured: missing ${missingVars.join(', ')}` };
   }
   if (!accessToken) {
     return { ok: false, status: 401, error: 'Missing auth token' };

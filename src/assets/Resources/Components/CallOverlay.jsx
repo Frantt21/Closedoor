@@ -23,18 +23,20 @@ import { getLiveKitToken } from '../../services/callService';
  */
 export default function CallOverlay({ call, role, peer, status, onAccept, onDecline, onClose, t }) {
   const [conn, setConn] = useState(null); // { token, url }
-  const [tokenError, setTokenError] = useState(false);
+  // tokenError: null = sin error | string = mensaje real devuelto por /api/livekit-token
+  const [tokenError, setTokenError] = useState(null);
 
   // ── Al pasar a 'active', pedir el token de LiveKit ──
   useEffect(() => {
     if (status !== 'active' || conn || !call?.room_name) return;
     let cancelled = false;
-    setTokenError(false);
+    setTokenError(null);
     getLiveKitToken(call.room_name)
       .then((data) => { if (!cancelled) setConn(data); })
       .catch((err) => {
-        console.warn('[CALL] getLiveKitToken error:', err?.message || err);
-        if (!cancelled) setTokenError(true);
+        const msg = err?.message || String(err || 'Could not start the call');
+        console.warn('[CALL] getLiveKitToken error:', msg);
+        if (!cancelled) setTokenError(msg);
       });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -70,7 +72,12 @@ export default function CallOverlay({ call, role, peer, status, onAccept, onDecl
                 <FaSpinner className="chat-call-spin" /> {t('chat.call_connecting') || 'Connecting…'}
               </>
             )}
-            {tokenError && (t('chat.call_error') || 'Could not start the call')}
+            {tokenError && (
+              <span className="chat-call-error">
+                {t('chat.call_error') || 'Could not start the call'}
+                <small className="chat-call-error-detail">{tokenError}</small>
+              </span>
+            )}
             {isRinging && role === 'caller' && (t('chat.call_calling') || 'Calling…')}
             {isRinging && role === 'callee' && (t('chat.call_incoming') || 'Incoming call…')}
             {status === 'ended' && (t('chat.call_ended') || 'Call ended')}

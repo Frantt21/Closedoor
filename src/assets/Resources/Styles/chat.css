@@ -3170,6 +3170,22 @@ dialog.fc-modal.chat-followers-modal {
     min-height: 1.2em;
 }
 
+.chat-call-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    text-align: center;
+}
+
+.chat-call-error-detail {
+    font-size: 0.72rem;
+    line-height: 1.35;
+    color: var(--color-text-muted, #6b7280);
+    max-width: 260px;
+    word-break: break-word;
+}
+
 .chat-call-spin {
     animation: chatCallSpin 0.9s linear infinite;
 }
