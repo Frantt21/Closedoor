@@ -29,6 +29,7 @@ export async function startCall(conversationId, callerId, calleeId) {
   const callId = crypto.randomUUID();
   const roomName = `call-${callId}`;
 
+  console.log('[CALL] startCall insert', { conversationId, callerId, calleeId, roomName });
   const { data, error } = await supabase
     .from('calls')
     .insert({
@@ -42,6 +43,7 @@ export async function startCall(conversationId, callerId, calleeId) {
     .select()
     .single();
 
+  console.log('[CALL] startCall result', { data, error });
   if (error) throw error;
   return data;
 }
@@ -52,6 +54,7 @@ export async function startCall(conversationId, callerId, calleeId) {
  * @param {'ringing'|'active'|'ended'|'missed'|'declined'} status
  */
 export async function updateCallStatus(callId, status) {
+  console.log('[CALL] updateCallStatus', { callId, status });
   const patch = { status };
   if (status === 'active') {
     patch.started_at = new Date().toISOString();
@@ -88,7 +91,8 @@ export async function getCall(callId) {
  * @returns {() => void} unsubscribe
  */
 export function subscribeToCalls(userId, onCall) {
-  return supabase
+  console.log('[CALL] subscribeToCalls', userId);
+  const channel = supabase
     .channel(`calls-${userId}`)
     .on(
       'postgres_changes',
@@ -100,11 +104,15 @@ export function subscribeToCalls(userId, onCall) {
         filter: `or=(caller_id.eq.${userId},callee_id.eq.${userId})`,
       },
       (payload) => {
+        console.log('[CALL] payload received', { eventType: payload.eventType, newRow: payload.new, oldRow: payload.old });
         const call = payload.new || payload.old;
         if (call) onCall(call, payload.eventType);
       }
-    )
-    .subscribe();
+    );
+  channel.subscribe((status, err) => {
+    console.log('[CALL] channel status', status, err ? JSON.stringify(err) : '');
+  });
+  return channel;
 }
 
 /**
