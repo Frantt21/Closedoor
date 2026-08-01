@@ -70,11 +70,17 @@
     border: var(--accent-surface-border, none);
     isolation: isolate;
     transition: background 0.2s ease, backdrop-filter 0.2s ease, border 0.2s ease;
-    /* ⚠️ Perf: solo en el perfil (donde hay listas largas) el navegador omite
-       paint/layout de cards fuera de viewport. contain-intrinsic-size evita
-       el salto de scroll (320px ≈ card con imagen). */
-    content-visibility: auto;
-    contain-intrinsic-size: auto 320px;
+}
+
+/* ── Rows virtualizados (VirtualPostList en el perfil) ──
+   La virtualización ya evita montar cards fuera de viewport, así que
+   content-visibility ya no hace falta. El row lleva el espaciado de 12px
+   que antes ponía el margin-bottom de .post-card. */
+.virtual-post-row .post-card {
+    margin-bottom: 0;
+}
+.virtual-post-row {
+    padding-bottom: 12px;
 }
 
 .profile-page .post-card:hover {
