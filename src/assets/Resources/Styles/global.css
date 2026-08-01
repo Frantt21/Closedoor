@@ -71,8 +71,9 @@ body,
 }
 
 /* ── Global scrollbar customization: track transparent, thumb visible ── */
-/* No scrollbar-gutter: stable — the scrollbar should overlay on top of content
-   without reserving real layout space, so it never affects the layout. */
+/* Se reserva el espacio del scrollbar (scrollbar-gutter: stable) para evitar
+   saltos de layout al abrir modales (overflow: hidden) o al navegar entre
+   páginas de distinta altura: el gutter permanece aunque no haya scroll. */
 html::-webkit-scrollbar {
     width: 6px;
 }
@@ -94,6 +95,9 @@ html::-webkit-scrollbar-thumb:hover {
 html {
     scrollbar-width: thin;
     scrollbar-color: var(--color-border, #2a2a2a) transparent;
+    /* Reservar el gutter del scrollbar siempre (evita saltos al abrir
+       modales o al cambiar el contenido de altura). */
+    scrollbar-gutter: stable;
 }
 
 body {

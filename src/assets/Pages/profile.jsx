@@ -61,7 +61,7 @@ import usePageMeta from "../../hooks/usePageMeta";
 import useBgContrast from "../../hooks/useBgContrast";
 import FollowersModal from "../Resources/Components/FollowersModal";
 import ModalShell from "../Resources/Components/ModalShell";
-import PostCard from "../Resources/Components/PostCard";
+import ConfirmModal from "../Resources/Components/ConfirmModal";
 import CreatePostModal from "../Resources/Components/CreatePostModal";
 import FloatingActionButton from "../Resources/Components/FloatingActionButton";
 import { toast } from 'react-toastify';
@@ -179,6 +179,7 @@ function Profile() {
   // ── Block / context menu state ──
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [blockLoading, setBlockLoading] = useState(false);
+  const [confirmBlock, setConfirmBlock] = useState(false);
   const [dropdownStyle, setDropdownStyle] = useState({});
   const contextMenuRef = useRef(null);
   const dropdownRef = useRef(null);
@@ -1196,6 +1197,47 @@ function Profile() {
         setNicknameModalUser(null);
     }, [nicknameModalUser]);
 
+    // ── Block/unblock (confirmación solo al bloquear) ──
+    const handleBlockToggle = useCallback(async () => {
+        if (!user?.id || !activeProfile?.id) return;
+        setBlockLoading(true);
+        try {
+            if (isBlockedByMe) {
+                await unblockUser(user.id, activeProfile.id);
+                setIsBlockedByMeDb(false);
+                cacheBlockStatus(user.id, activeProfile.id, false);
+            } else {
+                await blockUser(user.id, activeProfile.id);
+                // Auto-unfollow: ambos sentidos via RPC (bypass RLS)
+                try {
+                    await unfollowBothWays(user.id, activeProfile.id);
+                    setIsFollower(false);
+                    setCachedFollowStatus(user.id, activeProfile.id, false);
+                    setIsFollowedBy(false);
+                    setCachedFollowStatus(activeProfile.id, user.id, false);
+                } catch (e) {
+                    console.warn('Could not unfollow both ways on block:', e);
+                }
+                // Refrescar follow counts despues de anular seguimiento
+                try {
+                    const counts = await getFollowCounts(activeProfile.id);
+                    setFollowCounts(counts);
+                    setCachedFollowCounts(activeProfile.id, counts);
+                    setCountsLoading(false);
+                } catch (e) {
+                    console.warn('Could not refresh follow counts after block:', e);
+                }
+                setIsBlockedByMeDb(true);
+                cacheBlockStatus(user.id, activeProfile.id, true);
+            }
+            setContextMenuOpen(false);
+        } catch (err) {
+            console.error('Block/unblock error:', err);
+        } finally {
+            setBlockLoading(false);
+        }
+    }, [user?.id, activeProfile?.id, isBlockedByMe]);
+
     const getDisplayName = (otherProfile) => {
         if (!otherProfile) return t('common.unknown');
         const nick = nicknames[otherProfile.id];
@@ -1325,6 +1367,35 @@ function Profile() {
         }
         return map;
     }, [profilePosts, activeProfile?.username]);
+
+    // ── Replies: posts sintéticos (comentario como card) + replyInfo por id de comentario ──
+    // Identidad estable (useMemo) para que React.memo de PostCard salte re-renders
+    // al scrollear. getKey en VirtualPostList resuelve por commentId (varias
+    // replies al mismo post comparten post_id → no pueden usar post.id como key).
+    const repliesPosts = useMemo(() => replies.map((reply) => ({
+        id: reply.post_id,
+        commentId: reply.id,
+        content: reply.content,
+        image_urls: reply.image_url ? [reply.image_url] : [],
+        image_url: null,
+        video_url: reply.video_url,
+        likes_count: reply.comment_likes_count || 0,
+        dislikes_count: reply.comment_dislikes_count || 0,
+        created_at: reply.created_at,
+        user_id: reply.profiles?.id || reply.user_id,
+        profiles: reply.profiles,
+    })), [replies]);
+
+    const replyInfoByPostId = useMemo(() => {
+        const map = new Map();
+        for (const reply of replies) {
+            map.set(reply.id, {
+                commentId: reply.id,
+                replyTo: reply.posts?.profiles?.username || t('common.unknown'),
+            });
+        }
+        return map;
+    }, [replies, t]);
 
     // ── Extract body background vars early (must be before early returns for hook ordering) ──
     const bgUrl = activeProfile?.profile_background_url;
@@ -1801,42 +1872,13 @@ function Profile() {
                   <button
                     type="button"
                     className="fc-dropdown-btn"
-                    onClick={async () => {
-                      setBlockLoading(true);
-                      try {
-                        if (isBlockedByMe) {
-                          await unblockUser(user.id, activeProfile.id);
-                          setIsBlockedByMeDb(false);
-                          cacheBlockStatus(user.id, activeProfile.id, false);
-                        } else {
-                          await blockUser(user.id, activeProfile.id);
-                          // Auto-unfollow: ambos sentidos via RPC (bypass RLS)
-                          try {
-                            await unfollowBothWays(user.id, activeProfile.id);
-                            setIsFollower(false);
-                            setCachedFollowStatus(user.id, activeProfile.id, false);
-                            setIsFollowedBy(false);
-                            setCachedFollowStatus(activeProfile.id, user.id, false);
-                          } catch (e) {
-                            console.warn('Could not unfollow both ways on block:', e);
-                          }
-                          // Refrescar follow counts despues de anular seguimiento
-                          try {
-                            const counts = await getFollowCounts(activeProfile.id);
-                            setFollowCounts(counts);
-                            setCachedFollowCounts(activeProfile.id, counts);
-                            setCountsLoading(false);
-                          } catch (e) {
-                            console.warn('Could not refresh follow counts after block:', e);
-                          }
-                          setIsBlockedByMeDb(true);
-                          cacheBlockStatus(user.id, activeProfile.id, true);
-                        }
+                    onClick={() => {
+                      if (isBlockedByMe) {
+                        // Desbloquear no requiere confirmación
+                        handleBlockToggle();
+                      } else {
                         setContextMenuOpen(false);
-                      } catch (err) {
-                        console.error('Block/unblock error:', err);
-                      } finally {
-                        setBlockLoading(false);
+                        setConfirmBlock(true);
                       }
                     }}
                     disabled={blockLoading}
@@ -2101,14 +2143,13 @@ function Profile() {
                                 {t('profile.no_saved_sub')}
                             </p>
                         </div>
-                    ) : savedPosts.map((post) => (
-                            <PostCard
-                                key={post.id}
-                                post={post}
-                                liked={savedLikedIds.includes(post.id)}
-                                disliked={savedDislikedIds.includes(post.id)}
-                                reposted={savedRepostedIds.includes(post.id)}
-                                saved={true}
+                    ) : (
+                            <VirtualPostList
+                                posts={savedPosts}
+                                likedIds={savedLikedIds}
+                                dislikedIds={savedDislikedIds}
+                                repostedIds={savedRepostedIds}
+                                savedIds={savedPosts.map((p) => p.id)}
                                 onUpdate={handlePostUpdate}
                                 onDelete={handlePostDelete}
                                 onSaveToggle={handleSaveToggle}
@@ -2116,7 +2157,7 @@ function Profile() {
                                 onDislikeToggle={handleDislikeToggle}
                                 onRepostToggle={handleRepostToggle}
                             />
-                        ))
+                        )
                 ) : tab === 'likes' ? (
                     likedPostsLoading ? (
                         <div className="posts-skeleton">
@@ -2145,14 +2186,13 @@ function Profile() {
                                     : t('profile.no_likes_sub_other')}
                             </p>
                         </div>
-                    ) : (isOwnProfile ? showLikes : activeProfile?.show_likes) && likedPosts.map((post) => (
-                            <PostCard
-                                key={post.id}
-                                post={post}
-                                liked={likedLikedIds.includes(post.id)}
-                                disliked={likedDislikedIds.includes(post.id)}
-                                reposted={likedRepostedIds.includes(post.id)}
-                                saved={likedSavedIds.includes(post.id)}
+                    ) : (isOwnProfile ? showLikes : activeProfile?.show_likes) && (
+                            <VirtualPostList
+                                posts={likedPosts}
+                                likedIds={likedLikedIds}
+                                dislikedIds={likedDislikedIds}
+                                repostedIds={likedRepostedIds}
+                                savedIds={likedSavedIds}
                                 onUpdate={handlePostUpdate}
                                 onDelete={handlePostDelete}
                                 onSaveToggle={handleSaveToggle}
@@ -2160,7 +2200,7 @@ function Profile() {
                                 onDislikeToggle={handleDislikeToggle}
                                 onRepostToggle={handleRepostToggle}
                             />
-                        ))
+                        )
                 ) : tab === 'scheduled' ? (
                     scheduledPostsLoading ? (
                         <div className="posts-skeleton">
@@ -2185,14 +2225,13 @@ function Profile() {
                                 {t('profile.no_scheduled_sub') || 'Programa un post para que se publique automáticamente.'}
                             </p>
                         </div>
-                    ) : isOwnProfile && scheduledPosts.map((post) => (
-                            <PostCard
-                                key={post.id}
-                                post={post}
-                                liked={false}
-                                disliked={false}
-                                reposted={false}
-                                saved={false}
+                    ) : isOwnProfile && (
+                            <VirtualPostList
+                                posts={scheduledPosts}
+                                likedIds={[]}
+                                dislikedIds={[]}
+                                repostedIds={[]}
+                                savedIds={[]}
                                 onUpdate={handlePostUpdate}
                                 onDelete={handlePostDelete}
                                 onSaveToggle={handleSaveToggle}
@@ -2200,7 +2239,7 @@ function Profile() {
                                 onDislikeToggle={handleDislikeToggle}
                                 onRepostToggle={handleRepostToggle}
                             />
-                        ))
+                        )
                 ) : tab === 'replies' ? (
                     repliesLoading ? (
                         <div className="posts-skeleton">
@@ -2230,33 +2269,15 @@ function Profile() {
                             </p>
                         </div>
                     ) : (
-                        replies.map((reply) => {
-                            const replyPost = {
-                                id: reply.post_id,
-                                commentId: reply.id,
-                                content: reply.content,
-                                image_urls: reply.image_url ? [reply.image_url] : [],
-                                image_url: null,
-                                video_url: reply.video_url,
-                                likes_count: reply.comment_likes_count || 0,
-                                dislikes_count: reply.comment_dislikes_count || 0,
-                                created_at: reply.created_at,
-                                user_id: reply.profiles?.id || reply.user_id,
-                                profiles: reply.profiles,
-                            };
-                            return (
-                                <PostCard
-                                    key={reply.id}
-                                    post={replyPost}
-                                    liked={repliesLikedIds.includes(reply.id)}
-                                    disliked={repliesDislikedIds.includes(reply.id)}
-                                    replyInfo={{
-                                        commentId: reply.id,
-                                        replyTo: reply.posts?.profiles?.username || t('common.unknown'),
-                                    }}
-                                />
-                            );
-                        })
+                        <VirtualPostList
+                            posts={repliesPosts}
+                            likedIds={repliesLikedIds}
+                            dislikedIds={repliesDislikedIds}
+                            repostedIds={[]}
+                            savedIds={[]}
+                            getKey={(post) => post.commentId || post.id}
+                            replyInfoByPostId={replyInfoByPostId}
+                        />
                     )
                 ) : null}
             </div>
@@ -2289,6 +2310,15 @@ function Profile() {
                     onClose={() => setNicknameModalUser(null)}
                     onSaved={handleSavedNickname}
                 />
+
+            {/* Block confirmation */}
+            {confirmBlock && (
+                <ConfirmModal
+                    message={t('block.confirm_block', { user: activeProfile?.username || 'user' })}
+                    onConfirm={() => { setConfirmBlock(false); handleBlockToggle(); }}
+                    onCancel={() => setConfirmBlock(false)}
+                />
+            )}
         </div>
     );
 }

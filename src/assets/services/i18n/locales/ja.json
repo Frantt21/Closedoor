@@ -32,6 +32,7 @@
   "block.block": "ユーザーをブロック",
   "block.blocked": "ブロック済み",
   "block.blocked_user": "@{user}をブロックしました",
+  "block.confirm_block": "@{user}をブロックしますか？このユーザーはあなたのプロフィールや投稿を表示できなくなります。",
   "block.interests_hidden": "ブロックにより興味が非表示です",
   "block.no_blocked_users": "ブロックしたユーザーはいません。",
   "block.stats_hidden": "ブロックによりコンテンツが非表示です",

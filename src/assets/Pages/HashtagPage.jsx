@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useI18n } from '../services/i18n/useI18n';
 import { getPostsByHashtag, searchPostsByContent } from '../services/hashtagService';
 import { getLikedPostIds, getRepostedPostIds, getDislikedPostIds, clearFeedCache } from '../services/postService';
-import PostCard from '../Resources/Components/PostCard';
+import VirtualPostList from '../Resources/Components/VirtualPostList';
 import { FaArrowLeft, FaHashtag, FaRegSadTear, FaFire } from 'react-icons/fa';
 import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/post.css';
@@ -152,21 +152,19 @@ export default function HashtagPage() {
         </div>
       ) : (
         <div className="posts-feed">
-          {posts.map((post) => (
-            <PostCard
-              key={post.id}
-              post={post}
-              liked={likedIds.includes(post.id)}
-              disliked={dislikedIds.includes(post.id)}
-              reposted={repostedIds.includes(post.id)}
-              onUpdate={handlePostUpdate}
-              onDelete={handlePostDelete}
-              onLikeToggle={handleLikeToggle}
-              onDislikeToggle={handleDislikeToggle}
-              onRepostToggle={handleRepostToggle}
-              onBlockUser={handleBlockUser}
-            />
-          ))}
+          <VirtualPostList
+            posts={posts}
+            likedIds={likedIds}
+            dislikedIds={dislikedIds}
+            repostedIds={repostedIds}
+            savedIds={[]}
+            onUpdate={handlePostUpdate}
+            onDelete={handlePostDelete}
+            onLikeToggle={handleLikeToggle}
+            onDislikeToggle={handleDislikeToggle}
+            onRepostToggle={handleRepostToggle}
+            onBlockUser={handleBlockUser}
+          />
         </div>
       )}
     </div>

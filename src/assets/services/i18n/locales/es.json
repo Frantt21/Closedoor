@@ -32,6 +32,7 @@
   "block.block": "Bloquear usuario",
   "block.blocked": "Bloqueado",
   "block.blocked_user": "Has bloqueado a @{user}",
+  "block.confirm_block": "¿Seguro que quieres bloquear a @{user}? No podrá ver tu perfil ni tus publicaciones.",
   "block.interests_hidden": "Intereses ocultos por bloqueo",
   "block.no_blocked_users": "No has bloqueado a ningún usuario todavía.",
   "block.stats_hidden": "Contenido oculto por bloqueo",

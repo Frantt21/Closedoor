@@ -32,6 +32,7 @@
   "block.block": "Block user",
   "block.blocked": "Blocked",
   "block.blocked_user": "You've blocked @{user}",
+  "block.confirm_block": "Are you sure you want to block @{user}? They won't be able to see your profile or posts.",
   "block.interests_hidden": "Interests hidden due to block",
   "block.no_blocked_users": "You haven't blocked any users yet.",
   "block.stats_hidden": "Content hidden due to block",

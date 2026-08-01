@@ -18,6 +18,17 @@ function VirtualPostList({
     repostedIds,
     savedIds,
     repostInfoByPostId = null,
+    replyInfoByPostId = null,
+    // Resuelve la clave única de cada row (React key + lookups de liked/
+    // disliked/reposted/saved/replyInfo). Para posts normales es post.id;
+    // para replies (varias por post) es post.commentId || post.id.
+    getKey = null,
+    // Renderizador custom (ej. NotificationItem). Si se pasa, se usa en vez
+    // de PostCard; recibe (item, rowKey) y devuelve el JSX de la fila.
+    renderItem = null,
+    // Altura estimada por row para el primer paint, antes de que el
+    // ResizeObserver mida la real. 332 = PostCard; ~96 = NotificationItem.
+    estimateHeight = 332,
     onUpdate,
     onDelete,
     onSaveToggle,
@@ -36,9 +47,11 @@ function VirtualPostList({
     // Ref al array actual: los listeners/observers (creados una vez) siempre
     // leen la última versión → sin closures stale al cambiar posts.length.
     const postsRef = useRef(posts);
-    // 320 (card) + 12 (padding-bottom del row) para que el primer paint ya
-    // incluya el gap entre cards antes de que el ResizeObserver mida.
-    const ESTIMATE = 332;
+    // Altura estimada por row para el primer paint, antes de que el
+    // ResizeObserver mida la real. 332 = PostCard; ~96 = NotificationItem.
+    // computeRange es un callback estable ([]) que captura ESTIMATE al
+    // crearse; como estimateHeight es constante por instancia, es seguro.
+    const ESTIMATE = estimateHeight;
     const OVERSCAN = 900; // px extra arriba/abajo del viewport
 
     // Calcula el rango visible midiendo EN VIVO la posición del contenedor
@@ -196,9 +209,10 @@ function VirtualPostList({
             <div style={{ height: total, position: 'relative', width: '100%' }}>
                 {visible.map((i) => {
                     const post = posts[i];
+                    const rowKey = getKey ? getKey(post) : post.id;
                     return (
                         <div
-                            key={post.id}
+                            key={rowKey}
                             data-index={i}
                             ref={rowRef}
                             className="virtual-post-row"
@@ -210,21 +224,26 @@ function VirtualPostList({
                                 transform: `translateY(${positions[i]}px)`,
                             }}
                         >
-                            <PostCard
-                                post={post}
-                                liked={likedIds.includes(post.id)}
-                                disliked={dislikedIds.includes(post.id)}
-                                reposted={repostedIds.includes(post.id)}
-                                saved={savedIds.includes(post.id)}
-                                onUpdate={onUpdate}
-                                onDelete={onDelete}
-                                onSaveToggle={onSaveToggle}
-                                onLikeToggle={onLikeToggle}
-                                onDislikeToggle={onDislikeToggle}
-                                onRepostToggle={onRepostToggle}
-                                onBlockUser={onBlockUser}
-                                repostInfo={repostInfoByPostId?.get(post.id) || null}
-                            />
+                            {renderItem ? (
+                                renderItem(post, rowKey)
+                            ) : (
+                                <PostCard
+                                    post={post}
+                                    liked={likedIds.includes(rowKey)}
+                                    disliked={dislikedIds.includes(rowKey)}
+                                    reposted={repostedIds.includes(rowKey)}
+                                    saved={savedIds.includes(rowKey)}
+                                    onUpdate={onUpdate}
+                                    onDelete={onDelete}
+                                    onSaveToggle={onSaveToggle}
+                                    onLikeToggle={onLikeToggle}
+                                    onDislikeToggle={onDislikeToggle}
+                                    onRepostToggle={onRepostToggle}
+                                    onBlockUser={onBlockUser}
+                                    repostInfo={repostInfoByPostId?.get(rowKey) || null}
+                                    replyInfo={replyInfoByPostId?.get(rowKey) || null}
+                                />
+                            )}
                         </div>
                     );
                 })}

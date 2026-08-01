@@ -7,6 +7,7 @@ import { acceptFollowRequest, rejectFollowRequest } from '../services/followServ
 import { FaUserPlus, FaHeart, FaHeartBroken, FaComment, FaRetweet, FaBullhorn, FaBell, FaLock, FaPoll, FaCheck, FaTimes } from 'react-icons/fa';
 import Avatar from '../Resources/Components/Avatar';
 import Tooltip from '../Resources/Components/Tooltip';
+import VirtualPostList from '../Resources/Components/VirtualPostList';
 import '../Resources/Styles/notifications.css';
 import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/skeleton.css';
@@ -269,18 +270,23 @@ export default function Notifications() {
         </div>
       ) : (
         <div className="notifications-list">
-          {notifications.map((notif) => (              <NotificationItem
-              key={notif.id}
-              notification={notif}
-              isSelected={selectedIds.includes(notif.id)}
-              isDeleting={deletingIds.has(notif.id)}
-              onSelect={() => handleSelectOne(notif.id)}
-              onMarkAsRead={markAsRead}
-              onDelete={() => handleDeleteOne(notif.id)}
-              onAcceptRequest={handleAcceptRequest}
-              onRejectRequest={handleRejectRequest}
-            />
-          ))}
+          <VirtualPostList
+            posts={notifications}
+            getKey={(n) => n.id}
+            estimateHeight={96}
+            renderItem={(notif) => (
+              <NotificationItem
+                notification={notif}
+                isSelected={selectedIds.includes(notif.id)}
+                isDeleting={deletingIds.has(notif.id)}
+                onSelect={() => handleSelectOne(notif.id)}
+                onMarkAsRead={markAsRead}
+                onDelete={() => handleDeleteOne(notif.id)}
+                onAcceptRequest={handleAcceptRequest}
+                onRejectRequest={handleRejectRequest}
+              />
+            )}
+          />
         </div>
       )}
     </div>

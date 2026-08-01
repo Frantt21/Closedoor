@@ -32,6 +32,7 @@
   "block.block": "Заблокировать",
   "block.blocked": "Заблокирован",
   "block.blocked_user": "Вы заблокировали @{user}",
+  "block.confirm_block": "Вы уверены, что хотите заблокировать @{user}? Он не сможет видеть ваш профиль и публикации.",
   "block.interests_hidden": "Интересы скрыты из-за блокировки",
   "block.no_blocked_users": "Вы еще никого не заблокировали.",
   "block.stats_hidden": "Контент скрыт из-за блокировки",
