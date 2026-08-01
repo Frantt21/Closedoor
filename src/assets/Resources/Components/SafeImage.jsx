@@ -64,6 +64,8 @@ export default function SafeImage({
       src={normalizedSrc}
       alt={alt}
       className={className}
+      loading="lazy"
+      decoding="async"
       onClick={onClick}
       onError={handleError}
       style={style}

@@ -453,6 +453,8 @@ export async function likePost(postId, userId) {
     console.error('Error liking post:', error);
     throw error;
   }
+  // Like = interacción válida → contar vista (dedup server-side)
+  trackPostView(postId, userId).catch(() => {});
 }
 
 export async function unlikePost(postId, userId) {
@@ -577,6 +579,8 @@ export async function createComment({ postId, userId, content, parentId = null, 
     console.error('Error creating comment:', error);
     throw error;
   }
+  // Comentar = interacción válida → contar vista (dedup server-side)
+  trackPostView(postId, userId).catch(() => {});
 
   // Notificar a usuarios @mencionados en el comentario (en background)
   // Nota: La notificación al dueño del post la maneja el DB Trigger
@@ -784,6 +788,8 @@ export async function repostPost(postId, userId) {
     console.error('Error reposting:', error);
     throw error;
   }
+  // Repost = interacción válida → contar vista (dedup server-side)
+  trackPostView(postId, userId).catch(() => {});
 }
 
 export async function unrepostPost(postId, userId) {
@@ -814,74 +820,36 @@ export async function isReposted(postId, userId) {
 
 // ── VIEWS ──
 
-const VIEWED_POSTS_KEY = 'fc_viewed_';
-
-// Whether the increment_post_views RPC function is available (checked once, cached)
-let _rpcAvailable = true;
-
 /**
- * Track a post view (once per user per post, dedup via localStorage)
- * Increments views_count on the post if not already viewed.
- * Uses a PostgreSQL RPC function for atomic increment (no race condition).
- * Requires running migrations/046_increment_views_function.sql in the DB.
+ * Track a post view (una vez por usuario por post, dedup server-side).
+ *
+ * El dedup real lo hace la tabla `post_views` (UNIQUE user_id+post_id) vía el
+ * RPC `increment_post_views` (atómico): solo incrementa views_count la PRIMERA
+ * vez que ese usuario interactúa con el post (abrir, comentar, like, dislike,
+ * guardar o repost).
+ *
+ * Se llama SIEMPRE al RPC (sin fast-path de localStorage): el RPC es idempotente
+ * gracias a la UNIQUE, así que las llamadas repetidas del mismo usuario no
+ * suman. Un fast-path local rompería el conteo por datos viejos del sistema
+ * anterior (scroll) que marcaba posts como "ya vistos" sin haber insertado
+ * nunca la fila en post_views.
+ *
+ * Requiere migrations/047_post_views_dedup.sql en la DB.
  */
 export async function trackPostView(postId, userId) {
-  if (!postId) return false;
-  const key = VIEWED_POSTS_KEY + (userId || 'anon');
+  // Sin usuario autenticado no se puede deduplicar server-side: no contar
+  // (evita inflar el contador con visitas anónimas).
+  if (!postId || !userId) return false;
+
   try {
-    const viewed = getItem(key) || [];
-    if (viewed.includes(postId)) return false; // Already viewed
-
-    if (_rpcAvailable) {
-      // Atomic increment via RPC — no race condition
-      const { error } = await supabase.rpc('increment_post_views', {
-        post_id: postId,
-      });
-
-      if (error) {
-        // Check if the function doesn't exist → cache and fallback permanently
-        // Cache RPC failure — si el error es 404 o "function not found", no reintentar
-        if (error?.code === '404' || error?.code === 'P0001' || error?.code === '42883') {
-          _rpcAvailable = false;
-        } else {
-          const msg = error.message || '';
-          if (msg.includes('function') && (msg.includes('not found') || msg.includes('does not exist'))) {
-            _rpcAvailable = false;
-          }
-        }
-        // Fallback: use SELECT+UPDATE (race condition possible without RPC)
-        const { data: post } = await supabase
-          .from('posts')
-          .select('views_count')
-          .eq('id', postId)
-          .single();
-
-        if (post) {
-          await supabase
-            .from('posts')
-            .update({ views_count: (post.views_count || 0) + 1 })
-            .eq('id', postId);
-        }
-      }
-    } else {
-      // RPC not available (cached from previous failure) — fallback directly
-      const { data: post } = await supabase
-        .from('posts')
-        .select('views_count')
-        .eq('id', postId)
-        .single();
-
-      if (post) {
-        await supabase
-          .from('posts')
-          .update({ views_count: (post.views_count || 0) + 1 })
-          .eq('id', postId);
-      }
+    // RPC atómico: inserta en post_views y solo incrementa si es la primera vez
+    const { error } = await supabase.rpc('increment_post_views', {
+      post_id: postId,
+    });
+    if (error) {
+      console.warn('Error tracking view:', error?.message || error);
+      return false;
     }
-
-    // Add to viewed set
-    viewed.push(postId);
-    setItem(key, viewed);
     return true;
   } catch (err) {
     console.warn('Error tracking view:', err);
@@ -1372,6 +1340,8 @@ export async function dislikePost(postId, userId) {
 
   // Notificar al dueño del post (en background)
   notifyDislike(userId, postId);
+  // Dislike = interacción válida → contar vista (dedup server-side)
+  trackPostView(postId, userId).catch(() => {});
 }
 
 export async function undislikePost(postId, userId) {
@@ -1423,6 +1393,8 @@ export async function savePost(postId, userId) {
     console.error('Error saving post:', error);
     throw error;
   }
+  // Guardar = interacción válida → contar vista (dedup server-side)
+  trackPostView(postId, userId).catch(() => {});
 }
 
 export async function unsavePost(postId, userId) {

@@ -78,41 +78,41 @@ export default function HashtagPage() {
     fetchPosts();
   }, [decodedTag, user?.id, t]);
 
-  const handlePostUpdate = (updatedPost) => {
+  const handlePostUpdate = useCallback((updatedPost) => {
     setPosts((prev) =>
       prev.map((p) => (p.id === updatedPost.id ? { ...p, ...updatedPost } : p))
     );
     clearFeedCache('hashtag_' + decodedTag);
-  };
+  }, [decodedTag]);
 
-  const handleLikeToggle = (postId, nowLiked) => {
+  const handleLikeToggle = useCallback((postId, nowLiked) => {
     setLikedIds((prev) =>
       nowLiked ? [...prev, postId] : prev.filter((id) => id !== postId)
     );
-  };
+  }, []);
 
-  const handleRepostToggle = (postId, nowReposted) => {
+  const handleRepostToggle = useCallback((postId, nowReposted) => {
     setRepostedIds((prev) =>
       nowReposted ? [...prev, postId] : prev.filter((id) => id !== postId)
     );
-  };
+  }, []);
 
-  const handleDislikeToggle = (postId, nowDisliked) => {
+  const handleDislikeToggle = useCallback((postId, nowDisliked) => {
     setDislikedIds((prev) =>
       nowDisliked ? [...prev, postId] : prev.filter((id) => id !== postId)
     );
-  };
+  }, []);
 
-  const handlePostDelete = (postId) => {
+  const handlePostDelete = useCallback((postId) => {
     setPosts((prev) => prev.filter((p) => p.id !== postId));
     clearFeedCache('hashtag_' + decodedTag);
-  };
+  }, [decodedTag]);
 
-  const handleBlockUser = (blockedUserId) => {
+  const handleBlockUser = useCallback((blockedUserId) => {
     if (!blockedUserId) return;
     setPosts((prev) => prev.filter((p) => p.user_id !== blockedUserId));
     clearFeedCache('hashtag_' + decodedTag);
-  };
+  }, [decodedTag]);
 
   return (
     <div className="post-detail-page">

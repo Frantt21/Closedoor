@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo, useContext } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback, useContext } from "react";
 import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
@@ -945,7 +945,8 @@ function Profile() {
     // ── Handlers for like/repost/dislike sync ──
     // Solo actualizan arrays booleanos de IDs. Los contadores los maneja PostCard localmente
     // y Realtime los sincroniza desde la DB.
-    const handleLikeToggle = (postId, nowLiked) => {
+    // useCallback: identidad estable → React.memo de PostCard puede saltar re-renders.
+    const handleLikeToggle = useCallback((postId, nowLiked) => {
       setLikedPostIds((prev) =>
         nowLiked ? [...prev, postId] : prev.filter((id) => id !== postId)
       );
@@ -955,9 +956,9 @@ function Profile() {
       setLikedLikedIds((prev) =>
         nowLiked ? [...prev, postId] : prev.filter((id) => id !== postId)
       );
-    };
+    }, []);
 
-    const handleRepostToggle = (postId, nowReposted) => {
+    const handleRepostToggle = useCallback((postId, nowReposted) => {
       setRepostedPostIds((prev) =>
         nowReposted ? [...prev, postId] : prev.filter((id) => id !== postId)
       );
@@ -967,9 +968,9 @@ function Profile() {
       setLikedRepostedIds((prev) =>
         nowReposted ? [...prev, postId] : prev.filter((id) => id !== postId)
       );
-    };
+    }, []);
 
-    const handleDislikeToggle = (postId, nowDisliked) => {
+    const handleDislikeToggle = useCallback((postId, nowDisliked) => {
       setDislikedPostIds((prev) =>
         nowDisliked ? [...prev, postId] : prev.filter((id) => id !== postId)
       );
@@ -979,10 +980,10 @@ function Profile() {
       setLikedDislikedIds((prev) =>
         nowDisliked ? [...prev, postId] : prev.filter((id) => id !== postId)
       );
-    };
+    }, []);
 
     // ── Handlers for post actions ──
-    const handlePostCreated = async () => {
+    const handlePostCreated = useCallback(async () => {
         const userId = activeProfile?.id;
         if (!userId) return;
         try {
@@ -1012,9 +1013,9 @@ function Profile() {
         } catch (err) {
             console.error('Error refreshing posts:', err);
         }
-    };
+    }, [activeProfile?.id, user?.id, filterEncrypted]);
 
-    const handlePostUpdate = (updatedPost) => {
+    const handlePostUpdate = useCallback((updatedPost) => {
         if (updatedPost._editing) {
             setEditingPost(updatedPost);
             setShowCreatePost(true);
@@ -1026,15 +1027,15 @@ function Profile() {
             );
             return [...updated].sort(sortProfilePosts);
         });
-    };
+    }, []);
 
-    const handlePostDelete = (postId) => {
+    const handlePostDelete = useCallback((postId) => {
         setProfilePosts((prev) => prev.filter((p) => p.id !== postId));
         setScheduledPosts((prev) => prev.filter((p) => p.id !== postId));
-    };
+    }, []);
 
     // ── Sincronizar saved state desde PostCard ──
-    const handleSaveToggle = (postId, nowSaved) => {
+    const handleSaveToggle = useCallback((postId, nowSaved) => {
         // Actualizar savedPostIds inmediatamente (para icono bookmark en Posts tab)
         setSavedPostIds((prev) =>
             nowSaved ? [...prev, postId] : prev.filter((id) => id !== postId)
@@ -1069,10 +1070,10 @@ function Profile() {
             setSavedLikedIds((prev) => prev.filter((id) => id !== postId));
             setSavedRepostedIds((prev) => prev.filter((id) => id !== postId));
         }
-    };
+    }, [user?.id]);
 
     // ── Re-fetch counts when follow changes ──
-    const handleFollowChange = () => {
+    const handleFollowChange = useCallback(() => {
         if (activeProfile?.id) {
             getFollowCounts(activeProfile.id)
                 .then((counts) => {
@@ -1085,7 +1086,7 @@ function Profile() {
                     setCountsLoading(false);
                 });
         }
-    };
+    }, [activeProfile?.id]);
 
     // ── Share profile (copia la URL al portapapeles) ──
     const handleShareProfile = async () => {
@@ -1276,6 +1277,28 @@ function Profile() {
         if (postSubFilter === 'reposts') return profilePosts.filter(p => p._repostInfo);
         return profilePosts;
     }, [profilePosts, postSubFilter]);
+
+    // ── Paginación: renderizar de a 25 posts para no montar cientos de PostCards ──
+    const POSTS_PAGE_SIZE = 25;
+    const [visiblePostCount, setVisiblePostCount] = useState(POSTS_PAGE_SIZE);
+    useEffect(() => {
+        setVisiblePostCount(POSTS_PAGE_SIZE);
+    }, [activeProfile?.id]);
+    const visibleProfilePosts = useMemo(
+        () => filteredProfilePosts.slice(0, visiblePostCount),
+        [filteredProfilePosts, visiblePostCount]
+    );
+
+    // ── repostInfo memoizado por post (identidad estable → React.memo de PostCard) ──
+    const repostInfoByPostId = useMemo(() => {
+        const map = new Map();
+        for (const post of profilePosts) {
+            if (post._repostInfo) {
+                map.set(post.id, { ...post._repostInfo, repostedBy: activeProfile?.username });
+            }
+        }
+        return map;
+    }, [profilePosts, activeProfile?.username]);
 
     // ── Extract body background vars early (must be before early returns for hook ordering) ──
     const bgUrl = activeProfile?.profile_background_url;
@@ -2001,7 +2024,7 @@ function Profile() {
                         </div>
                     ) : (
                         <>
-                        {filteredProfilePosts.map((post) => (
+                        {visibleProfilePosts.map((post) => (
                             <PostCard
                                 key={post.id}
                                 post={post}
@@ -2015,9 +2038,20 @@ function Profile() {
                                 onLikeToggle={handleLikeToggle}
                                 onDislikeToggle={handleDislikeToggle}
                                 onRepostToggle={handleRepostToggle}
-                                repostInfo={post._repostInfo ? { ...post._repostInfo, repostedBy: activeProfile?.username } : null}
+                                repostInfo={repostInfoByPostId.get(post.id) || null}
                             />
                         ))}
+                        {visiblePostCount < filteredProfilePosts.length && (
+                            <div className="profile-posts-more-wrap">
+                                <button
+                                    type="button"
+                                    className="profile-posts-more-btn"
+                                    onClick={() => setVisiblePostCount((c) => c + POSTS_PAGE_SIZE)}
+                                >
+                                    {t('post.show_more') || 'Show more'}
+                                </button>
+                            </div>
+                        )}
                         {/* ── Sentinel for infinite scroll ── */}
 
                         </>

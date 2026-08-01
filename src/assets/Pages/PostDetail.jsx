@@ -475,8 +475,6 @@ export default function PostDetail() {
         imageUrl,
         videoUrl,
       });
-      // El primer comentario del usuario en este post cuenta como vista
-      trackPostView(postId, user?.id);
       setComments((prev) => [...prev, newComment]);
       setCommentInput('');
       setCommentMediaUrl('');

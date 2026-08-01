@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { IconNewspaper } from '../Resources/Components/ShellIcons';
 import { useI18n } from '../services/i18n/useI18n';
 import '../Resources/Styles/Home.css';
@@ -120,7 +120,7 @@ function Home() {
                     setPosts((prev) =>
                         prev.map((p) =>
                             p.id === updated.id
-                                ? { ...p, likes_count: updated.likes_count, dislikes_count: updated.dislikes_count, reposts_count: updated.reposts_count, comments_count: updated.comments_count }
+                                ? { ...p, likes_count: updated.likes_count, dislikes_count: updated.dislikes_count, reposts_count: updated.reposts_count, comments_count: updated.comments_count, views_count: updated.views_count }
                                 : p
                         )
                     );
@@ -206,7 +206,7 @@ function Home() {
       return unsub;
     }, [user?.id]);
 
-    const handlePostCreated = async () => {
+    const handlePostCreated = useCallback(async () => {
         try {
             const data = await getFeed({ limit: 30, userId: user?.id, filterEncrypted });
             setPosts(data);
@@ -228,9 +228,9 @@ function Home() {
         } catch (err) {
             console.error('Error refreshing feed:', err);
         }
-    };
+    }, [user?.id, filterEncrypted]);
 
-    const handlePostUpdate = (updatedPost) => {
+    const handlePostUpdate = useCallback((updatedPost) => {
         if (updatedPost._editing) {
             setEditingPost(updatedPost);
             setShowCreatePost(true);
@@ -239,36 +239,36 @@ function Home() {
         setPosts((prev) =>
             prev.map((p) => (p.id === updatedPost.id ? { ...p, ...updatedPost } : p))
         );
-    };
+    }, []);
 
-    const handleLikeToggle = (postId, nowLiked) => {
+    const handleLikeToggle = useCallback((postId, nowLiked) => {
         setLikedPostIds((prev) =>
             nowLiked ? [...prev, postId] : prev.filter((id) => id !== postId)
         );
-    };
+    }, []);
 
-    const handleRepostToggle = (postId, nowReposted) => {
+    const handleRepostToggle = useCallback((postId, nowReposted) => {
         setRepostedPostIds((prev) =>
             nowReposted ? [...prev, postId] : prev.filter((id) => id !== postId)
         );
-    };
+    }, []);
 
-    const handleDislikeToggle = (postId, nowDisliked) => {
+    const handleDislikeToggle = useCallback((postId, nowDisliked) => {
         setDislikedPostIds((prev) =>
             nowDisliked ? [...prev, postId] : prev.filter((id) => id !== postId)
         );
-    };
+    }, []);
 
-    const handlePostDelete = (postId) => {
+    const handlePostDelete = useCallback((postId) => {
         setPosts((prev) => prev.filter((p) => p.id !== postId));
-    };
+    }, []);
 
     // ── Handle blocking a user: remove their posts from feed + clear cache ──
-    const handleBlockUser = (blockedUserId) => {
+    const handleBlockUser = useCallback((blockedUserId) => {
         if (!blockedUserId) return;
         setPosts((prev) => prev.filter((p) => p.user_id !== blockedUserId));
         clearFeedCache('home_feed');
-    };
+    }, []);
 
     return (
         <div>
