@@ -24,7 +24,6 @@ import {
   setNickname,
   removeNickname,
 } from '../services/chatService';
-import { startCall, updateCallStatus, subscribeToCalls } from '../services/callService';
 import { getFollowing } from '../services/followService';
 import { isBlocked, getCachedBlockStatus, cacheBlockStatus } from '../services/blockService';
 import FollowButton from '../Resources/Components/FollowButton';
@@ -40,7 +39,6 @@ import RichText from '../Resources/Components/RichText';
 import SafeImage from '../Resources/Components/SafeImage';
 import ConfirmModal from '../Resources/Components/ConfirmModal';
 import LinkPreview from '../Resources/Components/LinkPreview';
-import CallOverlay from '../Resources/Components/CallOverlay';
 import { toast } from 'react-toastify';
 import { supabase } from '../services/supabaseclient';
 import { uploadImage } from '../services/cdnService';
@@ -53,6 +51,7 @@ import '../Resources/Components/css/modal.css';
 import { getItem, setItem, removeItem, getSessionItem, setSessionItem, removeSessionItem } from '../services/secureStorage';
 import { useUserStatus } from '../services/useUserStatus';
 import { useRegisterMultipleUserStatus, UserStatusContext } from '../../context/UserStatusContext';
+import { useCall } from '../../context/CallContext';
 
 // ── Helper: corrige estados obsoletos usando user_status_updated_at ──
 const STALE_STATUS_MS = 60 * 1000;
@@ -411,13 +410,8 @@ export default function Chat() {
   // ── Blocked status: null=unknown, 'blocked_by_me', 'blocked_by_them' ──
   const [isBlockedConv, setIsBlockedConv] = useState(null);
 
-  // ── Voice call state (LiveKit) ──
-  const [callSession, setCallSession] = useState(null); // { call, role, status }
-  const [incomingCall, setIncomingCall] = useState(null); // fila de calls entrante
-  const callSessionRef = useRef(null);
-  useEffect(() => { callSessionRef.current = callSession; }, [callSession]);
-  const incomingCallRef = useRef(null);
-  useEffect(() => { incomingCallRef.current = incomingCall; }, [incomingCall]);
+  // ── Voice call state (LiveKit) — global en CallContext (ring en cualquier ruta) ──
+  const { callSession, startCall } = useCall();
   const scrollToBottom = useCallback(() => {
     messagesContainerRef.current?.scrollTo({ top: 0, behavior: 'instant' });
     setNewMsgCount(0);
@@ -1501,122 +1495,20 @@ export default function Chat() {
   const activeConv = conversations.find((c) => c.id === activeConvId);
   const otherUser = activeConv?.otherUser;
 
-  // ══ Voice call handlers (LiveKit) ══
+  // ══ Voice call (LiveKit) — la lógica vive en CallContext (global) ══
   const handleStartCall = useCallback(async () => {
     if (!user?.id || !activeConvId || !otherUser?.id) return;
     if (isBlockedConv) {
       toast.error(t('chat.blocked_cannot_send') || 'No puedes llamar a este usuario');
       return;
     }
-    if (callSessionRef.current) return; // ya hay una llamada activa
     try {
-      const call = await startCall(activeConvId, user.id, otherUser.id);
-      setCallSession({ call, role: 'caller', status: 'ringing' });
+      await startCall(activeConvId, otherUser.id);
     } catch (err) {
       console.warn('Error starting call:', err);
       toast.error(t('chat.call_error') || 'No se pudo iniciar la llamada');
     }
-  }, [user?.id, activeConvId, otherUser?.id, isBlockedConv, t]);
-
-  const handleAcceptCall = useCallback(async () => {
-    const call = incomingCallRef.current;
-    if (!call) return;
-    try {
-      await updateCallStatus(call.id, 'active');
-      setCallSession({ call, role: 'callee', status: 'active' });
-      setIncomingCall(null);
-    } catch (err) {
-      console.warn('Error accepting call:', err);
-      toast.error(t('chat.call_error') || 'No se pudo iniciar la llamada');
-    }
-  }, [t]);
-
-  const handleDeclineCall = useCallback(async () => {
-    const call = incomingCallRef.current;
-    if (!call) return;
-    try {
-      await updateCallStatus(call.id, 'declined');
-    } catch (err) {
-      console.warn('Error declining call:', err);
-    }
-    setIncomingCall(null);
-  }, []);
-
-  const handleEndCall = useCallback(() => {
-    const session = callSessionRef.current;
-    if (session) {
-      updateCallStatus(session.call.id, 'ended').catch(() => {});
-    }
-    setCallSession(null);
-    setIncomingCall(null);
-  }, []);
-
-  // ── Suscripción a eventos de llamadas (ring entrante + cambios de estado) ──
-  useEffect(() => {
-    if (!user?.id) return;
-    const unsub = subscribeToCalls(user.id, (call, eventType) => {
-      // Ring entrante: soy el callee y la llamada está en ringing
-      if (eventType === 'INSERT' && call.status === 'ringing' && call.callee_id === user.id) {
-        if (callSessionRef.current) {
-          // Ya en una llamada → rechazar automáticamente
-          updateCallStatus(call.id, 'declined').catch(() => {});
-          return;
-        }
-        supabase
-          .from('profiles')
-          .select('id, username, displayname, avatar_url')
-          .eq('id', call.caller_id)
-          .maybeSingle()
-          .then(({ data: callerProfile }) => {
-            setIncomingCall({ ...call, caller_profile: callerProfile });
-          })
-          .catch(() => setIncomingCall(call));
-        return;
-      }
-      // Cambios en la llamada actual (aceptada/colgada por el otro lado)
-      const cur = callSessionRef.current;
-      if (cur && cur.call.id === call.id) {
-        if (call.status === 'active' && cur.status !== 'active') {
-          setCallSession({ ...cur, status: 'active' });
-        } else if (['ended', 'missed', 'declined'].includes(call.status) && cur.status !== call.status) {
-          setCallSession({ ...cur, status: call.status });
-          setTimeout(() => setCallSession(null), 1200);
-        }
-      }
-      // Si la llamada entrante terminó (el caller colgó antes de contestar)
-      const inc = incomingCallRef.current;
-      if (inc && inc.id === call.id && ['ended', 'missed', 'declined'].includes(call.status)) {
-        setIncomingCall(null);
-      }
-    });
-    return () => unsub?.unsubscribe();
-  }, [user?.id]);
-
-  // ── Timeout: el caller cuelga automáticamente tras 30s de ring sin respuesta ──
-  useEffect(() => {
-    if (!callSession || callSession.role !== 'caller' || callSession.status !== 'ringing') return;
-    const t = setTimeout(() => {
-      const cur = callSessionRef.current;
-      if (cur && cur.role === 'caller' && cur.status === 'ringing') {
-        updateCallStatus(cur.call.id, 'missed').catch(() => {});
-        setCallSession(null);
-      }
-    }, 30000);
-    return () => clearTimeout(t);
-  }, [callSession?.call?.id, callSession?.role, callSession?.status]);
-
-  // ── Cleanup al desmontar: si el usuario sale del Chat con una llamada en curso,
-  // marcarla como ended/missed para que el ring del otro lado no quede huérfano. ──
-  useEffect(() => {
-    return () => {
-      const cur = callSessionRef.current;
-      if (cur && ['ringing', 'active'].includes(cur.status)) {
-        // 'missed' solo tiene sentido si la llamada seguía en ringing
-        const terminal = cur.status === 'ringing' && cur.role === 'caller' ? 'missed' : 'ended';
-        updateCallStatus(cur.call.id, terminal).catch(() => {});
-      }
-    };
-  }, []);
+  }, [user?.id, activeConvId, otherUser?.id, isBlockedConv, startCall, t]);
 
   // ── Subscribe to other users' realtime status for the visible conversation list ──
   const visibleConversationUserIds = React.useMemo(() => {
@@ -2899,31 +2791,7 @@ export default function Chat() {
 
   return (
     <div className="chat-page">
-      {/* ── Voice call overlay (LiveKit) ── */}
-      {incomingCall && !callSession && (
-        <CallOverlay
-          call={incomingCall}
-          role="callee"
-          peer={incomingCall.caller_profile || otherUser}
-          status="ringing"
-          onAccept={handleAcceptCall}
-          onDecline={handleDeclineCall}
-          onClose={handleDeclineCall}
-          t={t}
-        />
-      )}
-      {callSession && (
-        <CallOverlay
-          call={callSession.call}
-          role={callSession.role}
-          peer={callSession.role === 'caller' ? otherUser : (callSession.call.caller_profile || otherUser)}
-          status={callSession.status}
-          onAccept={handleAcceptCall}
-          onDecline={handleDeclineCall}
-          onClose={handleEndCall}
-          t={t}
-        />
-      )}
+      {/* ── Voice call overlay: ahora lo renderiza CallContext (global, cualquier ruta) ── */}
       <div className={`chat-list${!showList ? ' chat-list--hide-mobile' : ''}`}>
         {renderConversationListContent()}
       </div>

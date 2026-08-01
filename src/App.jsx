@@ -4,6 +4,7 @@ import Header from './assets/Resources/Components/Header.jsx';
 import FollowCountsWatcher from './assets/Resources/Components/FollowCountsWatcher.jsx';
 import BlockRealtimeWatcher from './assets/Resources/Components/BlockRealtimeWatcher.jsx';
 import { I18nProvider } from './assets/services/i18n/I18nContext';
+import { CallProvider } from './context/CallContext';
 import RightPanel from './assets/Resources/Components/RightPanel';
 import AppLoader from './assets/Resources/Components/AppLoader';
 import MobileNav from './assets/Resources/Components/MobileNav';
@@ -134,6 +135,7 @@ function App() {
 
   return (
     <I18nProvider>
+      <CallProvider>
       <AppLoader>
         <div className={isChatRoute ? "app-layout app-layout--chat" : "app-layout"}>
           {/* Components */}
@@ -184,6 +186,7 @@ function App() {
           />
         </div>
       </AppLoader>
+      </CallProvider>
     </I18nProvider>
   );
 }
