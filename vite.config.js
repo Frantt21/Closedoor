@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 import ogTagsPlugin from './plugins/ogTagsPlugin'
+import livekitTokenPlugin from './plugins/livekitTokenPlugin'
 import preloadRouteChunks from './plugins/preloadRouteChunks'
 import inlineCssPlugin from './plugins/inlineCssPlugin'
 
@@ -45,6 +46,7 @@ export default defineConfig({
   },
   plugins: [
     ogTagsPlugin(),
+    livekitTokenPlugin(),
     preloadRouteChunks(),
     inlineCssPlugin(),
     react(),

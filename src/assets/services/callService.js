@@ -125,8 +125,10 @@ export function subscribeToCalls(userId, onCall) {
  * @returns {Promise<{token: string, url: string}>}
  */
 export async function getLiveKitToken(room) {
-  const { data: session } = await supabase.auth.getSession();
-  const accessToken = session?.access_token;
+  // getSession() devuelve { data: { session }, error } — el destructuring
+  // correcto es `data: { session }` (auth-js 2.107).
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data?.session?.access_token;
   if (!accessToken) throw new Error('Not authenticated');
 
   const res = await fetch('/api/livekit-token', {

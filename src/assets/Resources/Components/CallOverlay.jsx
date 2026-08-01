@@ -32,7 +32,10 @@ export default function CallOverlay({ call, role, peer, status, onAccept, onDecl
     setTokenError(false);
     getLiveKitToken(call.room_name)
       .then((data) => { if (!cancelled) setConn(data); })
-      .catch(() => { if (!cancelled) setTokenError(true); });
+      .catch((err) => {
+        console.warn('[CALL] getLiveKitToken error:', err?.message || err);
+        if (!cancelled) setTokenError(true);
+      });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, call?.room_name]);
