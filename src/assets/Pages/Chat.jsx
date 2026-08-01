@@ -1498,7 +1498,6 @@ export default function Chat() {
 
   // ══ Voice call (LiveKit) — la lógica vive en CallContext (global) ══
   const handleStartCall = useCallback(async () => {
-    console.log('[CALL] Chat.handleStartCall', { conv: activeConvId, other: otherUser?.id });
     if (!user?.id || !activeConvId || !otherUser?.id) return;
     if (isBlockedConv) {
       toast.error(t('chat.blocked_cannot_send') || 'No puedes llamar a este usuario');

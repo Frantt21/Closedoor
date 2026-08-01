@@ -64,17 +64,20 @@ BEGIN
     RETURN;
   END IF;
 
-  -- Insertar la vista; si ya existe (UNIQUE user_id+post_id) no se inserta nada
+  -- Insertar la vista; si ya existe (UNIQUE user_id+post_id) no se inserta nada.
+  -- ⚠️ Usamos $1 (el parámetro) en vez del nombre `post_id` y ON CONFLICT DO NOTHING
+  -- SIN lista de columnas: el nombre `post_id` choca con la columna de post_views
+  -- y provoca ERROR: column reference "post_id" is ambiguous.
   INSERT INTO post_views (user_id, post_id)
-  VALUES (v_user_id, post_id)
-  ON CONFLICT (user_id, post_id) DO NOTHING
+  VALUES (v_user_id, $1)
+  ON CONFLICT DO NOTHING
   RETURNING true INTO v_new;
 
   -- Solo si fue una fila nueva → incrementar el contador
   IF v_new THEN
     UPDATE posts
     SET views_count = views_count + 1
-    WHERE id = post_id;
+    WHERE id = $1;
   END IF;
 END;
 $$;

@@ -29,7 +29,6 @@ export async function startCall(conversationId, callerId, calleeId) {
   const callId = crypto.randomUUID();
   const roomName = `call-${callId}`;
 
-  console.log('[CALL] startCall insert', { conversationId, callerId, calleeId, roomName });
   const { data, error } = await supabase
     .from('calls')
     .insert({
@@ -43,7 +42,6 @@ export async function startCall(conversationId, callerId, calleeId) {
     .select()
     .single();
 
-  console.log('[CALL] startCall result', { data, error });
   if (error) throw error;
   return data;
 }
@@ -54,7 +52,6 @@ export async function startCall(conversationId, callerId, calleeId) {
  * @param {'ringing'|'active'|'ended'|'missed'|'declined'} status
  */
 export async function updateCallStatus(callId, status) {
-  console.log('[CALL] updateCallStatus', { callId, status });
   const patch = { status };
   if (status === 'active') {
     patch.started_at = new Date().toISOString();
@@ -91,7 +88,6 @@ export async function getCall(callId) {
  * @returns {() => void} unsubscribe
  */
 export function subscribeToCalls(userId, onCall) {
-  console.log('[CALL] subscribeToCalls', userId);
   const channel = supabase
     .channel(`calls-${userId}`)
     .on(
@@ -105,7 +101,6 @@ export function subscribeToCalls(userId, onCall) {
         // visibles a participantes de la conversación; filtramos client-side.
       },
       (payload) => {
-        console.log('[CALL] payload received', { eventType: payload.eventType, newRow: payload.new, oldRow: payload.old });
         const call = payload.new || payload.old;
         if (!call) return;
         // Filtro client-side: solo me interesan las llamadas donde soy caller o callee
@@ -113,9 +108,7 @@ export function subscribeToCalls(userId, onCall) {
         onCall(call, payload.eventType);
       }
     );
-  channel.subscribe((status, err) => {
-    console.log('[CALL] channel status', status, err ? JSON.stringify(err) : '');
-  });
+  channel.subscribe(() => {});
   return channel;
 }
 

@@ -35,7 +35,6 @@ export default function CallOverlay({ call, role, peer, status, onAccept, onDecl
       .then((data) => { if (!cancelled) setConn(data); })
       .catch((err) => {
         const msg = err?.message || String(err || 'Could not start the call');
-        console.warn('[CALL] getLiveKitToken error:', msg);
         if (!cancelled) setTokenError(msg);
       });
     return () => { cancelled = true; };

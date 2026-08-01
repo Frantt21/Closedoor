@@ -846,18 +846,26 @@ const VIEWED_THIS_SESSION = new Set();
 export async function trackPostView(postId, userId) {
   // Sin usuario autenticado no se puede deduplicar server-side: no contar
   // (evita inflar el contador con visitas anónimas).
-  if (!postId || !userId) return false;
+  if (!postId || !userId) {
+    console.log('[VIEW] trackPostView skip (sin ids)', { postId, userId });
+    return false;
+  }
 
   const key = `${userId}:${postId}`;
   // Ya contada en esta sesión → no reintentar (evita doble conteo si la DB
   // aún corre la función vieja 046 sin dedup).
-  if (VIEWED_THIS_SESSION.has(key)) return true;
+  if (VIEWED_THIS_SESSION.has(key)) {
+    console.log('[VIEW] trackPostView skip (ya en set de sesión)', { postId, userId });
+    return true;
+  }
 
   try {
+    console.log('[VIEW] trackPostView → rpc increment_post_views', { postId, userId });
     // RPC atómico: inserta en post_views y solo incrementa si es la primera vez
-    const { error } = await supabase.rpc('increment_post_views', {
+    const { data, error } = await supabase.rpc('increment_post_views', {
       post_id: postId,
     });
+    console.log('[VIEW] rpc resultado', { postId, userId, data, error: error?.message || null });
     if (error) {
       console.warn('Error tracking view:', error?.message || error);
       return false;
@@ -865,6 +873,7 @@ export async function trackPostView(postId, userId) {
     // Solo marcar como vista tras una llamada exitosa (si falla, se reintenta
     // en la próxima interacción).
     VIEWED_THIS_SESSION.add(key);
+    console.log('[VIEW] trackPostView ok → marcada en sesión', { postId, userId });
     return true;
   } catch (err) {
     console.warn('Error tracking view:', err);
