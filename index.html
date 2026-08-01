@@ -29,11 +29,7 @@
     <link rel="dns-prefetch" href="https://<TU_PROYECTO>.supabase.co" />
     <link rel="dns-prefetch" href="https://api.foranly.space:24587" />
 
-    <!-- ── Splash placeholder: logo + fondo oscuro, visible inmediatamente ──
-         Se oculta al instante cuando JS carga (js-ready) y React monta el AppLoader
-         sobre el mismo fondo #000. Evita el flash del hero de 'no sesión'. ── -->
     <style>
-      /* Ensures no white flash between splash hiding and React mounting */
       body { background: #000; }
 
       #splash-placeholder {
@@ -66,9 +62,6 @@
     </style>
   </head>
   <body>
-    <!-- ── Pre-rendered splash: logo animado sobre fondo oscuro ──
-         La estructura (padding-top + inner centrado) coincide exactamente con
-         el AppLoader de React para evitar saltos visuales. -->
     <div id="splash-placeholder">
       <div class="splash-inner">
         <img src="/logo.svg" alt="Closedoor" class="splash-logo" />

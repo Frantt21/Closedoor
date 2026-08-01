@@ -92,6 +92,7 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
         const { data: posts } = await supabase
           .from('posts')
           .select('id, likes_count, dislikes_count, comments_count, reposts_count, views_count')
+          .neq('is_encrypted', true)
           .eq('user_id', profile.id);
 
         if (posts) {

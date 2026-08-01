@@ -143,6 +143,7 @@ function Explore() {
           supabase
             .from('posts')
             .select('user_id, likes_count')
+            .neq('is_encrypted', true)
             .in('user_id', data.map((p) => p.id))
             .then(({ data: likesData }) => {
               const likes = {};

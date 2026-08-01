@@ -462,6 +462,76 @@ textarea.fc-modal-input {
     border-color: rgba(255, 80, 80, 0.3);
 }
 
+/* ── Editar social link (lápiz + fila de edición inline) ── */
+.fc-modal-social-edit {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm, 6px);
+    background: transparent;
+    color: #6b7280;
+    border: none;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.fc-modal-social-edit:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: var(--color-text, #ffffff);
+}
+
+.fc-modal-social-item--editing {
+    padding: 8px 10px;
+    border-color: var(--color-border, #2a2a2a);
+}
+
+.fc-modal-social-edit-input {
+    flex: 1;
+    min-width: 0;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+}
+
+.fc-modal-social-edit-save,
+.fc-modal-social-edit-cancel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm, 6px);
+    background: transparent;
+    border: none;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.fc-modal-social-edit-save {
+    color: #4ade80;
+}
+
+.fc-modal-social-edit-save:hover {
+    background: rgba(74, 222, 128, 0.15);
+}
+
+.fc-modal-social-edit-cancel {
+    color: #6b7280;
+}
+
+.fc-modal-social-edit-cancel:hover {
+    background: rgba(255, 80, 80, 0.12);
+    color: #f87171;
+}
+
 .fc-modal-save {
     background: var(--color-text, #ffffff);
     color: var(--color-bg, #000000);

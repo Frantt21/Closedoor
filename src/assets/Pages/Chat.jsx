@@ -21,8 +21,6 @@ import {
   broadcastTyping,
   subscribeToTyping,
   getNicknames, getCachedNicknames, cacheNicknames,
-  setNickname,
-  removeNickname,
 } from '../services/chatService';
 import { getFollowing } from '../services/followService';
 import { isBlocked, getCachedBlockStatus, cacheBlockStatus } from '../services/blockService';
@@ -33,7 +31,8 @@ import Avatar from '../Resources/Components/Avatar';
 import Badge from '../Resources/Components/Badge';
 import Tooltip from '../Resources/Components/Tooltip';
 import GifPicker from '../Resources/Components/GifPicker';
-import { getTimeAgo, IMG_RE, detectMediaFromContent, DEFAULT_AVATAR, getImageStyle, sanitizeUrl } from '../services/helpers';
+import { getTimeAgo, IMG_RE, detectMediaFromContent, getImageStyle, sanitizeUrl } from '../services/helpers';
+import NicknameModal from '../Resources/Components/NicknameModal';
 import { getPost } from '../services/postService';
 import RichText from '../Resources/Components/RichText';
 import SafeImage from '../Resources/Components/SafeImage';
@@ -106,7 +105,6 @@ export default function Chat() {
   });
   // Nickname modal state
   const [nicknameModal, setNicknameModal] = useState({ open: false, targetUserId: null, currentName: '', userData: null });
-  const [nicknameInput, setNicknameInput] = useState('');
 
   // Helper: get display name with nickname override
   const getDisplayName = useCallback((otherUser) => {
@@ -1020,9 +1018,10 @@ export default function Chat() {
       if (hiddenConvIds.includes(c.id)) return false;
       const name = (c.otherUser?.displayname || c.otherUser?.username || '').toLowerCase();
       const uname = (c.otherUser?.username || '').toLowerCase();
-      return name.includes(q) || uname.includes(q);
+      const nick = (nicknames[c.otherUser?.id] || '').toLowerCase();
+      return name.includes(q) || uname.includes(q) || nick.includes(q);
     });
-  }, [conversations, hiddenConvIds, searchQuery]);
+  }, [conversations, hiddenConvIds, searchQuery, nicknames]);
 
   // Persist hidden IDs (saved by lazy initializer on mount, persisted on every change)
   useEffect(() => {
@@ -1047,7 +1046,6 @@ export default function Chat() {
     if (!conv?.otherUser?.id) return;
     const currentNick = nicknames[conv.otherUser.id] || '';
     setNicknameModal({ open: true, targetUserId: conv.otherUser.id, currentName: currentNick, userData: conv.otherUser });
-    setNicknameInput(currentNick);
     setContextMenu({ open: false, x: 0, y: 0, convId: null });
   }, [contextMenu.convId, conversations, nicknames]);
 
@@ -1056,35 +1054,7 @@ export default function Chat() {
     if (!targetUserId) return;
     const currentNick = nicknames[targetUserId] || '';
     setNicknameModal({ open: true, targetUserId, currentName: currentNick, userData: userData || null });
-    setNicknameInput(currentNick);
   }, [nicknames]);
-
-  const handleSaveNickname = useCallback(async () => {
-    if (!nicknameModal.targetUserId || !user?.id) return;
-    const trimmed = nicknameInput.trim();
-    try {
-      if (trimmed) {
-        await setNickname(user.id, nicknameModal.targetUserId, trimmed);
-      } else {
-        await removeNickname(user.id, nicknameModal.targetUserId);
-      }
-      setNicknames(prev => {
-        const next = { ...prev };
-        if (trimmed) {
-          next[nicknameModal.targetUserId] = trimmed;
-        } else {
-          delete next[nicknameModal.targetUserId];
-        }
-        return next;
-      });
-      setNicknameModal({ open: false, targetUserId: null, currentName: '' });
-      setNicknameInput('');
-      toast.success(t('chat.nickname_saved') || 'Nickname saved');
-    } catch (err) {
-      console.error('Error saving nickname:', err);
-      toast.error(t('common.error') || 'Error');
-    }
-  }, [nicknameModal.targetUserId, nicknameInput, user?.id]);
 
   // ── Pin/unpin conversation ──
   const handlePinConversation = useCallback(async () => {
@@ -3346,200 +3316,25 @@ export default function Chat() {
         document.body
       )}
 
-      {nicknameModal.open && createPortal(
-        <div className="chat-nickname-overlay" onClick={() => setNicknameModal({ open: false, targetUserId: null, currentName: '', userData: null })}>
-          <div className="chat-nickname-modal" onClick={(e) => e.stopPropagation()}>
-            {/* ── Header ── */}
-            <div className="chat-nickname-modal-header">
-              <h3 className="chat-nickname-modal-title">{nicknameModal.currentName ? (t('chat.edit_nickname') || 'Edit nickname') : (t('chat.set_nickname') || 'Set nickname')}</h3>
-              <button className="chat-nickname-modal-close" onClick={() => setNicknameModal({ open: false, targetUserId: null, currentName: '', userData: null })}>
-                <FaTimes />
-              </button>
-            </div>
-
-            <div className="chat-nickname-modal-body">
-              {nicknameModal.userData ? (
-                <>
-                  {/* ── Banner preview: use edit-profile preview card classes ── */}
-                  <div
-                    className="fc-preview-card fc-preview-card--large"
-                    style={{
-                      '--accent-color': nicknameModal.userData?.accent_color || 'transparent',
-                      '--accent-color-2': nicknameModal.userData?.accent_color_secondary || nicknameModal.userData?.accent_color || 'transparent',
-                    }}
-                  >
-                    <div className="fc-preview-card-banner" style={{ position: 'relative', overflow: 'hidden' }}>
-                      {nicknameModal.userData?.banner_url ? (
-                        <div
-                          style={{
-                            position: 'absolute',
-                            inset: 0,
-                            backgroundImage: `url(${nicknameModal.userData.banner_url})`,
-                            backgroundRepeat: 'no-repeat',
-                          }}
-                        />
-                      ) : null}
-                      <div className="fc-preview-card-overlay"></div>
-
-                      <div className="fc-preview-card-avatar">
-                        <img
-                          src={nicknameModal.userData?.avatar_url || DEFAULT_AVATAR}
-                          alt={nicknameModal.userData?.username || ''}
-                        />
-                      </div>
-
-                      <div className="fc-preview-card-info" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
-                        <div style={{ margin: 0, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-                          <span className="fc-preview-card-name">
-                            {nicknameInput.trim() || nicknameModal.userData?.displayname || nicknameModal.userData?.username || t('common.unknown')}
-                          </span>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 400, opacity: 0.6, color: 'rgba(255,255,255,0.7)' }}>
-                            @{nicknameModal.userData?.username || ''}
-                          </span>
-                          {Array.isArray(nicknameModal.userData?.roles) && nicknameModal.userData.roles.some(r => r !== 'user') && (
-                            <Badge roles={nicknameModal.userData.roles} />
-                          )}
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 1, fontSize: '0.7rem', color: 'rgba(255,255,255,0.7)', textShadow: '0 1px 2px rgba(0,0,0,0.6)' }}>
-                          <span style={{ display: 'flex', gap: 2 }}>
-                            <strong style={{ color: '#fff', fontWeight: 700, fontSize: '0.75rem' }}>{nicknameModal.userData?.followerCount || 0}</strong>
-                            {t('profile.followers')}
-                          </span>
-                        </div>
-
-                        {(nicknameModal.userData?.bio || nicknameModal.userData?.pronouns) && (
-                          <p style={{ margin: 0, fontSize: '0.7rem', lineHeight: 1.4, color: 'rgba(255,255,255,0.75)', textShadow: '0 1px 2px rgba(0,0,0,0.6)', maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-                            {nicknameModal.userData?.bio || ''}
-                            {nicknameModal.userData?.bio && nicknameModal.userData?.pronouns && (
-                              <span style={{ fontSize: '0.75rem', fontWeight: 400, opacity: 0.5 }}> · {nicknameModal.userData.pronouns}</span>
-                            )}
-                            {!nicknameModal.userData?.bio && nicknameModal.userData?.pronouns && (
-                              <span style={{ fontSize: '0.75rem', fontWeight: 400, opacity: 0.5 }}>{nicknameModal.userData.pronouns}</span>
-                            )}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* ── Explore card preview ── */}
-                  <div className={`explore-card${(nicknameModal.userData?.accent_color || nicknameModal.userData?.accent_color_secondary) ? ' explore-card--accent' : ''}`}
-                    style={{
-                      '--accent-color': nicknameModal.userData?.accent_color || 'transparent',
-                      '--accent-color-2': nicknameModal.userData?.accent_color_secondary || nicknameModal.userData?.accent_color || 'transparent',
-                    }}
-                  >
-                    <div className="explore-card-banner">
-                      {nicknameModal.userData?.banner_url ? (
-                        <img
-                          className="explore-card-banner-img"
-                          src={nicknameModal.userData.banner_url}
-                          alt=""
-                          style={getImageStyle(nicknameModal.userData?.banner_position)}
-                        />
-                      ) : (
-                        <div className="explore-card-banner" style={{ background: 'var(--color-surface, #1a1a1a)' }} />
-                      )}
-                      <div className="explore-card-overlay" />
-                    </div>
-                    <div className="explore-card-body">
-                      <Avatar
-                        className="explore-card-avatar"
-                        src={nicknameModal.userData?.avatar_url || DEFAULT_AVATAR}
-                        alt={nicknameModal.userData?.username || ''}
-                        style={getImageStyle(nicknameModal.userData?.avatar_position)}
-                      />
-                      <div className="explore-card-info">
-                        <div className="explore-card-name-row">
-                          <span className="explore-card-name">
-                            {nicknameInput.trim() || nicknameModal.userData?.displayname || nicknameModal.userData?.username || t('common.unknown')}
-                          </span>
-                          <span style={{ fontSize: '0.68rem', fontWeight: 400, opacity: 0.5 }}>@{nicknameModal.userData?.username || ''}</span>
-                          {Array.isArray(nicknameModal.userData?.roles) && nicknameModal.userData.roles.some(r => r !== 'user') && (
-                            <Badge roles={nicknameModal.userData.roles} />
-                          )}
-                        </div>
-                        <span className="explore-card-followers">
-                          {nicknameModal.userData?.followerCount || 0} {nicknameModal.userData?.followerCount === 1 ? t('explore.followers_singular') : t('explore.followers_plural')}
-                        </span>
-                        {(nicknameModal.userData?.bio || nicknameModal.userData?.pronouns) && (
-                          <p className="explore-card-bio">
-                            {nicknameModal.userData?.bio || ''}
-                            {nicknameModal.userData?.bio && nicknameModal.userData?.pronouns && <span> · {nicknameModal.userData?.pronouns}</span>}
-                            {!nicknameModal.userData?.bio && nicknameModal.userData?.pronouns && <span>{nicknameModal.userData?.pronouns}</span>}
-                          </p>
-                        )}
-                      </div>
-                      <div className="explore-card-action">
-                        <button type="button" className="follow-btn follow-btn--follow" disabled>
-                          {t('follow.follow')}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="chat-nickname-no-data">
-                  <FaUser className="chat-nickname-no-data-icon" />
-                  <p>{t('chat.nickname_for_user') || 'Set a nickname for this user'}</p>
-                </div>
-              )}
-
-              {/* ── Nickname input ── */}
-              <div className="chat-nickname-input-section">
-                <label className="chat-nickname-input-label">
-                  {t('chat.nickname_placeholder') || 'Enter a nickname...'}
-                </label>
-                <input
-                  className="chat-nickname-modal-input"
-                  type="text"
-                  value={nicknameInput}
-                  onChange={(e) => setNicknameInput(e.target.value)}
-                  placeholder={t('chat.nickname_placeholder') || 'Enter a nickname...'}
-                  maxLength={50}
-                  autoFocus
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleSaveNickname(); if (e.key === 'Escape') setNicknameModal({ open: false, targetUserId: null, currentName: '', userData: null }); }}
-                />
-                <span className="chat-nickname-char-count">{nicknameInput.length}/50</span>
-              </div>
-            </div>
-
-            {/* ── Footer ── */}
-            <div className="chat-nickname-modal-footer">
-              <button
-                className="fc-modal-save"
-                onClick={handleSaveNickname}
-              >
-                {t('common.save') || 'Save'}
-              </button>
-              {nicknameModal.currentName && (
-                <button
-                  className="fc-modal-save--danger"
-                  onClick={async () => {
-                    setNicknameInput('');
-                    if (!nicknameModal.targetUserId || !user?.id) return;
-                    try {
-                      await removeNickname(user.id, nicknameModal.targetUserId);
-                      setNicknames(prev => {
-                        const next = { ...prev };
-                        delete next[nicknameModal.targetUserId];
-                        return next;
-                      });
-                      setNicknameModal({ open: false, targetUserId: null, currentName: '' });
-                      toast.success(t('chat.nickname_removed') || 'Nickname removed');
-                    } catch (err) {
-                      console.error('Error removing nickname:', err);
-                    }
-                  }}
-                >
-                  {t('common.delete') || 'Remove'}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>,
-        document.body
+      {nicknameModal.open && nicknameModal.userData && (
+        <NicknameModal
+          userData={nicknameModal.userData}
+          currentName={nicknameModal.currentName}
+          onClose={() => setNicknameModal({ open: false, targetUserId: null, currentName: '', userData: null })}
+          onSaved={(name) => {
+            const tid = nicknameModal.targetUserId;
+            if (!tid) return;
+            setNicknames(prev => {
+              const next = { ...prev };
+              if (name) {
+                next[tid] = name;
+              } else {
+                delete next[tid];
+              }
+              return next;
+            });
+          }}
+        />
       )}
     </div>
   );

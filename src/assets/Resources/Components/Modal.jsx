@@ -10,7 +10,7 @@ import ImagePositionEditor from './ImagePositionEditor';
 import { detectPlatform, getPlatformIcon, getPlatformName } from '../../services/socialPlatforms';
 import { extractColors } from '../../services/colorExtractor';
 import { useI18n } from '../../services/i18n/useI18n';
-import { FaCamera, FaUpload, FaSpinner } from 'react-icons/fa';
+import { FaCamera, FaUpload, FaSpinner, FaEdit, FaCheck, FaTimes } from 'react-icons/fa';
 import { toast } from 'react-toastify';
 
 import { uploadImage, uploadWithLocalPreview } from '../../services/cdnService';
@@ -92,6 +92,9 @@ export default function Modal({
   const [socialError, setSocialError] = useState('');
   const [detected, setDetected] = useState(null); // { platform, username, url } preview before adding
   const [detectedUsername, setDetectedUsername] = useState('');
+  // ── Edición de un social link existente ──
+  const [editingSocialIndex, setEditingSocialIndex] = useState(null);
+  const [editSocialInput, setEditSocialInput] = useState('');
 
   // Auto-detect platform as user types
   useEffect(() => {
@@ -221,6 +224,8 @@ export default function Modal({
     setInterestInput('');
     setNewSocial('');
     setSocialError('');
+    setEditingSocialIndex(null);
+    setEditSocialInput('');
     setShowUrlModal(null);
     setUrlInput('');
     setHasChanges(false);
@@ -415,12 +420,76 @@ export default function Modal({
 
   const handleRemoveSocial = (index) => {
     setSocialLinks((prev) => prev.filter((_, i) => i !== index));
+    // Si se elimina un item mientras otro está en edición, los índices se
+    // desplazan y editingSocialIndex apuntaría al link equivocado → cancelar.
+    setEditingSocialIndex(null);
+    setEditSocialInput('');
   };
 
   const handleSocialKeyDown = (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleAddSocial();
+    }
+  };
+
+  // ── Editar un social link existente (re-detecta la plataforma al guardar) ──
+  const handleStartEditSocial = (i) => {
+    setEditingSocialIndex(i);
+    setEditSocialInput(socialLinks[i]?.url || '');
+    setSocialError('');
+  };
+
+  const handleCancelEditSocial = () => {
+    setEditingSocialIndex(null);
+    setEditSocialInput('');
+    setSocialError('');
+  };
+
+  const handleSaveEditSocial = () => {
+    if (editingSocialIndex === null) return;
+    const input = editSocialInput.trim();
+    if (!input) {
+      setSocialError(t('modal.social_detect_error'));
+      return;
+    }
+    const result = detectPlatform(input);
+    if (!result) {
+      setSocialError(t('modal.social_detect_error'));
+      return;
+    }
+    // En edición se preserva la URL exacta que escribió el usuario: result.url
+    // ya viene normalizada con protocolo por detectPlatform (el icono y el
+    // username se actualizan igual por detección). NO se usa urlTemplate aquí
+    // porque reconstruiría desde el username y truncaría la edición
+    // (ej. https://x.com/user/status/123 → https://x.com/user).
+    const finalUrl = sanitizeUrl(result.url || input);
+    if (!finalUrl) {
+      setSocialError(t('modal.social_detect_error'));
+      return;
+    }
+    // Duplicado contra el resto de links (excluyendo el que se edita)
+    if (socialLinks.some((s, i) => i !== editingSocialIndex && s.url === finalUrl)) {
+      setSocialError(t('modal.social_duplicate'));
+      return;
+    }
+    setSocialLinks((prev) => prev.map((link, i) =>
+      i === editingSocialIndex
+        ? { platform: result.platform.id, username: result.username || input, url: finalUrl }
+        : link
+    ));
+    setEditingSocialIndex(null);
+    setEditSocialInput('');
+    setSocialError('');
+  };
+
+  const handleEditSocialKeyDown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); handleSaveEditSocial(); }
+    else if (e.key === 'Escape') {
+      // stopPropagation: evitar que ModalShell cierre el modal entero al cancelar la edición
+      e.preventDefault();
+      e.stopPropagation();
+      handleCancelEditSocial();
     }
   };
 
@@ -958,20 +1027,58 @@ export default function Modal({
                 </button>
                 <div className={`fc-modal-suggested-collapse ${socialLinksExpanded ? 'fc-modal-suggested-collapse--open' : ''}`}>
                 <div className="fc-modal-social-list">
-                  {socialLinks.map((link, i) => (
-                    <div key={link.url} className="fc-modal-social-item">
-                      <span className="fc-modal-social-icon">{React.createElement(getPlatformIcon(link.platform))}</span>
-                      <span className="fc-modal-social-username">@{link.username}</span>
-                      <button
-                        type="button"
-                        className="fc-modal-social-remove"
-                        onClick={() => handleRemoveSocial(i)}
-                        title={t('common.delete')}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
+                  {socialLinks.map((link, i) =>
+                    editingSocialIndex === i ? (
+                      <div key={link.url} className="fc-modal-social-item fc-modal-social-item--editing">
+                        <span className="fc-modal-social-icon">{React.createElement(getPlatformIcon(link.platform))}</span>
+                        <input
+                          className="fc-modal-input fc-modal-social-edit-input"
+                          value={editSocialInput}
+                          onChange={(e) => { setEditSocialInput(e.target.value); setSocialError(''); }}
+                          onKeyDown={handleEditSocialKeyDown}
+                          autoFocus
+                          placeholder={t('modal.social_placeholder')}
+                        />
+                        <button
+                          type="button"
+                          className="fc-modal-social-edit-save"
+                          onClick={handleSaveEditSocial}
+                          title={t('modal.save')}
+                        >
+                          <FaCheck />
+                        </button>
+                        <button
+                          type="button"
+                          className="fc-modal-social-edit-cancel"
+                          onClick={handleCancelEditSocial}
+                          title={t('modal.cancel')}
+                        >
+                          <FaTimes />
+                        </button>
+                      </div>
+                    ) : (
+                      <div key={link.url} className="fc-modal-social-item">
+                        <span className="fc-modal-social-icon">{React.createElement(getPlatformIcon(link.platform))}</span>
+                        <span className="fc-modal-social-username">@{link.username}</span>
+                        <button
+                          type="button"
+                          className="fc-modal-social-edit"
+                          onClick={() => handleStartEditSocial(i)}
+                          title={t('common.edit')}
+                        >
+                          <FaEdit />
+                        </button>
+                        <button
+                          type="button"
+                          className="fc-modal-social-remove"
+                          onClick={() => handleRemoveSocial(i)}
+                          title={t('common.delete')}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    )
+                  )}
                 </div>
                 </div>
               </div>

@@ -501,6 +501,22 @@ export default function CreatePostModal({
         }
 
         await updatePost(editPost.id, updateData);
+
+        // ── Encrypted add (edición): notificar SOLO a los usuarios recién
+        //    agregados a la lista de permitidos (los que ya estaban ya saben).
+        //    Crítico porque los posts encriptados son invisibles en feeds: la
+        //    notificación es el único canal de descubrimiento.
+        if (isEncrypted && editPost.id) {
+          const prevAllowedIds = editPost.allowed_users || [];
+          const newAddedIds = allowedUsers
+            .map((u) => u.id)
+            .filter((id) => !prevAllowedIds.includes(id));
+          if (newAddedIds.length > 0) {
+            notifyEncryptedAdd(userId, editPost.id, newAddedIds).catch((err) =>
+              console.warn('Error notifying encrypted add on edit:', err)
+            );
+          }
+        }
       } else {
         if (!userId) {
           setError(t('create_post.auth_error'));

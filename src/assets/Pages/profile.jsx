@@ -52,7 +52,7 @@ import Badge from "../Resources/Components/Badge";
 import Avatar from "../Resources/Components/Avatar";
 import Tooltip from "../Resources/Components/Tooltip";
 import { getPlatformIcon, getPlatformName } from "../services/socialPlatforms";
-import { FaFeather, FaBookmark, FaLock, FaEllipsisH, FaBan, FaClock, FaHeart, FaRetweet, FaChevronDown, FaShareAlt, FaComment } from 'react-icons/fa';
+import { FaFeather, FaBookmark, FaLock, FaEllipsisH, FaBan, FaClock, FaHeart, FaRetweet, FaChevronDown, FaShareAlt, FaComment, FaTag } from 'react-icons/fa';
 import FollowButton from "../Resources/Components/FollowButton";
 import { blockUser, unblockUser, isBlocked, cacheBlockStatus, getCachedBlockStatus, unfollowBothWays } from "../services/blockService";
 import { useI18n } from "../services/i18n/useI18n";
@@ -69,10 +69,11 @@ import { getCdnUrl } from '../services/cdnService';
 import { useUserStatus } from '../services/useUserStatus';
 import { useRegisterUserStatus, UserStatusContext } from '../../context/UserStatusContext';
 import { getNicknames, getCachedNicknames, cacheNicknames } from "../services/chatService";
+import NicknameModal from "../Resources/Components/NicknameModal";
 import VirtualPostList from "../Resources/Components/VirtualPostList";
 
 function Profile() {
-    const { t, showAccent, accentVisibility, showLikes, filterEncrypted, showBadges, locale } = useI18n();
+    const { t, showAccent, accentVisibility, showLikes, showBadges, locale } = useI18n();
     const { username: profileUsername } = useParams();
     const navigate = useNavigate();
     const { user, profile: ownProfile, refreshProfile, isAuthenticated, loading } = useAuth();
@@ -535,7 +536,7 @@ function Profile() {
         }
         const loadPosts = async () => {
             try {
-                const items = await getProfileContent(userId, user?.id, filterEncrypted);
+                const items = await getProfileContent(userId, user?.id);
                 setProfilePosts(items);
                 // Batch check likes/reposts/saves for current user
                 let likedIds = [], repostedIds = [], savedIds = [], dislikedIds = [];
@@ -584,7 +585,7 @@ function Profile() {
         const refreshAfterChange = async () => {
             if (!canViewContent) return;
             try {
-                const items = await getProfileContent(profileId, user?.id, filterEncrypted);
+                const items = await getProfileContent(profileId, user?.id);
                 setProfilePosts(items);
                 let likedIds = [], repostedIds = [], savedIds = [], dislikedIds = [];
                 if (user?.id && items.length > 0) {
@@ -1006,7 +1007,7 @@ function Profile() {
         if (!userId) return;
         try {
             // Refrescar posts normales (fetch all)
-            const items = await getProfileContent(userId, user?.id, filterEncrypted);
+            const items = await getProfileContent(userId, user?.id);
             setProfilePosts(items);
             let likedIds = [], repostedIds = [], savedIds = [], dislikedIds = [];
             if (user?.id && items.length > 0) {
@@ -1031,7 +1032,7 @@ function Profile() {
         } catch (err) {
             console.error('Error refreshing posts:', err);
         }
-    }, [activeProfile?.id, user?.id, filterEncrypted]);
+    }, [activeProfile?.id, user?.id]);
 
     const handlePostUpdate = useCallback((updatedPost) => {
         if (updatedPost._editing) {
@@ -1168,8 +1169,7 @@ function Profile() {
             if (cached) return cached;
         }
         return {};
-    });
-    useEffect(() => {
+    });    useEffect(() => {
         if (!user?.id) return;
         getNicknames(user.id).then((map) => {
             setNicknames(map);
@@ -1178,6 +1178,23 @@ function Profile() {
     }, [user?.id]);
 
 
+
+    // ── Nickname modal state (abierto desde el context menu) ──
+    const [nicknameModalUser, setNicknameModalUser] = useState(null);
+
+    const handleSavedNickname = useCallback((finalName) => {
+        if (!nicknameModalUser?.id) return;
+        setNicknames(prev => {
+            const next = { ...prev };
+            if (finalName) {
+                next[nicknameModalUser.id] = finalName;
+            } else {
+                delete next[nicknameModalUser.id];
+            }
+            return next;
+        });
+        setNicknameModalUser(null);
+    }, [nicknameModalUser]);
 
     const getDisplayName = (otherProfile) => {
         if (!otherProfile) return t('common.unknown');
@@ -1771,6 +1788,19 @@ function Profile() {
                   <button
                     type="button"
                     className="fc-dropdown-btn"
+                    onClick={() => {
+                      setNicknameModalUser({ ...activeProfile, followerCount: followCounts?.followers || 0 });
+                      setContextMenuOpen(false);
+                    }}
+                  >
+                    <FaTag />
+                    {nicknames[activeProfile.id] ? (t('chat.edit_nickname') || 'Edit nickname') : (t('chat.set_nickname') || 'Set nickname')}
+                  </button>
+                )}
+                {!isOwnProfile && (
+                  <button
+                    type="button"
+                    className="fc-dropdown-btn"
                     onClick={async () => {
                       setBlockLoading(true);
                       try {
@@ -2250,6 +2280,14 @@ function Profile() {
                     onSuccess={handlePostCreated}
                     editPost={editingPost}
                     userId={user?.id}
+                />
+
+            {/* Nickname modal (context menu → set/edit apodo) */}
+            <NicknameModal
+                    userData={nicknameModalUser}
+                    currentName={nicknameModalUser ? (nicknames[nicknameModalUser.id] || '') : ''}
+                    onClose={() => setNicknameModalUser(null)}
+                    onSaved={handleSavedNickname}
                 />
         </div>
     );

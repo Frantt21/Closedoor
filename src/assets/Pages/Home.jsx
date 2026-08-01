@@ -30,7 +30,7 @@ import FloatingActionButton from '../Resources/Components/FloatingActionButton';
 const FEED_LIMIT = 150;
 
 function Home() {
-    const { t, filterEncrypted } = useI18n();
+    const { t } = useI18n();
     usePageTitle(t('home.title'));
     const { user, isAuthenticated, profile } = useAuth();
 
@@ -94,10 +94,10 @@ function Home() {
                 const ids = (following || []).map((f) => f.id);
                 setFollowingIds(ids);
                 if (ids.length > 0) {
-                    data = await getFeed({ limit: FEED_LIMIT, userId: user?.id, filterEncrypted, authorIds: ids });
+                    data = await getFeed({ limit: FEED_LIMIT, userId: user?.id, authorIds: ids });
                 }
             } else {
-                data = await getFeed({ limit: FEED_LIMIT, userId: user?.id, filterEncrypted });
+                data = await getFeed({ limit: FEED_LIMIT, userId: user?.id });
                 // Algoritmo "Para ti": puntúa por intereses del autor, hashtags y engagement
                 data = rankFeedForUser(data, profile?.interests || []);
             }
@@ -143,9 +143,9 @@ function Home() {
             // No apagar el skeleton si este fetch es de un tab que ya no está activo
             if (tabRef.current === whichTab) setPostsLoading(false);
         }
-    }, [user?.id, filterEncrypted, interestsKey]);
+    }, [user?.id, interestsKey]);
 
-    // ── Load feed (con cache, refresca al cambiar tab / filterEncrypted) ──
+    // ── Load feed (con cache, refresca al cambiar tab) ──
     useEffect(() => {
         const key = cacheKeyFor(tab);
         const cached = getCachedFeed(key);
@@ -190,8 +190,8 @@ function Home() {
                     // Ignorar posts programados (scheduled_at en futuro)
                     if (newPost.scheduled_at && new Date(newPost.scheduled_at) > new Date()) return;
 
-                    // Ignorar posts encriptados de otros usuarios
-                    if (newPost.is_encrypted && newPost.user_id !== user?.id) return;
+                    // Ignorar posts encriptados: invisibles en feeds (solo perfil/notificación)
+                    if (newPost.is_encrypted) return;
 
                     // En tab "Siguiendo", solo autores que sigo
                     if (tabRef.current === 'following' && !followingIdsRef.current.includes(newPost.user_id)) return;

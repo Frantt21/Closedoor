@@ -2,7 +2,9 @@ import React, { useEffect, useState, useCallback, useRef } from "react";
 import ModalShell from './ModalShell';
 import { useNavigate } from "react-router-dom";
 import { useI18n } from "../../services/i18n/useI18n";
+import { useAuth } from "../../../hooks/useAuth";
 import { getFollowers, getFollowing, getCachedFollowers, getCachedFollowing, setCachedFollowers, setCachedFollowing } from "../../services/followService";
+import { getNicknames, getCachedNicknames, cacheNicknames } from "../../services/chatService";
 import FollowButton from "./FollowButton";
 import Avatar from "./Avatar";
 import Badge from "./Badge";
@@ -46,6 +48,10 @@ function FollowersModalItem({ user, onClose }) {
 
 export default function FollowersModal({ isOpen = true, userId, type, onClose }) {
   const { t } = useI18n();
+  const { user } = useAuth();
+  // Los nicknames son por-usuario (cada quien tiene su propio mapa de apodos),
+  // así que se cargan con el usuario AUTENTICADO, no con el dueño del perfil.
+  const nicknameOwnerId = user?.id || userId;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
@@ -68,6 +74,22 @@ export default function FollowersModal({ isOpen = true, userId, type, onClose })
 
   const isFollowers = type === "followers";
   const title = isFollowers ? t('followers.title') : t('following.title');
+
+  // ── Nicknames (display name override from chat_nicknames, cache-first) ──
+  const [nicknames, setNicknames] = useState(() => {
+    if (nicknameOwnerId) {
+      const cached = getCachedNicknames(nicknameOwnerId);
+      if (cached) return cached;
+    }
+    return {};
+  });
+  useEffect(() => {
+    if (!nicknameOwnerId) return;
+    getNicknames(nicknameOwnerId).then((map) => {
+      setNicknames(map);
+      cacheNicknames(nicknameOwnerId, map);
+    }).catch(() => {});
+  }, [nicknameOwnerId]);
 
   // Scroll locking, Escape handling: manejado por ModalShell (<dialog> nativo)
 
@@ -114,9 +136,12 @@ export default function FollowersModal({ isOpen = true, userId, type, onClose })
   }, [userId, type, isFollowers]);
 
   const filteredUsers = debouncedQuery
-    ? users.filter((u) =>
-        u.username.toLowerCase().includes(debouncedQuery.toLowerCase())
-      )
+    ? users.filter((u) => {
+        const q = debouncedQuery.toLowerCase();
+        const uname = (u.username || '').toLowerCase();
+        const nick = (nicknames[u.id] || '').toLowerCase();
+        return uname.includes(q) || nick.includes(q);
+      })
     : users;
 
   return (

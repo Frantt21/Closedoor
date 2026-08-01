@@ -80,7 +80,8 @@ export function extractUrls(text) {
 // ── URL sanitization (anti-XSS) ──
 // Solo protocolos seguros. javascript:, data:, vbscript: y otros
 // protocolos peligrosos se neutralizan para evitar ejecución de scripts.
-const SAFE_URL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:']);
+// Sin los dos puntos: el regex de isSafeUrl captura el esquema sin ':' (ej. 'https')
+const SAFE_URL_PROTOCOLS = new Set(['http', 'https', 'mailto']);
 
 export function isSafeUrl(url) {
   if (!url || typeof url !== 'string') return false;
@@ -102,7 +103,16 @@ export function isSafeUrl(url) {
 }
 
 export function sanitizeUrl(url, fallback = '') {
-  return isSafeUrl(url) ? url.trim() : fallback;
+  if (!isSafeUrl(url)) return fallback;
+  const trimmed = url.trim();
+  // URLs sin protocolo explícito y que no son rutas internas ("/") se
+  // resuelven como rutas relativas del propio dominio (ej. href="x.com/u"
+  // abriría app.foranly.space/x.com/u). Se completan con https:// para
+  // que apunten al sitio externo. Rutas internas ("/...") se mantienen.
+  if (!trimmed.startsWith('/') && !/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)) {
+    return `https://${trimmed}`;
+  }
+  return trimmed;
 }
 
 // ── Content sanitization (anti-XSS al guardar) ──

@@ -111,7 +111,7 @@ export async function getPosts({ userId, profileUserId, limit = 20, offset = 0 }
     'is_pinned', 'pinned_at', 'is_encrypted', 'is_sensitive',
     'likes_count', 'dislikes_count', 'comments_count', 'reposts_count', 'views_count',
     'created_at', 'updated_at', 'mentions',
-    'allowed_users', 'obfuscated_display', 'comments_allowed', 'poll_data',
+    'allowed_users', 'obfuscated_display', 'encrypted_content', 'encrypted_iv', 'comments_allowed', 'poll_data',
     'profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position)'
   ].join(',');
   let query = supabase.from('posts').select(feedSelect);
@@ -149,7 +149,7 @@ export async function getPost(postId) {
     'is_pinned', 'pinned_at', 'is_encrypted', 'is_sensitive',
     'likes_count', 'dislikes_count', 'comments_count', 'reposts_count', 'views_count',
     'created_at', 'updated_at', 'mentions',
-    'allowed_users', 'obfuscated_display', 'comments_allowed', 'poll_data',
+    'allowed_users', 'obfuscated_display', 'encrypted_content', 'encrypted_iv', 'comments_allowed', 'poll_data',
     'profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position)'
   ].join(',');
   const { data, error } = await supabase.from('posts').select(explicitSelect)
@@ -235,7 +235,7 @@ export async function togglePinPost(postId, userId, currentPinned) {
 
 // ── PROFILE CONTENT (posts + reposts) ──
 
-export async function getProfileContent(profileUserId, currentUserId, filterEncrypted = true, { offset = 0, limit = 999999 } = {}) {
+export async function getProfileContent(profileUserId, currentUserId, { offset = 0, limit = 999999 } = {}) {
   if (!profileUserId) return [];
 
   const [posts, repostsResult] = await Promise.all([
@@ -246,6 +246,7 @@ export async function getProfileContent(profileUserId, currentUserId, filterEncr
         id, created_at, user_id,
         posts!reposts_post_id_fkey (
           id, user_id, content, image_url, image_urls, video_url, is_pinned, pinned_at, mentions,
+          is_encrypted, encrypted_content, encrypted_iv, allowed_users, obfuscated_display,
           likes_count, dislikes_count, comments_count, reposts_count, views_count, created_at, updated_at,
           profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)
         )
@@ -287,13 +288,10 @@ export async function getProfileContent(profileUserId, currentUserId, filterEncr
   }
   merged.sort(sortProfilePosts);
 
-  // Filtrar posts encriptados si filterEncrypted está activo
-  // pero siempre mostrar los propios posts encriptados del usuario
-  if (filterEncrypted) {
-    return merged.filter((p) => !p.is_encrypted || p.user_id === currentUserId);
-  }
-
-  return merged;
+  // Posts encriptados: solo el autor los ve en su propio perfil. Nunca en
+  // perfiles ajenos ni en ningún feed (invisibles para todo algoritmo),
+  // independiente del setting filter_encrypted.
+  return merged.filter((p) => !p.is_encrypted || p.user_id === currentUserId);
 }
 
 // ── Cache de IDs visibles (para evitar consultas repetidas a follows/profiles) ──
@@ -388,14 +386,15 @@ async function refreshVisibleIds(userId) {
 
 // ── FEED (filtrando perfiles privados, con cache de IDs visibles) ──
 
-export async function getFeed({ limit = 20, offset = 0, userId, filterEncrypted = true, authorIds } = {}) {
+export async function getFeed({ limit = 20, offset = 0, userId, authorIds } = {}) {
   let query = supabase
     .from('posts')
     .select('*, profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position, interests)');
 
-  // Excluir posts programados del feed
-  // Filter encrypted posts in JavaScript (not DB) to allow own encrypted posts
-  // through even when filterEncrypted is active
+  // Excluir posts programados del feed.
+  // Los posts encriptados se filtran en JS (al final): son invisibles para todo
+  // algoritmo/feed; solo el autor los ve en su perfil y los incluidos vía
+  // notificación (deep-link a /post/:id).
   query = query.or('scheduled_at.is.null,scheduled_at.lte.now');
 
   // Resolver IDs visibles con cache (o fetch si cache miss)
@@ -434,12 +433,10 @@ export async function getFeed({ limit = 20, offset = 0, userId, filterEncrypted 
     refreshVisibleIds(userId);
   }
 
-  // Filter encrypted posts in JS: hide others' encrypted posts but keep own
-  if (filterEncrypted) {
-    return posts.filter((p) => !p.is_encrypted || p.user_id === userId);
-  }
-
-  return posts;
+  // Encrypted posts are invisible to every feed surface (Para ti / Siguiendo),
+  // regardless of the filter_encrypted setting: they are only known via the
+  // notification to included users and via the author's own profile.
+  return posts.filter((p) => !p.is_encrypted);
 }
 
 // ── LIKES ──
@@ -635,7 +632,7 @@ export async function getUserComments(userId, { limit = 50, offset = 0 } = {}) {
     .select(`
       id, content, image_url, video_url, created_at, post_id, comment_likes_count, comment_dislikes_count,
       profiles!comments_user_id_fkey (id, username, displayname, avatar_url, roles, avatar_position),
-      posts!comments_post_id_fkey (id, user_id, content, image_url, profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles))
+      posts!comments_post_id_fkey (id, user_id, content, image_url, is_encrypted, encrypted_content, encrypted_iv, allowed_users, obfuscated_display, profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles))
     `)
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
@@ -1299,7 +1296,7 @@ export async function getScheduledPosts(userId, { limit = 50, offset = 0 } = {})
     'is_pinned', 'pinned_at', 'is_encrypted', 'is_sensitive',
     'likes_count', 'dislikes_count', 'comments_count', 'reposts_count', 'views_count',
     'created_at', 'updated_at', 'mentions',
-    'allowed_users', 'obfuscated_display', 'comments_allowed', 'poll_data',
+    'allowed_users', 'obfuscated_display', 'encrypted_content', 'encrypted_iv', 'comments_allowed', 'poll_data',
     'profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position)'
   ].join(',');
   const { data, error } = await supabase.from('posts').select(explicitSelect)
@@ -1331,6 +1328,7 @@ export async function getLikedPosts(userId, { limit = 50, offset = 0 } = {}) {
       id, created_at,
       posts!likes_post_id_fkey (
         id, user_id, content, image_url, image_urls, video_url, mentions,
+        is_encrypted, encrypted_content, encrypted_iv, allowed_users, obfuscated_display,
         likes_count, dislikes_count, comments_count, reposts_count, views_count, created_at, updated_at,
         profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)
       )
@@ -1474,7 +1472,9 @@ export async function getSavedPosts(userId, { limit = 50, offset = 0 } = {}) {
     .select(`
       id, created_at,
       posts!saved_posts_post_id_fkey (
-        id, user_id, content, image_url, image_urls, video_url, mentions,          likes_count, dislikes_count, comments_count, reposts_count, views_count, created_at, updated_at,
+        id, user_id, content, image_url, image_urls, video_url, mentions,
+        is_encrypted, encrypted_content, encrypted_iv, allowed_users, obfuscated_display,
+        likes_count, dislikes_count, comments_count, reposts_count, views_count, created_at, updated_at,
         profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)
       )
     `)

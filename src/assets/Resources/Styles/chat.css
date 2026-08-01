@@ -2757,13 +2757,6 @@ dialog.fc-modal.chat-followers-modal {
     flex-shrink: 0;
 }
 
-.chat-nickname-modal-title {
-    font-size: 1.05rem;
-    font-weight: 700;
-    margin: 0;
-    color: var(--color-text, #fff);
-}
-
 .chat-nickname-modal-close {
     background: none;
     border: none;
@@ -3003,50 +2996,6 @@ dialog.fc-modal.chat-followers-modal {
     background: var(--accent-color, #3b82f6);
     color: #fff;
     letter-spacing: 0.03em;
-}
-
-/* ── Nickname input section ── */
-.chat-nickname-input-section {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    position: relative;
-}
-
-.chat-nickname-input-label {
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: var(--color-text-secondary, #9ca3af);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-}
-
-.chat-nickname-modal-input {
-    width: 100%;
-    padding: 10px 12px;
-    border-radius: var(--radius-sm, 8px);
-    border: 1px solid var(--color-border, #2a2a2a);
-    background: var(--overlay-bg, rgba(255,255,255,0.06));
-    color: var(--color-text, #fff);
-    font-family: inherit;
-    font-size: 0.9rem;
-    outline: none;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
-    box-sizing: border-box;
-}
-
-.chat-nickname-modal-input:focus {
-    border-color: var(--accent-color, #3b82f6);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-color, #3b82f6) 25%, transparent);
-}
-
-.chat-nickname-char-count {
-    position: absolute;
-    right: 10px;
-    bottom: 10px;
-    font-size: 0.68rem;
-    color: var(--color-text-muted, #6b7280);
-    pointer-events: none;
 }
 
 /* ── Footer ── */
