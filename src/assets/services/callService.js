@@ -100,13 +100,17 @@ export function subscribeToCalls(userId, onCall) {
         event: '*',
         schema: 'public',
         table: 'calls',
-        // OR: soy el caller O el callee (comma = AND en Realtime, por eso or=)
-        filter: `or=(caller_id.eq.${userId},callee_id.eq.${userId})`,
+        // Sin filtro de servidor: los filtros or=(...) pueden fallar silenciosamente
+        // en Realtime (canal SUBSCRIBED pero sin eventos). RLS ya limita las filas
+        // visibles a participantes de la conversación; filtramos client-side.
       },
       (payload) => {
         console.log('[CALL] payload received', { eventType: payload.eventType, newRow: payload.new, oldRow: payload.old });
         const call = payload.new || payload.old;
-        if (call) onCall(call, payload.eventType);
+        if (!call) return;
+        // Filtro client-side: solo me interesan las llamadas donde soy caller o callee
+        if (call.caller_id !== userId && call.callee_id !== userId) return;
+        onCall(call, payload.eventType);
       }
     );
   channel.subscribe((status, err) => {
