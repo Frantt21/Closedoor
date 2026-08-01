@@ -836,10 +836,22 @@ export async function isReposted(postId, userId) {
  *
  * Requiere migrations/047_post_views_dedup.sql en la DB.
  */
+// Dedup por sesión (en memoria, se resetea al recargar): evita que una misma
+// apertura + interacción (like, comentar, etc.) disparen el RPC varias veces
+// en la misma sesión. No es persistente (a diferencia del viejo fast-path de
+// localStorage que causaba el bug), así que la DB sigue siendo la fuente de
+// verdad entre sesiones (UNIQUE user_id+post_id).
+const VIEWED_THIS_SESSION = new Set();
+
 export async function trackPostView(postId, userId) {
   // Sin usuario autenticado no se puede deduplicar server-side: no contar
   // (evita inflar el contador con visitas anónimas).
   if (!postId || !userId) return false;
+
+  const key = `${userId}:${postId}`;
+  // Ya contada en esta sesión → no reintentar (evita doble conteo si la DB
+  // aún corre la función vieja 046 sin dedup).
+  if (VIEWED_THIS_SESSION.has(key)) return true;
 
   try {
     // RPC atómico: inserta en post_views y solo incrementa si es la primera vez
@@ -850,6 +862,9 @@ export async function trackPostView(postId, userId) {
       console.warn('Error tracking view:', error?.message || error);
       return false;
     }
+    // Solo marcar como vista tras una llamada exitosa (si falla, se reintenta
+    // en la próxima interacción).
+    VIEWED_THIS_SESSION.add(key);
     return true;
   } catch (err) {
     console.warn('Error tracking view:', err);

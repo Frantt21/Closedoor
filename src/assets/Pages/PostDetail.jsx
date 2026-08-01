@@ -322,9 +322,16 @@ export default function PostDetail() {
     loadComments();
   }, [loadComments]);
 
-  // Track post view (once per user)
+  // Track post view (once per user) — guard useRef: evita el doble disparo
+  // del efecto por React.StrictMode (dev monta 2 veces) o porque user?.id
+  // cambia de undefined → id al resolver la auth. El dedup real lo hace la
+  // DB (UNIQUE user_id+post_id), pero este guard evita llamadas redundantes
+  // y el doble conteo si la DB aún corre la función vieja sin dedup (046).
+  const viewTrackedRef = useRef(null);
   useEffect(() => {
-    if (!postId) return;
+    if (!postId || !user?.id) return;
+    if (viewTrackedRef.current === postId) return;
+    viewTrackedRef.current = postId;
     trackPostView(postId, user?.id);
   }, [postId, user?.id]);
 
