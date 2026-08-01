@@ -75,14 +75,19 @@ export function UserStatusProvider({ children }) {
 
       if (!error && data) {
         setStatuses(prev => {
+          let changed = false;
           const next = { ...prev };
           for (const row of data) {
             const effective = computeEffectiveStatus(row);
             if (next[row.id] !== effective) {
               next[row.id] = effective;
+              changed = true;
             }
           }
-          return next;
+          // ⚠️ Perf: si ningún status cambió, devolver el MISMO objeto (prev)
+          // para no disparar re-renders en todos los consumidores del contexto
+          // cada 3s (el perfil se re-renderizaba entero en cada poll).
+          return changed ? next : prev;
         });
       }
     } catch {}

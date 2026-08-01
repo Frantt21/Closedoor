@@ -26,10 +26,15 @@
     background-position: var(--profile-bg-position, center center);
     background-size: var(--profile-bg-size, cover);
     background-repeat: no-repeat;
-    background-attachment: fixed;
     filter: blur(var(--profile-bg-blur, 0px));
     pointer-events: none;
     z-index: -2;
+    /* ⚠️ Perf: sin background-attachment: fixed — fuerza re-rasterización del
+       fondo en CADA frame de scroll (la capa ya es position: fixed, así que
+       el attachment es redundante y solo duplicaba el costo de repaint).
+       translateZ(0) promueve la capa a GPU; filter: blur ya crea stacking
+       context propio, por eso NO usamos will-change (memoria GPU permanente). */
+    transform: translateZ(0);
 }
 
 /* ---- Accent color gradient overlay ---- */
