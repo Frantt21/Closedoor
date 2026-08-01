@@ -389,6 +389,75 @@ function decodeEntities(str) {
 // ── CDN proxy routes ──
 app.all('/cdn/*', cdnProxy);
 
+// ── LiveKit token endpoint (local dev) — espejo de api/livekit-token.js ──
+// Emite un AccessToken de LiveKit verificando que el usuario sea participante
+// de la conversación de la llamada. En producción lo maneja Vercel.
+app.post('/api/livekit-token', express.json(), async (req, res) => {
+  const LIVEKIT_URL = process.env.LIVEKIT_URL || '';
+  const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || '';
+  const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || '';
+
+  if (!supabase || !LIVEKIT_URL || !LIVEKIT_API_KEY || !LIVEKIT_API_SECRET) {
+    res.status(500).json({ success: false, error: 'LiveKit not configured' });
+    return;
+  }
+
+  const authHeader = req.headers.authorization || '';
+  const accessToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (!accessToken) {
+    res.status(401).json({ success: false, error: 'Missing auth token' });
+    return;
+  }
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
+  if (authError || !user) {
+    res.status(401).json({ success: false, error: 'Invalid session' });
+    return;
+  }
+
+  const room = req.body?.room;
+  if (!room || typeof room !== 'string') {
+    res.status(400).json({ success: false, error: 'Missing room' });
+    return;
+  }
+
+  const { data: call } = await supabase
+    .from('calls')
+    .select('conversation_id, status')
+    .eq('room_name', room)
+    .maybeSingle();
+  if (!call) {
+    res.status(404).json({ success: false, error: 'Call not found' });
+    return;
+  }
+
+  if (!['ringing', 'active'].includes(call.status)) {
+    res.status(409).json({ success: false, error: 'Call is not active' });
+    return;
+  }
+
+  const { data: isParticipant } = await supabase
+    .rpc('is_conversation_participant', { conv_id: call.conversation_id });
+  if (!isParticipant) {
+    res.status(403).json({ success: false, error: 'Not a participant' });
+    return;
+  }
+
+  try {
+    const { AccessToken } = await import('livekit-server-sdk');
+    const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
+      identity: user.id,
+      ttl: '2h',
+    });
+    at.addGrant({ roomJoin: true, room, canPublish: true, canSubscribe: true, canPublishData: true });
+    const token = await at.toJwt();
+    res.status(200).json({ success: true, token, url: LIVEKIT_URL });
+  } catch (err) {
+    console.warn('[livekit-token] Token error:', err.message);
+    res.status(500).json({ success: false, error: 'Token generation failed' });
+  }
+});
+
 // ── Route-based OG tag configuration ──
 function getOGForRoute(req) {
   const host = req.get('host');
