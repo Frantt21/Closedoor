@@ -1,6 +1,7 @@
 import { supabase } from './supabaseclient';
 import { getItem, setItem, removeItem } from './secureStorage';
 import { getCdnUrl } from './cdnService';
+import { sanitizeContent } from './helpers';
 
 /**
  * Normaliza TODAS las URLs del CDN en un objeto profile para garantizar
@@ -433,10 +434,14 @@ export async function ensureUserProfile(user) {
  */
 export async function updateUserProfile(userId, updates) {
   try {
+    const safeUpdates = { ...updates };
+    if (typeof safeUpdates.bio === 'string') {
+      safeUpdates.bio = sanitizeContent(safeUpdates.bio);
+    }
     const { data, error } = await supabase
       .from('profiles')
       .update({
-        ...updates,
+        ...safeUpdates,
         updated_at: new Date().toISOString(),
       })
       .eq('id', userId)

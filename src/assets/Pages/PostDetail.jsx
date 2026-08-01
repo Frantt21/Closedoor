@@ -38,7 +38,7 @@ import ConfirmModal from '../Resources/Components/ConfirmModal';
 import Tooltip from '../Resources/Components/Tooltip';
 import CreatePostModal from '../Resources/Components/CreatePostModal';
 import useMentionAutocomplete from '../hooks/useMentionAutocomplete';
-import { getTimeAgo, IMG_RE, VID_RE, getImageStyle } from '../services/helpers';
+import { getTimeAgo, IMG_RE, VID_RE, getImageStyle, sanitizeUrl } from '../services/helpers';
 import { uploadImage, uploadWithLocalPreview } from '../services/cdnService';
 import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/post.css';
@@ -645,8 +645,9 @@ export default function PostDetail() {
   };
 
   const executeExternalLink = () => {
-    if (confirmExternalLink) {
-      window.open(confirmExternalLink, '_blank', 'noopener noreferrer');
+    const safeLink = sanitizeUrl(confirmExternalLink);
+    if (safeLink) {
+      window.open(safeLink, '_blank', 'noopener noreferrer');
     }
     setConfirmExternalLink(null);
   };

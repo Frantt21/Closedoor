@@ -31,7 +31,7 @@ import SafeImage from './SafeImage';
 import Avatar from './Avatar';
 import RichText from './RichText';
 import { useI18n } from '../../services/i18n/useI18n';
-import { DEFAULT_AVATAR, getTimeAgo, getEmbedUrl as getEmbedUrlHelper, isVideoUrl as isVideoUrlHelper, IMG_RE, VID_RE, VID_RE_EXTENDED, getImageStyle } from '../../services/helpers';import { decode as encryptDecode,
+import { DEFAULT_AVATAR, getTimeAgo, getEmbedUrl as getEmbedUrlHelper, isVideoUrl as isVideoUrlHelper, IMG_RE, VID_RE, VID_RE_EXTENDED, getImageStyle, sanitizeUrl } from '../../services/helpers';import { decode as encryptDecode,
   decryptForUser,
   getCachedDecryptedContent,
   setCachedDecryptedContent,
@@ -538,8 +538,9 @@ const PostCard = React.memo(function PostCard({
   }, []);
 
   const executeExternalLink = useCallback(() => {
-    if (confirmExternalLink) {
-      window.open(confirmExternalLink, '_blank', 'noopener noreferrer');
+    const safeLink = sanitizeUrl(confirmExternalLink);
+    if (safeLink) {
+      window.open(safeLink, '_blank', 'noopener noreferrer');
     }
     setConfirmExternalLink(null);
   }, [confirmExternalLink]);

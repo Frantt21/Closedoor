@@ -56,7 +56,7 @@ import { FaFeather, FaBookmark, FaLock, FaEllipsisH, FaBan, FaClock, FaHeart, Fa
 import FollowButton from "../Resources/Components/FollowButton";
 import { blockUser, unblockUser, isBlocked, cacheBlockStatus, getCachedBlockStatus, unfollowBothWays } from "../services/blockService";
 import { useI18n } from "../services/i18n/useI18n";
-import { getContrastText, isUUID, getTimeAgo, getImageStyle } from "../services/helpers";
+import { getContrastText, isUUID, getTimeAgo, getImageStyle, sanitizeUrl } from "../services/helpers";
 import usePageMeta from "../../hooks/usePageMeta";
 import useBgContrast from "../../hooks/useBgContrast";
 import FollowersModal from "../Resources/Components/FollowersModal";
@@ -1301,6 +1301,14 @@ function Profile() {
       bgPos = `${p.x ?? 50}% ${p.y ?? 50}%`;
       bgSize = `${Math.max(p.zoom ?? 1, 1.05) * 100}%`;
     } catch {}
+    const bgBlur = activeProfile?.profile_background_blur ?? 0;
+
+    const bgVars = hasBg ? {
+      '--profile-bg-image': `url(${bgUrl})`,
+      '--profile-bg-position': bgPos,
+      '--profile-bg-size': bgSize,
+      '--profile-bg-blur': `${bgBlur}px`,
+    } : {};
 
     // ── Render ──
     if (!isAuthenticated && !profileUsername) {
@@ -1358,17 +1366,6 @@ function Profile() {
     const surfColor = activeProfile?.accent_surface_color;
     const surfGlass = activeProfile?.accent_surface_glass === true;
 
-    // ── Background image (blur/position only — url/dim/hasBg/accentVisible already extracted before early returns) ──
-    const bgBlur = (activeProfile?.profile_background_blur ?? 0);
-
-
-    const bgVars = hasBg ? {
-      '--profile-bg-image': `url(${bgUrl})`,
-      '--profile-bg-position': bgPos,
-      '--profile-bg-size': bgSize,
-      '--profile-bg-blur': `${bgBlur}px`,
-    } : {};
-
     const styleVars = {
       ...bgVars,
       ...(accentVisible ? {
@@ -1422,7 +1419,7 @@ function Profile() {
     };
 
     return (            <div className="profile-page" style={styleVars}>
-            {/* ── Dim & blur overlay for profile background ── */}
+            {/* ── Dim & blur overlay for profile background (imagen vía .profile-page::before) ── */}
             {hasBg && (
               <div
                 style={{
@@ -1579,7 +1576,7 @@ function Profile() {
                                 {activeProfile.social_links.slice(0, 3).map((link, i) => (
                                     <Tooltip key={link.url} text={getPlatformName(link.platform)}>
                                     <a
-                                        href={link.url}
+                                        href={sanitizeUrl(link.url)}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="profile-social-link"
@@ -1848,7 +1845,7 @@ function Profile() {
                         {activeProfile.social_links.map((link, i) => (
                             <a
                                 key={link.url}
-                                href={link.url}
+                                href={sanitizeUrl(link.url)}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="social-links-modal-item"

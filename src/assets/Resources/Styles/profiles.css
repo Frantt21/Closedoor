@@ -12,7 +12,10 @@
     position: relative;
 }
 
-/* ---- Background image + dim overlay ---- */
+/* ---- Background image: capa fija a pantalla completa (::before).
+   Las variables --profile-bg-* las define profile.jsx en el inline style
+   de .profile-page solo cuando el perfil tiene fondo. z-index -2 = detrás
+   del contenido y del dim overlay (-1), encima del fondo del body. ---- */
 
 .profile-page::before {
     content: '';

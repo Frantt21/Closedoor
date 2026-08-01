@@ -1,6 +1,7 @@
 import { supabase } from './supabaseclient';
 import { getItem, setItem, removeItem, clearAll } from './secureStorage';
 import { getCdnUrl } from './cdnService';
+import { sanitizeContent } from './helpers';
 
 /**
  * Normaliza URLs del CDN en objetos de post devueltos por Supabase.
@@ -40,6 +41,7 @@ export async function resolveMentions(content) {
 }
 
 export async function createPost({ userId, content, imageUrl, imageUrls, videoUrl, encryptedContent, encryptedIv, allowedUsers, obfuscatedDisplay, pollData, scheduledAt, commentsAllowed, isSensitive }) {
+  content = content ? sanitizeContent(content) : content;
   let mentions = {};
   if (content) {
     try {
@@ -163,6 +165,7 @@ export async function getPost(postId) {
 
 export async function updatePost(postId, updates) {
   const finalUpdates = { ...updates, updated_at: new Date().toISOString() };
+  if (finalUpdates.content) finalUpdates.content = sanitizeContent(finalUpdates.content);
 
   // Re-resolve mentions and hashtags if content changed
   if (updates.content) {
@@ -562,7 +565,7 @@ export async function createComment({ postId, userId, content, parentId = null, 
     .insert({
       user_id: userId,
       post_id: postId,
-      content,
+      content: sanitizeContent(content),
       parent_id: parentId,
       image_url: imageUrl,
       video_url: videoUrl,
@@ -644,7 +647,7 @@ export async function deleteComment(commentId) {
 export async function updateComment(commentId, content) {
   const { data, error } = await supabase
     .from('comments')
-    .update({ content, updated_at: new Date().toISOString() })
+    .update({ content: sanitizeContent(content), updated_at: new Date().toISOString() })
     .eq('id', commentId)
     .select()
     .single();

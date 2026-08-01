@@ -1,6 +1,7 @@
 import { supabase } from './supabaseclient';
 import { getItem, setItem, removeItem } from './secureStorage';
 import { encryptForUsers, decryptForUser } from './alphabetEncryption';
+import { sanitizeContent } from './helpers';
 
 // ── Conversation ──
 
@@ -278,8 +279,10 @@ export async function markAsRead(conversationId, userId) {
 export async function sendMessage(conversationId, senderId, content, participantIds, replyTo = null, sharedPostId = null) {
   const allIds = [...new Set([senderId, ...participantIds])];
 
+  // Sanitizar contenido antes de cifrarlo (anti-XSS: no guardar scripts)
+  const cleanContent = sanitizeContent(content);
   // Encrypt content for all participants
-  const { ciphertext, iv } = await encryptForUsers(content, senderId, allIds);
+  const { ciphertext, iv } = await encryptForUsers(cleanContent, senderId, allIds);
 
   // Build insert payload
   const insertPayload = {
@@ -317,7 +320,7 @@ export async function sendMessage(conversationId, senderId, content, participant
   // Update conversation last_message_text with obfuscated preview
   const obfuscatedPreview = sharedPostId
     ? '📌 Shared a post'
-    : (content.length > 80 ? content.slice(0, 80) + '...' : content);
+    : (cleanContent.length > 80 ? cleanContent.slice(0, 80) + '...' : cleanContent);
   await supabase
     .from('conversations')
     .update({ last_message_text: obfuscatedPreview })

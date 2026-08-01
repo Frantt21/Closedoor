@@ -5,7 +5,7 @@ import '../Styles/explore.css';
 import Badge from './Badge';
 import ConfirmModal from './ConfirmModal';
 import Avatar from './Avatar';
-import { DEFAULT_AVATAR, getImageStyle, getBackgroundStyle } from '../../services/helpers';
+import { DEFAULT_AVATAR, getImageStyle, getBackgroundStyle, sanitizeUrl } from '../../services/helpers';
 import ImagePositionEditor from './ImagePositionEditor';
 import { detectPlatform, getPlatformIcon, getPlatformName } from '../../services/socialPlatforms';
 import { extractColors } from '../../services/colorExtractor';
@@ -385,8 +385,12 @@ export default function Modal({
       setSocialError(t('modal.social_detect_error'));
       return;
     }
-    // Rebuild URL with possibly edited username
-    const finalUrl = detected.platform.urlTemplate(username);
+    // Rebuild URL with possibly edited username (sanitizada: solo http/https/mailto)
+    const finalUrl = sanitizeUrl(detected.platform.urlTemplate(username));
+    if (!finalUrl) {
+      setSocialError(t('modal.social_detect_error'));
+      return;
+    }
     if (socialLinks.some((s) => s.url === finalUrl)) {
       setSocialError(t('modal.social_duplicate'));
       return;

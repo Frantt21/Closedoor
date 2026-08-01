@@ -77,6 +77,54 @@ export function extractUrls(text) {
   return all;
 }
 
+// ── URL sanitization (anti-XSS) ──
+// Solo protocolos seguros. javascript:, data:, vbscript: y otros
+// protocolos peligrosos se neutralizan para evitar ejecución de scripts.
+const SAFE_URL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:']);
+
+export function isSafeUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (!trimmed) return false;
+  // Los caracteres de control (C0, DEL) son inválidos en URLs y permiten
+  // evadir el chequeo de protocolo: el navegador los elimina antes de
+  // parsear el esquema (ej. "\u0000javascript:..." se vuelve "javascript:").
+  if (/[\u0000-\u001F\u007F]/.test(trimmed)) return false;
+  // Rutas relativas internas (perfil, posts, CDN) — no ejecutan scripts
+  if (trimmed.startsWith('/')) return true;
+  // Protocolo explícito → debe estar en la lista blanca
+  const match = trimmed.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/);
+  if (match) {
+    return SAFE_URL_PROTOCOLS.has(match[1].toLowerCase());
+  }
+  // Sin protocolo → se resuelve como ruta relativa o se completa con https
+  return true;
+}
+
+export function sanitizeUrl(url, fallback = '') {
+  return isSafeUrl(url) ? url.trim() : fallback;
+}
+
+// ── Content sanitization (anti-XSS al guardar) ──
+// La app es de texto plano: mentions/hashtags son texto, no HTML. Se eliminan
+// tags peligrosos y atributos de eventos para que el contenido no pueda
+// transportar scripts, incluso si un futuro render path no escapara.
+export function sanitizeContent(text) {
+  if (typeof text !== 'string' || !text) return text || '';
+  let out = text;
+  // 1) Eliminar bloques <script>…</script> completos (con su contenido)
+  out = out.replace(/<\s*script\b[\s\S]*?<\s*\/\s*script\s*>/gi, '');
+  // 2) Eliminar tags peligrosos (apertura y cierre), conservando el texto interior
+  out = out.replace(/<\s*\/?\s*(?:script|iframe|object|embed|link|meta|base|style|form|template|svg|math)\b[^>]*>/gi, '');
+  // 3) Eliminar TODOS los atributos de eventos (onclick, onerror, …) de tags restantes
+  out = out.replace(/<[a-zA-Z][^>]*>/gi, (tag) =>
+    tag.replace(/\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+  );
+  // 4) Neutralizar protocolos peligrosos en texto plano (javascript:, vbscript:, data:)
+  out = out.replace(/\b(?:javascript|vbscript|data):/gi, '');
+  return out;
+}
+
 // ── Detect media type from text content (auto-detection) ──
 export function detectMediaFromContent(text) {
   const urls = extractUrls(text);

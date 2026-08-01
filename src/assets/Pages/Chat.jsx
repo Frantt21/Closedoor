@@ -33,7 +33,7 @@ import Avatar from '../Resources/Components/Avatar';
 import Badge from '../Resources/Components/Badge';
 import Tooltip from '../Resources/Components/Tooltip';
 import GifPicker from '../Resources/Components/GifPicker';
-import { getTimeAgo, IMG_RE, detectMediaFromContent, DEFAULT_AVATAR, getImageStyle } from '../services/helpers';
+import { getTimeAgo, IMG_RE, detectMediaFromContent, DEFAULT_AVATAR, getImageStyle, sanitizeUrl } from '../services/helpers';
 import { getPost } from '../services/postService';
 import RichText from '../Resources/Components/RichText';
 import SafeImage from '../Resources/Components/SafeImage';
@@ -1279,8 +1279,9 @@ export default function Chat() {
   }, []);
 
   const executeExternalLink = useCallback(() => {
-    if (confirmExternalLink) {
-      window.open(confirmExternalLink, '_blank', 'noopener noreferrer');
+    const safeLink = sanitizeUrl(confirmExternalLink);
+    if (safeLink) {
+      window.open(safeLink, '_blank', 'noopener noreferrer');
     }
     setConfirmExternalLink(null);
   }, [confirmExternalLink]);

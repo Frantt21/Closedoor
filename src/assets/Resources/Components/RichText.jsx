@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { isSafeUrl } from '../../services/helpers';
 
 // Combined regex for @mentions, #hashtags, and URLs
 const COMBINED_REGEX = /(?<![\w@])(@[a-zA-Z0-9_]+)|(?<![#\w])#([a-zA-Z0-9_\u00C0-\u024F]+)|(https?:\/\/[^\s<]+)/gi;
@@ -78,7 +79,7 @@ export default function RichText({
             </Link>
           );
         }
-        if (part.startsWith('http://') || part.startsWith('https://')) {
+        if ((part.startsWith('http://') || part.startsWith('https://')) && isSafeUrl(part)) {
           return (
             <a
               key={i}

@@ -14,6 +14,7 @@ import {
 import { decryptMessage, getTotalUnreadChatCount, getConversations } from '../assets/services/chatService';
 import { useAuth } from '../hooks/useAuth';
 import { getItem, setSessionItem, removeSessionItem } from '../assets/services/secureStorage';
+import { isSafeUrl } from '../assets/services/helpers';
 
 // ── Helpers para notificaciones en vivo ──
 
@@ -98,7 +99,9 @@ async function tryShowOsNotification(message, avatarUrl, link, tag) {
     });
     notif.onclick = () => {
       window.focus();
-      window.location.href = link;
+      if (isSafeUrl(link)) {
+        window.location.href = link;
+      }
       notif.close();
     };
     return true;

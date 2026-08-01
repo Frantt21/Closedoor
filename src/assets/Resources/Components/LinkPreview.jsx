@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { sanitizeUrl } from '../../services/helpers';
 
 /**
  * Fetches OG tag data for a URL from the /api/og-link endpoint.
@@ -88,7 +89,7 @@ export default function LinkPreview({ url, onExternalLink, className = '' }) {
     // Fallback: show just the raw URL as a clickable link
     return (
       <a
-        href={url}
+        href={sanitizeUrl(url)}
         target="_blank"
         rel="noopener noreferrer"
         className={`chat-link-preview chat-link-preview--fallback ${className}`}
@@ -116,7 +117,7 @@ export default function LinkPreview({ url, onExternalLink, className = '' }) {
 
   return (
     <a
-      href={url}
+      href={sanitizeUrl(url)}
       target="_blank"
       rel="noopener noreferrer"
       className={`chat-link-preview ${className}`}
