@@ -388,10 +388,10 @@ async function refreshVisibleIds(userId) {
 
 // ── FEED (filtrando perfiles privados, con cache de IDs visibles) ──
 
-export async function getFeed({ limit = 20, offset = 0, userId, filterEncrypted = true } = {}) {
+export async function getFeed({ limit = 20, offset = 0, userId, filterEncrypted = true, authorIds } = {}) {
   let query = supabase
     .from('posts')
-    .select('*, profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position)');
+    .select('*, profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position, interests)');
 
   // Excluir posts programados del feed
   // Filter encrypted posts in JavaScript (not DB) to allow own encrypted posts
@@ -406,8 +406,16 @@ export async function getFeed({ limit = 20, offset = 0, userId, filterEncrypted 
     visibleIdsArray = await fetchVisibleIds(userId);
   }
 
-  if (visibleIdsArray.length > 0) {
-    query = query.in('user_id', visibleIdsArray);
+  // Si se piden autores concretos (tab "Siguiendo"): intersectar con los IDs
+  // visibles (públicos + seguidos) para no exponer perfiles privados.
+  let filteredIds = visibleIdsArray;
+  if (Array.isArray(authorIds) && authorIds.length > 0) {
+    const authorSet = new Set(authorIds);
+    filteredIds = visibleIdsArray.filter((id) => authorSet.has(id));
+  }
+
+  if (filteredIds.length > 0) {
+    query = query.in('user_id', filteredIds);
   } else {
     return [];
   }

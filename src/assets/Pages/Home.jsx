@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { IconNewspaper } from '../Resources/Components/ShellIcons';
 import { useI18n } from '../services/i18n/useI18n';
 import '../Resources/Styles/Home.css';
@@ -19,14 +19,23 @@ import {
   getCachedFeed,
   clearFeedCache,
 } from '../services/postService';
-import PostCard from '../Resources/Components/PostCard';
+import { getFollowing } from '../services/followService';
+import { rankFeedForUser } from '../services/feedRanking';
+import VirtualPostList from '../Resources/Components/VirtualPostList';
 import CreatePostModal from '../Resources/Components/CreatePostModal';
 import FloatingActionButton from '../Resources/Components/FloatingActionButton';
+
+// Lote acotado por petición: suficiente para el ranking y la virtualización,
+// sin traer todo el histórico (respeta recursos de servidor).
+const FEED_LIMIT = 150;
 
 function Home() {
     const { t, filterEncrypted } = useI18n();
     usePageTitle(t('home.title'));
-    const { user, isAuthenticated } = useAuth();
+    const { user, isAuthenticated, profile } = useAuth();
+
+    // 'for_you' (algoritmo de relevancia) | 'following' (solo seguidos)
+    const [tab, setTab] = useState('for_you');
 
     const [posts, setPosts] = useState(() => {
         const cached = getCachedFeed('home_feed');
@@ -54,9 +63,92 @@ function Home() {
     const [showCreatePost, setShowCreatePost] = useState(false);
     const [editingPost, setEditingPost] = useState(null);
 
-    // ── Load feed (con cache, refresca cuando cambia filterEncrypted) ──
+    // Lista de seguidos (para el tab "Siguiendo" y el filtro realtime)
+    const [followingIds, setFollowingIds] = useState([]);
+    const followingIdsRef = useRef(followingIds);
+    useEffect(() => { followingIdsRef.current = followingIds; }, [followingIds]);
+    // Tab activo visible para el listener realtime (no re-suscribir por tab)
+    const tabRef = useRef(tab);
+    useEffect(() => { tabRef.current = tab; }, [tab]);
+
+    const cacheKeyFor = (whichTab) =>
+        whichTab === 'following' ? 'home_feed_following' : 'home_feed';
+
+    // Dep estable para el ranking: el objeto profile de AuthContext se actualiza
+    // por realtime (status, etc.) y su referencia a interests cambia; si usáramos
+    // profile?.interests directo, el callback se recrearía y refetchearía el feed.
+    const interestsKey = JSON.stringify(profile?.interests || []);
+
+    // ── Carga el feed del tab indicado (con cache, ranking y filtros) ──
+    const loadFeedForTab = useCallback(async (whichTab) => {
+        const key = cacheKeyFor(whichTab);
+        try {
+            let data = [];
+            if (whichTab === 'following') {
+                if (!user?.id) {
+                    setPosts([]);
+                    setPostsLoading(false);
+                    return;
+                }
+                const following = await getFollowing(user.id);
+                const ids = (following || []).map((f) => f.id);
+                setFollowingIds(ids);
+                if (ids.length > 0) {
+                    data = await getFeed({ limit: FEED_LIMIT, userId: user?.id, filterEncrypted, authorIds: ids });
+                }
+            } else {
+                data = await getFeed({ limit: FEED_LIMIT, userId: user?.id, filterEncrypted });
+                // Algoritmo "Para ti": puntúa por intereses del autor, hashtags y engagement
+                data = rankFeedForUser(data, profile?.interests || []);
+            }
+
+            // Filtrar posts de usuarios bloqueados (ambas direcciones, con cache 5min)
+            if (user?.id && data.length > 0) {
+                try {
+                    const [blockedIds, blockedMeIds] = await Promise.all([
+                        getBlockedUserIds(user.id),
+                        getUsersWhoBlockedMeIds(user.id),
+                    ]);
+                    const excludedIds = new Set([...blockedIds, ...blockedMeIds]);
+                    data = data.filter(p => !excludedIds.has(p.user_id));
+                } catch (e) {
+                    console.warn('Could not filter blocked posts:', e);
+                }
+            }
+            // Guard anti-race: si el usuario cambió de tab mientras se resolvía
+            // el fetch, descartar este resultado (un fetch lento del tab anterior
+            // no debe pisar el feed del tab activo).
+            if (tabRef.current !== whichTab) return;
+
+            setPosts(data);
+
+            let likedIds = [], repostedIds = [], savedIds = [], dislikedIds = [];
+            if (user?.id && data.length > 0) {
+                const postIds = data.map((p) => p.id);
+                [likedIds, repostedIds, savedIds, dislikedIds] = await Promise.all([
+                    getLikedPostIds(postIds, user.id),
+                    getRepostedPostIds(postIds, user.id),
+                    getSavedPostIds(postIds, user.id),
+                    getDislikedPostIds(postIds, user.id),
+                ]);
+                setLikedPostIds(likedIds);
+                setRepostedPostIds(repostedIds);
+                setSavedPostIds(savedIds);
+                setDislikedPostIds(dislikedIds);
+            }
+            setCachedFeed(key, data, likedIds, repostedIds, savedIds, dislikedIds);
+        } catch (err) {
+            console.error('Error loading feed:', err);
+        } finally {
+            // No apagar el skeleton si este fetch es de un tab que ya no está activo
+            if (tabRef.current === whichTab) setPostsLoading(false);
+        }
+    }, [user?.id, filterEncrypted, interestsKey]);
+
+    // ── Load feed (con cache, refresca al cambiar tab / filterEncrypted) ──
     useEffect(() => {
-        const cached = getCachedFeed('home_feed');
+        const key = cacheKeyFor(tab);
+        const cached = getCachedFeed(key);
         if (cached) {
             setPosts(cached.items || []);
             setLikedPostIds(cached.likedIds || []);
@@ -65,48 +157,9 @@ function Home() {
             setDislikedPostIds(cached.dislikedIds || []);
             setPostsLoading(false);
         }
-
-        const loadFeed = async () => {
-            try {
-                let data = await getFeed({ limit: 30, userId: user?.id, filterEncrypted });
-                // Filtrar posts de usuarios bloqueados (ambas direcciones, con cache 5min)
-                if (user?.id && data.length > 0) {
-                    try {
-                        const [blockedIds, blockedMeIds] = await Promise.all([
-                            getBlockedUserIds(user.id),
-                            getUsersWhoBlockedMeIds(user.id),
-                        ]);
-                        const excludedIds = new Set([...blockedIds, ...blockedMeIds]);
-                        data = data.filter(p => !excludedIds.has(p.user_id));
-                    } catch (e) {
-                        console.warn('Could not filter blocked posts:', e);
-                    }
-                }
-                setPosts(data);
-                let likedIds = [], repostedIds = [], savedIds = [], dislikedIds = [];
-                if (user?.id && data.length > 0) {
-                    const postIds = data.map((p) => p.id);
-                    [likedIds, repostedIds, savedIds, dislikedIds] = await Promise.all([
-                        getLikedPostIds(postIds, user.id),
-                        getRepostedPostIds(postIds, user.id),
-                        getSavedPostIds(postIds, user.id),
-                        getDislikedPostIds(postIds, user.id),
-                    ]);
-                    setLikedPostIds(likedIds);
-                    setRepostedPostIds(repostedIds);
-                    setSavedPostIds(savedIds);
-                    setDislikedPostIds(dislikedIds);
-                }
-                setCachedFeed('home_feed', data, likedIds, repostedIds, savedIds, dislikedIds);
-            } catch (err) {
-                console.error('Error loading feed:', err);
-            } finally {
-                setPostsLoading(false);
-            }
-        };
-
-        loadFeed();
-    }, [user?.id, filterEncrypted]);
+        setPostsLoading(!getCachedFeed(key));
+        loadFeedForTab(tab);
+    }, [tab, loadFeedForTab]);
 
     // ── Realtime: actualizar contadores + insertar nuevos posts en vivo ──
     useEffect(() => {
@@ -140,11 +193,14 @@ function Home() {
                     // Ignorar posts encriptados de otros usuarios
                     if (newPost.is_encrypted && newPost.user_id !== user?.id) return;
 
+                    // En tab "Siguiendo", solo autores que sigo
+                    if (tabRef.current === 'following' && !followingIdsRef.current.includes(newPost.user_id)) return;
+
                     try {
                         // Fetch post completo con perfil del autor
                         const { data, error } = await supabase
                             .from('posts')
-                            .select('*, profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position)')
+                            .select('*, profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position, interests)')
                             .eq('id', newPost.id)
                             .single();
 
@@ -206,29 +262,9 @@ function Home() {
       return unsub;
     }, [user?.id]);
 
-    const handlePostCreated = useCallback(async () => {
-        try {
-            const data = await getFeed({ limit: 30, userId: user?.id, filterEncrypted });
-            setPosts(data);
-            let likedIds = [], repostedIds = [], savedIds = [], dislikedIds = [];
-            if (user?.id && data.length > 0) {
-                const postIds = data.map((p) => p.id);
-                [likedIds, repostedIds, savedIds, dislikedIds] = await Promise.all([
-                    getLikedPostIds(postIds, user.id),
-                    getRepostedPostIds(postIds, user.id),
-                    getSavedPostIds(postIds, user.id),
-                    getDislikedPostIds(postIds, user.id),
-                ]);
-                setLikedPostIds(likedIds);
-                setRepostedPostIds(repostedIds);
-                setSavedPostIds(savedIds);
-                setDislikedPostIds(dislikedIds);
-            }
-            setCachedFeed('home_feed', data, likedIds, repostedIds, savedIds, dislikedIds);
-        } catch (err) {
-            console.error('Error refreshing feed:', err);
-        }
-    }, [user?.id, filterEncrypted]);
+    const handlePostCreated = useCallback(() => {
+        loadFeedForTab(tab);
+    }, [loadFeedForTab, tab]);
 
     const handlePostUpdate = useCallback((updatedPost) => {
         if (updatedPost._editing) {
@@ -244,6 +280,12 @@ function Home() {
     const handleLikeToggle = useCallback((postId, nowLiked) => {
         setLikedPostIds((prev) =>
             nowLiked ? [...prev, postId] : prev.filter((id) => id !== postId)
+        );
+    }, []);
+
+    const handleSaveToggle = useCallback((postId, nowSaved) => {
+        setSavedPostIds((prev) =>
+            nowSaved ? [...prev, postId] : prev.filter((id) => id !== postId)
         );
     }, []);
 
@@ -268,6 +310,7 @@ function Home() {
         if (!blockedUserId) return;
         setPosts((prev) => prev.filter((p) => p.user_id !== blockedUserId));
         clearFeedCache('home_feed');
+        clearFeedCache('home_feed_following');
     }, []);
 
     return (
@@ -293,7 +336,21 @@ function Home() {
             ) : (
                 <div className="posts-section">
                     <div className="posts-section-header">
+                        <div className="posts-section-tabs">
                             <button
+                                className={`posts-section-tab ${tab === 'for_you' ? 'posts-section-tab--active' : ''}`}
+                                onClick={() => setTab('for_you')}
+                            >
+                                {t('home.tab_for_you')}
+                            </button>
+                            <button
+                                className={`posts-section-tab ${tab === 'following' ? 'posts-section-tab--active' : ''}`}
+                                onClick={() => setTab('following')}
+                            >
+                                {t('home.tab_following')}
+                            </button>
+                        </div>
+                        <button
                             className="posts-section-action"
                             onClick={() => setShowCreatePost(true)}
                         >
@@ -318,26 +375,26 @@ function Home() {
                         <div className="posts-empty">
                             <span className="posts-empty-icon"><IconNewspaper /></span>
                             <p className="posts-empty-text">
-                                {t('home.no_posts_first')}
+                                {tab === 'following'
+                                    ? t('home.no_posts_following')
+                                    : t('home.no_posts_first')}
                             </p>
                         </div>
                     ) : (
-                        posts.map((post) => (
-                            <PostCard
-                                key={post.id}
-                                post={post}
-                                liked={likedPostIds.includes(post.id)}
-                                disliked={dislikedPostIds.includes(post.id)}
-                                reposted={repostedPostIds.includes(post.id)}
-                                saved={savedPostIds.includes(post.id)}
-                                onUpdate={handlePostUpdate}
-                                onDelete={handlePostDelete}
-                                onLikeToggle={handleLikeToggle}
-                                onDislikeToggle={handleDislikeToggle}
-                                onRepostToggle={handleRepostToggle}
-                                onBlockUser={handleBlockUser}
-                            />
-                        ))
+                        <VirtualPostList
+                            posts={posts}
+                            likedIds={likedPostIds}
+                            dislikedIds={dislikedPostIds}
+                            repostedIds={repostedPostIds}
+                            savedIds={savedPostIds}
+                            onUpdate={handlePostUpdate}
+                            onDelete={handlePostDelete}
+                            onSaveToggle={handleSaveToggle}
+                            onLikeToggle={handleLikeToggle}
+                            onDislikeToggle={handleDislikeToggle}
+                            onRepostToggle={handleRepostToggle}
+                            onBlockUser={handleBlockUser}
+                        />
                     )}
                 </div>
             )}

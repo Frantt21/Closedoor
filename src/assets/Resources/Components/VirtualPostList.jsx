@@ -1,0 +1,236 @@
+import React, { useEffect, useRef, useState, useCallback, useReducer } from "react";
+import PostCard from "./PostCard";
+
+/**
+ * VirtualPostList
+ *
+ * Virtualización propia (sin librería externa): el scroll es de ventana, así
+ * que medimos EN VIVO la posición del contenedor (header/banner arriba) y
+ * calculamos el rango visible desde window.scrollY con las alturas medidas
+ * (fallback: estimación). Solo se montan las cards del rango + overscan →
+ * FPS estable con cientos de posts. Un ResizeObserver por row re-mide al
+ * cargar imágenes y reposiciona sin huecos ni superposiciones.
+ */
+function VirtualPostList({
+    posts,
+    likedIds,
+    dislikedIds,
+    repostedIds,
+    savedIds,
+    repostInfoByPostId = null,
+    onUpdate,
+    onDelete,
+    onSaveToggle,
+    onLikeToggle,
+    onDislikeToggle,
+    onRepostToggle,
+    onBlockUser,
+}) {
+    const listRef = useRef(null);
+    const [range, setRange] = useState({ start: 0, end: 0 });
+    // Fuerza re-render manual (para mediciones de altura de rows).
+    const [, forceRender] = useReducer((x) => x + 1, 0);
+    // Alturas medidas por índice (index → px). Fallback ESTIMATE.
+    const heightsRef = useRef({});
+    const roRef = useRef(null);
+    // Ref al array actual: los listeners/observers (creados una vez) siempre
+    // leen la última versión → sin closures stale al cambiar posts.length.
+    const postsRef = useRef(posts);
+    // 320 (card) + 12 (padding-bottom del row) para que el primer paint ya
+    // incluya el gap entre cards antes de que el ResizeObserver mida.
+    const ESTIMATE = 332;
+    const OVERSCAN = 900; // px extra arriba/abajo del viewport
+
+    // Calcula el rango visible midiendo EN VIVO la posición del contenedor
+    // (banner + header + tabs arriba). setRange con el mismo rango no
+    // dispara re-render (React baila) → barato llamarlo en cada scroll.
+    // Callback estable: solo lee refs, nunca se recrea por render.
+    const computeRange = useCallback(() => {
+        const el = listRef.current;
+        if (!el) return;
+        const off = Math.round(el.getBoundingClientRect().top + window.scrollY);
+        const relTop = window.scrollY - off;
+        const relBottom = relTop + window.innerHeight;
+        const h = heightsRef.current;
+        const n = postsRef.current.length;
+        if (n === 0) {
+            setRange((prev) => (prev.start === 0 && prev.end === -1 ? prev : { start: 0, end: -1 }));
+            return;
+        }
+        let start = 0;
+        let acc = 0;
+        for (let i = 0; i < n; i++) {
+            const size = h[i] || ESTIMATE;
+            if (acc + size > relTop - OVERSCAN) {
+                start = i;
+                break;
+            }
+            acc += size;
+        }
+        acc = 0;
+        let end = n - 1;
+        for (let i = 0; i < n; i++) {
+            const size = h[i] || ESTIMATE;
+            if (acc > relBottom + OVERSCAN) {
+                end = i - 1;
+                break;
+            }
+            acc += size;
+        }
+        if (end < start) end = start;
+        if (end >= n) end = n - 1;
+        setRange((prev) => (prev.start === start && prev.end === end ? prev : { start, end }));
+    }, []);
+
+    // Mantener el ref de posts siempre fresco (se actualiza tras cada render,
+    // antes de que los listeners/observers lo lean).
+    useEffect(() => {
+        postsRef.current = posts;
+    });
+
+    // Scroll + resize + re-mediciones retrasadas (header inestable) →
+    // recomputa el rango con rAF-throttling.
+    useEffect(() => {
+        let raf = 0;
+        const schedule = () => {
+            if (raf) return;
+            raf = requestAnimationFrame(() => {
+                raf = 0;
+                computeRange();
+            });
+        };
+        window.addEventListener('scroll', schedule, { passive: true });
+        window.addEventListener('resize', schedule, { passive: true });
+        schedule();
+        const t1 = setTimeout(schedule, 250);
+        const t2 = setTimeout(schedule, 800);
+        return () => {
+            window.removeEventListener('scroll', schedule);
+            window.removeEventListener('resize', schedule);
+            if (raf) cancelAnimationFrame(raf);
+            clearTimeout(t1);
+            clearTimeout(t2);
+        };
+    }, [computeRange]);
+
+    // Disconnect del ResizeObserver al desmontar el componente.
+    useEffect(() => {
+        return () => {
+            if (roRef.current) {
+                roRef.current.disconnect();
+                roRef.current = null;
+            }
+        };
+    }, []);
+
+    // Reset de mediciones al cambiar de perfil o filtrar la lista:
+    // re-mide los rows montados y fuerza el re-render con posiciones frescas.
+    useEffect(() => {
+        heightsRef.current = {};
+        const el = listRef.current;
+        if (el) {
+            el.querySelectorAll('.virtual-post-row').forEach((node) => {
+                const idx = Number(node.getAttribute('data-index'));
+                if (!Number.isNaN(idx)) {
+                    heightsRef.current[idx] = Math.round(node.getBoundingClientRect().height);
+                }
+            });
+        }
+        computeRange();
+        forceRender();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [posts, computeRange]);
+
+    // Mide la altura real de cada row montado y reposiciona al cambiar
+    // (imágenes/GIFs que cargan después del montaje). Callback estable.
+    // IMPORTANTE: se mide offsetHeight (incluye padding+borde), NO
+    // contentRect.height — el row lleva padding-bottom: 12px (gap entre
+    // cards en CSS) y contentRect lo EXCLUYE, dejando las cards pegadas.
+    const handleRowResize = useCallback((entries) => {
+        let changed = false;
+        for (const entry of entries) {
+            const idx = Number(entry.target.getAttribute('data-index'));
+            if (Number.isNaN(idx)) continue;
+            const px = Math.round(entry.target.offsetHeight);
+            if ((heightsRef.current[idx] || 0) !== px) {
+                heightsRef.current[idx] = px;
+                changed = true;
+            }
+        }
+        if (changed) {
+            forceRender();
+            computeRange();
+        }
+    }, [computeRange]);
+
+    // Ref callback de cada row: el ResizeObserver es la ÚNICA fuente de
+    // medición (su callback inicial mide y fuerza el re-render con las
+    // posiciones correctas). No hay pre-medición aquí: eso suprimiría la
+    // corrección y dejaría el spacing estimado.
+    const rowRef = useCallback((node) => {
+        if (!node) return undefined;
+        if (!roRef.current) {
+            roRef.current = new ResizeObserver(handleRowResize);
+        }
+        roRef.current.observe(node);
+        return () => {
+            if (roRef.current) roRef.current.unobserve(node);
+        };
+    }, [handleRowResize]);
+
+    // Posiciones acumuladas, alto total y rango visible (O(n) barato).
+    const positions = [];
+    let total = 0;
+    const h = heightsRef.current;
+    for (let i = 0; i < posts.length; i++) {
+        positions[i] = total;
+        total += h[i] || ESTIMATE;
+    }
+    const visible = [];
+    for (let i = range.start; i <= range.end; i++) {
+        if (posts[i]) visible.push(i);
+    }
+
+    return (
+        <div ref={listRef}>
+            <div style={{ height: total, position: 'relative', width: '100%' }}>
+                {visible.map((i) => {
+                    const post = posts[i];
+                    return (
+                        <div
+                            key={post.id}
+                            data-index={i}
+                            ref={rowRef}
+                            className="virtual-post-row"
+                            style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                transform: `translateY(${positions[i]}px)`,
+                            }}
+                        >
+                            <PostCard
+                                post={post}
+                                liked={likedIds.includes(post.id)}
+                                disliked={dislikedIds.includes(post.id)}
+                                reposted={repostedIds.includes(post.id)}
+                                saved={savedIds.includes(post.id)}
+                                onUpdate={onUpdate}
+                                onDelete={onDelete}
+                                onSaveToggle={onSaveToggle}
+                                onLikeToggle={onLikeToggle}
+                                onDislikeToggle={onDislikeToggle}
+                                onRepostToggle={onRepostToggle}
+                                onBlockUser={onBlockUser}
+                                repostInfo={repostInfoByPostId?.get(post.id) || null}
+                            />
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+export default VirtualPostList;
