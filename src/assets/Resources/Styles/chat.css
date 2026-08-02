@@ -48,7 +48,7 @@
     height: 34px;
     border: none;
     border-radius: var(--radius, 10px);
-    background: var(--overlay-bg-subtle);
+    background: var(--color-surface, #1a1a1a);
     color: var(--color-text-secondary, #9ca3af);
     cursor: pointer;
     font-size: 0.85rem;
@@ -88,7 +88,7 @@
     font-size: 0.85rem;
     font-family: inherit;
     color: var(--color-text, #ffffff);
-    background: var(--overlay-bg);
+    background: var(--color-surface, #1a1a1a);
     border: none;
     border-radius: var(--radius, 10px);
     outline: none;
@@ -209,7 +209,7 @@
 }
 
 .chat-list-item--active {
-    background: var(--overlay-bg);
+    background: var(--color-surface, #1a1a1a);
     border-radius: var(--radius, 10px);
 }
 
@@ -492,7 +492,7 @@
 }
 
 .chat-header-action-btn--active {
-    background: var(--accent-color, #6b7280);
+    background: var(--color-surface, #1a1a1a);
     color: #ffffff;
 }
 
@@ -2513,9 +2513,9 @@ dialog.fc-modal.chat-followers-modal {
     align-items: center;
     gap: 8px;
     padding: 6px 10px;
-    border-radius: var(--radius-sm, 6px);
-    background: var(--color-bg, #000000);
-    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius, 10px);
+    background: var(--color-surface-hover, #252525);
+    border: none;
 }
 
 .chat-msg-search-bar-icon {
