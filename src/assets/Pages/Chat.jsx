@@ -123,6 +123,37 @@ export default function Chat() {
     return () => document.body.classList.remove('fc-chat-open-mobile');
   }, [isMobile, showList]);
 
+  // ── iOS: cancelar el auto-scroll del documento al abrir el teclado ──
+  // Al enfocar el input, Safari scrollea el documento para "mostrarlo" usando
+  // la altura vieja (sin teclado). Cuando luego --app-height se reduce, el
+  // chat-page ya encaja en el viewport del teclado pero el documento quedó
+  // scrolleado → el composer se eleva hasta el top. Como el chat se ajusta
+  // solo con --app-height y el scroll real vive en .chat-messages, el
+  // documento nunca debe scrollear: mientras el teclado esté abierto, se
+  // devuelve el scroll del documento a 0 en cada cambio del visual viewport.
+  useEffect(() => {
+    if (!isMobile || showList) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const cancelIOSAutoScroll = () => {
+      // Teclado abierto ⇔ visual viewport más bajo que el layout viewport
+      const keyboardOpen = vv.height < window.innerHeight;
+      if (keyboardOpen) {
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      }
+    };
+
+    vv.addEventListener('resize', cancelIOSAutoScroll);
+    vv.addEventListener('scroll', cancelIOSAutoScroll);
+    return () => {
+      vv.removeEventListener('resize', cancelIOSAutoScroll);
+      vv.removeEventListener('scroll', cancelIOSAutoScroll);
+    };
+  }, [isMobile, showList]);
+
   // Nicknames: map of target_user_id → nickname (cache-first)
   const [nicknames, setNicknames] = useState(() => {
     if (user?.id) {

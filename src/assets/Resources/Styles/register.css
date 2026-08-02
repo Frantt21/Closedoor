@@ -108,6 +108,10 @@
     cursor: pointer;
     transition: opacity 0.2s ease, transform 0.15s ease;
     margin-top: 4px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
 }
 
 .auth-submit:hover:not(:disabled) {
@@ -123,6 +127,18 @@
     opacity: 0.4;
     cursor: not-allowed;
     transform: none;
+}
+
+/* ── Spinner del botón de submit ── */
+.auth-submit-spinner {
+    width: 15px;
+    height: 15px;
+    flex-shrink: 0;
+    border: 2px solid currentColor;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: authSpin 0.7s linear infinite;
+    opacity: 0.8;
 }
 
 .auth-error {

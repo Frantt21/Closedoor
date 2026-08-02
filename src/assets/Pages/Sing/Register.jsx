@@ -9,6 +9,10 @@ import TurnstileCaptcha, { isTurnstileActive } from '../../Resources/Components/
 import '../../Resources/Styles/login.css';
 import '../../Resources/Styles/register.css';
 
+// Tiempo mínimo que el loader del botón se muestra (evita saltos bruscos
+// y que el formulario se limpie antes de confirmar la sesión).
+const MIN_SUBMIT_MS = 600;
+
 function Register() {
   const { t } = useI18n();
   usePageTitle(t('auth.register_title'));
@@ -63,20 +67,28 @@ function Register() {
       return;
     }
 
+    const startedAt = Date.now();
     const result = await register(email, password, username, nickname || username, captchaToken);
 
     if (result.success) {
+      // El loader se mantiene visible al menos MIN_SUBMIT_MS para que la
+      // confirmación de la sesión no se sienta como un salto brusco.
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < MIN_SUBMIT_MS) {
+        await new Promise((r) => setTimeout(r, MIN_SUBMIT_MS - elapsed));
+      }
+
+      setLoading(false);
       const params = new URLSearchParams(location.search);
       const redirect = params.get('redirect') || '/';
       navigate(redirect);
-    } else {
-      setError(result.error || t('auth.register_error'));
+      return;
     }
 
-    // Resetear el reto para el siguiente intento
+    // Error: se muestra de inmediato, sin el delay del loader
+    setError(result.error || t('auth.register_error'));
     setCaptchaToken(null);
     setCaptchaNonce((n) => n + 1);
-
     setLoading(false);
   };
 
@@ -135,6 +147,7 @@ function Register() {
           </div>
           <TurnstileCaptcha onTokenChange={setCaptchaToken} resetKey={captchaNonce} />
           <button className="auth-submit" type="submit" disabled={loading}>
+            {loading && <span className="auth-submit-spinner" aria-hidden="true" />}
             {loading ? t('auth.registering') : t('auth.register_btn')}
           </button>
 
@@ -148,11 +161,21 @@ function Register() {
             disabled={discordLoading}
             onClick={async () => {
               setDiscordLoading(true);
-              await loginWithDiscord();
+              const startedAt = Date.now();
+              const res = await loginWithDiscord();
+              if (res && !res.success) {
+                setDiscordLoading(false);
+                return;
+              }
+              // OAuth redirige la página; el loader se mantiene un instante
+              const elapsed = Date.now() - startedAt;
+              if (elapsed < MIN_SUBMIT_MS) {
+                await new Promise((r) => setTimeout(r, MIN_SUBMIT_MS - elapsed));
+              }
               setDiscordLoading(false);
             }}
           >
-            <FaDiscord className="auth-discord-icon" />
+            {discordLoading ? <span className="auth-submit-spinner" aria-hidden="true" /> : <FaDiscord className="auth-discord-icon" />}
             {discordLoading
               ? (t('auth.redirecting') || 'Redirecting...')
               : (t('auth.login_discord') || 'Continue with Discord')}
