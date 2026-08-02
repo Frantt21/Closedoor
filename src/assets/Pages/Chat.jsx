@@ -258,6 +258,10 @@ export default function Chat() {
   const messagesContainerRef = useRef(null);
   const inputRef = useRef(null);
   const messagesCacheRef = useRef({});
+  // Debounce del guardado a sessionStorage: cada mensaje realtime muta `messages`
+  // y serializar TODO el caché en cada cambio bloquearía el hilo. El flush en
+  // unmount/pagehide persiste al salir, así que el debounce es seguro.
+  const cacheSaveTimerRef = useRef(null);
   const skipCacheWipeRef = useRef(false);  // prevents useLayoutEffect from wiping messages when resolving pending conv
   const skipMsgLoadRef = useRef(false);   // prevents useEffect from fetching messages when sendContent resolves pending conv
   const staleBackgroundFetchRef = useRef(false); // true cuando se muestran datos stale mientras se fetchea en bg
@@ -300,16 +304,12 @@ export default function Chat() {
   };
   const saveCacheToSession = (cache) => {
     try {
-      // Limit size: keep only last 200 messages per conversation
-      const trimmed = {};
-      for (const [convId, msgs] of Object.entries(cache)) {
-        if (convId === '_meta') {
-          trimmed._meta = msgs;
-        } else if (Array.isArray(msgs)) {
-          trimmed[convId] = msgs.length > 200 ? msgs.slice(msgs.length - 200) : msgs;
-        }
-      }
-      setSessionItem(getSessionCacheKey(), trimmed);
+      // Se cachea la conversación COMPLETA (todo lo cargado, incluyendo los
+      // mensajes antiguos traídos con loadOlderMessages). Como el caché se
+      // limpia en cada carga de página (ver restore abajo), no hay acumulación
+      // de datos stale; si aun así se supera la cuota, el catch la limpia y el
+      // chat se repuebla con fetch fresco.
+      setSessionItem(getSessionCacheKey(), cache);
     } catch (e) {
       // sessionStorage quota exceeded — clear cache
       if (e.name === 'QuotaExceededError' || e.code === 22) {
@@ -318,29 +318,31 @@ export default function Chat() {
     }
   };
 
-  // ── Flag de sesión: evita borrar el caché en cada navegación SPA ──
+  // ── Flag de sesión: limpia el caché en CADA carga de página, no en cada SPA ──
   // `performance.getEntriesByType('navigation')` retorna el tipo de carga ORIGINAL
-  // de la página. Si el usuario recargó (F5), type = 'reload'. Pero al navegar
-  // a otra ruta y volver (SPA), el componente se monta de nuevo y el tipo SIGUE
-  // siendo 'reload' — causando que el caché se borre en cada ruta.
-  // window.__fc_cacheClearedOnReload persiste a través de montajes/desmontajes.
+  // de la página ('navigate' | 'reload'). Al navegar por SPA el componente se
+  // monta de nuevo pero el tipo SIGUE siendo el original — sin el flag, el caché
+  // se borraría en cada ruta. window.__fc_cacheClearedOnLoad persiste a través de
+  // montajes/desmontajes: limpia 1 vez por carga de página, y los remounts SPA
+  // restauran desde sessionStorage.
 
   // Restore cache from sessionStorage — only when user is available (not during auth loading)
   const sessionRestoredRef = useRef(false);
   if (!sessionRestoredRef.current && user?.id) {
-    let isReload = false;
+    let navType = 'navigate';
     try {
       const navEntries = performance.getEntriesByType ? performance.getEntriesByType('navigation') : null;
-      const navType = navEntries?.[0]?.type || (performance.navigation && performance.navigation.type === 1 ? 'reload' : 'navigate');
-      isReload = navType === 'reload';
+      navType = navEntries?.[0]?.type || (performance.navigation && performance.navigation.type === 1 ? 'reload' : 'navigate');
     } catch (e) { /* ignore */ }
 
-    if (isReload && !window.__fc_cacheClearedOnReload) {
-      // 1ª vez: reload real → limpiar caché
-      window.__fc_cacheClearedOnReload = true;
+    // Cada carga COMPLETA de página (onload: navigate o reload) limpia el caché
+    // de sesión → el chat arranca fresco y repuebla con fetch. Los remounts SPA
+    // (flag ya seteado en esta carga) restauran desde sessionStorage.
+    const isFullPageLoad = navType === 'navigate' || navType === 'reload';
+    if (isFullPageLoad && !window.__fc_cacheClearedOnLoad) {
+      window.__fc_cacheClearedOnLoad = true;
       try { removeSessionItem(getSessionCacheKey()); } catch (e) {}
       messagesCacheRef.current = {};
-      // Limpiar caché 1 vez por sesión
     } else {
       // SPA navigation → restaurar desde sessionStorage
       const restored = loadCacheFromSession();
@@ -783,13 +785,22 @@ export default function Chat() {
       hasMoreMessages,
       oldestMessageDate,
     };
-    // Persist to sessionStorage so cache survives page reload
-    saveCacheToSession(messagesCacheRef.current);
+    // Persist to sessionStorage so cache survives page reload (debounced)
+    if (cacheSaveTimerRef.current) clearTimeout(cacheSaveTimerRef.current);
+    cacheSaveTimerRef.current = setTimeout(() => {
+      cacheSaveTimerRef.current = null;
+      saveCacheToSession(messagesCacheRef.current);
+    }, 400);
   }, [messages, activeConvId, msgsLoading]);
 
   // ── Flush messages cache on pagehide & unmount (navegación entre rutas) ──
   useEffect(() => {
     const flushCache = () => {
+      // Cancelar el save pendiente: aquí se persiste de inmediato
+      if (cacheSaveTimerRef.current) {
+        clearTimeout(cacheSaveTimerRef.current);
+        cacheSaveTimerRef.current = null;
+      }
       if (!activeConvId) return;
       if (messagesOwnerRef.current !== activeConvId) return;
       messagesCacheRef.current[activeConvId] = messages;
@@ -1775,6 +1786,19 @@ export default function Chat() {
     allChatMediaUrlsRef.current = merged;
   }, [messages, activeConvId]);
 
+  // ── Restaurar scroll tras cargar mensajes antiguos ──
+  // Se dispara tras cada cambio de `messages`, pero solo actúa si hay un scroll
+  // pendiente (guardado en loadOlderMessages). El guard de convId evita restaurar
+  // en otra conversación si la carga se abortó o el usuario cambió de chat.
+  useLayoutEffect(() => {
+    const saved = scrollBeforeLoadRef.current;
+    if (!saved) return;
+    scrollBeforeLoadRef.current = null;
+    if (saved.convId !== activeConvId) return;
+    const sc = messagesContainerRef.current;
+    if (sc) sc.scrollTop = saved.scrollTop;
+  }, [messages, activeConvId]);
+
   // ── Load older messages (infinite scroll / pagination) ──
   const loadOlderMessages = useCallback(async () => {
     // SYNCHRONOUS check — prevents cascade from multiple scroll events in same event loop tick
@@ -1785,10 +1809,12 @@ export default function Chat() {
     const convIdAtStart = activeConvId;
     let aborted = false;
 
-    // Save scrollHeight AND scrollTop BEFORE prepending so we can restore scroll position
+    // Guardar la posición del scroll ANTES de insertar los viejos para restaurarla
+    // tras el commit (useLayoutEffect más arriba). column-reverse ancla al fondo:
+    // forzar el MISMO scrollTop mantiene visible exactamente lo mismo mientras
+    // los mensajes antiguos aparecen arriba ("coso1" se queda quieto).
     const el = messagesContainerRef.current;
-    const scrollHeightBefore = el ? el.scrollHeight : 0;
-    scrollBeforeLoadRef.current = el ? { scrollTop: el.scrollTop, scrollHeight: el.scrollHeight } : null;    
+    scrollBeforeLoadRef.current = el ? { scrollTop: el.scrollTop, convId: convIdAtStart } : null;    
 
     try {
       let attempts = 0;
@@ -1806,7 +1832,10 @@ export default function Chat() {
         } catch (e) {
           raw = [];
         }
-        if (aborted || convIdAtStart !== activeConvId) return;
+        if (aborted || convIdAtStart !== activeConvId) {
+          scrollBeforeLoadRef.current = null;
+          return;
+        }
         hasMore = raw.length > PAGE_SIZE;
         if (raw.length > PAGE_SIZE) raw = raw.slice(0, PAGE_SIZE);
         filtered = raw.filter(m => !m.deleted_for?.includes(user.id));
@@ -1825,7 +1854,10 @@ export default function Chat() {
         break;
       } while (attempts < 3);
 
-      if (aborted || convIdAtStart !== activeConvId) return;
+      if (aborted || convIdAtStart !== activeConvId) {
+        scrollBeforeLoadRef.current = null;
+        return;
+      }
 
       // ══ Pre-fetch shared post data BEFORE setMessages so DOM is stable at scroll-restore time ══
       const sharedPostIds = [...new Set(decrypted.filter(m => m.shared_post_id).map(m => m.shared_post_id))];
@@ -1839,11 +1871,17 @@ export default function Chat() {
       }
 
       // Safety: user might have switched conversations during shared-post fetch
-      if (convIdAtStart !== activeConvId) return;
+      if (convIdAtStart !== activeConvId) {
+        scrollBeforeLoadRef.current = null;
+        return;
+      }
 
       if (decrypted.length === 0) {
         // No visible messages found; if server indicated no more, mark finished
         if (!hasMore) setHasMoreMessages(false);
+        // Sin setMessages el useLayoutEffect de restore no se dispara: limpiar
+        // el ref pendiente para que no restaure un scroll viejo más tarde.
+        scrollBeforeLoadRef.current = null;
         return;
       }
 
@@ -1857,6 +1895,10 @@ export default function Chat() {
 
     } catch (err) {
       console.warn('Error loading older messages:', err);
+      // Este catch solo se alcanza si setMessages NO llegó a ejecutarse
+      // (ej. fallo de decryptMessage en el Promise.all): limpiar el ref
+      // pendiente para que no restaure un scroll viejo más tarde.
+      scrollBeforeLoadRef.current = null;
     } finally {
       setLoadingMore(false);
       loadingMoreRef.current = false;
@@ -2282,11 +2324,18 @@ export default function Chat() {
       <div className="chat-messages-body" ref={messagesContainerRef}>
         {msgsLoading ? (
           <div className="chat-messages-loading">
-            {[1,2,3,4].map((i) => (
-              <div key={i} className={`chat-messages-skeleton-msg ${i % 2 === 0 ? 'chat-messages-skeleton-msg--own' : 'chat-messages-skeleton-msg--other'}`}>
-                <div className={`chat-messages-skeleton-bubble ${i % 2 === 0 ? 'chat-messages-skeleton-bubble--own' : 'chat-messages-skeleton-bubble--other'} ${i === 3 ? 'chat-messages-skeleton-bubble--short' : ''} ${i === 1 ? 'chat-messages-skeleton-bubble--long' : ''}`} />
-              </div>
-            ))}
+            {[0, 1, 2, 3, 4].map((i) => {
+              const own = i % 2 === 1;
+              return (
+                <div key={i} className={`chat-skeleton-msg ${own ? 'chat-skeleton-msg--own' : 'chat-skeleton-msg--other'}`}>
+                  {!own && <div className="chat-skeleton-avatar" />}
+                  <div className={`chat-skeleton-bubble ${own ? 'chat-skeleton-bubble--own' : 'chat-skeleton-bubble--other'} chat-skeleton-bubble--w${(i % 3) + 1}`}>
+                    <div className="chat-skeleton-line" />
+                    <div className="chat-skeleton-line chat-skeleton-line--short" />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         ) : dedupedMessages.length === 0 ? (
           <div className="chat-messages-empty">
@@ -2545,15 +2594,6 @@ export default function Chat() {
               </div>
             );
           })
-        )}
-        {loadingMore && (
-          <div className="chat-messages-loading">
-            {[1,2].map((i) => (
-              <div key={i} className={`chat-messages-skeleton-msg ${i % 2 === 0 ? 'chat-messages-skeleton-msg--own' : 'chat-messages-skeleton-msg--other'}`}>
-                <div className={`chat-messages-skeleton-bubble ${i % 2 === 0 ? 'chat-messages-skeleton-bubble--own' : 'chat-messages-skeleton-bubble--other'} chat-messages-skeleton-bubble--short`} />
-              </div>
-            ))}
-          </div>
         )}
         {loadingMore && (
           <div className="chat-load-more-spinner">
