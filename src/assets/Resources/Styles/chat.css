@@ -2452,11 +2452,12 @@ dialog.fc-modal.chat-followers-modal {
         max-width: 85%;
     }
 
-    /* Móvil: ocultar avatares de los mensajes para dar más espacio a las burbujas */
+    /* Móvil: ocultar avatares de los mensajes para dar más espacio a las burbujas.
+       !important vence al estilo inline (display:inline-flex) del componente Avatar. */
     .chat-message-avatar,
     .chat-message-avatar--own,
     .chat-message-avatar-spacer {
-        display: none;
+        display: none !important;
     }
 }
 
