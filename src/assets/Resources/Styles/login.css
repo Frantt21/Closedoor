@@ -69,6 +69,20 @@
     gap: 14px;
 }
 
+/* ── Cloudflare Turnstile (widget de CAPTCHA) ── */
+.auth-captcha {
+    display: flex;
+    justify-content: center;
+    min-height: 0;
+}
+
+@media (max-width: 340px) {
+    .auth-captcha > div {
+        transform: scale(0.85);
+        transform-origin: center;
+    }
+}
+
 .auth-input {
     padding: 12px 14px;
     border: 1.5px solid var(--color-border, #2a2a2a);

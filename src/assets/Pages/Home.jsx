@@ -93,8 +93,12 @@ function Home() {
                 const following = await getFollowing(user.id);
                 const ids = (following || []).map((f) => f.id);
                 setFollowingIds(ids);
-                if (ids.length > 0) {
-                    data = await getFeed({ limit: FEED_LIMIT, userId: user?.id, authorIds: ids });
+                // El tab "Siguiendo" también muestra los posts propios: se añade
+                // el propio id a authorIds. followingIds queda igual (solo se usa
+                // para el filtro realtime de autores ajenos).
+                const authorIds = ids.includes(user.id) ? ids : [...ids, user.id];
+                if (authorIds.length > 0) {
+                    data = await getFeed({ limit: FEED_LIMIT, userId: user?.id, authorIds });
                 }
             } else {
                 data = await getFeed({ limit: FEED_LIMIT, userId: user?.id });

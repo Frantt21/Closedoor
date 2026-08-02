@@ -3285,3 +3285,142 @@ dialog.fc-modal.chat-followers-modal {
 .chat-call-btn--mute.chat-call-btn--active {
     background: var(--accent-color, #6b7280);
 }
+
+/* ── Botón minimizar (vista completa) ── */
+.chat-call-minimize-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--color-text-secondary, #9ca3af);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.chat-call-minimize-btn:hover {
+    background: rgba(255, 255, 255, 0.16);
+    color: var(--color-text, #ffffff);
+}
+
+/* ── Modo minimizado: ventana flotante arrastrable ── */
+.chat-call-overlay--minimized {
+    inset: auto;
+    width: 280px;
+    height: 84px;
+    right: 16px;
+    bottom: 16px;
+    display: block;
+    align-items: initial;
+    justify-content: initial;
+    background: var(--color-surface, #1a1a1a);
+    backdrop-filter: none;
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius, 10px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+    overflow: hidden;
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    animation: none;
+    z-index: 10001;
+}
+
+.chat-call-overlay--minimized:active {
+    cursor: grabbing;
+}
+
+.chat-call-overlay--minimized .chat-call-active-hidden {
+    display: none;
+}
+
+/* ── Contenido de la ventana minimizada ── */
+.chat-call-mini {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 12px;
+    z-index: 2;
+}
+
+.chat-call-mini-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.chat-call-mini-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.chat-call-mini-name {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--color-text, #ffffff);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chat-call-mini-status {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.7rem;
+    color: var(--color-text-muted, #6b7280);
+    font-variant-numeric: tabular-nums;
+}
+
+.chat-call-mini-live {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #22c55e;
+    flex-shrink: 0;
+}
+
+.chat-call-mini-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border: none;
+    border-radius: 50%;
+    flex-shrink: 0;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #ffffff;
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.chat-call-mini-btn:hover {
+    transform: scale(1.06);
+}
+
+.chat-call-mini-btn--expand {
+    background: var(--color-surface-hover, #2a2a2a);
+    color: var(--color-text, #ffffff);
+}
+
+.chat-call-mini-btn--end {
+    background: #ef4444;
+}
+
+.chat-call-mini-btn--end:hover {
+    background: #dc2626;
+}

@@ -4,6 +4,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../services/i18n/useI18n';
 import usePageTitle from '../../../hooks/usePageTitle';
 import { FaEye, FaEyeSlash, FaDiscord } from 'react-icons/fa';
+import TurnstileCaptcha, { isTurnstileActive } from '../../Resources/Components/TurnstileCaptcha';
 import '../../Resources/Styles/login.css';
 
 function Login() {
@@ -15,6 +16,8 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const [discordLoading, setDiscordLoading] = useState(false);
   const [error, setError] = useState('');
+  const [captchaToken, setCaptchaToken] = useState(null);
+  const [captchaNonce, setCaptchaNonce] = useState(0);
   const { login, loginWithDiscord } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -30,7 +33,13 @@ function Login() {
       return;
     }
 
-    const result = await login(emailOrUsername, password);
+    if (isTurnstileActive() && !captchaToken) {
+      setError(t('auth.captcha_required') || 'Complete the CAPTCHA to continue');
+      setLoading(false);
+      return;
+    }
+
+    const result = await login(emailOrUsername, password, captchaToken);
 
     if (result.success) {
       const params = new URLSearchParams(location.search);
@@ -39,6 +48,10 @@ function Login() {
     } else {
       setError(result.error || t('auth.login_error'));
     }
+
+    // Resetear el reto para el siguiente intento
+    setCaptchaToken(null);
+    setCaptchaNonce((n) => n + 1);
 
     setLoading(false);
   };
@@ -78,6 +91,7 @@ function Login() {
               {showPassword ? <FaEyeSlash /> : <FaEye />}
             </button>
           </div>
+          <TurnstileCaptcha onTokenChange={setCaptchaToken} resetKey={captchaNonce} />
           <button
             className="auth-submit"
             type="submit"

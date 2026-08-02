@@ -574,6 +574,15 @@ export default function CreatePostModal({
         }
       }
 
+      // ── Toast de confirmación de publicación ──
+      if (isEditing) {
+        toast.success(t('create_post.updated') || 'Post updated');
+      } else if (finalScheduledAt) {
+        toast.success(t('create_post.scheduled') || 'Post scheduled');
+      } else {
+        toast.success(t('create_post.posted') || 'Post published!');
+      }
+
       setContent('');
       setPreviewUrl(null);
       setPreviewType(null);

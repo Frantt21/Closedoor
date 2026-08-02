@@ -342,7 +342,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const login = async (emailOrUsername, password) => {
+  const login = async (emailOrUsername, password, captchaToken) => {
     try {
       setError(null);
       let email = emailOrUsername;
@@ -361,6 +361,10 @@ export function AuthProvider({ children }) {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
+        options: {
+          // Token de Cloudflare Turnstile (verificado server-side por Supabase)
+          captchaToken: captchaToken || undefined,
+        },
       });
 
       if (error) {
@@ -392,7 +396,7 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const register = async (email, password, username, nickname) => {
+  const register = async (email, password, username, nickname, captchaToken) => {
     try {
       setError(null);
 
@@ -451,6 +455,8 @@ export function AuthProvider({ children }) {
         email,
         password,
         options: {
+          // Token de Cloudflare Turnstile (verificado server-side por Supabase)
+          captchaToken: captchaToken || undefined,
           data: {
             username,
             display_name: nickname || username,

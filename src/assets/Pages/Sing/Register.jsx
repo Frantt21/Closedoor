@@ -5,6 +5,7 @@ import { useI18n } from '../../services/i18n/useI18n';
 import usePageTitle from '../../../hooks/usePageTitle';
 import { USERNAME_MIN, USERNAME_MAX, DISPLAYNAME_MAX } from '../../services/userService';
 import { FaEye, FaEyeSlash, FaDiscord } from 'react-icons/fa';
+import TurnstileCaptcha, { isTurnstileActive } from '../../Resources/Components/TurnstileCaptcha';
 import '../../Resources/Styles/login.css';
 import '../../Resources/Styles/register.css';
 
@@ -19,6 +20,8 @@ function Register() {
   const [loading, setLoading] = useState(false);
   const [discordLoading, setDiscordLoading] = useState(false);
   const [error, setError] = useState('');
+  const [captchaToken, setCaptchaToken] = useState(null);
+  const [captchaNonce, setCaptchaNonce] = useState(0);
   const { register, loginWithDiscord } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -54,7 +57,13 @@ function Register() {
       return;
     }
 
-    const result = await register(email, password, username, nickname || username);
+    if (isTurnstileActive() && !captchaToken) {
+      setError(t('auth.captcha_required') || 'Complete the CAPTCHA to continue');
+      setLoading(false);
+      return;
+    }
+
+    const result = await register(email, password, username, nickname || username, captchaToken);
 
     if (result.success) {
       const params = new URLSearchParams(location.search);
@@ -63,6 +72,10 @@ function Register() {
     } else {
       setError(result.error || t('auth.register_error'));
     }
+
+    // Resetear el reto para el siguiente intento
+    setCaptchaToken(null);
+    setCaptchaNonce((n) => n + 1);
 
     setLoading(false);
   };
@@ -120,6 +133,7 @@ function Register() {
               {showPassword ? <FaEyeSlash /> : <FaEye />}
             </button>
           </div>
+          <TurnstileCaptcha onTokenChange={setCaptchaToken} resetKey={captchaNonce} />
           <button className="auth-submit" type="submit" disabled={loading}>
             {loading ? t('auth.registering') : t('auth.register_btn')}
           </button>
