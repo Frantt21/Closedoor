@@ -666,6 +666,7 @@ export default function PostDetail() {
       setComments((prev) => prev.filter((c) => c.id !== commentId));
     } catch (err) {
       console.error('Error deleting comment:', err);
+      toast.error(t('post.comment_delete_failed') || 'Could not delete comment');
     }
   };
 

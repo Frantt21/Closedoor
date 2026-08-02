@@ -346,6 +346,7 @@
   "post.days_ago": "{n}d ago",
   "post.delete": "Delete",
   "post.delete_comment_confirm": "Delete this comment?",
+  "post.comment_delete_failed": "Could not delete comment",
   "post.delete_confirm": "Delete this post?",
   "post.deleted_success": "Post deleted successfully.",
   "post.dislike": "Dislike",

@@ -341,6 +341,7 @@
   "post.days_ago": "hace {n}d",
   "post.delete": "Eliminar",
   "post.delete_comment_confirm": "¿Eliminar este comentario?",
+  "post.comment_delete_failed": "No se pudo eliminar el comentario",
   "post.delete_confirm": "¿Eliminar este post?",
   "post.deleted_success": "Post eliminado correctamente.",
   "post.dislike": "No me gusta",

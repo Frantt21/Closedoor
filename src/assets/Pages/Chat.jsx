@@ -723,18 +723,6 @@ export default function Chat() {
 
           if (aborted) return;
 
-          // Pre-fetch shared post data BEFORE setMessages
-          const sharedPostIds = [...new Set(decrypted.filter(m => m.shared_post_id).map(m => m.shared_post_id))];
-          if (sharedPostIds.length > 0) {
-            await Promise.all(sharedPostIds.map(async (pid) => {
-              if (sharedPosts[pid]) return;
-              try {
-                const postData = await getPost(pid);
-                setSharedPosts(prev => ({ ...prev, [pid]: postData }));
-              } catch {}
-            }));
-          }
-
           // ══ Stale refresh: MERGE con el caché existente en vez de reemplazar ══
           // Si el caché estaba marcado como stale (llegaron mensajes nuevos mientras
           // no se veía la conversación), el fetch de background trae solo el primer
@@ -874,6 +862,31 @@ export default function Chat() {
     setItem('chatRecentEmojis', recentEmojis);
   }, [recentEmojis]);
 
+  // ── Pre-fetch shared posts para los mensajes visibles ──
+  // Corre SIEMPRE que `messages` cambie (fetch inicial, restore desde caché,
+  // loadOlder, realtime) para que ningún shared post quede en loading.
+  useEffect(() => {
+    const sharedPostIds = [...new Set(
+      messages.filter((m) => m.shared_post_id).map((m) => m.shared_post_id)
+    )];
+    if (sharedPostIds.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      for (const pid of sharedPostIds) {
+        if (cancelled) break;
+        if (sharedPosts[pid]) continue;
+        try {
+          const postData = await getPost(pid);
+          if (!cancelled && postData) {
+            setSharedPosts((prev) => (prev[pid] ? prev : { ...prev, [pid]: postData }));
+          }
+        } catch { /* ignore */ }
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages]);
+
   // Sync messages cache on every update (realtime, delete, edit, etc.)
   // Only writes to cache if the messages actually belong to activeConvId
   // IMPORTANT: Skip saving while loading (msgsLoading) to avoid a race condition:
@@ -1001,6 +1014,35 @@ export default function Chat() {
     setShowPinnedPanel(false);
     setShowProfileCard(false);
   };
+
+  // ── Abrir un post compartido desde el chat, recordando la conversación ──
+  // Se guarda la conversación activa en sessionStorage para que al volver
+  // con el botón back del PostDetail, Chat se monte y restaure la misma
+  // conversación + scroll en vez de caer en la lista.
+  const openSharedPost = (postId) => {
+    if (activeConvId) {
+      try { setSessionItem('fc_chat_restore_conv', activeConvId); } catch {}
+    }
+    navigate(`/post/${postId}`);
+  };
+
+  // ── Restaurar conversación al volver de un post compartido (botón back) ──
+  useEffect(() => {
+    if (!user?.id || !showList) return;
+    let savedConvId = null;
+    try { savedConvId = getSessionItem('fc_chat_restore_conv') || null; } catch {}
+    if (!savedConvId) return;
+    try { removeSessionItem('fc_chat_restore_conv'); } catch {}
+
+    // La conversación debe existir en el listado ya cargado (caché o fetch)
+    const convExists = conversations.some((c) => c.id === savedConvId);
+    if (!convExists) return;
+
+    // Restaurar en el próximo tick para que el layout effect y el scroll
+    // corran con los mensajes ya restaurados desde el caché.
+    setTimeout(() => selectConversation(savedConvId), 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showList, conversations, user?.id]);
 
   // ── Send message — solo enviar si no hay subida en curso ──
   const handleSend = async () => {
@@ -2031,17 +2073,6 @@ export default function Chat() {
         return;
       }
 
-      // ══ Pre-fetch shared post data BEFORE setMessages so DOM is stable at scroll-restore time ══
-      const sharedPostIds = [...new Set(decrypted.filter(m => m.shared_post_id).map(m => m.shared_post_id))];
-      if (sharedPostIds.length > 0) {
-        await Promise.all(sharedPostIds.map(async (pid) => {
-          try {
-            const postData = await getPost(pid);
-            setSharedPosts(prev => prev[pid] ? prev : { ...prev, [pid]: postData });
-          } catch { /* ignore */ }
-        })).catch(() => {});
-      }
-
       // Safety: user might have switched conversations during shared-post fetch
       if (convIdAtStart !== activeConvId) {
         scrollBeforeLoadRef.current = null;
@@ -2624,7 +2655,7 @@ export default function Chat() {
                       const sharedPost = sharedPosts[msg.shared_post_id];
                       if (!sharedPost) {
                         return (
-                          <div className="chat-message-shared-post chat-message-shared-post--loading" onClick={() => navigate(`/post/${msg.shared_post_id}`)}>
+                          <div className="chat-message-shared-post chat-message-shared-post--loading" onClick={() => openSharedPost(msg.shared_post_id)}>
                             <div className="chat-message-shared-post-spinner" />
                             <span>{t('common.loading')}</span>
                           </div>
@@ -2633,7 +2664,7 @@ export default function Chat() {
                       const postProfile = sharedPost.profiles || {};
                       const hasMedia = !!(sharedPost.image_urls?.length || sharedPost.image_url);
                       return (
-                        <div className="chat-message-shared-post" onClick={() => navigate(`/post/${sharedPost.id}`)}>
+                        <div className="chat-message-shared-post" onClick={() => openSharedPost(sharedPost.id)}>
                           {/* Header: avatar + username + badge */}
                           <div className="chat-message-shared-post-header">
                             <Avatar

@@ -646,10 +646,23 @@ export async function getUserComments(userId, { limit = 50, offset = 0 } = {}) {
 }
 
 export async function deleteComment(commentId) {
-  const { error } = await supabase.from('comments').delete().eq('id', commentId);
+  // .select('id') nos permite saber si RLS realmente permitió el borrado:
+  // si devuelve 0 filas (sin error), la fila no se eliminó (p.ej. el dueño
+  // del post sin la política de borrado o el comentario no existe) → se
+  // lanza un error para que el frontend NO haga un borrado local falso.
+  const { data, error } = await supabase
+    .from('comments')
+    .delete()
+    .eq('id', commentId)
+    .select('id');
   if (error) {
     console.error('Error deleting comment:', error);
     throw error;
+  }
+  if (!data || data.length === 0) {
+    const err = new Error('Comment could not be deleted (RLS or not found)');
+    console.error(err.message);
+    throw err;
   }
 }
 
