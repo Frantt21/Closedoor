@@ -874,7 +874,7 @@ export default function Settings() {
                       <div className="settings-accent-list">
                         {userBadges.map((badge) => {
                           const visible = getBadgeVisible(badge);
-                          const badgeImg = badge === 'mod' ? null : `/${badge}_badge.png`;
+                          const badgeImg = badge === 'mod' ? null : `/${badge}_badge2.png`;
                           return (
                             <label key={badge} className="settings-stat-toggle">
                               <span className="settings-stat-toggle-label">
