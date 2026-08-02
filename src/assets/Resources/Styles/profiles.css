@@ -890,3 +890,12 @@ dialog.fc-modal.social-links-modal {
         flex-shrink: 0;
     }
 }
+
+/* ---- Móvil y tablets (<= 1024px): el fondo siempre hace cover
+   para que la imagen llene toda la pantalla sin bandas vacías,
+   sin importar el zoom elegido en desktop. ---- */
+@media (max-width: 1024px) {
+    .profile-page::before {
+        background-size: cover;
+    }
+}

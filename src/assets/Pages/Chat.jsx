@@ -112,6 +112,17 @@ export default function Chat() {
   // (the chat takes almost the whole viewport)
   useLockBodyScroll(isMobile && !showList);
 
+  // On mobile, hide the bottom nav while a conversation is open
+  // (the chat is full-viewport; body.fc-chat-open-mobile drives the CSS)
+  useEffect(() => {
+    if (isMobile && !showList) {
+      document.body.classList.add('fc-chat-open-mobile');
+    } else {
+      document.body.classList.remove('fc-chat-open-mobile');
+    }
+    return () => document.body.classList.remove('fc-chat-open-mobile');
+  }, [isMobile, showList]);
+
   // Nicknames: map of target_user_id → nickname (cache-first)
   const [nicknames, setNicknames] = useState(() => {
     if (user?.id) {

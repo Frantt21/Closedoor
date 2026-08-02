@@ -152,4 +152,10 @@
   .mobile-nav {
     display: block;
   }
+
+  /* Ocultar la nav cuando hay una conversación de chat abierta en móvil
+     (Chat.jsx agrega body.fc-chat-open-mobile al abrir un chat) */
+  body.fc-chat-open-mobile .mobile-nav {
+    display: none;
+  }
 }
