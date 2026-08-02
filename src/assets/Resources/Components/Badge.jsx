@@ -5,13 +5,13 @@ import './css/badge.css';
 const ROLE_CONFIG = {
   admin: {
     className: 'role-badge--admin',
-    img: '/admin_badge.png',
+    img: '/admin_badge2.png',
     alt: 'Admin',
     tooltip: 'Admin',
   },
   dev: {
     className: 'role-badge--dev',
-    img: '/dev_badge.png',
+    img: '/dev_badge2.png',
     alt: 'Dev',
     tooltip: 'Dev',
   },
@@ -28,7 +28,7 @@ const ROLE_CONFIG = {
   },
   verified: {
     className: 'role-badge--verified',
-    img: '/verified_badge.png',
+    img: '/verified_badge2.png',
     alt: 'Verified',
     tooltip: 'Verified',
   },
