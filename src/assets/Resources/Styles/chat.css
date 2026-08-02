@@ -2451,6 +2451,13 @@ dialog.fc-modal.chat-followers-modal {
     .chat-message {
         max-width: 85%;
     }
+
+    /* Móvil: ocultar avatares de los mensajes para dar más espacio a las burbujas */
+    .chat-message-avatar,
+    .chat-message-avatar--own,
+    .chat-message-avatar-spacer {
+        display: none;
+    }
 }
 
 /* Desktop: always show both */

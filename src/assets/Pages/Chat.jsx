@@ -42,6 +42,7 @@ import { toast } from 'react-toastify';
 import { supabase } from '../services/supabaseclient';
 import { uploadImage } from '../services/cdnService';
 import usePageTitle from '../../hooks/usePageTitle';
+import useLockBodyScroll from '../../hooks/useLockBodyScroll';
 import '../Resources/Styles/chat.css';
 import '../Resources/Styles/explore.css';
 import '../Resources/Styles/profiles.css';
@@ -95,6 +96,21 @@ export default function Chat() {
 
   // Mobile: show conversation list or messages
   const [showList, setShowList] = useState(true);
+
+  // Mobile detection (same breakpoint as chat.css responsive rules)
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 1024px)').matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1024px)');
+    const handler = (e) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
+  // On mobile, lock the body scroll while a conversation is open
+  // (the chat takes almost the whole viewport)
+  useLockBodyScroll(isMobile && !showList);
 
   // Nicknames: map of target_user_id → nickname (cache-first)
   const [nicknames, setNicknames] = useState(() => {
@@ -961,10 +977,37 @@ export default function Chat() {
     await sendContent(content, { clearInput: true });
   };
 
+  // ── Editar un mensaje (desde menú contextual o atajo ↑) ──
+  const startEditingMessage = useCallback((msg) => {
+    if (!msg?.decryptedContent) return;
+    editContentRef.current = msg.decryptedContent;
+    const { imageUrl } = detectMediaFromContent(msg.decryptedContent);
+    editMediaUrlRef.current = imageUrl || '';
+    // Strip image URL from text, so the user only edits the text portion
+    let cleanText = msg.decryptedContent;
+    if (imageUrl) {
+      cleanText = cleanText.replace(imageUrl, '').replace(/\n{2,}/g, '\n').trim();
+    }
+    setEditMsgId(msg.id);
+    setEditText(cleanText);
+    setShowEditModal(true);
+  }, []);
+
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
+      return;
+    }
+    // Atajo: flecha ↑ con el input vacío → editar el último mensaje propio
+    if (e.key === 'ArrowUp' && !inputValue) {
+      const lastOwn = [...messages].reverse().find(
+        (m) => m.sender_id === user?.id && m.decryptedContent
+      );
+      if (lastOwn) {
+        e.preventDefault();
+        startEditingMessage(lastOwn);
+      }
     }
   };
 
@@ -1203,19 +1246,8 @@ export default function Chat() {
   const handleStartEdit = useCallback(() => {
     const msg = msgMenu.msg;
     setMsgMenu({ open: false, x: 0, y: 0, msg: null });
-    if (!msg?.decryptedContent) return;
-    editContentRef.current = msg.decryptedContent;
-    const { imageUrl } = detectMediaFromContent(msg.decryptedContent);
-    editMediaUrlRef.current = imageUrl || '';
-    // Strip image URL from text, so the user only edits the text portion
-    let cleanText = msg.decryptedContent;
-    if (imageUrl) {
-      cleanText = cleanText.replace(imageUrl, '').replace(/\n{2,}/g, '\n').trim();
-    }
-    setEditMsgId(msg.id);
-    setEditText(cleanText);
-    setShowEditModal(true);
-  }, [msgMenu.msg]);
+    startEditingMessage(msg);
+  }, [msgMenu.msg, startEditingMessage]);
 
   const handleCancelEdit = useCallback(() => {
     setEditMsgId(null);
@@ -1329,6 +1361,34 @@ export default function Chat() {
   const cancelReply = useCallback(() => {
     setReplyingTo(null);
   }, []);
+
+  // ── Swipe a la derecha sobre un mensaje → responder (móvil) ──
+  const swipeStartRef = useRef(null);
+
+  const handleMsgTouchStart = useCallback((e) => {
+    const t = e.touches[0];
+    if (!t) return;
+    swipeStartRef.current = { x: t.clientX, y: t.clientY };
+  }, []);
+
+  const handleMsgTouchCancel = useCallback(() => {
+    swipeStartRef.current = null;
+  }, []);
+
+  const handleMsgTouchEnd = useCallback((e, msg) => {
+    const start = swipeStartRef.current;
+    swipeStartRef.current = null;
+    if (!start || !msg) return;
+    const t = e.changedTouches[0];
+    if (!t) return;
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    // Swipe horizontal hacia la derecha con dominancia clara sobre el vertical
+    if (dx > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      e.preventDefault();
+      handleStartReply(msg);
+    }
+  }, [handleStartReply]);
 
   // ── Add media URL as preview above input (not pasted into textarea) ──
   const handleMediaSend = useCallback(() => {
@@ -2460,6 +2520,9 @@ export default function Chat() {
                   data-msg-id={msg.id}
                   className={`chat-message ${isOwn ? 'chat-message--own' : 'chat-message--other'}`}
                   onContextMenu={(e) => handleMsgContextMenu(e, msg)}
+                  onTouchStart={handleMsgTouchStart}
+                  onTouchEnd={(e) => handleMsgTouchEnd(e, msg)}
+                  onTouchCancel={handleMsgTouchCancel}
                 >
                 <div className={`chat-message-row ${isOwn ? 'chat-message-row--own' : 'chat-message-row--other'}`}>
                   {!isOwn && showAvatar && (
