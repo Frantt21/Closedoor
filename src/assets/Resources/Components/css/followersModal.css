@@ -85,6 +85,62 @@ dialog.fc-modal.followers-modal {
     position: relative;
 }
 
+/* ---- Sort dropdown (botón con background + context menu del app) ---- */
+.followers-modal-sort {
+    position: relative;
+    padding: 10px 24px 4px;
+    flex-shrink: 0;
+}
+
+.followers-modal-sort-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 14px;
+    border: none;
+    border-radius: var(--radius, 10px);
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-family: inherit;
+    color: var(--color-text, #ffffff);
+    background: var(--overlay-bg);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s ease;
+}
+
+.followers-modal-sort-btn:hover,
+.followers-modal-sort-btn[aria-expanded="true"] {
+    background: var(--overlay-bg-hover);
+}
+
+.followers-modal-sort-btn-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.followers-modal-sort-btn-chevron {
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    opacity: 0.7;
+    transition: transform 0.15s ease;
+}
+
+.followers-modal-sort-btn[aria-expanded="true"] .followers-modal-sort-btn-chevron {
+    transform: rotate(180deg);
+}
+
+/* Posicionamiento del menú; la estética la aporta .fc-dropdown (context menu global) */
+.followers-modal-sort-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 190px;
+    z-index: 100;
+}
+
 .followers-modal-loading,
 .followers-modal-empty {
     padding: 40px 24px;
@@ -196,6 +252,10 @@ dialog.fc-modal.followers-modal {
 
     .followers-modal-search {
         padding: 10px 16px 8px;
+    }
+
+    .followers-modal-sort {
+        padding: 10px 16px 4px;
     }
 
     .followers-modal-item {

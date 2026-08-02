@@ -44,7 +44,7 @@
   background: var(--overlay-bg-subtle);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  color: var(--color-text-secondary, #9ca3af);
+  color: var(--color-text, #ffffff);
   border: none;
 }
 
@@ -80,7 +80,7 @@
   background: var(--overlay-bg-subtle);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  color: var(--color-text-secondary, #9ca3af);
+  color: var(--color-text, #ffffff);
   border: 1px solid var(--color-border, #2a2a2a);
 }
 

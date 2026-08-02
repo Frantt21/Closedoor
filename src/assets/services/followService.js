@@ -323,6 +323,31 @@ export async function getFollowing(userId) {
 }
 
 /**
+ * Get follower counts for many users in one batch.
+ * Returns a map: { [userId]: followerCount }
+ */
+export async function getFollowersCounts(userIds) {
+  const ids = [...new Set((userIds || []).filter(Boolean))];
+  if (ids.length === 0) return {};
+
+  const countPromises = ids.map(async (uid) => {
+    const { count } = await supabase
+      .from('follows')
+      .select('follower_id', { count: 'exact', head: true })
+      .eq('following_id', uid)
+      .eq('status', 'accepted');
+    return { id: uid, followers: count || 0 };
+  });
+  const countResults = await Promise.all(countPromises);
+
+  const map = {};
+  for (const r of countResults) {
+    map[r.id] = r.followers;
+  }
+  return map;
+}
+
+/**
  * Get follow counts for a user
  */
 export async function getFollowCounts(userId) {

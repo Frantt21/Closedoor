@@ -545,7 +545,7 @@ dialog.fc-modal.social-links-modal {
     background: rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    color: rgba(255, 255, 255, 0.8);
+    color: #ffffff;
     border: none;
     border-radius: var(--radius, 10px);
     cursor: pointer;
