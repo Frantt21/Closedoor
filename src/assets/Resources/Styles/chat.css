@@ -2432,6 +2432,13 @@ dialog.fc-modal.chat-followers-modal {
         height: calc(var(--app-height, 100vh) - 64px);
     }
 
+    /* Con una conversación abierta la nav está oculta (body.fc-chat-open-mobile)
+       → el chat ocupa toda la altura, sin el hueco de 64px que se reservaba
+       para la nav. Al volver a la lista la clase se quita y se restaura. */
+    body.fc-chat-open-mobile .chat-page {
+        height: var(--app-height, 100vh);
+    }
+
     .chat-list {
         width: 100%;
         min-width: 0;

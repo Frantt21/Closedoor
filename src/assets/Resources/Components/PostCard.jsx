@@ -29,6 +29,7 @@ import Badge from './Badge';
 import SafeImage from './SafeImage';
 import Avatar from './Avatar';
 import RichText from './RichText';
+import LinkPreview from './LinkPreview';
 import { useI18n } from '../../services/i18n/useI18n';
 import { DEFAULT_AVATAR, getTimeAgo, getEmbedUrl as getEmbedUrlHelper, isVideoUrl as isVideoUrlHelper, IMG_RE, VID_RE, VID_RE_EXTENDED, getImageStyle, sanitizeUrl } from '../../services/helpers';import { decode as encryptDecode,
   decryptForUser,
@@ -998,6 +999,28 @@ const PostCard = React.memo(function PostCard({
               );
             })()}
           </p>
+
+          {/* ── Link preview (OG card) para URLs no-media visibles en el contenido ── */}
+          {!showEncryptedLoading && !showEncryptedLabel && (() => {
+            const text = displayContent || '';
+            const urls = text.match(/(https?:\/\/[^\s<]+)/gi) || [];
+            const skip = getSkipUrls(post);
+            const nonMediaUrls = urls.filter((u) => !skip.includes(u));
+            if (nonMediaUrls.length === 0) return null;
+            // Si el post está truncado, solo mostrar el preview si la URL es visible
+            const shouldTruncate = !fullContent && text.length > TRUNCATE_LENGTH;
+            const truncateAt = shouldTruncate
+              ? text.lastIndexOf(' ', TRUNCATE_LENGTH) || TRUNCATE_LENGTH
+              : text.length;
+            const displayedText = shouldTruncate ? text.slice(0, truncateAt) : text;
+            const url = nonMediaUrls[0];
+            if (!displayedText.includes(url)) return null;
+            return (
+              <div className="post-card-link-preview">
+                <LinkPreview url={url} onExternalLink={handleExternalLink} />
+              </div>
+            );
+          })()}
 
           {/* ── Scheduled badge (solo futuro, ya-publicados son posts normales sin badge) ── */}
           {post.scheduled_at && new Date(post.scheduled_at) > new Date() && (

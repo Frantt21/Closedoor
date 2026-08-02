@@ -6,6 +6,7 @@ import Badge from './Badge';
 import ConfirmModal from './ConfirmModal';
 import Avatar from './Avatar';
 import { DEFAULT_AVATAR, getImageStyle, getBackgroundStyle, sanitizeUrl } from '../../services/helpers';
+import { USERNAME_MIN, USERNAME_MAX, USERNAME_RE, DISPLAYNAME_MAX, PRONOUNS_MAX } from '../../services/userService';
 import ImagePositionEditor from './ImagePositionEditor';
 import { detectPlatform, getPlatformIcon, getPlatformName } from '../../services/socialPlatforms';
 import { extractColors } from '../../services/colorExtractor';
@@ -349,11 +350,31 @@ export default function Modal({
   // ── Cerrar con Escape y scroll locking: manejado por ModalShell (<dialog> nativo)
 
   const handleSave = async () => {
+    // ── Validación de límites coherentes (mismos que el servicio) ──
+    const u = username.trim();
+    const d = displayname.trim();
+    const p = pronouns.trim();
+    if (!USERNAME_RE.test(u)) {
+      toast.error(t('auth.username_invalid_chars') || 'Username can only contain letters, numbers and underscores');
+      return;
+    }
+    if (u.length < USERNAME_MIN || u.length > USERNAME_MAX) {
+      toast.error(t('auth.username_length') || `Username must be between ${USERNAME_MIN} and ${USERNAME_MAX} characters`);
+      return;
+    }
+    if (d.length > DISPLAYNAME_MAX) {
+      toast.error(t('modal.displayname_length') || `Display name can't exceed ${DISPLAYNAME_MAX} characters`);
+      return;
+    }
+    if (p.length > PRONOUNS_MAX) {
+      toast.error(t('modal.pronouns_length') || `Pronouns can't exceed ${PRONOUNS_MAX} characters`);
+      return;
+    }
     setSaving(true);
     try {
       await onSave({
-        username: username.trim(),
-        displayname: displayname.trim() || null,
+        username: u,
+        displayname: d || null,
         avatar_url: avatar.trim() || null,
         avatar_position: avatarPosition || null,
         banner_url: banner.trim() || null,
@@ -361,7 +382,7 @@ export default function Modal({
         banner_credits: bannerCredits.trim() || null,
         avatar_credits: avatarCredits.trim() || null,
         bio: bio.trim(),
-        pronouns: pronouns.trim() || null,
+        pronouns: p || null,
         social_links: socialLinks,
         accent_color: selectedAccent || null,
         accent_color_secondary: selectedAccentSecondary || null,
@@ -822,7 +843,9 @@ export default function Modal({
                   value={displayname}
                   onChange={(e) => setDisplayname(e.target.value)}
                   placeholder={t('modal.nickname_placeholder') || 'Your display name'}
+                  maxLength={DISPLAYNAME_MAX}
                 />
+                <span className="fc-modal-char-count">{displayname.length}/{DISPLAYNAME_MAX}</span>
               </label>
               <label className="fc-modal-label">
                 {t('modal.username_label')}
@@ -831,7 +854,9 @@ export default function Modal({
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="username"
+                  maxLength={USERNAME_MAX}
                 />
+                <span className="fc-modal-char-count">{username.length}/{USERNAME_MAX}</span>
               </label>
               <label className="fc-modal-label" style={{ marginTop: 2 }}>
                 {t('modal.pronouns_label')}
@@ -840,7 +865,9 @@ export default function Modal({
                   value={pronouns}
                   onChange={(e) => setPronouns(e.target.value)}
                   placeholder={t('modal.pronouns_placeholder')}
+                  maxLength={PRONOUNS_MAX}
                 />
+                <span className="fc-modal-char-count">{pronouns.length}/{PRONOUNS_MAX}</span>
                 <span style={{ fontSize: '0.72rem', color: 'var(--color-text-muted, #6b7280)', marginTop: 2, display: 'block' }}>
                   {t('modal.pronouns_hint')}
                 </span>

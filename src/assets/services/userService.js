@@ -22,6 +22,41 @@ function normalizeProfileUrls(profile) {
   return profile;
 }
 
+// ── Límites coherentes de caracteres (una sola fuente de verdad) ──
+export const USERNAME_MIN = 3;
+export const USERNAME_MAX = 20;
+export const DISPLAYNAME_MAX = 50;
+export const PRONOUNS_MAX = 30;
+export const BIO_MAX = 80;
+export const USERNAME_RE = /^[a-zA-Z0-9_]+$/;
+
+/**
+ * Valida campos de perfil contra los límites coherentes.
+ * @param {object} fields - { username, displayname, pronouns, bio }
+ * @param {object} [opts] - { minUsername } — false solo en rutas de creación
+ *                          automática (OAuth/legacy) donde el username puede
+ *                          derivarse del email.
+ * @returns {string|null} - Mensaje de error o null si todo está bien.
+ */
+export function validateProfileFields(fields = {}, { minUsername = true } = {}) {
+  if (typeof fields.username === 'string') {
+    const u = fields.username.trim();
+    if (!USERNAME_RE.test(u)) return 'Username can only contain letters, numbers and underscores';
+    if (u.length > USERNAME_MAX) return `Username can't exceed ${USERNAME_MAX} characters`;
+    if (minUsername && u.length < USERNAME_MIN) return `Username must be at least ${USERNAME_MIN} characters`;
+  }
+  if (typeof fields.displayname === 'string' && fields.displayname.trim().length > DISPLAYNAME_MAX) {
+    return `Display name can't exceed ${DISPLAYNAME_MAX} characters`;
+  }
+  if (typeof fields.pronouns === 'string' && fields.pronouns.trim().length > PRONOUNS_MAX) {
+    return `Pronouns can't exceed ${PRONOUNS_MAX} characters`;
+  }
+  if (typeof fields.bio === 'string' && fields.bio.trim().length > BIO_MAX) {
+    return `Bio can't exceed ${BIO_MAX} characters`;
+  }
+  return null;
+}
+
 /**
  * Get email by username
  * @param {string} username - Username to find
@@ -140,10 +175,14 @@ export async function checkEmailExists(email) {
  * @returns {Promise<object>} - Created profile data
  */
 export async function createUserProfile(userId, email, username, displayname) {
+  // Validación de límites (sin mínimo: rutas automáticas derivan el username)
+  const err = validateProfileFields({ username, displayname }, { minUsername: false });
+  if (err) throw new Error(err);
+
   const profile = {
     id: userId,
     email: email.toLowerCase(),
-    username: username.toLowerCase(),
+    username: username.trim().toLowerCase(),
     displayname: displayname || username,
     created_at: new Date().toISOString(),
   };
@@ -409,10 +448,19 @@ export async function ensureUserProfile(user) {
       return existingProfile;
     }
 
-    const username =
+    // Derivar un username válido: solo [a-z0-9_], minúsculas, máx 20.
+    // Sanitizamos porque el origen puede ser el prefijo del email (con puntos)
+    // o el display name de OAuth (con espacios/emojis), y createUserProfile
+    // ya valida estrictamente el formato.
+    const raw =
       user.user_metadata?.username ||
       user.user_metadata?.name ||
-      user.email?.split('@')[0];
+      user.email?.split('@')[0] ||
+      '';
+    const username = String(raw)
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, '')
+      .slice(0, USERNAME_MAX);
 
     if (!username) {
       console.warn('No username available to create profile for user', user.id);
@@ -435,6 +483,9 @@ export async function ensureUserProfile(user) {
 export async function updateUserProfile(userId, updates) {
   try {
     const safeUpdates = { ...updates };
+    // Validar límites coherentes antes de escribir en la DB
+    const err = validateProfileFields(safeUpdates);
+    if (err) throw new Error(err);
     if (typeof safeUpdates.bio === 'string') {
       safeUpdates.bio = sanitizeContent(safeUpdates.bio);
     }

@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../services/i18n/useI18n';
 import usePageTitle from '../../../hooks/usePageTitle';
+import { USERNAME_MIN, USERNAME_MAX, DISPLAYNAME_MAX } from '../../services/userService';
 import { FaEye, FaEyeSlash, FaDiscord } from 'react-icons/fa';
 import '../../Resources/Styles/login.css';
 import '../../Resources/Styles/register.css';
@@ -46,6 +47,13 @@ function Register() {
       return;
     }
 
+    // Username: longitud coherente (3–20)
+    if (username.trim().length < USERNAME_MIN || username.trim().length > USERNAME_MAX) {
+      setError(t('auth.username_length') || `Username must be between ${USERNAME_MIN} and ${USERNAME_MAX} characters`);
+      setLoading(false);
+      return;
+    }
+
     const result = await register(email, password, username, nickname || username);
 
     if (result.success) {
@@ -74,6 +82,7 @@ function Register() {
             value={nickname}
             onChange={(e) => setNickname(e.target.value)}
             disabled={loading}
+            maxLength={DISPLAYNAME_MAX}
           />
           <input
             className="auth-input"
@@ -82,6 +91,7 @@ function Register() {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             disabled={loading}
+            maxLength={USERNAME_MAX}
           />
           <input
             className="auth-input"

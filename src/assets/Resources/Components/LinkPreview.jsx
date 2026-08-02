@@ -10,6 +10,11 @@ import { sanitizeUrl } from '../../services/helpers';
  * @param {function} [props.onExternalLink] - Callback when the card is clicked (for external link warning)
  * @param {string} [props.className] - Additional CSS class
  */
+// ── Dedup de fetches en vuelo: si varias cards piden la MISMA url a la vez
+// (típico en feeds con muchos enlaces), comparten una sola petición a
+// /api/og-link en vez de lanzar N fetches concurrentes. ──
+const inFlightMap = new Map();
+
 export default function LinkPreview({ url, onExternalLink, className = '' }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -44,8 +49,21 @@ export default function LinkPreview({ url, onExternalLink, className = '' }) {
       setLoading(true);
       setError(false);
       try {
-        const res = await fetch(`/api/og-link?url=${encodeURIComponent(url)}`);
-        const json = await res.json();
+        let json;
+        const inFlight = inFlightMap.get(url);
+        if (inFlight) {
+          // Ya hay una petición en curso para esta URL → reutilizarla
+          json = await inFlight;
+        } else {
+          const p = fetch(`/api/og-link?url=${encodeURIComponent(url)}`)
+            .then((res) => res.json());
+          inFlightMap.set(url, p);
+          try {
+            json = await p;
+          } finally {
+            inFlightMap.delete(url);
+          }
+        }
         if (cancelled || !mountedRef.current) return;
 
         if (json.success) {

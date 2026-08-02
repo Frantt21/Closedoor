@@ -16,6 +16,9 @@ import {
     clearCachedProfile,
     clearCachedProfileByUsername,
     trackProfileView,
+    USERNAME_MIN,
+    USERNAME_MAX,
+    USERNAME_RE,
 } from "../services/userService";
 import {
     getFollowCounts,
@@ -1270,8 +1273,16 @@ function Profile() {
         if (!user?.id) return;
 
         const normalizedUsername = (username || "").trim().toLowerCase();
-        if (!normalizedUsername || normalizedUsername.length < 3) {
+        if (!normalizedUsername || normalizedUsername.length < USERNAME_MIN) {
             toast.error(t('profile.username_short'));
+            return;
+        }
+        if (!USERNAME_RE.test(normalizedUsername)) {
+            toast.error(t('auth.username_invalid_chars') || 'Username can only contain letters, numbers and underscores');
+            return;
+        }
+        if (normalizedUsername.length > USERNAME_MAX) {
+            toast.error(t('auth.username_length') || `Username must be between ${USERNAME_MIN} and ${USERNAME_MAX} characters`);
             return;
         }
 
