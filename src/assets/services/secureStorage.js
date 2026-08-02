@@ -69,7 +69,15 @@ function encrypt(value) {
   for (let i = 0; i < encoded.length; i++) {
     result[i] = encoded[i] ^ key[i % key.length];
   }
-  return btoa(String.fromCharCode(...result));
+  // Chunked conversion: String.fromCharCode(...largeArray) lanza RangeError
+  // (Maximum call stack size exceeded) con caches grandes (ej. conversación de
+  // chat completa). Se convierte en trozos de 32KB y se concatena.
+  let binary = '';
+  const CHUNK = 0x8000; // 32KB
+  for (let i = 0; i < result.length; i += CHUNK) {
+    binary += String.fromCharCode.apply(null, result.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
 }
 
 /**
@@ -182,8 +190,10 @@ export function setSessionItem(key, value) {
     const hashed = hashSessionKey(key);
     const encrypted = encrypt(value);
     sessionStorage.setItem(hashed, encrypted);
+    return true;
   } catch {
-    // Storage might be full
+    // Storage might be full (QuotaExceededError) or value too large
+    return false;
   }
 }
 

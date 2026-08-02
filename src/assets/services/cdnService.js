@@ -3,9 +3,11 @@
  * Handles image uploads to the Go CDN server at api.foranly.space
  * Supports: avatar, banner, post, chat images
  *
- * Upload results are cached in encrypted localStorage by file fingerprint
- * (userId + type + file.name + file.size + file.lastModified) so that
- * re-uploading the same file returns instantly without a network request.
+ * Upload results are cached in encrypted localStorage by CONTENT HASH
+ * (userId + type + sha256(file content)) so that re-uploading the same file
+ * returns instantly without a network request. No se usa nombre/tamaño/fecha
+ * como clave porque las capturas de Windows pegadas al chat comparten esos
+ * campos y colisionaban devolviendo la imagen anterior.
  *
  * Cache: permanente. El backend CDN usa dedup por hash, así que las URLs
  * cacheadas NUNCA se vuelven obsoletas. Cada entrada ocupa ~300 bytes en
@@ -18,12 +20,32 @@ const CDN_BASE = import.meta.env.VITE_CDN_URL || '';
 const CACHE_PREFIX = 'cdn_upload_';
 
 /**
- * Generate a cache key for the upload result.
- * Uniquely identifies a file by its name, size, and lastModified timestamp,
- * scoped to the user and upload type.
+ * Genera un hash SHA-256 del contenido del archivo.
+ * Devuelve null si crypto.subtle no está disponible (contexto no seguro) —
+ * en ese caso se usa el fallback de nombre/tamaño/fecha.
  */
-function getUploadCacheKey(userId, type, file) {
-  return `${CACHE_PREFIX}${userId}_${type}_${file.name}_${file.size}_${file.lastModified}`;
+async function getFileContentHash(file) {
+  try {
+    const buf = await file.arrayBuffer();
+    const digest = await crypto.subtle.digest('SHA-256', buf);
+    return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Generate a cache key for the upload result.
+ * Se identifica por el HASH del CONTENIDO (no por nombre/tamaño/fecha):
+ * las capturas de Windows (Win+Shift+S) pegadas al chat comparten nombre,
+ * tamaño y lastModified, lo que hacía colisionar la clave y devolver la
+ * imagen anterior. Con el hash, contenido distinto → clave distinta, y
+ * re-subir el MISMO archivo sigue devolviendo la URL cacheada al instante.
+ */
+async function getUploadCacheKey(userId, type, file) {
+  const contentHash = await getFileContentHash(file);
+  const fingerprint = contentHash || `${file.name}_${file.size}_${file.lastModified}`;
+  return `${CACHE_PREFIX}${userId}_${type}_${fingerprint}`;
 }
 
 /**
@@ -32,7 +54,7 @@ function getUploadCacheKey(userId, type, file) {
  */
 async function getCachedUpload(userId, type, file) {
   try {
-    const key = getUploadCacheKey(userId, type, file);
+    const key = await getUploadCacheKey(userId, type, file);
     const parsed = await getItem(key);
     if (!parsed) return null;
     return parsed.result;
@@ -46,7 +68,7 @@ async function getCachedUpload(userId, type, file) {
  */
 async function setCachedUpload(userId, type, file, result) {
   try {
-    const key = getUploadCacheKey(userId, type, file);
+    const key = await getUploadCacheKey(userId, type, file);
     await setItem(key, {
       result,
       timestamp: Date.now(),
@@ -108,15 +130,9 @@ export async function uploadImage(file, userId, type) {
     throw new Error('Missing required parameters: file, userId, type');
   }
 
-  // ── Check local cache first (instant return for re-uploads) ──
-  const cached = await getCachedUpload(userId, type, file);
-  if (cached) {
-    console.debug('⚡ CDN cache hit:', file.name);
-    // Normalizar URLs cacheadas de sesiones anteriores (forceHttps → relativa)
-    return { ...cached, url: normalizeCdnUrl(cached.url) };
-  }
-
-  // Validate file type
+  // Validate file type + size ANTES del hash/caché: así un archivo inválido
+  // (tipo no soportado o >20MB) falla rápido sin leer su contenido completo
+  // para calcular el hash de la clave de caché.
   const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
   if (!allowedTypes.includes(file.type)) {
     throw new Error(`Unsupported file type: ${file.type}. Allowed: JPEG, PNG, GIF, WebP`);
@@ -126,6 +142,14 @@ export async function uploadImage(file, userId, type) {
   const maxSize = 20 * 1024 * 1024;
   if (file.size > maxSize) {
     throw new Error(`File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max: 20MB`);
+  }
+
+  // ── Check local cache first (instant return for re-uploads) ──
+  const cached = await getCachedUpload(userId, type, file);
+  if (cached) {
+    console.debug('⚡ CDN cache hit:', file.name);
+    // Normalizar URLs cacheadas de sesiones anteriores (forceHttps → relativa)
+    return { ...cached, url: normalizeCdnUrl(cached.url) };
   }
 
   const formData = new FormData();

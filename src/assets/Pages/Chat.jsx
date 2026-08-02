@@ -47,6 +47,7 @@ import '../Resources/Styles/explore.css';
 import '../Resources/Styles/profiles.css';
 import '../Resources/Styles/post.css';
 import '../Resources/Components/css/modal.css';
+import '../Resources/Components/css/postCard.css';
 import { getItem, setItem, removeItem, getSessionItem, setSessionItem, removeSessionItem } from '../services/secureStorage';
 import { useUserStatus } from '../services/useUserStatus';
 import { useRegisterMultipleUserStatus, UserStatusContext } from '../../context/UserStatusContext';
@@ -303,18 +304,46 @@ export default function Chat() {
     return {};
   };
   const saveCacheToSession = (cache) => {
+    // Intento 1: guardar la conversación COMPLETA (todo lo cargado, incluyendo
+    // los mensajes antiguos traídos con loadOlderMessages). El caché se limpia
+    // en cada carga de página (ver restore abajo), así que no hay acumulación
+    // de datos stale. Si la cuota de sessionStorage se supera, se degrada
+    // guardando solo los mensajes más recientes en vez de tirar todo.
+    if (setSessionItem(getSessionCacheKey(), cache)) return;
+
+    // Intento 2 (fallback por cuota): recortar cada conversación a los N
+    // mensajes más recientes y reintentar. Así el restore al volver al chat
+    // al menos devuelve los últimos mensajes, no un caché vacío.
     try {
-      // Se cachea la conversación COMPLETA (todo lo cargado, incluyendo los
-      // mensajes antiguos traídos con loadOlderMessages). Como el caché se
-      // limpia en cada carga de página (ver restore abajo), no hay acumulación
-      // de datos stale; si aun así se supera la cuota, el catch la limpia y el
-      // chat se repuebla con fetch fresco.
-      setSessionItem(getSessionCacheKey(), cache);
-    } catch (e) {
-      // sessionStorage quota exceeded — clear cache
-      if (e.name === 'QuotaExceededError' || e.code === 22) {
+      const MAX_CACHED_PER_CONV = 150;
+      const trimmed = { _meta: cache._meta };
+      for (const [convId, msgs] of Object.entries(cache)) {
+        if (convId === '_meta') continue;
+        if (Array.isArray(msgs) && msgs.length > MAX_CACHED_PER_CONV) {
+          trimmed[convId] = msgs.slice(msgs.length - MAX_CACHED_PER_CONV);
+          // El meta de esa conversación ya no coincide con los mensajes
+          // recortados: forzar hasMoreMessages=true y el cursor al mensaje
+          // más antiguo del recorte para que la paginación siga bien.
+          if (trimmed._meta?.[convId]) {
+            trimmed._meta[convId] = {
+              ...trimmed._meta[convId],
+              hasMoreMessages: true,
+              oldestMessageDate: trimmed[convId][0]?.created_at ?? null,
+            };
+          }
+        } else {
+          trimmed[convId] = msgs;
+        }
+      }
+      // Si incluso el recorte no cabe (cuota mínima), limpiar para que el chat
+      // se repueble con fetch fresco en la próxima visita (setSessionItem ya no
+      // lanza — devuelve false, por eso se comprueba el retorno).
+      const saved = setSessionItem(getSessionCacheKey(), trimmed);
+      if (!saved) {
         try { removeSessionItem(getSessionCacheKey()); } catch {}
       }
+    } catch {
+      try { removeSessionItem(getSessionCacheKey()); } catch {}
     }
   };
 
@@ -648,13 +677,32 @@ export default function Chat() {
             }));
           }
 
-          messagesCacheRef.current[convForThisEffect] = decrypted;
-          messagesOwnerRef.current = convForThisEffect;
-          setMessages(decrypted);
-          if (decrypted.length > 0) {
-            setOldestMessageDate(decrypted[0].created_at);
+          // ══ Stale refresh: MERGE con el caché existente en vez de reemplazar ══
+          // Si el caché estaba marcado como stale (llegaron mensajes nuevos mientras
+          // no se veía la conversación), el fetch de background trae solo el primer
+          // batch (INITIAL_BATCH_LIMIT). Reemplazar el caché con ese batch tiraba
+          // todos los mensajes antiguos ya cargados con loadOlderMessages → el caché
+          // quedaba pegado en ~40 mensajes. Aquí fusionamos: viejos cacheados (que no
+          // estén en el batch nuevo) + batch nuevo, deduplicando por id y ordenando.
+          const prevCached = messagesCacheRef.current[convForThisEffect];
+          const prevMeta = messagesCacheRef.current._meta?.[convForThisEffect];
+          let finalMessages = decrypted;
+          if (Array.isArray(prevCached) && prevCached.length > 0) {
+            const fetchedIds = new Set(decrypted.map(m => m.id));
+            const keptOlder = prevCached.filter(m => !fetchedIds.has(m.id));
+            finalMessages = [...keptOlder, ...decrypted];
+            // Orden ascendente defensivo (el realtime puede intercalar mensajes)
+            finalMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
           }
-          setHasMoreMessages(hasMore);
+          messagesCacheRef.current[convForThisEffect] = finalMessages;
+          messagesOwnerRef.current = convForThisEffect;
+          setMessages(finalMessages);
+          if (finalMessages.length > 0) {
+            setOldestMessageDate(finalMessages[0].created_at);
+          }
+          // Si ya teníamos TODO cargado (hasMore=false en caché), mantenerlo en vez
+          // de usar el hasMore del primer batch, que siempre es true con >40 msgs.
+          setHasMoreMessages(prevMeta?.hasMoreMessages ?? hasMore);
         } catch {
         } finally {
           staleBackgroundFetchRef.current = false;
@@ -1292,9 +1340,8 @@ export default function Chat() {
     setTimeout(() => inputRef.current?.focus(), 50);
   }, [mediaUrl]);
 
-  // ── Upload image file to CDN for chat (subida directa, sin blob) ──
-  const handleChatMediaUpload = useCallback(async (e) => {
-    const file = e.target.files?.[0];
+  // ── Subir imagen a CDN para el chat (compartido: input file + pegado Ctrl+V) ──
+  const uploadChatImageFile = useCallback(async (file) => {
     if (!file || !user?.id) return;
 
     if (!file.type.startsWith('image/')) {
@@ -1332,9 +1379,32 @@ export default function Chat() {
       });
     } finally {
       setUploadingChatMedia(false);
-      e.target.value = '';
     }
   }, [user?.id, t]);
+
+  // ── Input file del chat → sube la imagen seleccionada ──
+  const handleChatMediaUpload = useCallback(async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await uploadChatImageFile(file);
+    e.target.value = '';
+  }, [uploadChatImageFile]);
+
+  // ── Pegar imagen (Ctrl+V) en el input → sube directo y muestra preview ──
+  const handleChatPaste = useCallback((e) => {
+    if (uploadingChatMedia) return; // evita uploads concurrentes (mismo guard que el input file)
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.kind === 'file' && item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (!file) continue; // item sin File → seguir con los demás
+        e.preventDefault();
+        uploadChatImageFile(file);
+        return;
+      }
+    }
+  }, [uploadChatImageFile, uploadingChatMedia]);
 
   // ── Insert emoji at cursor position in the input ──
   const handleInputEmojiSelect = useCallback((emoji) => {
@@ -2007,10 +2077,33 @@ export default function Chat() {
       else if (isFirst) { groupClass = 'chat-message-bubble--first'; isGrouped = true; }
       else if (isLast) { groupClass = 'chat-message-bubble--last'; isGrouped = true; }
       else { groupClass = 'chat-message-bubble--middle'; isGrouped = true; }
-      map[msg.id] = { groupClass, showAvatar: isFirst, isGrouped };
+      // Marcar el mensaje que INICIA cada día (el más antiguo del grupo) para
+      // renderizar el divisor de fecha por encima de él (estilo Discord/Instagram).
+      const sameDayAsPrev = prev && new Date(msg.created_at).toDateString() === new Date(prev.created_at).toDateString();
+      map[msg.id] = { groupClass, showAvatar: isFirst, isGrouped, showDayDivider: !sameDayAsPrev };
     }
     return map;
   }, [dedupedMessages]);
+
+  // ── Etiqueta del divisor de día (Hoy / Ayer / fecha localizada) ──
+  const getDayDividerLabel = (dateStr) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return ''; // fecha inválida → sin etiqueta
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfMsgDay = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+    const diffDays = Math.round((startOfToday - startOfMsgDay) / 86400000);
+    if (diffDays === 0) return t('chat.today');
+    if (diffDays === 1) return t('chat.yesterday');
+    const dateLocale = locale === 'en' ? 'en-US' : locale === 'ja' ? 'ja-JP' : locale === 'pt' ? 'pt-BR' : locale === 'ru' ? 'ru-RU' : 'es-ES';
+    const sameYear = date.getFullYear() === now.getFullYear();
+    return date.toLocaleDateString(dateLocale, {
+      day: 'numeric',
+      month: 'short',
+      ...(sameYear ? {} : { year: 'numeric' }),
+    });
+  };
 
   // ── Reversed messages for column-reverse render (newest first in DOM) ──
   const reversedMessages = React.useMemo(() => [...dedupedMessages].reverse(), [dedupedMessages]);
@@ -2362,12 +2455,12 @@ export default function Chat() {
             const ownReaction = reactions[user.id];
 
             return (
-              <div
-                key={msg.id}
-                data-msg-id={msg.id}
-                className={`chat-message ${isOwn ? 'chat-message--own' : 'chat-message--other'}`}
-                onContextMenu={(e) => handleMsgContextMenu(e, msg)}
-              >
+              <React.Fragment key={msg.id}>
+                <div
+                  data-msg-id={msg.id}
+                  className={`chat-message ${isOwn ? 'chat-message--own' : 'chat-message--other'}`}
+                  onContextMenu={(e) => handleMsgContextMenu(e, msg)}
+                >
                 <div className={`chat-message-row ${isOwn ? 'chat-message-row--own' : 'chat-message-row--other'}`}>
                   {!isOwn && showAvatar && (
                     <Avatar
@@ -2591,7 +2684,13 @@ export default function Chat() {
                   </div>
                 )}
 
-              </div>
+                </div>
+                {groupInfo.showDayDivider && (
+                  <div className="chat-day-divider" aria-hidden="true">
+                    <span>{getDayDividerLabel(msg.created_at)}</span>
+                  </div>
+                )}
+              </React.Fragment>
             );
           })
         )}
@@ -2756,6 +2855,8 @@ export default function Chat() {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
+            onPaste={handleChatPaste}
+            title={t('chat.paste_image_hint') || 'Paste an image with Ctrl+V'}
             placeholder={t('chat.input_placeholder')}
             rows={1}
             maxLength={2000}
