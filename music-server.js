@@ -21,6 +21,7 @@
  * Endpoints (mismos que usa el frontend vía VITE_MUSIC_API_URL):
  *   GET /api/music/health                     → estado de yt-dlp/ffmpeg
  *   GET /api/music/search?q=...&limit=...     → Deezer (metadatos + flag stream)
+ *   GET /api/music/search?track=...           → preview FRESCO de Deezer (expira)
  *   GET /api/music/stream?artist=&title=&duration=&fresh= → stream completo
  *
  * Variables opcionales: PORT, YTDLP_BIN, FFMPEG_BIN.
@@ -29,6 +30,7 @@
 
 import http from 'http';
 import { combinedMusicSearch, getMusicHealth, handleStreamRequest } from './api/_musicStream.js';
+import { resolveTrackPreview } from './api/_music.js';
 
 const PORT = process.env.PORT || 3000;
 
@@ -93,6 +95,20 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === '/api/music/search') {
+      // ── Modo track: resolver preview FRESCO de Deezer (los previews expiran
+      //    ≈ 15 min) — Uso: GET /api/music/search?track=<id>&provider=deezer
+      const trackId = url.searchParams.get('track');
+      if (trackId) {
+        try {
+          const previewUrl = await resolveTrackPreview(trackId, 'deezer');
+          res.status(200).json({ success: true, provider: 'deezer', previewUrl });
+        } catch (err) {
+          console.warn('[music-server]', err.message);
+          res.status(502).json({ success: false, error: err.message });
+        }
+        return;
+      }
+
       const q = (url.searchParams.get('q') || '').trim();
       if (!q) {
         res.status(400).json({ success: false, error: 'Missing ?q parameter' });

@@ -476,6 +476,20 @@ app.get('/api/music/health', async (req, res) => {
 });
 
 app.get('/api/music/search', async (req, res) => {
+  // ── Modo track: preview FRESCO de Deezer (expira ≈ 15 min) — paridad con
+  //    music-server.js (Termux) y api/music-search.js (Vercel serverless)
+  const trackId = req.query?.track;
+  if (trackId) {
+    try {
+      const previewUrl = await resolveTrackPreview(trackId, 'deezer');
+      res.status(200).json({ success: true, provider: 'deezer', previewUrl });
+    } catch (err) {
+      console.warn('Music preview resolve error:', err.message);
+      res.status(502).json({ success: false, error: err.message });
+    }
+    return;
+  }
+
   const q = (req.query?.q || '').trim();
   if (!q) {
     res.status(400).json({ success: false, error: 'Missing ?q parameter' });

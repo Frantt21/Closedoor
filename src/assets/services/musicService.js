@@ -196,16 +196,33 @@ export async function resolvePreviewUrl(song) {
   if (hit && Date.now() - hit.at < RESOLVED_PREVIEW_TTL) return hit.url;
   resolvedPreviewCache.delete(key); // entrada expirada → liberar
 
-  try {
-    const url = `/api/music-search?track=${encodeURIComponent(song.trackId)}&provider=deezer`;
-    const res = await fetch(url);
-    const data = await res.json();
-    if (data?.success && data.previewUrl) {
-      resolvedPreviewCache.set(key, { url: data.previewUrl, at: Date.now() });
-      return data.previewUrl;
+  // Candidatos en orden:
+  //   1) El server de música (túnel remoto si VITE_MUSIC_API_URL está
+  //      definida; solo se usa cuando NO es same-origin, porque en Vercel
+  //      `/api/music/search` no existe como serverless).
+  //   2) Proxy same-origin `/api/music-search` (serverless de Vercel o
+  //      server.js en dev) — cubre el caso sin túnel.
+  const trackParam = encodeURIComponent(song.trackId);
+  const candidates = MUSIC_API !== '/api/music'
+    ? [`${MUSIC_API}/search?track=${trackParam}&provider=deezer`]
+    : [];
+  candidates.push(`/api/music-search?track=${trackParam}&provider=deezer`);
+
+  for (const url of candidates) {
+    try {
+      const res = await fetch(url, {
+        headers: TUNNEL_HEADERS,
+        signal: AbortSignal.timeout(6000),
+      });
+      if (!res.ok) continue;
+      const data = await res.json();
+      if (data?.success && data.previewUrl) {
+        resolvedPreviewCache.set(key, { url: data.previewUrl, at: Date.now() });
+        return data.previewUrl;
+      }
+    } catch (err) {
+      console.warn('[music] preview resolve failed:', err?.message || err);
     }
-  } catch (err) {
-    console.warn('[music] preview resolve failed:', err?.message || err);
   }
 
   return song.previewUrl;
