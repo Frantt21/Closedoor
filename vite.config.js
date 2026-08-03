@@ -14,6 +14,14 @@ export default defineConfig({
         target: 'http://api.foranly.space:24587',
         changeOrigin: true,
       },
+      // API de música (búsqueda Deezer, stream yt-dlp, health) en dev:
+      // requiere `npm run start` (server.js) levantado junto al dev server.
+      // Si no está corriendo, la petición falla rápido y el frontend usa el
+      // fallback de previews (iTunes directo funciona en dev sin server).
+      '/api/music': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
     },
     allowedHosts: [
       '.ngrok-free.app',

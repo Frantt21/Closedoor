@@ -122,6 +122,9 @@ CREATE TABLE IF NOT EXISTS profiles (
   -- Intereses e información adicional
   interests TEXT[] DEFAULT '{}',
   social_links JSONB DEFAULT '[]'::jsonb,
+  -- Canción del perfil (card con disco animado; preview 30s vía iTunes/Deezer
+  -- o stream completo vía server yt-dlp — ver README)
+  song JSONB DEFAULT NULL,
   -- Color de acento
   accent_color VARCHAR(7) DEFAULT NULL,
   accent_color_secondary TEXT DEFAULT NULL,

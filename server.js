@@ -20,6 +20,8 @@ import { fileURLToPath } from 'url';
 import http from 'http';
 import { buildSitemapUrls, wrapSitemapXml } from './api/_sitemap.js';
 import { issueLiveKitToken } from './api/_livekit.js';
+import { searchMusicServer, resolveTrackPreview } from './api/_music.js';
+import { combinedMusicSearch, handleStreamRequest, getMusicHealth } from './api/_musicStream.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIST = join(__dirname, 'dist');
@@ -388,7 +390,8 @@ function decodeEntities(str) {
 }
 
 // ── CDN proxy routes ──
-app.all('/cdn/*', cdnProxy);
+// Express 5 (path-to-regexp v8) ya no acepta '*' como wildcard → {*path}
+app.all('/cdn/{*path}', cdnProxy);
 
 // ── LiveKit token endpoint (local dev) — usa la lógica compartida api/_livekit.js ──
 // Emite un AccessToken de LiveKit verificando que el usuario sea participante
@@ -412,6 +415,92 @@ app.post('/api/livekit-token', express.json(), async (req, res) => {
   } else {
     res.status(result.status).json({ success: false, error: result.error });
   }
+});
+
+// ── Music search proxy (local dev) — matches api/music-search.js ──
+// Deezer no envía headers CORS, así que la búsqueda se hace por el servidor;
+// iTunes se consulta directo desde el navegador (CORS OK).
+app.get('/api/music-search', async (req, res) => {
+  const provider = req.query?.provider === 'itunes' ? 'itunes' : 'deezer';
+
+  // ── Modo track: resolver preview FRESCO (los de Deezer expiran) ──
+  // Uso: GET /api/music-search?track=<id>&provider=deezer (no requiere ?q)
+  const trackId = req.query?.track;
+  if (trackId) {
+    try {
+      const previewUrl = await resolveTrackPreview(trackId, provider);
+      res.status(200).json({ success: true, provider, previewUrl });
+    } catch (err) {
+      console.warn('Music search proxy error:', err.message);
+      res.status(502).json({ success: false, error: err.message });
+    }
+    return;
+  }
+
+  const q = (req.query?.q || '').trim();
+  if (!q) {
+    res.status(400).json({ success: false, error: 'Missing ?q parameter' });
+    return;
+  }
+
+  try {
+    const results = await searchMusicServer(q, provider, req.query?.limit);
+    res.status(200).json({ success: true, provider, results });
+  } catch (err) {
+    console.warn('Music search proxy error:', err.message);
+    res.status(502).json({ success: false, error: err.message });
+  }
+});
+
+// ── Música: stream completo vía yt-dlp + ffmpeg ──
+// ⚠️ Solo server self-hosted (Vercel serverless no puede correr yt-dlp).
+// Requiere yt-dlp y ffmpeg instalados; configurables con YTDLP_BIN/FFMPEG_BIN.
+app.get('/api/music/health', async (req, res) => {
+  res.status(200).json(await getMusicHealth());
+});
+
+app.get('/api/music/search', async (req, res) => {
+  const q = (req.query?.q || '').trim();
+  if (!q) {
+    res.status(400).json({ success: false, error: 'Missing ?q parameter' });
+    return;
+  }
+  try {
+    const data = await combinedMusicSearch(q, req.query?.limit);
+    res.status(200).json(data);
+  } catch (err) {
+    console.warn('Music combined search error:', err.message);
+    res.status(502).json({ success: false, error: err.message });
+  }
+});
+
+// ── Rate limit simple por IP para el stream (resolver yt-dlp es caro y
+//    un abuso podría hacer que YouTube bloquee la IP del server) ──
+const streamLimits = new Map(); // ip → { count, resetAt }
+function rateLimitStream(req) {
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown';
+  const now = Date.now();
+  const entry = streamLimits.get(ip);
+  if (!entry || now > entry.resetAt) {
+    streamLimits.set(ip, { count: 1, resetAt: now + 60_000 });
+    return true;
+  }
+  entry.count += 1;
+  if (streamLimits.size > 5000) streamLimits.clear();
+  return entry.count <= 15; // máx 15 streams/min por IP
+}
+
+app.get('/api/music/stream', async (req, res) => {
+  const { artist = '', title = '', duration = 0, fresh } = req.query || {};
+  if (!title) {
+    res.status(400).json({ success: false, error: 'Missing ?title parameter' });
+    return;
+  }
+  if (!rateLimitStream(req)) {
+    res.status(429).json({ success: false, error: 'Too many stream requests, try again in a minute' });
+    return;
+  }
+  await handleStreamRequest(req, res, { artist, title, duration, fresh: fresh === '1' });
 });
 
 // ── Route-based OG tag configuration ──

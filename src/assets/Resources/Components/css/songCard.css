@@ -1,0 +1,400 @@
+/* ==========================================
+   Song Card — "Mi canción" del perfil
+   (disco de vinilo animado + preview 30s)
+   ========================================== */
+
+/* ── Disco de vinilo ── */
+.song-card-vinyl-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.song-card-vinyl {
+  all: unset;
+  position: relative;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  cursor: pointer;
+  /* Surcos del vinilo + orificio central */
+  background:
+    radial-gradient(circle at center, #0a0a0a 0 5px, #1d1d1f 5.5px 7px, transparent 7.5px),
+    repeating-radial-gradient(circle at center, #101012 0 1px, #1b1b1e 1px 2.5px, #141417 2.5px 4px);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 4px 14px rgba(0, 0, 0, 0.45);
+  animation: songCardSpin 5s linear infinite;
+  animation-play-state: paused;
+  transition: transform 0.2s ease;
+}
+
+.song-card-vinyl:hover {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+    0 6px 18px rgba(0, 0, 0, 0.55);
+}
+
+.song-card-vinyl--playing {
+  animation-play-state: running;
+}
+
+.song-card-vinyl-art {
+  position: absolute;
+  inset: 17%;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--color-surface-hover, #252525);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.55);
+}
+
+@keyframes songCardSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .song-card-vinyl {
+    animation: none;
+  }
+}
+
+/* ── Info + controles ── */
+.song-card-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.song-card-info-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.song-card-play-btn {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--overlay-bg, rgba(255, 255, 255, 0.08));
+  color: var(--color-text, #ffffff);
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.song-card-play-btn:hover {
+  background: var(--overlay-bg-hover, rgba(255, 255, 255, 0.14));
+  transform: scale(1.08);
+}
+
+.song-card-play-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.song-card-texts {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.song-card-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--accent-surface-text-color, var(--color-text, #ffffff));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.song-card-artist {
+  font-size: 0.72rem;
+  color: var(--accent-surface-text-muted, var(--color-text-muted, #6b7280));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Barra de progreso ── */
+.song-card-progress {
+  height: 3px;
+  border-radius: var(--radius-full, 9999px);
+  background: var(--overlay-bg, rgba(255, 255, 255, 0.08));
+  overflow: hidden;
+}
+
+.song-card-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-color, var(--color-accent, #6b7280));
+  transition: width 0.2s linear;
+}
+
+.song-card-time {
+  font-size: 0.65rem;
+  color: var(--accent-surface-text-muted, var(--color-text-muted, #6b7280));
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Acciones (perfil propio) ── */
+.song-card-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--overlay-border, rgba(255, 255, 255, 0.12));
+}
+
+.song-card-action-btn {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm, 6px);
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 0.68rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.song-card-action-btn:hover {
+  background: var(--overlay-bg, rgba(255, 255, 255, 0.08));
+  color: var(--color-text, #ffffff);
+}
+
+.song-card-action-btn--danger:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+/* ── CTA "Agregar canción" ── */
+.song-card-add {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px dashed var(--color-border, #2a2a2a);
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.song-card-add:hover {
+  background: var(--overlay-bg, rgba(255, 255, 255, 0.08));
+  color: var(--color-text, #ffffff);
+  border-color: var(--overlay-border-hover, rgba(255, 255, 255, 0.25));
+}
+
+.song-card-add svg {
+  font-size: 0.75rem;
+  opacity: 0.6;
+}
+
+/* ── Editor inline ── */
+.song-card-search-row {
+  display: flex;
+  gap: 6px;
+}
+
+.song-card-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  font-size: 0.8rem;
+  font-family: inherit;
+  color: var(--color-text, #ffffff);
+  background: var(--overlay-bg-subtle, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--color-border, #2a2a2a);
+  border-radius: var(--radius-sm, 6px);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.song-card-search-input::placeholder {
+  color: var(--color-text-muted, #6b7280);
+}
+
+.song-card-search-input:focus {
+  border-color: var(--overlay-border-hover, rgba(255, 255, 255, 0.25));
+}
+
+.song-card-search-btn {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm, 6px);
+  flex-shrink: 0;
+  background: var(--overlay-bg, rgba(255, 255, 255, 0.08));
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.song-card-search-btn:hover:not(:disabled) {
+  background: var(--overlay-bg-hover, rgba(255, 255, 255, 0.14));
+  color: var(--color-text, #ffffff);
+}
+
+.song-card-search-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.song-card-search-msg {
+  margin: 8px 0 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.song-card-select-hint {
+  margin: 8px 0 4px;
+  font-size: 0.68rem;
+  color: var(--color-text-muted, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* ── Resultados de búsqueda ── */
+.song-card-results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 176px;
+  overflow-y: auto;
+  padding-right: 2px;
+  margin-top: 2px;
+}
+
+.song-card-results::-webkit-scrollbar {
+  width: 4px;
+}
+
+.song-card-results::-webkit-scrollbar-thumb {
+  background: var(--color-border, #2a2a2a);
+  border-radius: 2px;
+}
+
+.song-card-result {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.song-card-result:hover {
+  background: var(--overlay-bg, rgba(255, 255, 255, 0.08));
+}
+
+.song-card-result--selected {
+  background: var(--overlay-bg, rgba(255, 255, 255, 0.08));
+  outline: 1px solid var(--overlay-border-strong, rgba(255, 255, 255, 0.4));
+}
+
+.song-card-result-art {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm, 6px);
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--color-surface-hover, #252525);
+}
+
+.song-card-result-art--empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted, #6b7280);
+  font-size: 0.7rem;
+}
+
+.song-card-result-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.song-card-result-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text, #ffffff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.song-card-result-artist {
+  font-size: 0.68rem;
+  color: var(--color-text-muted, #6b7280);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Acciones del editor ── */
+.song-card-editor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.song-card-cancel-btn,
+.song-card-remove-btn {
+  all: unset;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.song-card-cancel-btn {
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+.song-card-cancel-btn:hover:not(:disabled) {
+  background: var(--overlay-bg, rgba(255, 255, 255, 0.08));
+  color: var(--color-text, #ffffff);
+}
+
+.song-card-remove-btn {
+  color: #ef4444;
+}
+
+.song-card-remove-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.song-card-cancel-btn:disabled,
+.song-card-remove-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

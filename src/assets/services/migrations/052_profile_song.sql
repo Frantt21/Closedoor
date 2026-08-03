@@ -1,0 +1,24 @@
+-- ==============================================
+-- Migration 052: Canción del perfil (profile song)
+-- ==============================================
+-- Almacena la canción que el usuario fija en su perfil (card con disco animado
+-- en el sidebar, preview de 30s vía iTunes Search / Deezer).
+--
+-- Formato JSONB (unificado entre proveedores):
+--   {
+--     "provider":    "itunes" | "deezer",
+--     "trackId":     "id del track en el proveedor",
+--     "title":       "nombre del tema",
+--     "artist":      "artista",
+--     "album":       "álbum",
+--     "artwork":     "URL del arte del álbum",
+--     "previewUrl":  "URL del preview de 30s",
+--     "externalUrl": "URL del track en el proveedor",
+--     "duration":    "duración en segundos (matcheo del stream)",
+--     "streamable":  "true si el server yt-dlp puede resolverla"
+--   }
+--
+-- NULL = sin canción fijada.
+-- ==============================================
+
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS song JSONB DEFAULT NULL;

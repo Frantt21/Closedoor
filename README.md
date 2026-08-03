@@ -196,6 +196,8 @@ Alternativamente, se admiten los siguientes nombres de variables:
 | `VITE_SUPABASE_ANON_KEY` | Clave anonima/publica de Supabase |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Clave publicable de Supabase (nomenclatura alternativa) |
 | `VITE_SUPABASE_PUBLIC_KEY` | Clave publica de Supabase (nomenclatura alternativa) |
+| `YTDLP_BIN` | Ruta del binario de `yt-dlp` (solo server self-hosted, default `yt-dlp`) |
+| `FFMPEG_BIN` | Ruta del binario de `ffmpeg` (solo server self-hosted, default `ffmpeg`) |
 
 ---
 
@@ -207,6 +209,41 @@ Alternativamente, se admiten los siguientes nombres de variables:
 | `npm run build` | Genera la build de produccion |
 | `npm run lint` | Ejecuta el analisis estatico con ESLint |
 | `npm run preview` | Vista previa de la build de produccion |
+
+---
+
+## Servidor de musica (streaming con yt-dlp)
+
+La card "Mi cancion" del perfil reproduce la cancion completa cuando el server self-hosted tiene **yt-dlp** y **ffmpeg** instalados; si no, degrada automaticamente a los previews de 30s de iTunes/Deezer.
+
+Arquitectura:
+- **Metadatos**: búsqueda en Deezer (titulo, artista, album, portada y duracion).
+- **Stream**: yt-dlp busca en YouTube `ytsearch:"artista - titulo"`, elige el candidato por similitud de titulo + duracion y resuelve la URL de audio directa (m4a preferido).
+- **Servido**: las URLs de YouTube expiran y estan ligadas a la IP del server, asi que se proxian con soporte de Range; los formatos no reproducibles en todos los navegadores (webm/opus) se transcodifican a m4a con ffmpeg en streaming.
+
+Endpoints (solo `server.js`, NO funcionan en Vercel serverless):
+
+| Endpoint | Descripcion |
+|---|---|
+| `GET /api/music/search?q=...` | Busqueda combinada Deezer + flag `stream` |
+| `GET /api/music/stream?artist=...&title=...&duration=...` | Stream completo (proxy Range / transcode) |
+| `GET /api/music/health` | Estado de los binarios (yt-dlp/ffmpeg) |
+
+Instalacion en el server:
+
+```bash
+# yt-dlp (binario oficial standalone o pip)
+curl -L -o /usr/local/bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp
+chmod +x /usr/local/bin/yt-dlp
+# o: python3 -m pip install yt-dlp
+
+# ffmpeg (requerido para extraccion/transcode)
+apt install -y ffmpeg   # o el gestor de paquetes de tu distro
+```
+
+> ⚠️ **Version minima de yt-dlp: 2024.08.06+** (el servidor usa el flag `--js-runtimes node` para extraer algunos formatos sin warnings). Verifica con `yt-dlp --version`; si es mas antigua, actualizalo o el stream fallara en canciones que requieran JS runtime.
+
+> ⚠️ **Legal/ToS**: el uso de yt-dlp con YouTube va contra los terminos de servicio de YouTube y puede haber implicaciones de copyright. Es responsabilidad del operador del server. El frontend no depende de esto: si el server no responde, la app sigue usando los previews de 30s.
 
 ---
 
