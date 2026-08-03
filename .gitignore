@@ -26,3 +26,5 @@ dist-ssr
 /cdn-server
 /.freebuff
 nul
+TERMUX_SETUP.md
+music-server.zip

@@ -455,6 +455,22 @@ app.get('/api/music-search', async (req, res) => {
 // ── Música: stream completo vía yt-dlp + ffmpeg ──
 // ⚠️ Solo server self-hosted (Vercel serverless no puede correr yt-dlp).
 // Requiere yt-dlp y ffmpeg instalados; configurables con YTDLP_BIN/FFMPEG_BIN.
+//
+// CORS para /api/music: el server puede exponerse vía túnel (Termux + ngrok/
+// cloudflared) y el app desplegado lo consume cross-origin. El API no usa
+// cookies → `*` es seguro. OPTIONS responde al preflight que genera el header
+// custom `ngrok-skip-browser-warning` en las peticiones fetch.
+app.use('/api/music', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range, ngrok-skip-browser-warning');
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+  next();
+});
+
 app.get('/api/music/health', async (req, res) => {
   res.status(200).json(await getMusicHealth());
 });

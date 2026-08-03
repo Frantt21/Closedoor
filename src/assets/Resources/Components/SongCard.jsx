@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { FaMusic, FaPlay, FaPause, FaPencilAlt, FaTrash, FaSearch, FaSpinner } from 'react-icons/fa';
 import { useI18n } from '../../services/i18n/useI18n';
 import { useAuth } from '../../../hooks/useAuth';
-import { searchMusic, resolvePreviewUrl, getStreamUrl } from '../../services/musicService';
+import { searchMusic, resolvePreviewUrl, getStreamUrl, getStreamHealth } from '../../services/musicService';
 import { updateUserProfile } from '../../services/userService';
 import { toast } from 'react-toastify';
 import './css/songCard.css';
@@ -43,6 +43,17 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
   const [duration, setDuration] = useState(songObj?.duration || 0);
   // true cuando el stream completo falló y hay que caer al preview de 30s
   const [usePreview, setUsePreview] = useState(false);
+  // ¿El server de stream (yt-dlp) está disponible? Gate: si solo corre vite
+  // (sin server.js), reproducir directamente el preview de 30s y evitar
+  // intentar una URL de stream que devolvería 502 / "no supported source".
+  const [streamHealthy, setStreamHealthy] = useState(false);
+  // Fallback para túneles free (ngrok): el <audio> no puede mandar headers y
+  // el interstitial de ngrok rompe la carga directa → se baja el stream con
+  // fetch + header de bypass y se reproduce desde un blob local.
+  const [blobSrc, setBlobSrc] = useState(null);
+  const [blobFailed, setBlobFailed] = useState(false);
+  const blobUrlRef = useRef(null);
+  const blobForRef = useRef(''); // sig de la canción para la que se descarga el blob
   const [progress, setProgress] = useState(0);
   // URL de preview resuelta con la sig de la canción a la que pertenece
   // (los previews de Deezer expiran ≈ 15 min → se re-consultan al reproducir)
@@ -52,9 +63,20 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
   // ── Sync cuando cambia el song del perfil (realtime / navegación) ──
   const songSig = songObj ? `${songObj.provider}:${songObj.trackId}` : '';
   const prevSigRef = useRef(songSig);
+  const revokeBlob = () => {
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+  };
+
   useEffect(() => {
     if (prevSigRef.current === songSig) return;
     prevSigRef.current = songSig;
+    revokeBlob();
+    blobForRef.current = ''; // invalida cualquier descarga de blob en vuelo
+    setBlobSrc(null);
+    setBlobFailed(false);
     setSelected(songObj || null);
     setPlaying(false);
     setCurrentTime(0);
@@ -98,21 +120,42 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
 
+  // Health del server de stream (una vez; getStreamHealth cachea 5 min)
+  useEffect(() => {
+    let cancelled = false;
+    getStreamHealth().then((h) => {
+      if (!cancelled) setStreamHealthy(!!h);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Pausar al desmontar (el <audio> siempre está montado → el ref es estable)
   useEffect(() => {
     const audio = audioRef.current;
     return () => {
       if (audio) audio.pause();
+      revokeBlob();
     };
   }, []);
 
   // Perfil ajeno sin canción → no mostrar la card
   if (!isOwnProfile && !selected) return null;
 
-  // ── Fuente de reproducción: stream completo (yt-dlp) si existe, con
-  //    fallback al preview de 30s cuando el server de stream no está o falla ──
-  const streamUrl = getStreamUrl(selected);
-  const playbackSrc = usePreview || !streamUrl ? effectivePreviewSrc : streamUrl;
+  // ── Fuente de reproducción: stream completo (yt-dlp) SOLO si el server
+  //    está disponible (health OK); si no, preview de 30s directamente ──
+  const streamUrl = streamHealthy ? getStreamUrl(selected) : null;
+  const isRemoteStream = !!streamUrl && (() => {
+    try {
+      return new URL(streamUrl, window.location.href).origin !== window.location.origin;
+    } catch {
+      return false;
+    }
+  })();
+  const playbackSrc = usePreview
+    ? effectivePreviewSrc
+    : (blobSrc || streamUrl || effectivePreviewSrc);
 
   const togglePlay = () => {
     const audio = audioRef.current;
@@ -373,10 +416,45 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
           setCurrentTime(0);
         }}
         onError={() => {
-          // Si el stream completo no se pudo cargar (server caído / sin match
-          // en YouTube), caer al preview de 30s (que puede tardar un instante
-          // en resolverse en Deezer).
-          if (streamUrl && !usePreview) setUsePreview(true);
+          // El stream directo no cargó. Dos causas típicas:
+          //  1) Túnel free tipo ngrok: devuelve el interstitial HTML y el
+          //     <audio> no puede mandar el header de bypass → bajar el stream
+          //     con fetch + header y reproducir desde un blob local (una vez
+          //     por canción).
+          //  2) Server caído / sin match en YouTube → caer al preview de 30s.
+          if (streamUrl && !usePreview && !blobFailed) {
+            if (isRemoteStream) {
+              setBlobFailed(true);
+              blobForRef.current = selSig; // canción para la que se descarga
+              fetch(streamUrl, { headers: { 'ngrok-skip-browser-warning': '1' } })
+                .then((r) => {
+                  if (!r.ok) throw new Error(`stream fetch ${r.status}`);
+                  const ct = r.headers.get('content-type') || '';
+                  // ngrok puede devolver 200 con el interstitial HTML → filtrar
+                  if (!/audio|octet-stream/i.test(ct)) throw new Error('not audio');
+                  return r.blob();
+                })
+                .then((blob) => {
+                  // La canción cambió mientras se descargaba → descartar
+                  if (blobForRef.current !== selSig) return;
+                  if (!blob.size) throw new Error('empty stream');
+                  const url = URL.createObjectURL(blob);
+                  revokeBlob();
+                  blobUrlRef.current = url;
+                  setBlobSrc(url);
+                  const a = audioRef.current;
+                  if (a) a.play().catch(() => {});
+                })
+                .catch(() => {
+                  if (blobForRef.current === selSig) setUsePreview(true);
+                });
+              return;
+            }
+            setUsePreview(true);
+            return;
+          }
+          // Ya sin opciones (blob/preview fallido) → no reintentar en bucle.
+          setUsePreview(true);
         }}
       />
     </div>

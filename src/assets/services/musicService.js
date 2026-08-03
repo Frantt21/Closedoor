@@ -15,8 +15,17 @@
 
 // API de streaming del server self-hosted (yt-dlp + ffmpeg).
 // Si no está disponible (Vercel / server apagado), el flujo cae a previews de 30s.
-const MUSIC_API = '/api/music';
+// Por defecto same-origin (/api/music, proxied a server.js en dev). Para
+// apuntar a un server remoto expuesto por túnel (Termux + ngrok/cloudflared),
+// define VITE_MUSIC_API_URL (p. ej. https://tu-tunel.ngrok-free.app/api/music)
+// en el build del app.
+const MUSIC_API = (import.meta.env.VITE_MUSIC_API_URL || '/api/music').replace(/\/+$/, '');
 const ITUNES_SEARCH_URL = 'https://itunes.apple.com/search';
+
+// Header para saltarse el interstitial de ngrok free en peticiones fetch
+// (inofensivo con otros túneles o el server local; no va en <audio>, que se
+// resuelve con fetch+blob en SongCard cuando el túnel lo requiere).
+const TUNNEL_HEADERS = { 'ngrok-skip-browser-warning': '1' };
 
 /** Escala la URL de arte de iTunes (ej. 100x100bb.jpg → 600x600bb.jpg). */
 function upscaleArtwork(url, size = 600) {
@@ -89,7 +98,10 @@ export async function getStreamHealth() {
     return streamHealthCache.data;
   }
   try {
-    const res = await fetch(`${MUSIC_API}/health`, { signal: AbortSignal.timeout(4000) });
+    const res = await fetch(`${MUSIC_API}/health`, {
+      headers: TUNNEL_HEADERS,
+      signal: AbortSignal.timeout(4000),
+    });
     const data = await res.json().catch(() => null);
     streamHealthCache = { at: Date.now(), data: data?.ok ? data : null };
     return streamHealthCache.data;
@@ -117,6 +129,7 @@ export async function searchMusic(query, { limit = 10 } = {}) {
   // 0) Server combinado (solo si responde; falla rápido si no está)
   try {
     const res = await fetch(`${MUSIC_API}/search?q=${encodeURIComponent(q)}&limit=${limit}`, {
+      headers: TUNNEL_HEADERS,
       signal: AbortSignal.timeout(6000),
     });
     if (res.ok) {

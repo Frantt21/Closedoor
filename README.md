@@ -229,6 +229,74 @@ Endpoints (solo `server.js`, NO funcionan en Vercel serverless):
 | `GET /api/music/stream?artist=...&title=...&duration=...` | Stream completo (proxy Range / transcode) |
 | `GET /api/music/health` | Estado de los binarios (yt-dlp/ffmpeg) |
 
+**Dev (2 terminales):** el dev server de vite (`npm run dev`) proxifica
+`/api/music/*` a `http://localhost:3000`, asi que para probar el streaming
+completo hay que levantar tambien el server:
+
+```bash
+# Terminal 1 — API + streaming (server.js)
+npm run start
+
+# Terminal 2 — frontend
+npm run dev
+```
+
+Si `npm run start` no esta corriendo, el frontend **degrada solo a los
+previews de 30s** (iTunes directo funciona en dev sin server): busca bien y
+reproduce previews, solo que no usa yt-dlp. El server auto-detecta yt-dlp en
+`~/.local/bin/yt-dlp` y respeta `YTDLP_BIN` si lo defines.
+
+### Server remoto en Termux (Android) + tunel
+
+> 📱 Guia completa paso a paso: **[TERMUX_SETUP.md](./TERMUX_SETUP.md)**
+
+> ⚡ Para Termux **no hace falta todo el repo**: hay un server standalone sin
+> dependencias, **`music-server.js`** (3 archivos, sin npm ni build, solo los
+> endpoints de musica). Es la via recomendada — ver TERMUX_SETUP.md.
+
+El server self-hosted corre bien en **Termux** (telefono dedicado), y se puede
+hacer accesible al app desplegado via **ngrok** o **cloudflared**:
+
+```bash
+# En Termux (instalar Termux desde F-Droid/GitHub, NO Google Play)
+pkg update && pkg upgrade -y
+pkg install python nodejs ffmpeg -y
+
+# yt-dlp: binario standalone (mas fiable que pip en Termux; necesita python3,
+# que ya esta instalado). El server usa --js-runtimes node, asi que NO hace
+# falta el extra "[default]" (yt-dlp-ejs).
+curl -L -o $PREFIX/bin/yt-dlp https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp
+chmod +x $PREFIX/bin/yt-dlp
+yt-dlp --version
+
+# Alternativa por pip (si prefieres): python -m pip install -U yt-dlp
+cd FastChange && npm install
+
+# Mantener vivo el proceso (Android mata los procesos en segundo plano):
+# desliza la notificacion de Termux → "Acquire wakelock"
+
+# Tunel (elige uno)
+ngrok http 3000            # ⚠️ free: el interstitial rompe el <audio> directo
+cloudflared tunnel --url http://localhost:3000   # ✅ sin interstitial
+```
+
+Y en el build del app (Vercel) define la variable:
+
+```
+VITE_MUSIC_API_URL=https://TU-TUNEL.trycloudflare.com/api/music
+```
+
+El frontend usara ese server para buscar (Deezer), health y stream; si el tunel
+cae, degrada a previews de 30s. Notas:
+- **ngrok free**: el interstitial rompe las peticiones del navegador; los
+  `fetch` llevan el header `ngrok-skip-browser-warning` y el `<audio>` usa un
+  fallback fetch+blob, asi que funciona, pero la URL dev-domain es persistente
+  por cuenta. **cloudflared** no tiene interstitial y es lo mas simple.
+- El stream NO debe pasar por Vercel (timeout de funciones cortaria una cancion
+  completa): `VITE_MUSIC_API_URL` hace que el app llame al tunel directamente.
+- El server responde CORS `*` en `/api/music` y auto-detecta yt-dlp en
+  `~/.local/bin/yt-dlp` o en el PATH de Termux.
+
 Instalacion en el server:
 
 ```bash

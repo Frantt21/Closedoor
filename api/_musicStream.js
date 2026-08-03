@@ -18,11 +18,18 @@
  */
 
 import { spawn } from 'child_process';
+import { existsSync } from 'fs';
 import http from 'http';
 import https from 'https';
+import { homedir } from 'os';
+import { join } from 'path';
 import { searchMusicServer } from './_music.js';
 
-const YTDLP_BIN = process.env.YTDLP_BIN || 'yt-dlp';
+// yt-dlp: se respeta YTDLP_BIN, si no se auto-detecta el binario standalone
+// común de `~/.local/bin/yt-dlp` (instalación típica local sin sudo) y como
+// último recurso se busca en el PATH.
+const localYtDlp = join(homedir(), '.local', 'bin', 'yt-dlp');
+const YTDLP_BIN = process.env.YTDLP_BIN || (existsSync(localYtDlp) ? localYtDlp : 'yt-dlp');
 const FFMPEG_BIN = process.env.FFMPEG_BIN || 'ffmpeg';
 const UA =
   'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
