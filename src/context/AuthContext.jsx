@@ -17,7 +17,7 @@ import { clearDecryptedCache } from '../assets/services/alphabetEncryption';
 import { clearBlockedListsCache } from '../assets/services/blockService';
 import { clearCachedFollowCounts } from '../assets/services/followService';
 import { initPresence, disposePresence } from '../assets/services/presenceService';
-import { getItem } from '../assets/services/secureStorage';
+import { getItem, waitForKeyReady } from '../assets/services/secureStorage';
 
 export const AuthContext = createContext();
 
@@ -53,6 +53,10 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
+        // Esperar a que la clave maestra esté cargada (IndexedDB/memoria)
+        // para poder descifrar la sesión de forma fiable.
+        await waitForKeyReady();
+
         // Get current session
         const {
           data: { session },

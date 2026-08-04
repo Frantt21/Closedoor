@@ -5,6 +5,7 @@ import ogTagsPlugin from './plugins/ogTagsPlugin'
 import livekitTokenPlugin from './plugins/livekitTokenPlugin'
 import preloadRouteChunks from './plugins/preloadRouteChunks'
 import inlineCssPlugin from './plugins/inlineCssPlugin'
+import { cspPlugin } from './plugins/cspPlugin'
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -57,6 +58,7 @@ export default defineConfig({
     livekitTokenPlugin(),
     preloadRouteChunks(),
     inlineCssPlugin(),
+    cspPlugin(),
     react(),
     babel({ presets: [reactCompilerPreset()] })
   ],

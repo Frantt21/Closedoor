@@ -320,8 +320,13 @@ function testCacheSecurity() {
     { label: 'XOR key de 32 bytes', pattern: 'new Uint8Array(32)' },
     { label: 'Almacenamiento cifrado en localStorage', pattern: 'localStorage.setItem' },
     { label: 'Prefijo para sessionStorage', pattern: "SESSION_STORAGE_PREFIX = '_ss'" },
-    { label: 'GetItem con decrypt', pattern: 'decrypt(raw)' },
-    { label: 'SetItem con encrypt', pattern: 'encrypt(value)' },
+    { label: 'GetItem con decrypt', pattern: 'decrypt(raw, entryName)' },
+    { label: 'SetItem con encrypt', pattern: 'encrypt(value, entryName)' },
+    { label: 'Clave maestra envuelta en IDB (no cruda)', pattern: 'idbSet(WRAP_KEY_RECORD' },
+    { label: 'Wrap key NO extraíble (Web Crypto)', pattern: 'non-extractable' },
+    { label: 'Blob cifrado de la clave (AES-GCM)', pattern: 'wrapMasterKey' },
+    { label: 'Migración borra clave cruda legacy', pattern: 'idbDelete(KEY_RECORD' },
+    { label: 'Salt aleatorio por entrada', pattern: 'crypto.getRandomValues(new Uint8Array(16))' },
     { label: 'Limpieza de fc_* legacy', pattern: "startsWith('fc_')" },
   ];
 
@@ -339,6 +344,71 @@ function testCacheSecurity() {
 }
 
 // ============================================
+// 6. TEST: CSP + superficie XSS
+// ============================================
+function testWebSecurity() {
+  console.log('\n═══════════════════════════════════════');
+  console.log('  6. 🌐 Web — CSP y superficie XSS');
+  console.log('═══════════════════════════════════════\n');
+
+  const root = path.resolve(__dirname, '..');
+  const cspPluginPath = path.join(root, 'plugins', 'cspPlugin.js');
+  const cspPlugin = fs.existsSync(cspPluginPath) ? fs.readFileSync(cspPluginPath, 'utf-8') : '';
+  const vercelPath = path.join(root, 'vercel.json');
+  const vercelJson = fs.existsSync(vercelPath) ? fs.readFileSync(vercelPath, 'utf-8') : '';
+  const supabaseClientPath = path.join(root, 'src', 'assets', 'services', 'supabaseclient.js');
+  const supabaseClient = fs.existsSync(supabaseClientPath) ? fs.readFileSync(supabaseClientPath, 'utf-8') : '';
+
+  const checks = [
+    { label: 'Plugin CSP existe', pattern: "name: 'inject-csp'", file: cspPlugin },
+    { label: 'CSP solo en build (no rompe dev HMR)', pattern: "apply: 'build'", file: cspPlugin },
+    { label: 'script-src SIN unsafe-eval/inline', pattern: "script-src 'self' https://challenges.cloudflare.com", file: cspPlugin },
+    { label: 'connect-src cubre túneles música (ngrok)', pattern: '*.ngrok-free.app', file: cspPlugin },
+    { label: 'connect-src cubre cloudflared', pattern: '*.trycloudflare.com', file: cspPlugin },
+    { label: 'connect-src cubre LiveKit', pattern: '*.livekit.cloud', file: cspPlugin },
+    { label: 'connect-src cubre Supabase Realtime (wss)', pattern: 'wss://', file: cspPlugin },
+    { label: 'frame-src cubre Turnstile', pattern: 'https://challenges.cloudflare.com', file: cspPlugin },
+    { label: 'object-src none (bloquea plugins/flash)', pattern: "object-src 'none'", file: cspPlugin },
+    { label: 'CSP en vercel.json (HTTP header)', pattern: 'Content-Security-Policy', file: vercelJson },
+    { label: 'X-Frame-Options DENY (anti clickjacking)', pattern: 'X-Frame-Options', file: vercelJson },
+    { label: 'X-Content-Type-Options nosniff', pattern: 'X-Content-Type-Options', file: vercelJson },
+    { label: 'Referrer-Policy strict', pattern: 'strict-origin-when-cross-origin', file: vercelJson },
+    { label: '__supabase SOLO en DEV (import.meta.env.DEV)', pattern: 'import.meta.env.DEV', file: supabaseClient },
+  ];
+
+  let pass = 0, fail = 0;
+  for (const check of checks) {
+    if (check.file.includes(check.pattern)) {
+      console.log(`✅ ${check.label}`);
+      pass++;
+    } else {
+      console.log(`⚠️  ${check.label}: no encontrado`);
+      fail++;
+    }
+  }
+
+  // Check NEGATIVO: la directiva script-src del CÓDIGO no debe contener
+  // unsafe-eval/unsafe-inline. (style-src sí usa unsafe-inline — obligatorio —
+  // pero script-src no.) Se extrae la línea literal del array (con comillas)
+  // para no capturar comentarios del archivo que mencionen esos tokens.
+  const scriptSrcLine = cspPlugin.split('\n').find((l) => l.includes('"script-src'));
+  if (
+    scriptSrcLine &&
+    !scriptSrcLine.includes("'unsafe-eval'") &&
+    !scriptSrcLine.includes("'unsafe-inline'") &&
+    scriptSrcLine.includes("https://challenges.cloudflare.com")
+  ) {
+    console.log('✅ script-src sin unsafe-eval ni unsafe-inline (check negativo)');
+    pass++;
+  } else {
+    console.log('⚠️  script-src contiene unsafe-eval o unsafe-inline (¡NO permitido!)');
+    fail++;
+  }
+
+  return { pass, fail };
+}
+
+// ============================================
 // MAIN
 // ============================================
 console.log('\n▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓');
@@ -351,6 +421,7 @@ results.sql = await testSQLInjection();
 results.xss = testXSS();
 results.auth = testAuthValidation();
 results.cache = testCacheSecurity();
+results.web = testWebSecurity();
 
 // ============================================
 // RESUMEN

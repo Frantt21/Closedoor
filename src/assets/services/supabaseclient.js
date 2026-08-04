@@ -83,7 +83,11 @@ export const dbPublic = {
   },
 };
 
-// Expuesto globalmente para pruebas de seguridad desde DevTools
-if (typeof window !== 'undefined') {
+// Exposición global SOLO en desarrollo para pruebas de seguridad desde
+// DevTools. En producción NO se expone: cualquier script inyectado (XSS)
+// podría llamar __supabase.auth.getSession() y leer el token en claro,
+// anulando el cifrado del storage. Para auditar producción usa
+// scripts/test-security-full.mjs (usa su propio cliente, sin global).
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
   window.__supabase = supabase;
 }
