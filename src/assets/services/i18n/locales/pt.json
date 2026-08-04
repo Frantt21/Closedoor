@@ -2,6 +2,8 @@
   "app.name": "FastChange",
   "app.tagline": "Compartilhe e descubra",
   "auth.email": "E-mail",
+  "auth.email_invalid": "Digite um e-mail válido",
+  "auth.email_domain_not_allowed": "Apenas e-mails do Gmail, Outlook, Yahoo, Proton e iCloud são permitidos",
   "auth.fill_fields": "Preencha todos os campos",
   "auth.has_account": "Já tem uma conta?",
   "auth.hide_password": "Ocultar senha",

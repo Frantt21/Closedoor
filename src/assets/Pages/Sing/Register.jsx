@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../services/i18n/useI18n';
 import usePageTitle from '../../../hooks/usePageTitle';
-import { USERNAME_MIN, USERNAME_MAX, DISPLAYNAME_MAX } from '../../services/userService';
+import { USERNAME_MIN, USERNAME_MAX, DISPLAYNAME_MAX, validateEmail } from '../../services/userService';
 import { FaEye, FaEyeSlash, FaDiscord } from 'react-icons/fa';
 import TurnstileCaptcha, { isTurnstileActive } from '../../Resources/Components/TurnstileCaptcha';
 import '../../Resources/Styles/login.css';
@@ -43,6 +43,19 @@ function Register() {
 
     if (password.length < 6) {
       setError(t('auth.password_length'));
+      setLoading(false);
+      return;
+    }
+
+    // Email: formato válido y proveedor permitido (Gmail, Outlook, Yahoo, Proton, iCloud)
+    const emailErr = validateEmail(email);
+    if (emailErr === 'invalid') {
+      setError(t('auth.email_invalid'));
+      setLoading(false);
+      return;
+    }
+    if (emailErr === 'domain') {
+      setError(t('auth.email_domain_not_allowed'));
       setLoading(false);
       return;
     }

@@ -5,6 +5,7 @@ import { useI18n } from '../../services/i18n/useI18n';
 import usePageTitle from '../../../hooks/usePageTitle';
 import { FaEye, FaEyeSlash, FaDiscord } from 'react-icons/fa';
 import TurnstileCaptcha, { isTurnstileActive } from '../../Resources/Components/TurnstileCaptcha';
+import { validateEmail } from '../../services/userService';
 import '../../Resources/Styles/login.css';
 
 // Tiempo mínimo que el loader del botón se muestra (evita saltos bruscos
@@ -33,6 +34,17 @@ function Login() {
 
     if (!emailOrUsername || !password) {
       setError(t('auth.fill_fields'));
+      setLoading(false);
+      return;
+    }
+
+    // Si el input es un email (contiene @), validar SOLO el formato.
+    // ⚠️ No se bloquea el dominio en el login: hay cuentas legacy registradas
+    // antes de la whitelist (la verificación de email estaba deshabilitada)
+    // con dominios fuera de la lista — bloquearlas las dejaría fuera.
+    // La restricción de dominio se aplica en el REGISTRO.
+    if (emailOrUsername.includes('@') && validateEmail(emailOrUsername) === 'invalid') {
+      setError(t('auth.email_invalid'));
       setLoading(false);
       return;
     }

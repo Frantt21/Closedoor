@@ -19,6 +19,7 @@ import { clearCachedFollowCounts } from '../assets/services/followService';
 import { initPresence, disposePresence } from '../assets/services/presenceService';
 import { getItem, waitForKeyReady } from '../assets/services/secureStorage';
 import { PROFILE_PUBLIC_COLUMNS } from '../assets/services/userService';
+import { validateEmail } from '../assets/services/userService';
 
 export const AuthContext = createContext();
 
@@ -353,6 +354,15 @@ export function AuthProvider({ children }) {
       setError(null);
       let email = emailOrUsername;
 
+      // Defensa en profundidad: si el input es un email, validar SOLO formato.
+      // ⚠️ El dominio NO se bloquea en login (cuentas legacy registradas antes
+      // de la whitelist con otros dominios podrían quedar fuera).
+      if (emailOrUsername.includes('@') && validateEmail(emailOrUsername) === 'invalid') {
+        const err = 'Enter a valid email address';
+        setError(err);
+        return { success: false, error: err };
+      }
+
       // If input doesn't contain @, treat it as username and fetch email
       if (!emailOrUsername.includes('@')) {
         const foundEmail = await getEmailByUsername(emailOrUsername);
@@ -415,6 +425,20 @@ export function AuthProvider({ children }) {
 
       if (password.length < 6) {
         const err = 'Password must be at least 6 characters';
+        setError(err);
+        return { success: false, error: err };
+      }
+
+      // Defensa en profundidad: validar formato y proveedor del email
+      // (Gmail, Outlook, Yahoo, Proton, iCloud) antes de contactar a Supabase.
+      const emailErr = validateEmail(email);
+      if (emailErr === 'invalid') {
+        const err = 'Enter a valid email address';
+        setError(err);
+        return { success: false, error: err };
+      }
+      if (emailErr === 'domain') {
+        const err = 'Only emails from Gmail, Outlook, Yahoo, Proton and iCloud are allowed';
         setError(err);
         return { success: false, error: err };
       }

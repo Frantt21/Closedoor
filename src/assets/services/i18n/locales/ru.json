@@ -2,6 +2,8 @@
   "app.name": "FastChange",
   "app.tagline": "Делитесь и открывайте",
   "auth.email": "Эл. почта",
+  "auth.email_invalid": "Введите корректный email",
+  "auth.email_domain_not_allowed": "Разрешены только почты Gmail, Outlook, Yahoo, Proton и iCloud",
   "auth.fill_fields": "Пожалуйста, заполните все поля",
   "auth.has_account": "Уже есть аккаунт?",
   "auth.hide_password": "Скрыть пароль",

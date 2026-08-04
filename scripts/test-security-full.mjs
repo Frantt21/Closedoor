@@ -18,14 +18,39 @@ import { fileURLToPath } from 'url';
 // Sanitización REAL del app (helpers.js) — el test verifica el comportamiento
 // real de producción, no una simulación local que puede divergir.
 import { sanitizeContent, sanitizeUrl } from '../src/assets/services/helpers.js';
+// Validación de email REAL del app (emailValidation.js — módulo puro sin
+// dependencias browser-only, re-exportado por userService.js).
+import { validateEmail } from '../src/assets/services/emailValidation.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const envPath = path.resolve(__dirname, '..', '.env.local');
-const envContent = fs.readFileSync(envPath, 'utf-8');
 
-const SUPABASE_URL = envContent.match(/VITE_SUPABASE_URL=(.+)/)?.[1]?.trim() || '';
-const SUPABASE_KEY = envContent.match(/VITE_SUPABASE_ANON_KEY=(.+)/)?.[1]?.trim()
-  || envContent.match(/VITE_SUPABASE_PUBLISHABLE_KEY=(.+)/)?.[1]?.trim() || '';
+// Credenciales: prioridad a env vars de CI (GitHub Secrets), fallback a .env.local.
+const envPath = path.resolve(__dirname, '..', '.env.local');
+let envContent = '';
+try {
+  envContent = fs.readFileSync(envPath, 'utf-8');
+} catch {
+  // CI sin .env.local — se usan process.env
+}
+
+// Orden de prioridad SIEMPRE: env vars (CI) primero, luego .env.local.
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL
+  || process.env.VITE_SUPABASE_DATA_API_URL
+  || envContent.match(/VITE_SUPABASE_URL=(.+)/)?.[1]?.trim()
+  || '';
+const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY
+  || process.env.VITE_SUPABASE_PUBLISHABLE_KEY
+  || envContent.match(/VITE_SUPABASE_ANON_KEY=(.+)/)?.[1]?.trim()
+  || envContent.match(/VITE_SUPABASE_PUBLISHABLE_KEY=(.+)/)?.[1]?.trim()
+  || '';
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.error('\n❌ Faltan credenciales de Supabase. En CI configura los secrets');
+  console.error('   VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY (Settings → Secrets → Actions).');
+  console.error('   Local: usa el .env.local existente.\n');
+  process.exitCode = 1;
+  throw new Error('Missing Supabase credentials');
+}
 
 const { createClient } = await import('@supabase/supabase-js');
 
@@ -265,8 +290,26 @@ function testAuthValidation() {
     { label: 'Username solo letras/num/_', username: 'user_name123', expect: true },
     { label: 'Username < 3 chars', username: 'ab', expect: false },
     { label: 'Username >= 3 chars', username: 'abc', expect: true },
+    // Email — whitelist REAL de proveedores (validateEmail de userService.js)
     { label: 'Email vacío', email: '', expect: false },
-    { label: 'Email válido', email: 'test@test.com', expect: true },
+    { label: 'Email sin formato', email: 'notanemail', expect: false },
+    { label: 'Email sin dominio (user@)', email: 'user@', expect: false },
+    { label: 'Email con dominio no permitido (temp)', email: 'user@tempmail.com', expect: false },
+    { label: 'Email con dominio inventado', email: 'user@test.com', expect: false },
+    { label: 'Gmail permitido', email: 'user@gmail.com', expect: true },
+    { label: 'Gmail con mayúsculas (case-insensitive)', email: 'User@GMAIL.COM', expect: true },
+    { label: 'Plus-addressing Gmail (user+tag@gmail.com)', email: 'user+tag@gmail.com', expect: true },
+    { label: 'Outlook permitido', email: 'user@outlook.com', expect: true },
+    { label: 'Outlook regional (outlook.es)', email: 'user@outlook.es', expect: true },
+    { label: 'Outlook regional (outlook.com.ar)', email: 'user@outlook.com.ar', expect: true },
+    { label: 'Hotmail permitido', email: 'user@hotmail.com', expect: true },
+    { label: 'Hotmail regional (hotmail.es)', email: 'user@hotmail.es', expect: true },
+    { label: 'Live regional (live.com.ar)', email: 'user@live.com.ar', expect: true },
+    { label: 'Yahoo permitido', email: 'user@yahoo.com', expect: true },
+    { label: 'Yahoo regional (yahoo.co.uk)', email: 'user@yahoo.co.uk', expect: true },
+    { label: 'Proton permitido', email: 'user@proton.me', expect: true },
+    { label: 'iCloud permitido', email: 'user@icloud.com', expect: true },
+    { label: 'iCloud alias (me.com) permitido', email: 'user@me.com', expect: true },
   ];
 
   let pass = 0, fail = 0;
@@ -283,7 +326,8 @@ function testAuthValidation() {
       if (tc.username.length > 20) { valid = false; reasons.push('too long'); }
     }
     if ('email' in tc) {
-      if (!tc.email) { valid = false; reasons.push('empty'); }
+      const res = validateEmail(tc.email);
+      if (res !== null) { valid = false; reasons.push(res === 'invalid' ? 'formato inválido' : `dominio no permitido (${res})`); }
     }
 
     if (valid === tc.expect) {
@@ -356,6 +400,8 @@ function testWebSecurity() {
   const supabaseClient = fs.existsSync(supabaseClientPath) ? fs.readFileSync(supabaseClientPath, 'utf-8') : '';
   const userServicePath = path.join(root, 'src', 'assets', 'services', 'userService.js');
   const userService = fs.existsSync(userServicePath) ? fs.readFileSync(userServicePath, 'utf-8') : '';
+  const loginPath = path.join(root, 'src', 'assets', 'Pages', 'Sing', 'Login.jsx');
+  const loginContent = fs.existsSync(loginPath) ? fs.readFileSync(loginPath, 'utf-8') : '';
   const serverPath = path.join(root, 'server.js');
   const serverContent = fs.existsSync(serverPath) ? fs.readFileSync(serverPath, 'utf-8') : '';
 
@@ -378,6 +424,7 @@ function testWebSecurity() {
     { label: 'getEmailByUsername via RPC (sin SELECT email)', pattern: "rpc('get_email_by_username'", file: userService },
     { label: 'checkEmailExists via RPC (sin SELECT email)', pattern: "rpc('email_exists'", file: userService },
     { label: 'getUserProfile sin select("*") (columna email revocada)', pattern: 'PROFILE_PUBLIC_COLUMNS', file: userService },
+    { label: 'Login NO bloquea dominio (solo formato — cuentas legacy)', pattern: 'validateEmail(emailOrUsername) === \'invalid\'', file: loginContent },
   ];
 
   let pass = 0, fail = 0;
@@ -425,6 +472,16 @@ function testWebSecurity() {
     fail++;
   }
 
+  // Check NEGATIVO: el login NO debe rechazar por dominio (bloquearía cuentas
+  // legacy registradas antes de la whitelist con dominios fuera de la lista).
+  if (loginContent.includes('email_domain_not_allowed')) {
+    console.log('⚠️  Login usa el error de dominio — cuentas legacy quedarían fuera (¡NO permitido!)');
+    fail++;
+  } else {
+    console.log('✅ Login solo valida formato de email (sin bloqueo por dominio)');
+    pass++;
+  }
+
   return { pass, fail };
 }
 
@@ -460,5 +517,11 @@ for (const [area, res] of Object.entries(results)) {
 
 const totalPct = ((total.pass / (total.pass + total.fail)) * 100).toFixed(0);
 console.log(`\n🏁  TOTAL: ${total.pass}/${total.pass + total.fail} (${totalPct}%)`);
-if (total.fail === 0) console.log('🎉  TODAS LAS PRUEBAS PASARON');
-else console.log(`⚠️  ${total.fail} PRUEBA(S) FALLARON — REVISAR`);
+if (total.fail === 0) {
+  console.log('🎉  TODAS LAS PRUEBAS PASARON');
+} else {
+  console.log(`⚠️  ${total.fail} PRUEBA(S) FALLARON — REVISAR`);
+}
+// process.exitCode (no process.exit) para que Node flushee el stdout en CI
+// y el resumen final nunca se pierda del log.
+process.exitCode = total.fail > 0 ? 1 : 0;

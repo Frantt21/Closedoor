@@ -94,6 +94,21 @@ export const PRONOUNS_MAX = 30;
 export const BIO_MAX = 80;
 export const USERNAME_RE = /^[a-zA-Z0-9_]+$/;
 
+// ── Validación de email (whitelist de proveedores) ──
+// Re-export del módulo puro emailValidation.js: cero dependencias, así la
+// lógica puede correr también en Node (test de seguridad/CI). La app usa
+// estas funciones para restringir el registro y el login a proveedores
+// conocidos (Gmail, Outlook, Yahoo, Proton, iCloud) porque la verificación
+// de email está deshabilitada en Supabase.
+export {
+  ALLOWED_EMAIL_DOMAINS,
+  ALLOWED_EMAIL_DOMAINS_LIST,
+  getEmailDomain,
+  isValidEmailFormat,
+  isAllowedEmailDomain,
+  validateEmail,
+} from './emailValidation';
+
 /**
  * Valida campos de perfil contra los límites coherentes.
  * @param {object} fields - { username, displayname, pronouns, bio }

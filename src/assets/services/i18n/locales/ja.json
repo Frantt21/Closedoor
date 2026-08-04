@@ -2,6 +2,8 @@
   "app.name": "FastChange",
   "app.tagline": "共有して発見しよう",
   "auth.email": "メールアドレス",
+  "auth.email_invalid": "有効なメールアドレスを入力してください",
+  "auth.email_domain_not_allowed": "Gmail、Outlook、Yahoo、Proton、iCloudのメールのみ許可されています",
   "auth.fill_fields": "すべての項目を入力してください",
   "auth.has_account": "すでにアカウントをお持ちですか？",
   "auth.hide_password": "パスワードを隠す",

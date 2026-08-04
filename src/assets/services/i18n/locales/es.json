@@ -2,6 +2,8 @@
   "app.name": "FastChange",
   "app.tagline": "Comparte y descubre",
   "auth.email": "Correo electrónico",
+  "auth.email_invalid": "Ingresa un correo electrónico válido",
+  "auth.email_domain_not_allowed": "Solo se permiten correos de Gmail, Outlook, Yahoo, Proton e iCloud",
   "auth.fill_fields": "Por favor completa todos los campos",
   "auth.captcha_required": "Completa el CAPTCHA para continuar",
   "auth.has_account": "¿Ya tienes cuenta?",
