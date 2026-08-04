@@ -453,6 +453,7 @@
   "profile.social_links": "Redes sociales",
   "profile.song_title": "Mi canción",
   "profile.song_add": "Agregar una canción",
+  "profile.song_loading": "Cargando…",
   "profile.song_change": "Cambiar canción",
   "profile.song_remove": "Quitar canción",
   "profile.song_search_placeholder": "Busca canción o artista...",

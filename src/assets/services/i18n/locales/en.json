@@ -463,6 +463,7 @@
   "profile.social_links": "Social links",
   "profile.song_title": "My song",
   "profile.song_add": "Add a song",
+  "profile.song_loading": "Loading…",
   "profile.song_change": "Change song",
   "profile.song_remove": "Remove song",
   "profile.song_search_placeholder": "Search song or artist...",
