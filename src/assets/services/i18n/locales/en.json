@@ -15,7 +15,7 @@
   "auth.redirecting": "Redirecting...",
   "auth.login_error": "Failed to login",
   "auth.login_link": "Log in",
-  "auth.login_placeholder": "Email, Username or Displayname",
+  "auth.login_placeholder": "Email",
   "auth.login_required": "You need to log in to do that",
   "auth.login_subtitle": "Welcome back! Enter your credentials.",
   "auth.login_title": "Log in",

@@ -15,7 +15,7 @@
   "auth.redirecting": "リダイレクト中...",
   "auth.login_error": "ログインに失敗しました",
   "auth.login_link": "ログイン",
-  "auth.login_placeholder": "メール、ユーザー名",
+  "auth.login_placeholder": "メールアドレス",
   "auth.login_required": "この操作を行うにはログインが必要です",
   "auth.login_subtitle": "おかえりなさい！認証情報を入力してください。",
   "auth.login_title": "ログイン",

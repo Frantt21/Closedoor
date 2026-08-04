@@ -98,9 +98,37 @@ async function testDB() {
       }
     },
     {
-      n: '1d', label: 'RPC get_email_by_username existe (login por username sin SELECT directo)',
+      n: '1d', label: 'RPC get_email_by_username bloqueado para anon (migración 054 — anti-scraping)',
       fn: () => supabase.rpc('get_email_by_username', { uname: 'usuario_que_no_existe_xyz' }),
-      check: (data, err) => ({ pass: !err, msg: err ? `⚠️  ${err.message}` : '✅ RPC disponible (null para username inexistente)' })
+      check: (data, err) => {
+        // Tras migración 054 el RPC exige sesión → anon recibe error de permiso.
+        // ⚠️ data === null SIN error NO es seguro: significa que anon pudo
+        // ejecutar el RPC (respondió 200 null) — la fuga persiste.
+        const blocked = !!err;
+        return blocked ? { pass: true, msg: '✅ Anon bloqueado (permiso denegado)' }
+          : { pass: false, msg: `⚠️  Anon pudo ejecutar el RPC (fuga de emails, respuesta: ${JSON.stringify(data)})` };
+      }
+    },
+    {
+      n: '1d2', label: 'RPC bump_hashtag_usage bloqueado para anon (migración 054 — no inflar trending)',
+      // ⚠️ Side-effect intencional: si la migración 054 NO está aplicada, este
+      // probe crea una fila real '__sec_test_anon__' en hashtags (demuestra el
+      // abuso). Con la migración aplicada solo recibe error y no escribe nada.
+      fn: () => supabase.rpc('bump_hashtag_usage', { p_name: '__sec_test_anon__' }),
+      check: (data, err) => {
+        const blocked = !!err;
+        return blocked ? { pass: true, msg: '✅ Anon bloqueado (no puede inflar trending)' }
+          : { pass: false, msg: '⚠️  Anon pudo inflar hashtags (¡abuso confirmado!)' };
+      }
+    },
+    {
+      n: '1d3', label: 'RPC unfollow_both_ways bloqueado para anon (migración 054 — no romper follows)',
+      fn: () => supabase.rpc('unfollow_both_ways', { blocker_id: '00000000-0000-0000-0000-000000000000', blocked_id: '00000000-0000-0000-0000-000000000000' }),
+      check: (data, err) => {
+        const blocked = !!err;
+        return blocked ? { pass: true, msg: '✅ Anon bloqueado (no puede des-followear)' }
+          : { pass: false, msg: '⚠️  Anon pudo ejecutar unfollow_both_ways (¡abuso confirmado!)' };
+      }
     },
     {
       n: '1e', label: 'RPC email_exists existe (registro sin SELECT directo)',

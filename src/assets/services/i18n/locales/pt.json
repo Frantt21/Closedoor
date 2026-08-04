@@ -15,7 +15,7 @@
   "auth.redirecting": "Redirecionando...",
   "auth.login_error": "Erro ao entrar",
   "auth.login_link": "Entre",
-  "auth.login_placeholder": "E-mail, Usuário ou Nome",
+  "auth.login_placeholder": "E-mail",
   "auth.login_required": "Você precisa fazer login para fazer isso",
   "auth.login_subtitle": "Bem-vindo de volta! Insira suas credenciais.",
   "auth.login_title": "Entrar",

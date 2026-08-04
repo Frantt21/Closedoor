@@ -146,7 +146,25 @@ texto plano:
 
 ---
 
-### 9. Whitelist de proveedores de email (registro y login)
+### 9. RPCs blindados contra anon (migración 054 — auditoría en vivo)
+
+**Problema (detectado atacando `app.foranly.space` con la anon key, sin sesión):**
+
+| RPC | Vulnerabilidad | Evidencia |
+|---|---|---|
+| `bump_hashtag_usage` | `SECURITY DEFINER` sin `REVOKE` → Supabase da `EXECUTE PUBLIC` por defecto. Cualquiera **creaba hashtags** y podía inflar el trending infinitamente | `bump('audtest_xxx')` creó el hashtag real en la DB (`use_count:1`) |
+| `unfollow_both_ways` | Idem: sin sesión, conociendo dos UUIDs **des-seguía a cualquier par de usuarios** | Respuesta `204` sin sesión |
+| `get_email_by_username` | `SECURITY DEFINER` con `GRANT` a `anon` — **fuga de emails** por enumeración de usernames | `get_email_by_username('orlndku')` → email real sin sesión |
+
+**Solución (`src/assets/services/migrations/054_secure_rpcs.sql`):**
+- `bump_hashtag_usage` → `REVOKE PUBLIC` + exige `auth.uid()` (solo usuarios logueados crean posts con hashtags).
+- `unfollow_both_ways` → `REVOKE PUBLIC` + exige `auth.uid() = blocker_id` (solo el que bloquea des-followea).
+- `get_email_by_username` → `REVOKE` de `anon`, solo `authenticated`. **El login por username deja de funcionar para anon** (trade-off aceptado para matar el scraping de emails).
+- Frontend: `AuthContext.login` ahora muestra "Login with username is no longer available — use your email address" y el placeholder de login pasó a solo "Email" en los 5 idiomas.
+
+**El test de seguridad ahora EXIGE estos bloqueos** (checks `1d`, `1d2`, `1d3`): si la migración no está aplicada, la auditoría baja de 100% y el CI bloquea el merge.
+
+### 10. Whitelist de proveedores de email (registro y login)
 
 **Problema:** como la verificación de email está deshabilitada en Supabase, cualquiera podía
 crear una cuenta con un correo falso/desechable (`user@tempmail.com`, dominios inventados, etc.).

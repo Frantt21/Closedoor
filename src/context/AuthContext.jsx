@@ -365,9 +365,12 @@ export function AuthProvider({ children }) {
 
       // If input doesn't contain @, treat it as username and fetch email
       if (!emailOrUsername.includes('@')) {
+        // ⚠️ Desde la migración 054, get_email_by_username exige sesión
+        // (estaba expuesto a anon: fuga de emails). El login por username
+        // dejó de estar disponible para usuarios anónimos.
         const foundEmail = await getEmailByUsername(emailOrUsername);
         if (!foundEmail) {
-          const err = 'Username or email not found';
+          const err = 'Login with username is no longer available — use your email address';
           setError(err);
           return { success: false, error: err };
         }

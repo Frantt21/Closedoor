@@ -15,7 +15,7 @@
   "auth.redirecting": "Redirigiendo...",
   "auth.login_error": "Error al iniciar sesión",
   "auth.login_link": "Inicia sesión",
-  "auth.login_placeholder": "Email, Usuario o Nombre",
+  "auth.login_placeholder": "Correo electrónico",
   "auth.login_required": "Necesitas iniciar sesión para hacer eso",
   "auth.login_subtitle": "¡Bienvenido de nuevo! Inicia Sesión.",
   "auth.login_title": "Iniciar sesión",
