@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useCallback, useRef, useContext } from 'react';
-import { supabase } from '../assets/services/supabaseclient';
+import { supabase, dbPublic } from '../assets/services/supabaseclient';
 import { startCall as apiStartCall, updateCallStatus, subscribeToCalls } from '../assets/services/callService';
 import CallOverlay from '../assets/Resources/Components/CallOverlay';
 import { useAuth } from '../hooks/useAuth';
@@ -30,7 +30,7 @@ export function useCall() {
 /** Helper: fetchea un perfil mínimo para el overlay. */
 function fetchPeerProfile(userId) {
   if (!userId) return Promise.resolve(null);
-  return supabase
+  return dbPublic
     .from('profiles')
     .select('id, username, displayname, avatar_url')
     .eq('id', userId)

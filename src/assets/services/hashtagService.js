@@ -1,4 +1,4 @@
-import { supabase } from './supabaseclient';
+import { supabase, dbPublic } from './supabaseclient';
 import { getItem, setItem, removeItem } from './secureStorage';
 
 /**
@@ -99,7 +99,7 @@ export async function getTrendingHashtags(limit = 10) {
 async function getTrendingHashtagsFresh(limit) {
   try {
     // 1. Get public profile IDs
-    const { data: publicProfiles, error: profError } = await supabase
+    const { data: publicProfiles, error: profError } = await dbPublic
       .from('profiles')
       .select('id')
       .or('is_private.is.null,is_private.eq.false');
@@ -112,7 +112,7 @@ async function getTrendingHashtagsFresh(limit) {
     // 2. Get recent post IDs from those profiles (24h) + validar mínimo de actividad
     // Excluir posts encriptados del trending (is_encrypted != true)
     const hoursAgo = new Date(Date.now() - TRENDING_HOURS * 60 * 60 * 1000).toISOString();
-    const { data: recentPosts, error: postError } = await supabase
+    const { data: recentPosts, error: postError } = await dbPublic
       .from('posts')
       .select('id')
       .in('user_id', publicUserIds)
@@ -176,7 +176,7 @@ async function getTrendingHashtagsFresh(limit) {
 export async function getPostsByHashtag(tag, { limit = 20, offset = 0 } = {}) {
   const cleanTag = tag.toLowerCase().replace(/^#/, '');
 
-  const { data, error } = await supabase
+  const { data, error } = await dbPublic
     .from('posts')
     .select('*, profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private)')
     .in('id', (await getPostIdsByHashtag(cleanTag, limit, offset)))
@@ -325,7 +325,7 @@ export async function searchPostsByContent(query, { limit = 20, offset = 0 } = {
   if (!query || query.length < 2) return [];
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await dbPublic
       .from('posts')
       .select('*, profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private)')
       .ilike('content', `%${query}%`)

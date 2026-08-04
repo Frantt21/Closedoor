@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { supabase } from '../assets/services/supabaseclient';
+import { supabase, dbPublic } from '../assets/services/supabaseclient';
 import {
   getNotifications,
   markAsRead,
@@ -424,7 +424,7 @@ export function NotificationProvider({ children }) {
           // Fetch sender profile
           let senderProfile = null;
           try {
-            const { data } = await supabase
+            const { data } = await dbPublic
               .from('profiles')
               .select('id, username, avatar_url')
               .eq('id', newMsg.sender_id)

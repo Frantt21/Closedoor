@@ -1,5 +1,5 @@
 import React, { createContext, useState, useEffect, useCallback, useRef, useContext } from 'react';
-import { supabase } from '../assets/services/supabaseclient';
+import { dbPublic } from '../assets/services/supabaseclient';
 
 /**
  * UserStatusContext — Proveedor global de estados de usuario.
@@ -68,7 +68,7 @@ export function UserStatusProvider({ children }) {
     if (ids.length === 0) return;
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await dbPublic
         .from('profiles')
         .select('id, user_status, user_status_updated_at')
         .in('id', ids);

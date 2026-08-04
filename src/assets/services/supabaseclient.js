@@ -59,3 +59,31 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
     detectSessionInUrl: true,
   },
 });
+
+/**
+ * Helper para consultar las vistas públicas (profiles_public, posts_public)
+ * que NO exponen email ni encrypted_content.
+ *
+ * Úsalo en lugar de supabase.from('profiles') para todas las consultas
+ * de SOLO LECTURA que no necesiten el email del usuario.
+ *
+ * Ejemplo:
+ *   const { data } = await dbPublic.from('profiles').select('id, username');
+ *   const { data } = await dbPublic.from('posts').select('id, content');
+ *
+ * Para operaciones de escritura (UPDATE, INSERT, DELETE) o consultas que
+ * requieran el email (login), sigue usando supabase.from('profiles') directamente.
+ */
+export const dbPublic = {
+  from: (table) => {
+    const viewName = table === 'profiles' ? 'profiles_public'
+      : table === 'posts' ? 'posts_public'
+      : table;
+    return supabase.from(viewName);
+  },
+};
+
+// Expuesto globalmente para pruebas de seguridad desde DevTools
+if (typeof window !== 'undefined') {
+  window.__supabase = supabase;
+}

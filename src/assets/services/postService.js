@@ -1,4 +1,4 @@
-import { supabase } from './supabaseclient';
+import { supabase, dbPublic } from './supabaseclient';
 import { getItem, setItem, removeItem, clearAll } from './secureStorage';
 import { getCdnUrl } from './cdnService';
 import { sanitizeContent } from './helpers';
@@ -111,10 +111,10 @@ export async function getPosts({ userId, profileUserId, limit = 20, offset = 0 }
     'is_pinned', 'pinned_at', 'is_encrypted', 'is_sensitive',
     'likes_count', 'dislikes_count', 'comments_count', 'reposts_count', 'views_count',
     'created_at', 'updated_at', 'mentions',
-    'allowed_users', 'obfuscated_display', 'encrypted_content', 'encrypted_iv', 'comments_allowed', 'poll_data',
+    'allowed_users', 'obfuscated_display', 'comments_allowed', 'poll_data',
     'profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position)'
   ].join(',');
-  let query = supabase.from('posts').select(feedSelect);
+  let query = dbPublic.from('posts').select(feedSelect);
 
   // Excluir posts programados (scheduled_at en futuro) — solo aparecen en pestaña "Programados"
   if (profileUserId) {
@@ -149,10 +149,10 @@ export async function getPost(postId) {
     'is_pinned', 'pinned_at', 'is_encrypted', 'is_sensitive',
     'likes_count', 'dislikes_count', 'comments_count', 'reposts_count', 'views_count',
     'created_at', 'updated_at', 'mentions',
-    'allowed_users', 'obfuscated_display', 'encrypted_content', 'encrypted_iv', 'comments_allowed', 'poll_data',
+    'allowed_users', 'obfuscated_display', 'comments_allowed', 'poll_data',
     'profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position)'
   ].join(',');
-  const { data, error } = await supabase.from('posts').select(explicitSelect)
+  const { data, error } = await dbPublic.from('posts').select(explicitSelect)
     .eq('id', postId)
     .single();
 
@@ -387,7 +387,7 @@ async function refreshVisibleIds(userId) {
 // ── FEED (filtrando perfiles privados, con cache de IDs visibles) ──
 
 export async function getFeed({ limit = 20, offset = 0, userId, authorIds } = {}) {
-  let query = supabase
+  let query = dbPublic
     .from('posts')
     .select('*, profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position, interests)');
 
@@ -1124,7 +1124,7 @@ export async function notifyCommentMentions(actorId, postId, commentId, content)
     if (u.id === actorId) continue;
     if (postOwnerId && u.id === postOwnerId) continue; // Already notified via 'comment'
     try {
-      const { data: profile } = await supabase
+      const { data: profile } = await dbPublic
         .from('profiles')
         .select('allow_mention')
         .eq('id', u.id)
@@ -1304,10 +1304,10 @@ export async function getScheduledPosts(userId, { limit = 50, offset = 0 } = {})
     'is_pinned', 'pinned_at', 'is_encrypted', 'is_sensitive',
     'likes_count', 'dislikes_count', 'comments_count', 'reposts_count', 'views_count',
     'created_at', 'updated_at', 'mentions',
-    'allowed_users', 'obfuscated_display', 'encrypted_content', 'encrypted_iv', 'comments_allowed', 'poll_data',
+    'allowed_users', 'obfuscated_display', 'comments_allowed', 'poll_data',
     'profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position)'
   ].join(',');
-  const { data, error } = await supabase.from('posts').select(explicitSelect)
+  const { data, error } = await dbPublic.from('posts').select(explicitSelect)
     .eq('user_id', userId)
     .not('scheduled_at', 'is', null)
     .gt('scheduled_at', now)
@@ -1526,7 +1526,7 @@ export function extractMentions(content) {
  */
 export async function getMentionUserIds(usernames) {
   if (!usernames.length) return [];
-  const { data, error } = await supabase
+  const { data, error } = await dbPublic
     .from('profiles')
     .select('id, username')
     .in('username', usernames);
@@ -1555,12 +1555,11 @@ export async function notifyMentions(actorId, postId, content) {
       allowedUsers.push(u);
       continue;
     }
-    try {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('allow_mention')
-        .eq('id', u.id)
-        .single();
+    try {        const { data: profile } = await dbPublic
+          .from('profiles')
+          .select('allow_mention')
+          .eq('id', u.id)
+          .single();
       // Solo notificar si allow_mention no es false (default: true)
       if (profile && profile.allow_mention !== false) {
         allowedUsers.push(u);

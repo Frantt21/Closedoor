@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { getFollowing } from '../services/followService';
-import { supabase } from '../services/supabaseclient';
+import { supabase, dbPublic } from '../services/supabaseclient';
 import MentionDropdownPortal from '../Resources/Components/MentionDropdownPortal';
 
 /**
@@ -40,7 +40,7 @@ export default function useMentionAutocomplete(userId, content, setContent) {
       .then(async (users) => {
         if (users.length > 0) {
           try {
-            const { data: prefs } = await supabase
+            const { data: prefs } = await dbPublic
               .from('profiles')
               .select('id, allow_encrypted_add')
               .in('id', users.map(u => u.id));

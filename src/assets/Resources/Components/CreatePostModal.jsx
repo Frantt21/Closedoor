@@ -16,7 +16,7 @@ import { toast } from 'react-toastify';
 import { uploadImage, uploadWithLocalPreview } from '../../services/cdnService';
 import Tooltip from './Tooltip';
 import { encode as encryptEncode, encryptForUsers, decryptForUser } from '../../services/alphabetEncryption';
-import { supabase } from '../../services/supabaseclient';
+import { supabase, dbPublic } from '../../services/supabaseclient';
 import useMentionAutocomplete from '../../hooks/useMentionAutocomplete';
 import './css/modal.css';
 import './css/createPostModal.css';
@@ -160,7 +160,7 @@ export default function CreatePostModal({
       const selectedIds = new Set(allowedUsers.map(u => u.id));
       let filtered = results.filter(u => !selectedIds.has(u.id));
       if (filtered.length > 0) {
-        const { data: prefs } = await supabase
+        const { data: prefs } = await dbPublic
           .from('profiles')
           .select('id, allow_encrypted_add')
           .in('id', filtered.map(u => u.id));
@@ -223,7 +223,7 @@ export default function CreatePostModal({
             // Filtrar el autor
             const others = allowedIds.filter(id => id !== userId);
             if (others.length > 0) {
-              supabase
+              dbPublic
                 .from('profiles')
                 .select('id, username, avatar_url')
                 .in('id', others)
@@ -433,7 +433,7 @@ export default function CreatePostModal({
       const mentionedUsers = await getMentionUserIds(mentionedUsernames);
       const others = mentionedUsers.filter(u => u.id !== userId);
       if (others.length > 0) {
-        const { data: mentionPrefs } = await supabase
+        const { data: mentionPrefs } = await dbPublic
           .from('profiles')
           .select('id, username, allow_mention')
           .in('id', others.map(u => u.id));

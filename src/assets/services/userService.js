@@ -1,4 +1,4 @@
-import { supabase } from './supabaseclient';
+import { supabase, dbPublic } from './supabaseclient';
 import { getItem, setItem, removeItem } from './secureStorage';
 import { getCdnUrl } from './cdnService';
 import { sanitizeContent } from './helpers';
@@ -102,7 +102,7 @@ export async function getEmailByUsername(username) {
  */
 export async function checkUsernameExists(username) {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await dbPublic
       .from('profiles')
       .select('id')
       .eq('username', username.toLowerCase())
@@ -123,7 +123,7 @@ export async function checkUsernameExists(username) {
 export async function isUsernameAvailable(username, currentUserId) {
   const normalized = username.toLowerCase();
   try {
-    const { data, error } = await supabase
+    const { data, error } = await dbPublic
       .from('profiles')
       .select('id')
       .eq('username', normalized)
@@ -256,7 +256,7 @@ export async function getUserProfileByUsername(username) {
     const cached = getCachedProfileByUsername(username);
 
     // Siempre fetch fresh data — aunque haya cache, resolvemos con datos frescos
-    const { data, error } = await supabase
+    const { data, error } = await dbPublic
       .from('profiles')
       .select('*')
       .eq('username', username.toLowerCase())
@@ -298,7 +298,7 @@ export async function getUserProfileByUsername(username) {
  */
 export async function searchProfiles(query, excludeUserId, limit = 10) {
   try {
-    let dbQuery = supabase
+    let dbQuery = dbPublic
       .from('profiles')
       .select('id, username, displayname, avatar_url')
       .ilike('username', `%${query.toLowerCase()}%`)
@@ -325,7 +325,7 @@ export async function searchProfiles(query, excludeUserId, limit = 10) {
 
 export async function listProfiles(excludeUserId, limit = 50) {
   try {
-    let query = supabase
+    let query = dbPublic
       .from('profiles')
       .select('id, username, displayname, avatar_url, banner_url, bio, pronouns, roles, created_at, is_private, interests, accent_color, accent_color_secondary, accent_surface_color, accent_surface_glass, accent_visibility, show_accent_profile, show_accent_explore, banner_position, avatar_position')
       .order('created_at', { ascending: false })

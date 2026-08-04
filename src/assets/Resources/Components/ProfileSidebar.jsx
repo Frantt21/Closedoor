@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { FaLock, FaHeart, FaHeartBroken, FaComment, FaRetweet, FaTags, FaFeather, FaBookmark, FaEye, FaUser, FaBan } from 'react-icons/fa';
 import { useI18n } from '../../services/i18n/useI18n';
-import { supabase } from '../../services/supabaseclient';
+import { supabase, dbPublic } from '../../services/supabaseclient';
 import { useAuth } from '../../../hooks/useAuth';
 import { getCachedBlockStatus, subscribeBlockChanges } from '../../services/blockService';
 import { getItem, setItem, removeItem } from '../../services/secureStorage';
@@ -90,7 +90,7 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
       }
 
       try {
-        const { data: posts } = await supabase
+        const { data: posts } = await dbPublic
           .from('posts')
           .select('id, likes_count, dislikes_count, comments_count, reposts_count, views_count')
           .neq('is_encrypted', true)
@@ -123,7 +123,7 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
           // Obtener vistas del perfil (resiliente a columna faltante)
           let profileViews = 0;
           try {
-            const { data: profileData } = await supabase
+            const { data: profileData } = await dbPublic
               .from('profiles')
               .select('profile_views_count')
               .eq('id', profile.id)

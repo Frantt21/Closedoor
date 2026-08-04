@@ -7,7 +7,7 @@ import '../Resources/Styles/post.css';
 import '../Resources/Styles/skeleton.css';
 import { useAuth } from '../../hooks/useAuth';
 import usePageTitle from '../../hooks/usePageTitle';
-import { supabase } from '../services/supabaseclient';
+import { supabase, dbPublic } from '../services/supabaseclient';
 import { getBlockedUserIds, getUsersWhoBlockedMeIds, clearBlockedListsCache, subscribeBlockChanges } from '../services/blockService';
 import {
   getFeed,
@@ -202,7 +202,7 @@ function Home() {
 
                     try {
                         // Fetch post completo con perfil del autor
-                        const { data, error } = await supabase
+                        const { data, error } = await dbPublic
                             .from('posts')
                             .select('*, profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position, interests)')
                             .eq('id', newPost.id)

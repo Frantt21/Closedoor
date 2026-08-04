@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { useI18n } from "../services/i18n/useI18n";
 import usePageTitle from "../../hooks/usePageTitle";
-import { supabase } from "../services/supabaseclient";
+import { supabase, dbPublic } from "../services/supabaseclient";
 import { listProfiles } from "../services/userService";
 import { getFollowCounts,
   setCachedFollowStatus,
@@ -140,7 +140,7 @@ function Explore() {
               )
             : Promise.resolve([]),
           // Aggregate total likes per user
-          supabase
+          dbPublic
             .from('posts')
             .select('user_id, likes_count')
             .neq('is_encrypted', true)

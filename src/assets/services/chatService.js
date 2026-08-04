@@ -1,4 +1,4 @@
-import { supabase } from './supabaseclient';
+import { supabase, dbPublic } from './supabaseclient';
 import { getItem, setItem, removeItem } from './secureStorage';
 import { encryptForUsers, decryptForUser } from './alphabetEncryption';
 import { sanitizeContent } from './helpers';
@@ -109,7 +109,7 @@ export async function getConversations(userId) {
   const uniqueUserIds = [...new Set(Object.values(otherUserIds).filter(Boolean))];
   let profilesMap = {};
   if (uniqueUserIds.length > 0) {
-    const { data: profiles } = await supabase
+    const { data: profiles } = await dbPublic
       .from('profiles')
       .select('id, username, displayname, avatar_url, banner_url, bio, pronouns, roles, is_private, interests, accent_color, accent_color_secondary, banner_position, avatar_position, user_status, user_status_updated_at')
       .in('id', uniqueUserIds);
@@ -309,7 +309,7 @@ export async function sendMessage(conversationId, senderId, content, participant
   if (error) throw error;
 
   // Fetch sender profile separately
-  const { data: senderProfile } = await supabase
+  const { data: senderProfile } = await dbPublic
     .from('profiles')
     .select('id, username, displayname, avatar_url, avatar_position, user_status, user_status_updated_at')
     .eq('id', senderId)
@@ -358,7 +358,7 @@ export async function getMessages(conversationId, limit = 50, before = null) {
   if (msgs.length === 0) return [];
 
   const senderIds = [...new Set(msgs.map(m => m.sender_id))];
-  const { data: profiles } = await supabase
+  const { data: profiles } = await dbPublic
     .from('profiles')
     .select('id, username, displayname, avatar_url, avatar_position, user_status, user_status_updated_at')
     .in('id', senderIds);
@@ -410,7 +410,7 @@ export function subscribeToMessages(conversationId, onMessage, onDelete) {
           .single();
         if (!msg) return;
 
-        const { data: profile } = await supabase
+        const { data: profile } = await dbPublic
           .from('profiles')
           .select('id, username, displayname, avatar_url, avatar_position, user_status, user_status_updated_at')
           .eq('id', msg.sender_id)
@@ -435,7 +435,7 @@ export function subscribeToMessages(conversationId, onMessage, onDelete) {
           .single();
         if (!msg) return;
 
-        const { data: profile } = await supabase
+        const { data: profile } = await dbPublic
           .from('profiles')
           .select('id, username, displayname, avatar_url, avatar_position, user_status, user_status_updated_at')
           .eq('id', msg.sender_id)
