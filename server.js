@@ -64,6 +64,27 @@ function cacheSet(key, data, ttl) {
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ── Security headers globales (paridad con vercel.json) ──
+// ⚠️ NO enviar header Content-Security-Policy aquí: la CSP completa vive en
+// la meta tag del HTML build (plugins/cspPlugin.js), y según la spec CSP un
+// header HTTP hace que el navegador IGNORE la meta CSP (la desactiva entera).
+// El clickjacking se cubre con X-Frame-Options: DENY.
+// La app no usa cookies (la sesión vive en localStorage cifrado vía el
+// adapter de supabaseclient), así que no hay flags Secure/SameSite que
+// configurar aquí.
+app.use((req, res, next) => {
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  // HSTS solo cuando la conexión es HTTPS (túnel/nginx); sobre http:// local
+  // los navegadores lo ignoran, y así no forzamos https en dev local.
+  const proto = req.headers['x-forwarded-proto'] || req.protocol;
+  if (proto === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
+
 // ── Check if build exists ──
 if (!existsSync(DIST)) {
   console.error(`❌ Build not found at ${DIST}. Run "npm run build" first.`);

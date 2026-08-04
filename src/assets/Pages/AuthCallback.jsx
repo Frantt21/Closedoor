@@ -29,11 +29,19 @@ function AuthCallback() {
           navigate('/', { replace: true });
         } else {
           // Try to exchange code for session (PKCE flow)
-          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(
-            new URLSearchParams(window.location.search).get('code') || ''
-          );
+          const code = new URLSearchParams(window.location.search).get('code') || '';
+          const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
           if (exchangeError) {
+            // Con PKCE + detectSessionInUrl, supabase-js pudo auto-intercambiar
+            // el code al inicializar (el code es de un solo uso). Re-consultar la
+            // sesión antes de declarar error: el auto-exchange puede haber
+            // completado la sesión entre medias.
+            const { data: retrySession } = await supabase.auth.getSession();
+            if (retrySession?.session) {
+              navigate('/', { replace: true });
+              return;
+            }
             console.error('Code exchange error:', exchangeError);
             setStatus('error');
             return;

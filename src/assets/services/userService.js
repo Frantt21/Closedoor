@@ -22,6 +22,70 @@ function normalizeProfileUrls(profile) {
   return profile;
 }
 
+// ── Columnas públicas de profiles (SIN email) ──
+// La columna email está REVOCADA para anon/authenticated (migración 053);
+// cualquier SELECT que la incluya (p. ej. select('*') sobre la tabla)
+// fallaría con permission denied. Esta lista explícita cubre todo lo que
+// la UI lee de un perfil. El email propio se obtiene de auth.users
+// (user?.email), nunca de la tabla.
+// Lista verificada contra las 53 columnas reales de la tabla (SELECT * real,
+// agosto 2026): 52 públicas + email (revocada). Si se añade una columna a la
+// tabla y el frontend la necesita, hay que añadirla aquí también.
+export const PROFILE_PUBLIC_COLUMNS = [
+  'id',
+  'username',
+  'avatar_url',
+  'bio',
+  'created_at',
+  'updated_at',
+  'banner_url',
+  'followers',
+  'followings',
+  'roles',
+  'social_links',
+  'accent_color',
+  'is_private',
+  'interests',
+  'stats_private',
+  'stats_visibility',
+  'profile_views_count',
+  'banner_position',
+  'avatar_position',
+  'accent_color_secondary',
+  'accent_surface_color',
+  'accent_surface_glass',
+  'show_accent_profile',
+  'accent_visibility',
+  'show_accent_explore',
+  'show_interests',
+  'show_profile_stats',
+  'show_trending',
+  'profile_background_url',
+  'profile_background_position',
+  'profile_background_blur',
+  'profile_background_dim',
+  'show_likes',
+  'show_saves',
+  'allow_mention',
+  'allow_encrypted_add',
+  'pronouns',
+  'banner_credits',
+  'avatar_credits',
+  'profile_text_color',
+  'banner_dim',
+  'filter_encrypted',
+  'show_accent',
+  'displayname',
+  'time_format_24h',
+  'theme',
+  'locale',
+  'show_badges',
+  'badges_visibility',
+  'user_status',
+  'user_status_updated_at',
+  'song',
+].join(', ');
+
 // ── Límites coherentes de caracteres (una sola fuente de verdad) ──
 export const USERNAME_MIN = 3;
 export const USERNAME_MAX = 20;
@@ -75,20 +139,20 @@ export async function getEmailByUsername(username) {
   const normalized = username.toLowerCase();
 
   try {
-    // First try by username
-    const { data: byUser, error: errUser } = await supabase
-      .from('profiles')
-      .select('email')
-      .eq('username', normalized)
-      .maybeSingle();
+    // La columna email está revocada para anon/authenticated (migración 053).
+    // El email por username se resuelve vía RPC SECURITY DEFINER: corre con
+    // permisos del definer (postgres) y solo devuelve el email del username
+    // pedido, nunca un SELECT masivo de la tabla.
+    const { data, error } = await supabase.rpc('get_email_by_username', {
+      uname: normalized,
+    });
 
-    if (errUser) {
-      console.error('Error querying by username:', errUser);
-      // continue even if the username lookup failed
+    if (error) {
+      console.error('Error resolving email by username:', error);
+      return null;
     }
 
-    if (byUser?.email) return byUser.email;
-    return null;
+    return data || null;
   } catch (err) {
     console.error('Get email error:', err);
     return null;
@@ -149,11 +213,11 @@ export async function isUsernameAvailable(username, currentUserId) {
  */
 export async function checkEmailExists(email) {
   try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('email', email.toLowerCase())
-      .maybeSingle();
+    // Igual que getEmailByUsername: la columna email está revocada; el check
+    // se resuelve vía RPC SECURITY DEFINER que devuelve solo un boolean.
+    const { data, error } = await supabase.rpc('email_exists', {
+      addr: email.toLowerCase(),
+    });
 
     if (error) {
       console.error('Error checking email:', error);
@@ -191,7 +255,7 @@ export async function createUserProfile(userId, email, username, displayname) {
     const { data, error } = await supabase
       .from('profiles')
       .insert([profile])
-      .select()
+      .select(PROFILE_PUBLIC_COLUMNS)
       .single();
 
     if (error) {
@@ -223,10 +287,11 @@ export async function getUserProfile(userId) {
     // Leer cache para el render inicial (el useState en profile.jsx lo usa)
     const cached = getCachedProfile(userId);
 
-    // Siempre fetch fresh data — aunque haya cache, resolvemos con datos frescos
+    // Siempre fetch fresh data — aunque haya cache, resolvemos con datos frescos.
+    // Usamos columnas explícitas SIN email (columna revocada en migración 053).
     const { data, error } = await supabase
       .from('profiles')
-      .select('*')
+      .select(PROFILE_PUBLIC_COLUMNS)
       .eq('id', userId)
       .maybeSingle();
 
@@ -496,7 +561,7 @@ export async function updateUserProfile(userId, updates) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', userId)
-      .select()
+      .select(PROFILE_PUBLIC_COLUMNS)
       .single();
 
     if (error) {

@@ -15,6 +15,10 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// Sanitización REAL del app (helpers.js) — el test verifica el comportamiento
+// real de producción, no una simulación local que puede divergir.
+import { sanitizeContent, sanitizeUrl } from '../src/assets/services/helpers.js';
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const envPath = path.resolve(__dirname, '..', '.env.local');
 const envContent = fs.readFileSync(envPath, 'utf-8');
@@ -50,11 +54,33 @@ async function testDB() {
     {
       n: '1b', label: 'Perfiles: email en vista profiles_public (sin auth)',
       fn: () => supabase.from('profiles_public').select('id, email, username').limit(10),
-      check: (data) => {
+      check: (data, err) => {
         const emails = data?.filter(x => x.email).length || 0;
         return emails === 0 ? { pass: true, msg: '✅ Sin emails en la vista' }
           : { pass: false, msg: `⚠️  ${emails}/${data?.length} emails visibles en la vista` };
       }
+    },
+    {
+      n: '1c', label: 'Columna email REVOCADA: SELECT directo falla o no devuelve emails (sin auth)',
+      fn: () => supabase.from('profiles').select('email').limit(1),
+      check: (data, err) => {
+        // Tras migración 053: la columna email está revocada para anon →
+        // o da error (permission denied) o devuelve 0 filas con email.
+        const emails = data?.filter(x => x.email).length || 0;
+        const blocked = !!err || emails === 0;
+        return blocked ? { pass: true, msg: '✅ Email inaccesible (revocada)' }
+          : { pass: false, msg: '⚠️  Email accesible por SELECT directo' };
+      }
+    },
+    {
+      n: '1d', label: 'RPC get_email_by_username existe (login por username sin SELECT directo)',
+      fn: () => supabase.rpc('get_email_by_username', { uname: 'usuario_que_no_existe_xyz' }),
+      check: (data, err) => ({ pass: !err, msg: err ? `⚠️  ${err.message}` : '✅ RPC disponible (null para username inexistente)' })
+    },
+    {
+      n: '1e', label: 'RPC email_exists existe (registro sin SELECT directo)',
+      fn: () => supabase.rpc('email_exists', { addr: 'nadie@example.com' }),
+      check: (data, err) => ({ pass: !err, msg: err ? `⚠️  ${err.message}` : '✅ RPC disponible' })
     },
     {
       n: 2, label: 'Posts encriptados: ocultos (sin auth)',
@@ -188,19 +214,18 @@ function testXSS() {
   console.log('  3. 🕸️  XSS — Sanitización de contenido');
   console.log('═══════════════════════════════════════\n');
 
-  // Importar helpers para probar sanitizeContent/sanitizeUrl
-  const helpersPath = path.resolve(__dirname, '..', 'src/assets/services/helpers.js');
-  // Simulación local de la lógica de sanitización
+  // Se ejecutan las funciones REALES de producción (importadas arriba):
+  // sanitizeContent y sanitizeUrl de helpers.js. Sin simulador local.
   const testCases = [
-    // sanitizeContent tests
-    { fn: 'sanitizeContent', input: '<script>alert(1)</script>', expect: 'alert(1)' },
+    // sanitizeContent tests — comportamiento REAL de helpers.js
+    { fn: 'sanitizeContent', input: '<script>alert(1)</script>', expect: '' },
     { fn: 'sanitizeContent', input: '<img src=x onerror=alert(1)>', expect: '<img src=x>' },
     { fn: 'sanitizeContent', input: '<a href="javascript:alert(1)">click</a>', expect: '<a href="">click</a>' },
     { fn: 'sanitizeContent', input: '<iframe src="https://evil.com"></iframe>', expect: '' },
     { fn: 'sanitizeContent', input: '<svg onload=alert(1)>', expect: '' },
     { fn: 'sanitizeContent', input: 'javascript:alert(1)', expect: 'alert(1)' },
     { fn: 'sanitizeContent', input: 'Normal text with @mention and #hashtag', expect: 'Normal text with @mention and #hashtag' },
-    // sanitizeUrl tests
+    // sanitizeUrl tests — comportamiento REAL de helpers.js
     { fn: 'sanitizeUrl', input: 'javascript:alert(1)', expect: '' },
     { fn: 'sanitizeUrl', input: 'https://evil.com', expect: 'https://evil.com' },
     { fn: 'sanitizeUrl', input: 'data:text/html,<script>alert(1)</script>', expect: '' },
@@ -208,46 +233,17 @@ function testXSS() {
     { fn: 'sanitizeUrl', input: ' \u0000javascript:alert(1)', expect: '' },
   ];
 
-  // Simular las funciones de sanitización
-  const SAFE_URL_PROTOCOLS = new Set(['http', 'https', 'mailto']);
-
-  function simulateSanitizeContent(text) {
-    if (typeof text !== 'string' || !text) return text || '';
-    let out = text;
-    out = out.replace(/<\s*script\b[\s\S]*?<\s*\/\s*script\s*>/gi, '');
-    out = out.replace(/<\s*\/?\s*(?:script|iframe|object|embed|link|meta|base|style|form|template|svg|math)\b[^>]*>/gi, '');
-    out = out.replace(/<[a-zA-Z][^>]*>/gi, (tag) =>
-      tag.replace(/\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-    );
-    out = out.replace(/\b(?:javascript|vbscript|data):/gi, '');
-    return out;
-  }
-
-  function simulateSanitizeUrl(url, fallback = '') {
-    if (!url || typeof url !== 'string') return fallback;
-    const trimmed = url.trim();
-    if (!trimmed) return fallback;
-    if (/[\u0000-\u001F\u007F]/.test(trimmed)) return fallback;
-    if (trimmed.startsWith('/')) return trimmed;
-    const match = trimmed.match(/^([a-zA-Z][a-zA-Z0-9+.-]*):/);
-    if (match && !SAFE_URL_PROTOCOLS.has(match[1].toLowerCase())) return fallback;
-    if (!trimmed.startsWith('/') && !/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)) {
-      return `https://${trimmed}`;
-    }
-    return trimmed;
-  }
-
   let pass = 0, fail = 0;
   for (const tc of testCases) {
     let result;
-    if (tc.fn === 'sanitizeContent') result = simulateSanitizeContent(tc.input);
-    else result = simulateSanitizeUrl(tc.input, '');
+    if (tc.fn === 'sanitizeContent') result = sanitizeContent(tc.input);
+    else result = sanitizeUrl(tc.input, '');
 
     if (result === tc.expect) {
-      console.log(`✅ ${tc.fn}("${tc.input.substring(0, 30)}...") → "${result.substring(0, 30)}"`);
+      console.log(`✅ ${tc.fn}("${tc.input.substring(0, 30)}...") → "${String(result).substring(0, 30)}"`);
       pass++;
     } else {
-      console.log(`⚠️  ${tc.fn}("${tc.input.substring(0, 30)}...") → "${result.substring(0, 30)}" (esperado: "${tc.expect}")`);
+      console.log(`⚠️  ${tc.fn}("${tc.input.substring(0, 30)}...") → "${String(result).substring(0, 30)}" (esperado: "${tc.expect}")`);
       fail++;
     }
   }
@@ -358,6 +354,10 @@ function testWebSecurity() {
   const vercelJson = fs.existsSync(vercelPath) ? fs.readFileSync(vercelPath, 'utf-8') : '';
   const supabaseClientPath = path.join(root, 'src', 'assets', 'services', 'supabaseclient.js');
   const supabaseClient = fs.existsSync(supabaseClientPath) ? fs.readFileSync(supabaseClientPath, 'utf-8') : '';
+  const userServicePath = path.join(root, 'src', 'assets', 'services', 'userService.js');
+  const userService = fs.existsSync(userServicePath) ? fs.readFileSync(userServicePath, 'utf-8') : '';
+  const serverPath = path.join(root, 'server.js');
+  const serverContent = fs.existsSync(serverPath) ? fs.readFileSync(serverPath, 'utf-8') : '';
 
   const checks = [
     { label: 'Plugin CSP existe', pattern: "name: 'inject-csp'", file: cspPlugin },
@@ -369,11 +369,15 @@ function testWebSecurity() {
     { label: 'connect-src cubre Supabase Realtime (wss)', pattern: 'wss://', file: cspPlugin },
     { label: 'frame-src cubre Turnstile', pattern: 'https://challenges.cloudflare.com', file: cspPlugin },
     { label: 'object-src none (bloquea plugins/flash)', pattern: "object-src 'none'", file: cspPlugin },
-    { label: 'CSP en vercel.json (HTTP header)', pattern: 'Content-Security-Policy', file: vercelJson },
     { label: 'X-Frame-Options DENY (anti clickjacking)', pattern: 'X-Frame-Options', file: vercelJson },
     { label: 'X-Content-Type-Options nosniff', pattern: 'X-Content-Type-Options', file: vercelJson },
     { label: 'Referrer-Policy strict', pattern: 'strict-origin-when-cross-origin', file: vercelJson },
+    { label: 'HSTS en vercel.json', pattern: 'Strict-Transport-Security', file: vercelJson },
+    { label: 'Permissions-Policy en vercel.json', pattern: 'Permissions-Policy', file: vercelJson },
     { label: '__supabase SOLO en DEV (import.meta.env.DEV)', pattern: 'import.meta.env.DEV', file: supabaseClient },
+    { label: 'getEmailByUsername via RPC (sin SELECT email)', pattern: "rpc('get_email_by_username'", file: userService },
+    { label: 'checkEmailExists via RPC (sin SELECT email)', pattern: "rpc('email_exists'", file: userService },
+    { label: 'getUserProfile sin select("*") (columna email revocada)', pattern: 'PROFILE_PUBLIC_COLUMNS', file: userService },
   ];
 
   let pass = 0, fail = 0;
@@ -402,6 +406,22 @@ function testWebSecurity() {
     pass++;
   } else {
     console.log('⚠️  script-src contiene unsafe-eval o unsafe-inline (¡NO permitido!)');
+    fail++;
+  }
+
+  // Check NEGATIVO (CSP): vercel.json/server.js NO deben enviar header CSP
+  // HTTP. Según la spec CSP, si existe un header CSP, el navegador IGNORA la
+  // meta CSP del HTML (que lleva la política completa) → se desactiva todo.
+  // El header solo serviría para romper la protección. X-Frame-Options: DENY
+  // ya cubre el clickjacking.
+  const noHttpCspHeader =
+    !/"key"\s*:\s*"Content-Security-Policy"/i.test(vercelJson) &&
+    !/setHeader\s*\(\s*['"]Content-Security-Policy/i.test(serverContent);
+  if (noHttpCspHeader) {
+    console.log('✅ NO header CSP HTTP (la meta CSP del HTML manda — sin shadowing)');
+    pass++;
+  } else {
+    console.log('⚠️  Se encontró header CSP HTTP → sombrea/ignora la meta CSP (¡desactiva la protección!)');
     fail++;
   }
 

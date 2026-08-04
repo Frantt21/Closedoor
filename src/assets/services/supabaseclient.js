@@ -57,6 +57,12 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
+    // PKCE: el token ya no viaja en el hash de la URL durante OAuth (Discord).
+    // Con el flujo implicit por defecto, access_token/refresh_token quedaban en
+    // el historial del navegador y podían filtrarse por Referrer. Con PKCE en la
+    // URL solo va un code de un solo uso y el token se intercambia en segundo
+    // plano. AuthCallback ya maneja exchangeCodeForSession para ese caso.
+    flowType: 'pkce',
   },
 });
 

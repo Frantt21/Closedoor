@@ -18,6 +18,7 @@ import { clearBlockedListsCache } from '../assets/services/blockService';
 import { clearCachedFollowCounts } from '../assets/services/followService';
 import { initPresence, disposePresence } from '../assets/services/presenceService';
 import { getItem, waitForKeyReady } from '../assets/services/secureStorage';
+import { PROFILE_PUBLIC_COLUMNS } from '../assets/services/userService';
 
 export const AuthContext = createContext();
 
@@ -276,10 +277,11 @@ export function AuthProvider({ children }) {
     if (!userId) return null;
 
     try {
-      // Bypass cache para obtener datos frescos siempre
+      // Bypass cache para obtener datos frescos siempre.
+      // Columnas explícitas SIN email (columna revocada en migración 053).
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select(PROFILE_PUBLIC_COLUMNS)
         .eq('id', userId)
         .maybeSingle();
 

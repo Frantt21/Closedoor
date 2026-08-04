@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { sanitizeUrl } from '../../services/helpers';
+import { getSessionItem, setSessionItem } from '../../services/secureStorage';
 
 /**
  * Fetches OG tag data for a URL from the /api/og-link endpoint.
@@ -32,16 +33,15 @@ export default function LinkPreview({ url, onExternalLink, className = '' }) {
     let cancelled = false;
     const cacheKey = `og_cache_${url}`;
 
-    // Check cache first (sessionStorage)
+    // Check cache first (sessionStorage cifrado vía secureStorage).
+    // getSessionItem devuelve el objeto ya deserializado (secureStorage
+    // hace JSON.parse internamente), así que se usa directamente.
     try {
-      const cached = sessionStorage.getItem(cacheKey);
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed && parsed.title) {
-          setData(parsed);
-          setLoading(false);
-          // Still refresh in background
-        }
+      const cached = getSessionItem(cacheKey);
+      if (cached && typeof cached === 'object' && cached.title) {
+        setData(cached);
+        setLoading(false);
+        // Still refresh in background
       }
     } catch {}
 
@@ -68,9 +68,9 @@ export default function LinkPreview({ url, onExternalLink, className = '' }) {
 
         if (json.success) {
           setData(json);
-          // Cache result
+          // Cache result (sessionStorage cifrado — consistente con el resto del storage)
           try {
-            sessionStorage.setItem(cacheKey, JSON.stringify(json));
+            setSessionItem(cacheKey, json);
           } catch {}
         } else {
           setError(true);

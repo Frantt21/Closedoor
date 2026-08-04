@@ -130,7 +130,12 @@ export function sanitizeContent(text) {
   out = out.replace(/<[a-zA-Z][^>]*>/gi, (tag) =>
     tag.replace(/\s+on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
   );
-  // 4) Neutralizar protocolos peligrosos en texto plano (javascript:, vbscript:, data:)
+  // 4) Neutralizar protocolos peligrosos DENTRO de atributos href/src:
+  //    <a href="javascript:..."> se convierte en <a href=""> (el valor se
+  //    vacía por completo, no solo se quita el prefijo). Va ANTES del paso 5
+  //    para que el protocolo aún esté presente cuando se vacía el atributo.
+  out = out.replace(/(\s+(?:href|src|action|formaction)\s*=\s*["'])(?:javascript|vbscript|data):[^"']*(["'])/gi, '$1$2');
+  // 5) Neutralizar protocolos peligrosos en texto plano (javascript:, vbscript:, data:)
   out = out.replace(/\b(?:javascript|vbscript|data):/gi, '');
   return out;
 }
