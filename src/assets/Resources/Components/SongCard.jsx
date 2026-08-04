@@ -52,8 +52,10 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
   // fetch + header de bypass y se reproduce desde un blob local.
   const [blobSrc, setBlobSrc] = useState(null);
   const [blobFailed, setBlobFailed] = useState(false);
+  const [loadingStream, setLoadingStream] = useState(false); // feedback visual al bajar el blob
   const blobUrlRef = useRef(null);
   const blobForRef = useRef(''); // sig de la canción para la que se descarga el blob
+  const wantsPlayRef = useRef(false); // el usuario pulsó play → autoplay cuando el blob esté listo
   const [progress, setProgress] = useState(0);
   // URL de preview resuelta con la sig de la canción a la que pertenece
   // (los previews de Deezer expiran ≈ 15 min → se re-consultan al reproducir)
@@ -88,6 +90,7 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
       audio.pause();
       audio.currentTime = 0;
     }
+    wantsPlayRef.current = false;
   }, [songObj, songSig]);
 
   const selSig = selected ? `${selected.provider}:${selected.trackId}` : '';
@@ -124,24 +127,26 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
   useEffect(() => {
     let cancelled = false;
     getStreamHealth().then((h) => {
-      if (!cancelled) setStreamHealthy(!!h);
+      if (cancelled) return;
+      setStreamHealthy(!!h);
+      console.info('[song] stream health:', h ? 'OK — stream completo disponible' : 'no disponible → preview 30s');
     });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  // Pausar al desmontar (el <audio> siempre está montado → el ref es estable)
+  // Pausar al desmontar (el <audio> siempre está montado → el ref es estable).
+  // blobForRef se resetea para invalidar cualquier fetch de blob en vuelo: el
+  // guard del .then aborta y no crea el object URL tras el cleanup (sin fugas).
   useEffect(() => {
     const audio = audioRef.current;
     return () => {
+      blobForRef.current = ''; // invalida descargas en vuelo al desmontar
       if (audio) audio.pause();
       revokeBlob();
     };
   }, []);
-
-  // Perfil ajeno sin canción → no mostrar la card
-  if (!isOwnProfile && !selected) return null;
 
   // ── Fuente de reproducción: stream completo (yt-dlp) SOLO si el server
   //    está disponible (health OK); si no, preview de 30s directamente ──
@@ -153,22 +158,122 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
       return false;
     }
   })();
+  // Para túneles remotos (ngrok free) el <audio> NUNCA carga el stream directo:
+  // el interstitial rompería la carga y daría "no supported sources". El blob
+  // se baja con fetch + header (startBlobDownload) al pulsar play, y el src del
+  // <audio> queda con el preview como placeholder hasta que el blob esté listo.
+  const canStartRemoteBlob = !!(streamUrl && isRemoteStream && !blobSrc && !blobFailed && !usePreview);
   const playbackSrc = usePreview
     ? effectivePreviewSrc
-    : (blobSrc || streamUrl || effectivePreviewSrc);
+    : (blobSrc || (isRemoteStream ? effectivePreviewSrc : streamUrl) || effectivePreviewSrc);
+
+  const ignorePlaybackError = (err) => {
+    // AbortError = el src cambió (nuevo load) antes de que play() arrancara.
+    // Es benigno (el blob/preview nuevo se encargará) → no loguear.
+    if (err?.name === 'AbortError') return;
+    console.warn('[song] playback error:', err?.message || err);
+  };
+
+  // Baja el stream con fetch + header de bypass (necesario para túneles free
+  // como ngrok: el <audio> no puede mandar headers) y reproduce desde blob.
+  // - Timeout 45s: la primera resolución de yt-dlp en el celular tarda 5-20s
+  //   y luego se descarga el blob entero antes de sonar.
+  // - Si ya hay una descarga en vuelo para esta canción, no se duplica.
+  // - Muestra el spinner (loadingStream) y loguea cada etapa para depurar.
+  const startBlobDownload = (url) => {
+    if (blobForRef.current === selSig) return; // ya en vuelo para esta canción
+    setBlobFailed(true);
+    blobForRef.current = selSig;
+    setLoadingStream(true);
+    console.info('[song] stream: descargando blob (primera vez puede tardar)...');
+    fetch(url, {
+      headers: { 'ngrok-skip-browser-warning': '1' },
+      signal: AbortSignal.timeout(45000),
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error(`stream fetch ${r.status}`);
+        const ct = r.headers.get('content-type') || '';
+        // ngrok puede devolver 200 con el interstitial HTML → filtrar
+        if (!/audio|octet-stream/i.test(ct)) throw new Error('not audio');
+        return r.blob();
+      })
+      .then((blob) => {
+        // La canción cambió mientras se descargaba → descartar
+        if (blobForRef.current !== selSig) return;
+        if (!blob.size) throw new Error('empty stream');
+        const objectUrl = URL.createObjectURL(blob);
+        revokeBlob();
+        blobUrlRef.current = objectUrl;
+        setBlobSrc(objectUrl);
+        setLoadingStream(false);
+        console.info(`[song] stream blob listo (${Math.round(blob.size / 1024)} KB)`);
+        const a = audioRef.current;
+        if (a) {
+          a.src = objectUrl; // src imperativo: no esperar al re-render de React
+          // Autoplay solo si el usuario ya pulsó play (si no, el blob queda
+          // listo y el siguiente click arranca al instante).
+          if (wantsPlayRef.current) {
+            a.play().then(() => setPlaying(true)).catch(ignorePlaybackError);
+          }
+        }
+      })
+      .catch((err) => {
+        // Fallo al bajar el stream (timeout/red/interstitial) → caer al preview
+        // de 30s automáticamente (blobFailed queda true: no reintentar en bucle).
+        if (blobForRef.current !== selSig) return;
+        console.warn('[song] stream blob falló:', err?.message || err);
+        blobForRef.current = '';
+        setBlobFailed(true);
+        setLoadingStream(false);
+        setUsePreview(true);
+        const a = audioRef.current;
+        if (a && effectivePreviewSrc) {
+          a.src = effectivePreviewSrc;
+          if (wantsPlayRef.current) {
+            a.play().then(() => setPlaying(true)).catch(ignorePlaybackError);
+          }
+        }
+      });
+  };
+
+  // Prefetch del blob en cuanto hay un stream remoto disponible y la canción
+  // está visible: así al pulsar play ya está descargado (o se ve el spinner
+  // mientras baja). Una vez por canción (guarda blobForRef).
+  useEffect(() => {
+    if (!canStartRemoteBlob || !streamUrl) return;
+    startBlobDownload(streamUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canStartRemoteBlob, selSig]);
+
+  // Perfil ajeno sin canción → no mostrar la card (después de los hooks)
+  if (!isOwnProfile && !selected) return null;
 
   const togglePlay = () => {
     const audio = audioRef.current;
-    if (!audio || !playbackSrc) return;
+    if (!audio) return;
     if (playing) {
       audio.pause();
       setPlaying(false);
-    } else {
-      audio
-        .play()
-        .then(() => setPlaying(true))
-        .catch((err) => console.warn('[song] playback error:', err?.message || err));
+      wantsPlayRef.current = false;
+      return;
     }
+    wantsPlayRef.current = true;
+    // Stream remoto (túnel): blob listo → reproducir ya; descargando → esperar
+    // (el autoplay salta cuando termine). Tras un fallo (blobFailed) se usa el
+    // preview automáticamente — sin reintentos en bucle del stream.
+    if (streamUrl && isRemoteStream && !usePreview) {
+      if (blobSrc) {
+        audio.play().then(() => setPlaying(true)).catch(ignorePlaybackError);
+        return;
+      }
+      if (blobForRef.current !== selSig) startBlobDownload(streamUrl);
+      return; // ya descargándose → el autoplay saltará al terminar
+    }
+    if (!playbackSrc) return;
+    audio
+      .play()
+      .then(() => setPlaying(true))
+      .catch(ignorePlaybackError);
   };
 
   const handleSearch = async () => {
@@ -341,61 +446,88 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
           {t('profile.song_add')}
         </button>
       ) : (
-        /* ── Canción fijada: disco + info + controles ── */
+        /* ── Canción fijada: portada + disco a la derecha + info ── */
         <div className="song-card-main">
-          <div className="song-card-vinyl-wrap">
+          {/* Escenario: portada + disco. Tiempo y acciones viven sobre la portada */}
+          <div className="song-card-stage">
+            {/* Portada: click = play/pausa; tiempo arriba-izq; acciones en hover */}
+            <div className="song-card-cover-wrap">
+              <button
+                type="button"
+                className={`song-card-cover ${!playbackSrc && !canStartRemoteBlob && !loadingStream ? 'song-card-cover--disabled' : ''}`}
+                onClick={togglePlay}
+                aria-pressed={playing}
+                disabled={!playbackSrc && !canStartRemoteBlob && !loadingStream}
+                title={loadingStream ? t('profile.song_loading') || 'Loading…' : (playing ? t('profile.song_pause') : t('profile.song_play'))}
+              >
+                {selected.artwork ? (
+                  <img
+                    className="song-card-cover-img"
+                    src={selected.artwork}
+                    alt={selected.title || ''}
+                    loading="lazy"
+                    onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }}
+                  />
+                ) : (
+                  <span className="song-card-cover-img song-card-cover-img--empty">
+                    <FaMusic />
+                  </span>
+                )}
+                <span className="song-card-cover-time">
+                  {formatTime(currentTime)} / {formatTime(duration)}
+                </span>
+                <span className="song-card-cover-btn">
+                  {loadingStream ? <FaSpinner className="fc-spin" /> : (playing ? <FaPause /> : <FaPlay />)}
+                </span>
+              </button>
+
+              {/* Editar / eliminar: solo perfil propio, visibles en hover (o siempre en táctil) */}
+              {isOwnProfile && (
+                <div className="song-card-cover-actions">
+                  <button
+                    type="button"
+                    className="song-card-cover-action"
+                    onClick={openEditor}
+                    title={t('profile.song_change')}
+                  >
+                    <FaPencilAlt />
+                  </button>
+                  <button
+                    type="button"
+                    className="song-card-cover-action song-card-cover-action--danger"
+                    onClick={removeSong}
+                    disabled={saving}
+                    title={t('profile.song_remove')}
+                  >
+                    <FaTrash />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Disco de vinilo: a la derecha de la portada, asomando la mitad */}
             <button
               type="button"
               className={`song-card-vinyl ${playing ? 'song-card-vinyl--playing' : ''}`}
               onClick={togglePlay}
               aria-pressed={playing}
+              disabled={!playbackSrc && !canStartRemoteBlob && !loadingStream}
               title={playing ? t('profile.song_pause') : t('profile.song_play')}
             >
               <span className="song-card-vinyl-art" style={{ backgroundImage: `url(${selected.artwork})` }} />
             </button>
-
-            <div className="song-card-info">
-              <div className="song-card-info-top">
-                <button
-                  type="button"
-                  className="song-card-play-btn"
-                  onClick={togglePlay}
-                  disabled={!playbackSrc}
-                  aria-pressed={playing}
-                  title={playing ? t('profile.song_pause') : t('profile.song_play')}
-                >
-                  {playing ? <FaPause /> : <FaPlay />}
-                </button>
-                <span className="song-card-texts">
-                  <span className="song-card-title">{selected.title}</span>
-                  <span className="song-card-artist">{selected.artist}</span>
-                </span>
-              </div>
-              <div className="song-card-progress">
-                <div className="song-card-progress-fill" style={{ width: `${Math.min(progress * 100, 100)}%` }} />
-              </div>
-              <span className="song-card-time">
-                {formatTime(currentTime)} / {formatTime(duration)}
-              </span>
-            </div>
           </div>
 
-          {isOwnProfile && (
-            <div className="song-card-actions">
-              <button type="button" className="song-card-action-btn" onClick={openEditor} title={t('profile.song_change')}>
-                <FaPencilAlt />
-              </button>
-              <button
-                type="button"
-                className="song-card-action-btn song-card-action-btn--danger"
-                onClick={removeSong}
-                disabled={saving}
-                title={t('profile.song_remove')}
-              >
-                <FaTrash />
-              </button>
+          {/* Título/artista + progreso */}
+          <div className="song-card-info">
+            <span className="song-card-texts">
+              <span className="song-card-title">{selected.title}</span>
+              <span className="song-card-artist">{selected.artist}</span>
+            </span>
+            <div className="song-card-progress">
+              <div className="song-card-progress-fill" style={{ width: `${Math.min(progress * 100, 100)}%` }} />
             </div>
-          )}
+          </div>
         </div>
       )}
 
@@ -416,44 +548,18 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
           setCurrentTime(0);
         }}
         onError={() => {
-          // El stream directo no cargó. Dos causas típicas:
-          //  1) Túnel free tipo ngrok: devuelve el interstitial HTML y el
-          //     <audio> no puede mandar el header de bypass → bajar el stream
-          //     con fetch + header y reproducir desde un blob local (una vez
-          //     por canción).
-          //  2) Server caído / sin match en YouTube → caer al preview de 30s.
+          // El src actual no cargó (p. ej. preview de Deezer expirado). Si hay
+          // stream disponible se baja el blob; si no, se cae al preview.
           if (streamUrl && !usePreview && !blobFailed) {
             if (isRemoteStream) {
-              setBlobFailed(true);
-              blobForRef.current = selSig; // canción para la que se descarga
-              fetch(streamUrl, { headers: { 'ngrok-skip-browser-warning': '1' } })
-                .then((r) => {
-                  if (!r.ok) throw new Error(`stream fetch ${r.status}`);
-                  const ct = r.headers.get('content-type') || '';
-                  // ngrok puede devolver 200 con el interstitial HTML → filtrar
-                  if (!/audio|octet-stream/i.test(ct)) throw new Error('not audio');
-                  return r.blob();
-                })
-                .then((blob) => {
-                  // La canción cambió mientras se descargaba → descartar
-                  if (blobForRef.current !== selSig) return;
-                  if (!blob.size) throw new Error('empty stream');
-                  const url = URL.createObjectURL(blob);
-                  revokeBlob();
-                  blobUrlRef.current = url;
-                  setBlobSrc(url);
-                  const a = audioRef.current;
-                  if (a) a.play().catch(() => {});
-                })
-                .catch(() => {
-                  if (blobForRef.current === selSig) setUsePreview(true);
-                });
+              startBlobDownload(streamUrl);
               return;
             }
             setUsePreview(true);
             return;
           }
-          // Ya sin opciones (blob/preview fallido) → no reintentar en bucle.
+          // Un blob está en vuelo → dejar que termine (no reintentar en bucle).
+          if (blobForRef.current === selSig) return;
           setUsePreview(true);
         }}
       />
