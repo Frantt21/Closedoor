@@ -198,6 +198,7 @@ Alternativamente, se admiten los siguientes nombres de variables:
 | `VITE_SUPABASE_PUBLIC_KEY` | Clave publica de Supabase (nomenclatura alternativa) |
 | `YTDLP_BIN` | Ruta del binario de `yt-dlp` (solo server self-hosted, default `yt-dlp`) |
 | `FFMPEG_BIN` | Ruta del binario de `ffmpeg` (solo server self-hosted, default `ffmpeg`) |
+| `YTDLP_COOKIES_FILE` | Ruta del `cookies.txt` de una cuenta logueada (anti-throttle de YouTube; default busca en `~/.config/yt-dlp/cookies.txt`) |
 
 ---
 
@@ -250,9 +251,11 @@ reproduce previews, solo que no usa yt-dlp. El server auto-detecta yt-dlp en
 
 > 📱 Guia completa paso a paso: **[TERMUX_SETUP.md](./TERMUX_SETUP.md)**
 
-> ⚡ Para Termux **no hace falta todo el repo**: hay un server standalone sin
-> dependencias, **`music-server.js`** (3 archivos, sin npm ni build, solo los
-> endpoints de musica). Es la via recomendada — ver TERMUX_SETUP.md.
+> ⚡ Para Termux **no hace falta todo el repo**: en la carpeta
+> **`backend-music-server/`** hay un server standalone sin dependencias
+> (3 archivos + `package.json`, sin npm ni build, solo los endpoints de musica).
+> Se mantiene al dia con `npm run sync-music-server`. Es la via recomendada —
+> ver TERMUX_SETUP.md.
 
 El server self-hosted corre bien en **Termux** (telefono dedicado), y se puede
 hacer accesible al app desplegado via **ngrok** o **cloudflared**:

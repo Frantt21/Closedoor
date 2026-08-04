@@ -14,6 +14,76 @@ function formatTime(s) {
   return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
+// Timeout por INACTIVIDAD (stall), no total: un stream grande y lento pero
+// constante NO debe abortarse al llegar al límite (un timeout total hacía que
+// el app descartara descargas que ya habían terminado y reintentara de más).
+// Se aborta solo si:
+//  - La respuesta del server no llega en STREAM_HEADERS_TIMEOUT (la resolución
+//    de yt-dlp en el celular, incluso el fallback lento, cabe holgado aquí).
+//  - El body no envía NINGÚN byte durante STREAM_STALL_TIMEOUT (colgado).
+const STREAM_HEADERS_TIMEOUT = 120_000; // espera de la respuesta del server
+const STREAM_STALL_TIMEOUT = 60_000;    // sin bytes durante 60s → abortar
+const STREAM_TOTAL_TIMEOUT = 300_000;   // tope absoluto (5 min) por seguridad
+
+// Descarga el blob del stream con timeout por INACTIVIDAD:
+// - Aborta si la respuesta tarda más de STREAM_HEADERS_TIMEOUT en llegar.
+// - Aborta si el body se queda sin bytes durante STREAM_STALL_TIMEOUT.
+// - Tope absoluto STREAM_TOTAL_TIMEOUT por si hubiera un tricleo patológico.
+// - Una descarga lenta PERO CONSTANTE nunca aborta → el app siempre recibe el
+//   blob aunque tarde 2-3 min en un túnel free.
+async function fetchStreamBlob(url) {
+  const controller = new AbortController();
+  const armTimer = (ms, label) =>
+    setTimeout(() => controller.abort(new DOMException(label, 'TimeoutError')), ms);
+
+  const totalTimer = armTimer(STREAM_TOTAL_TIMEOUT, 'Stream total timeout');
+  const headersTimer = armTimer(STREAM_HEADERS_TIMEOUT, 'Stream headers timeout');
+  try {
+    let res;
+    try {
+      res = await fetch(url, {
+        headers: { 'ngrok-skip-browser-warning': '1' },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(headersTimer);
+    }
+    if (!res.ok) throw new Error(`stream fetch ${res.status}`);
+    const ct = res.headers.get('content-type') || '';
+    // ngrok puede devolver 200 con el interstitial HTML → filtrar
+    if (!/audio|octet-stream/i.test(ct)) throw new Error('not audio');
+    if (!res.body) throw new Error('no body');
+
+    const reader = res.body.getReader();
+    const chunks = [];
+    let total = 0;
+    let stallTimer = null;
+    const armStall = () => {
+      clearTimeout(stallTimer);
+      stallTimer = armTimer(STREAM_STALL_TIMEOUT, 'Stream stalled');
+    };
+    try {
+      armStall();
+      for (;;) {
+        const { done, value } = await reader.read();
+        clearTimeout(stallTimer);
+        if (done) break;
+        if (value.length) {
+          chunks.push(value);
+          total += value.length;
+        }
+        armStall(); // cada chunk reinicia el contador de inactividad
+      }
+    } finally {
+      clearTimeout(stallTimer);
+    }
+    if (!total) throw new Error('empty stream');
+    return new Blob(chunks, { type: ct });
+  } finally {
+    clearTimeout(totalTimer);
+  }
+}
+
 /**
  * Card "Mi canción" del sidebar del perfil (arriba de los intereses).
  * - Muestra el arte del álbum como un disco de vinilo que gira al reproducir
@@ -41,6 +111,8 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(songObj?.duration || 0);
+  // true cuando el stream directo del <audio> falló (interstitial, CORS)
+  const [directStreamFailed, setDirectStreamFailed] = useState(false);
   // true cuando el stream completo falló y hay que caer al preview de 30s
   const [usePreview, setUsePreview] = useState(false);
   // ¿El server de stream (yt-dlp) está disponible? Gate: si solo corre vite
@@ -85,6 +157,7 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
     setDuration(songObj?.duration || 0);
     setProgress(0);
     setUsePreview(false);
+    setDirectStreamFailed(false);
     const audio = audioRef.current;
     if (audio) {
       audio.pause();
@@ -148,8 +221,14 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
     };
   }, []);
 
-  // ── Fuente de reproducción: stream completo (yt-dlp) SOLO si el server
-  //    está disponible (health OK); si no, preview de 30s directamente ──
+  // ── Fuente de reproducción: stream completo (yt-dlp) ──
+  // Estrategia de streaming PROGRESIVO:
+  //   1. Stream directo (<audio src> apunta a la URL del túnel): la canción
+  //      empieza a sonar mientras descarga. El navegador maneja el buffering.
+  //      Con cloudflared (sin interstitial) funciona perfecto.
+  //   2. Blob (fetch + Object URL): solo como fallback para túneles con
+  //      interstitial (ngrok free) donde el <audio> no puede cargar directo.
+  //   3. Preview de 30s: último recurso si todo falla.
   const streamUrl = streamHealthy ? getStreamUrl(selected) : null;
   const isRemoteStream = !!streamUrl && (() => {
     try {
@@ -158,14 +237,14 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
       return false;
     }
   })();
-  // Para túneles remotos (ngrok free) el <audio> NUNCA carga el stream directo:
-  // el interstitial rompería la carga y daría "no supported sources". El blob
-  // se baja con fetch + header (startBlobDownload) al pulsar play, y el src del
-  // <audio> queda con el preview como placeholder hasta que el blob esté listo.
-  const canStartRemoteBlob = !!(streamUrl && isRemoteStream && !blobSrc && !blobFailed && !usePreview);
+  // Para el stream directo remoto, el <audio> carga progresivamente.
+  // Si falla (onError en el <audio>), se cae al blob y luego al preview.
+  const canStreamDirect = !!(streamUrl && isRemoteStream && !directStreamFailed && !usePreview);
+  // Blob: solo si el stream directo ya falló.
+  const canStartBlob = !!(streamUrl && isRemoteStream && directStreamFailed && !blobSrc && !blobFailed && !usePreview);
   const playbackSrc = usePreview
     ? effectivePreviewSrc
-    : (blobSrc || (isRemoteStream ? effectivePreviewSrc : streamUrl) || effectivePreviewSrc);
+    : (blobSrc || (canStreamDirect ? streamUrl : (directStreamFailed ? effectivePreviewSrc : streamUrl)) || effectivePreviewSrc);
 
   const ignorePlaybackError = (err) => {
     // AbortError = el src cambió (nuevo load) antes de que play() arrancara.
@@ -176,31 +255,23 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
 
   // Baja el stream con fetch + header de bypass (necesario para túneles free
   // como ngrok: el <audio> no puede mandar headers) y reproduce desde blob.
-  // - Timeout 45s: la primera resolución de yt-dlp en el celular tarda 5-20s
-  //   y luego se descarga el blob entero antes de sonar.
+  // - Timeout por INACTIVIDAD (fetchStreamBlob): una descarga lenta pero
+  //   constante NUNCA aborta (antes un timeout total de 120s descartaba
+  //   descargas que ya habían terminado). Solo aborta si se cuelga.
+  // - Reintento único tras un abort: el server CACHEA la resolución, así que
+  //   el segundo intento suele completar rápido.
   // - Si ya hay una descarga en vuelo para esta canción, no se duplica.
   // - Muestra el spinner (loadingStream) y loguea cada etapa para depurar.
-  const startBlobDownload = (url) => {
+  const startBlobDownload = (url, attempt = 0) => {
     if (blobForRef.current === selSig) return; // ya en vuelo para esta canción
-    setBlobFailed(true);
     blobForRef.current = selSig;
+    setBlobFailed(true);
     setLoadingStream(true);
-    console.info('[song] stream: descargando blob (primera vez puede tardar)...');
-    fetch(url, {
-      headers: { 'ngrok-skip-browser-warning': '1' },
-      signal: AbortSignal.timeout(45000),
-    })
-      .then((r) => {
-        if (!r.ok) throw new Error(`stream fetch ${r.status}`);
-        const ct = r.headers.get('content-type') || '';
-        // ngrok puede devolver 200 con el interstitial HTML → filtrar
-        if (!/audio|octet-stream/i.test(ct)) throw new Error('not audio');
-        return r.blob();
-      })
+    console.info(`[song] stream: descargando blob (intento ${attempt + 1})...`);
+    fetchStreamBlob(url)
       .then((blob) => {
         // La canción cambió mientras se descargaba → descartar
         if (blobForRef.current !== selSig) return;
-        if (!blob.size) throw new Error('empty stream');
         const objectUrl = URL.createObjectURL(blob);
         revokeBlob();
         blobUrlRef.current = objectUrl;
@@ -218,9 +289,18 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
         }
       })
       .catch((err) => {
-        // Fallo al bajar el stream (timeout/red/interstitial) → caer al preview
-        // de 30s automáticamente (blobFailed queda true: no reintentar en bucle).
         if (blobForRef.current !== selSig) return;
+        // Un abort/timeout en el PRIMER intento casi siempre es la resolución
+        // lenta de yt-dlp en el server; como este CACHEA el resultado, un
+        // segundo intento completa rápido → reintentar una sola vez.
+        const isTimeout = err?.name === 'TimeoutError' || err?.name === 'AbortError';
+        if (isTimeout && attempt < 1) {
+          console.warn('[song] stream: intento 1 abortó por inactividad, reintentando (el server ya pudo resolver)...');
+          blobForRef.current = ''; // liberar para permitir el reintento
+          startBlobDownload(url, attempt + 1);
+          return;
+        }
+        // Fallo real (red/interstitial/no-audio) → caer al preview de 30s.
         console.warn('[song] stream blob falló:', err?.message || err);
         blobForRef.current = '';
         setBlobFailed(true);
@@ -236,14 +316,12 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
       });
   };
 
-  // Prefetch del blob en cuanto hay un stream remoto disponible y la canción
-  // está visible: así al pulsar play ya está descargado (o se ve el spinner
-  // mientras baja). Una vez por canción (guarda blobForRef).
+  // Si el stream directo falló, baja el blob como fallback.
   useEffect(() => {
-    if (!canStartRemoteBlob || !streamUrl) return;
+    if (!canStartBlob || !streamUrl) return;
     startBlobDownload(streamUrl);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canStartRemoteBlob, selSig]);
+  }, [canStartBlob, selSig]);
 
   // Perfil ajeno sin canción → no mostrar la card (después de los hooks)
   if (!isOwnProfile && !selected) return null;
@@ -258,16 +336,23 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
       return;
     }
     wantsPlayRef.current = true;
-    // Stream remoto (túnel): blob listo → reproducir ya; descargando → esperar
-    // (el autoplay salta cuando termine). Tras un fallo (blobFailed) se usa el
-    // preview automáticamente — sin reintentos en bucle del stream.
+    // Estrategia de streaming PROGRESIVO:
+    //   1. Stream directo (progresivo, arranca en segundos mientras descarga)
+    //   2. Blob (si el directo falló, p. ej. ngrok interstitial)
+    //   3. Preview de 30s (último recurso)
     if (streamUrl && isRemoteStream && !usePreview) {
-      if (blobSrc) {
-        audio.play().then(() => setPlaying(true)).catch(ignorePlaybackError);
-        return;
+      if (directStreamFailed) {
+        // Stream directo falló → intentar blob
+        if (blobSrc) {
+          audio.play().then(() => setPlaying(true)).catch(ignorePlaybackError);
+          return;
+        }
+        if (blobForRef.current !== selSig) startBlobDownload(streamUrl);
+        return; // blob descargándose → autoplay cuando termine
       }
-      if (blobForRef.current !== selSig) startBlobDownload(streamUrl);
-      return; // ya descargándose → el autoplay saltará al terminar
+      // Stream directo: el <audio> ya tiene la src URL, play() arranca
+      audio.play().then(() => setPlaying(true)).catch(ignorePlaybackError);
+      return;
     }
     if (!playbackSrc) return;
     audio
@@ -454,10 +539,10 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
             <div className="song-card-cover-wrap">
               <button
                 type="button"
-                className={`song-card-cover ${!playbackSrc && !canStartRemoteBlob && !loadingStream ? 'song-card-cover--disabled' : ''}`}
+                className={`song-card-cover ${!playbackSrc && !canStartBlob && !loadingStream ? 'song-card-cover--disabled' : ''}`}
                 onClick={togglePlay}
                 aria-pressed={playing}
-                disabled={!playbackSrc && !canStartRemoteBlob && !loadingStream}
+                disabled={!playbackSrc && !canStartBlob && !loadingStream}
                 title={loadingStream ? t('profile.song_loading') || 'Loading…' : (playing ? t('profile.song_pause') : t('profile.song_play'))}
               >
                 {selected.artwork ? (
@@ -511,7 +596,7 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
               className={`song-card-vinyl ${playing ? 'song-card-vinyl--playing' : ''}`}
               onClick={togglePlay}
               aria-pressed={playing}
-              disabled={!playbackSrc && !canStartRemoteBlob && !loadingStream}
+              disabled={!playbackSrc && !canStartBlob && !loadingStream}
               title={playing ? t('profile.song_pause') : t('profile.song_play')}
             >
               <span className="song-card-vinyl-art" style={{ backgroundImage: `url(${selected.artwork})` }} />
@@ -548,17 +633,21 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
           setCurrentTime(0);
         }}
         onError={() => {
-          // El src actual no cargó (p. ej. preview de Deezer expirado). Si hay
-          // stream disponible se baja el blob; si no, se cae al preview.
-          if (streamUrl && !usePreview && !blobFailed) {
-            if (isRemoteStream) {
-              startBlobDownload(streamUrl);
-              return;
-            }
-            setUsePreview(true);
+          // Si ya está en preview, no hay más fallbacks
+          if (usePreview) return;
+          // El src actual no cargó. Estrategia en cascada:
+          // 1. Si es stream directo remoto → marcar como fallido
+          // 2. Si el stream directo ya falló y hay que bajar blob → iniciar blob
+          // 3. Si ya es blob o preview → no hacer nada (no más fallbacks)
+          if (streamUrl && isRemoteStream && !directStreamFailed && !usePreview) {
+            console.info('[song] stream directo falló → bajando blob como fallback');
+            setDirectStreamFailed(true);
             return;
           }
-          // Un blob está en vuelo → dejar que termine (no reintentar en bucle).
+          if (streamUrl && isRemoteStream && directStreamFailed && !usePreview) {
+            startBlobDownload(streamUrl);
+            return;
+          }
           if (blobForRef.current === selSig) return;
           setUsePreview(true);
         }}

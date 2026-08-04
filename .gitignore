@@ -8,6 +8,9 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+
+# Caché en disco del server de música (URLs de stream resueltas)
+.music-stream-cache.json
 dist
 dist-ssr
 *.local
@@ -28,3 +31,8 @@ dist-ssr
 nul
 TERMUX_SETUP.md
 music-server.zip
+/backend-music-server
+scripts/sync-music-server.mjs
+.env.example
+TERMUX_DIAGNOSTICO.md
+diagnostico-stream.sh

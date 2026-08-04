@@ -9,6 +9,7 @@
     "start": "node server.js",
     "lint": "eslint .",
     "preview": "vite preview",
+    "sync-music-server": "node scripts/sync-music-server.mjs",
     "validate-locales": "node scripts/validate-locales.mjs"
   },
   "dependencies": {
