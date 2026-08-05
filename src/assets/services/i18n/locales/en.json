@@ -582,8 +582,6 @@
   "settings.show_stats_card_desc": "Show or hide the stats card on profiles.",
   "settings.show_toast_notifications": "Toast notifications",
   "settings.show_toast_notifications_desc": "Show an in-app toast when a new notification arrives",
-  "settings.show_trending": "Show trending",
-  "settings.show_trending_desc": "Show or hide the trending widget in the sidebar.",
   "status.online": "Online",
   "status.idle": "Idle",
   "status.dnd": "Do Not Disturb",

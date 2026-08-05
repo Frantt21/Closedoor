@@ -19,13 +19,17 @@ const CORS_SAFE_DOMAINS = [
   'cdn.discordapp.com',
 ];
 
-// Domains that block CORS — skip direct fetch to avoid console errors
+// Domains that block CORS or hotlinking — skip direct fetch to avoid console
+// errors and go straight to a proxy. wallhaven devuelve 403 al navegador y
+// wsrv.nl lo bloquea por política → se resuelve con el proxy propio.
 const CORS_BLOCKED_DOMAINS = [
   'pinimg.com',
   'pinterest.com',
   'fbcdn.net',
   'instagram.com',
   'cdninstagram.com',
+  'wallhaven.cc',
+  'imgur.com',
 ];
 
 // Image proxy that resizes + serves with proper CORS headers
@@ -104,6 +108,19 @@ function proxyViaWsrv(originalUrl) {
   return `${IMAGE_PROXY}${params.toString()}`;
 }
 
+/**
+ * Proxy de imágenes PROPIO (vía el backend: /api/image-proxy → music server).
+ * Algunos dominios (wallhaven) bloquean el fetch del navegador por CORS/hotlink
+ * Y además wsrv.nl los bloquea por política. El server baja la imagen SIN
+ * Origin header (esos dominios responden 200 a curl) y la devuelve con CORS *
+ * → el navegador puede leerla para extraer colores.
+ * Ruta relativa: funciona en producción (rewrite de Vercel) y en dev (proxy de
+ * Vite) — no depende de un servicio de terceros con políticas de bloqueo.
+ */
+function proxyViaSelf(originalUrl) {
+  return `/api/image-proxy?url=${encodeURIComponent(originalUrl)}`;
+}
+
 function loadBlobAndExtract(blob) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(blob);
@@ -145,11 +162,14 @@ export async function extractColors(imageUrl) {
     // CORS-safe → fetch directly
     colors = await attemptExtraction(imageUrl);
   } else if (matchesDomain(imageUrl, CORS_BLOCKED_DOMAINS)) {
-    // CORS-blocked → skip direct fetch (avoids console errors), use proxy
-    colors = await attemptExtraction(proxyViaWsrv(imageUrl));
+    // CORS-blocked/hotlink → proxy propio primero (sin política de bloqueo),
+    // wsrv como respaldo (resize + CORS para Pinterest/Instagram, etc.).
+    colors = await attemptExtraction(proxyViaSelf(imageUrl))
+      || await attemptExtraction(proxyViaWsrv(imageUrl));
   } else {
-    // Unknown → try direct first, then proxy
+    // Unknown → direct first, then own proxy, then wsrv
     colors = await attemptExtraction(imageUrl)
+      || await attemptExtraction(proxyViaSelf(imageUrl))
       || await attemptExtraction(proxyViaWsrv(imageUrl));
   }
 

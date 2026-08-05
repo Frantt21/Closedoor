@@ -130,7 +130,6 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
   const blobUrlRef = useRef(null);
   const blobForRef = useRef(''); // sig de la canción para la que se descarga el blob
   const wantsPlayRef = useRef(false); // el usuario pulsó play → autoplay cuando el blob esté listo
-  const [progress, setProgress] = useState(0);
   // URL de preview resuelta con la sig de la canción a la que pertenece
   // (los previews de Deezer expiran ≈ 15 min → se re-consultan al reproducir)
   const [resolvedPreview, setResolvedPreview] = useState({ sig: '', url: null });
@@ -157,7 +156,6 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
     setPlaying(false);
     setCurrentTime(0);
     setDuration(songObj?.duration || 0);
-    setProgress(0);
     setUsePreview(false);
     setDirectStreamFailed(false);
     const audio = audioRef.current;
@@ -619,15 +617,12 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
             </button>
           </div>
 
-          {/* Título/artista + progreso */}
+          {/* Título/artista (el progreso se ve en el contador de la portada) */}
           <div className="song-card-info">
             <span className="song-card-texts">
               <span className="song-card-title">{selected.title}</span>
               <span className="song-card-artist">{selected.artist}</span>
             </span>
-            <div className="song-card-progress">
-              <div className="song-card-progress-fill" style={{ width: `${Math.min(progress * 100, 100)}%` }} />
-            </div>
           </div>
         </div>
       )}
@@ -638,14 +633,11 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
         src={playbackSrc || undefined}
         preload="none"
         onTimeUpdate={(e) => {
-          const a = e.currentTarget;
-          setCurrentTime(a.currentTime);
-          setProgress(a.duration ? a.currentTime / a.duration : 0);
+          setCurrentTime(e.currentTarget.currentTime);
         }}
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
         onEnded={() => {
           setPlaying(false);
-          setProgress(0);
           setCurrentTime(0);
         }}
         onError={() => {

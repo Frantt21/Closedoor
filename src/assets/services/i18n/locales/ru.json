@@ -564,8 +564,6 @@
   "settings.show_stats_card_desc": "Показывать или скрывать карточку статистики в профилях.",
   "settings.show_toast_notifications": "Тосты",
   "settings.show_toast_notifications_desc": "Показывать всплывающее уведомление в приложении при получении нового уведомления",
-  "settings.show_trending": "Показывать тренды",
-  "settings.show_trending_desc": "Показывать или скрывать виджет трендов на боковой панели.",
   "status.online": "В сети",
   "status.idle": "Отошёл",
   "status.dnd": "Не беспокоить",

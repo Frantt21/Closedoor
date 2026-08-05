@@ -564,8 +564,6 @@
   "settings.show_stats_card_desc": "プロフィールの統計カードを表示/非表示にします。",
   "settings.show_toast_notifications": "トースト通知",
   "settings.show_toast_notifications_desc": "新しい通知が届いたときにアプリ内トーストを表示します",
-  "settings.show_trending": "トレンドを表示",
-  "settings.show_trending_desc": "サイドバーのトレンドウィジェットを表示/非表示にします。",
   "status.online": "オンライン",
   "status.idle": "退席中",
   "status.dnd": "取り込み中",

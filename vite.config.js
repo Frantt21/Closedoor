@@ -30,6 +30,12 @@ export default defineConfig({
         target: 'http://mapi.foranly.space:24633',
         changeOrigin: true,
       },
+      // Proxy de imágenes CORS (wallhaven, etc. bloquean el fetch del navegador):
+      // el server baja la imagen y la devuelve con CORS *, igual que en Vercel.
+      '/api/image-proxy': {
+        target: 'http://mapi.foranly.space:24633',
+        changeOrigin: true,
+      },
     },
     allowedHosts: [
       '.ngrok-free.app',

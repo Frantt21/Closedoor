@@ -197,7 +197,7 @@ function ProfileContent({ path, ownProfile, user, t }) {
       .finally(() => setLoading(false));
   }, [path, isOtherProfilePage, isUUID]);
 
-  const { showAccent, accentVisibility, showTrending, showInterests, showProfileStats } = useI18n();
+  const { showAccent, accentVisibility, showInterests, showProfileStats } = useI18n();
 
   // ── Extract bg URL early for useBgContrast (must be before any early returns) ──
   const bgUrlRight = (isOwnProfilePage ? ownProfile : viewedProfile)?.profile_background_url;
@@ -254,9 +254,6 @@ function ProfileContent({ path, ownProfile, user, t }) {
   const ownerShowStats = isOwnProfileRight
     ? showProfileStats
     : (activeProfile?.show_profile_stats ?? true);
-  const ownerShowTrending = isOwnProfileRight
-    ? showTrending
-    : (activeProfile?.show_trending ?? true);
 
   const accentVisibleRight = showAccent && ownerShowAccentProfile && (
     ownerAccentVisibility === 'both' ||
@@ -316,7 +313,6 @@ function ProfileContent({ path, ownProfile, user, t }) {
         showStats={ownerShowStats}
         surfaceStyle={resolvedSurfaceStyle}
       />
-      {ownerShowTrending && <TrendingHashtags t={t} surfaceStyle={resolvedSurfaceStyle} />}
     </>
   );
 }

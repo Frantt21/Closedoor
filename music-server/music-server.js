@@ -8,10 +8,13 @@
 
 import http from 'http';
 import https from 'https';
+import dns from 'dns';
 import { existsSync, mkdirSync, chmodSync, createWriteStream, unlinkSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
+
+const dnsLookup = dns.promises.lookup;
 import { combinedMusicSearch, getMusicHealth, handleStreamRequest, handleDownloadRequest, resolveStream, detectedCookiesFile } from './api/_musicStream.js';
 import { resolveTrackPreview } from './api/_music.js';
 
@@ -263,6 +266,55 @@ function rateLimitStream(req) {
   return entry.count <= 15;
 }
 
+// ── Rate limit del proxy de imágenes ──
+// Endpoint público → límite por IP (60/min) para evitar abuso de ancho de
+// banda del proxy abierto (imágenes grandes de terceros).
+const imageProxyLimits = new Map();
+function rateLimitImageProxy(req) {
+  const ip = req.socket?.remoteAddress || 'unknown';
+  const now = Date.now();
+  const entry = imageProxyLimits.get(ip);
+  if (!entry || now > entry.resetAt) {
+    imageProxyLimits.set(ip, { count: 1, resetAt: now + 60_000 });
+    return true;
+  }
+  entry.count += 1;
+  if (imageProxyLimits.size > 5000) imageProxyLimits.clear();
+  return entry.count <= 60;
+}
+
+// ── Anti-SSRF del proxy de imágenes ──
+// Comprueba la IP REAL resuelta (no solo el string del host): cubre
+// IPv4-mapped IPv6 (::ffff:127.0.0.1), shorthand (127.1, decimal), IPs
+// privadas y de metadata. Los nombres internos (metadata, *.internal,
+// *.local) se rechazan directamente.
+const PRIVATE_IP_RE = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|127\.|0\.|169\.254\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/;
+
+async function isHostAllowed(host) {
+  const h = String(host || '').toLowerCase();
+  if (!h) return false;
+  if (
+    h === 'localhost' || h === '127.0.0.1' || h === '::1' || h === '0.0.0.0' ||
+    h === '169.254.169.254' || h === 'metadata' || h === 'metadata.google.internal' ||
+    h.endsWith('.local') || h.endsWith('.internal') || h.endsWith('.localhost')
+  ) return false;
+  // Resolver la IP real: cubre formas que el string no revela.
+  try {
+    const { address } = await dnsLookup(h, { family: 0 });
+    if (PRIVATE_IP_RE.test(address)) return false;
+    if (address.startsWith('fe80') || address.startsWith('fd') || address.startsWith('fc')) return false; // link-local/ULA IPv6
+    if (address.startsWith('::ffff:')) {
+      const v4 = address.slice(7);
+      if (PRIVATE_IP_RE.test(v4)) return false;
+    }
+    return true;
+  } catch {
+    return false; // no resuelve → rechazar
+  }
+}
+
+const MAX_IMAGE_PROXY_BYTES = 20 * 1024 * 1024; // 20MB tope por imagen
+
 // ── Main ──
 // ── Detectar binarios (DESPUÉS de auto-setup) ──
 function findBinary(envVar, localName, systemName) {
@@ -468,9 +520,118 @@ async function main() {
         return;
       }
 
+      // ── Proxy de imágenes CORS (GET /api/image-proxy?url=...) ──
+      // Algunos dominios bloquean el fetch del navegador (CORS) o el
+      // hotlinking (wallhaven 403). Este proxy baja la imagen DESDE el
+      // server (sin Origin header → esos dominios responden 200) y la
+      // devuelve con CORS * para que el navegador pueda leerla (p. ej.
+      // extracción de colores para el contraste del fondo de perfil).
+      if (url.pathname === '/api/image-proxy') {
+        const target = url.searchParams.get('url') || '';
+        if (!target) {
+          res.status(400).json({ success: false, error: 'Missing ?url parameter' });
+          return;
+        }
+        let parsedTarget;
+        try {
+          parsedTarget = new URL(target);
+        } catch {
+          res.status(400).json({ success: false, error: 'Invalid URL' });
+          return;
+        }
+        if (parsedTarget.protocol !== 'http:' && parsedTarget.protocol !== 'https:') {
+          res.status(400).json({ success: false, error: 'Only http/https URLs are allowed' });
+          return;
+        }
+        if (!rateLimitImageProxy(req)) {
+          res.status(429).json({ success: false, error: 'Too many image proxy requests, try again in a minute' });
+          return;
+        }
+        // Anti-SSRF: rechaza IPs privadas/metadata resueltas y nombres internos.
+        if (!(await isHostAllowed(parsedTarget.hostname))) {
+          res.status(400).json({ success: false, error: 'URL not allowed' });
+          return;
+        }
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 15000);
+          const upRes = await fetch(target, {
+            signal: controller.signal,
+            redirect: 'follow',
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
+              'Accept': 'image/*,*/*;q=0.8',
+            },
+          });
+          // Anti-SSRF tras redirects: la URL FINAL (después de follow) también
+          // debe apuntar a un host público (un redirect podría caer a IP interna).
+          try {
+            if (upRes.url && !(await isHostAllowed(new URL(upRes.url).hostname))) {
+              clearTimeout(timer);
+              try { await upRes.body?.cancel(); } catch {}
+              res.status(400).json({ success: false, error: 'URL not allowed' });
+              return;
+            }
+          } catch {
+            // upRes.url ilegible → no bloquear (el chequeo inicial ya pasó)
+          }
+          if (!upRes.ok) {
+            clearTimeout(timer);
+            res.status(502).json({ success: false, error: `Upstream HTTP ${upRes.status}` });
+            return;
+          }
+          // Tope temprano por content-length (evita bufferizar 2GB para rechazarlo).
+          const declared = Number(upRes.headers.get('content-length') || 0);
+          if (declared > MAX_IMAGE_PROXY_BYTES) {
+            clearTimeout(timer);
+            res.status(413).json({ success: false, error: 'Image too large' });
+            return;
+          }
+          // Lectura con CAP: aborta si el stream supera el tope (content-length
+          // ausente o mentiroso → no hay OOM del server).
+          const reader = upRes.body?.getReader();
+          const chunks = [];
+          let total = 0;
+          let tooLarge = false;
+          if (reader) {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              total += value.byteLength;
+              if (total > MAX_IMAGE_PROXY_BYTES) {
+                tooLarge = true;
+                try { await reader.cancel(); } catch {}
+                break;
+              }
+              chunks.push(value);
+            }
+          }
+          clearTimeout(timer);
+          if (tooLarge) {
+            res.status(413).json({ success: false, error: 'Image too large' });
+            return;
+          }
+          const buf = Buffer.concat(chunks, total);
+          if (buf.length === 0) {
+            res.status(502).json({ success: false, error: 'Empty upstream response' });
+            return;
+          }
+          const contentType = upRes.headers.get('content-type') || 'application/octet-stream';
+          res.setHeader('Content-Type', contentType);
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          res.statusCode = 200;
+          res.end(buf);
+        } catch (err) {
+          console.warn('[music-server] image-proxy:', err.message);
+          if (!res.headersSent) res.status(502).json({ success: false, error: 'Image proxy error' });
+          else res.end();
+        }
+        return;
+      }
+
       res.status(404).json({
         success: false,
-        error: 'Not found. Endpoints: /api/music/health · /api/music/search?q=... · /api/music/stream?artist=&title= · /api/music/download?artist=&title= · /api/music/resolve?artist=&title=',
+        error: 'Not found. Endpoints: /api/music/health · /api/music/search?q=... · /api/music/stream?artist=&title= · /api/music/download?artist=&title= · /api/music/resolve?artist=&title= · /api/image-proxy?url=',
       });
     } catch (err) {
       console.warn('[music-server]', err.message);

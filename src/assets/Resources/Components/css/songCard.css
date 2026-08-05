@@ -129,8 +129,12 @@
     transition: opacity 0.15s ease, transform 0.15s ease;
   }
 
+  /* Visibles SOLO en hover real o foco por teclado (:has(:focus-visible)).
+     NO en :focus-within: al hacer clic en play el botón conserva el foco y
+     las acciones quedaban pegadas hasta clickear fuera. Con :focus-visible
+     (solo teclado) un clic ya no las deja visibles. */
   .song-card-cover-wrap:hover .song-card-cover-actions,
-  .song-card-cover-wrap:focus-within .song-card-cover-actions {
+  .song-card-cover-wrap:has(:focus-visible) .song-card-cover-actions {
     opacity: 1;
     transform: translateY(0);
   }
@@ -245,7 +249,7 @@
   }
 }
 
-/* ── Info: título/artista + progreso ── */
+/* ── Info: título/artista (el progreso se ve en el contador de la portada) ── */
 .song-card-info {
   min-width: 0;
   display: flex;
@@ -274,21 +278,6 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-/* ── Barra de progreso ── */
-.song-card-progress {
-  height: 4px;
-  border-radius: var(--radius-full, 9999px);
-  background: var(--overlay-bg, rgba(255, 255, 255, 0.08));
-  overflow: hidden;
-}
-
-.song-card-progress-fill {
-  height: 100%;
-  border-radius: inherit;
-  background: var(--accent-color, var(--color-accent, #6b7280));
-  transition: width 0.2s linear;
 }
 
 /* ── CTA "Agregar canción" ── */

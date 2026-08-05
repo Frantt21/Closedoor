@@ -572,8 +572,6 @@
   "settings.show_stats_card_desc": "Muestra u oculta la card de estadísticas en los perfiles.",
   "settings.show_toast_notifications": "Notificaciones toast",
   "settings.show_toast_notifications_desc": "Muestra un toast en la app al recibir una nueva notificación",
-  "settings.show_trending": "Mostrar tendencias",
-  "settings.show_trending_desc": "Muestra u oculta el widget de tendencias en la barra lateral.",
   "status.online": "En línea",
   "status.idle": "Ausente",
   "status.dnd": "No molestar",

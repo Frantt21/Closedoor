@@ -29,8 +29,9 @@ function normalizeProfileUrls(profile) {
 // la UI lee de un perfil. El email propio se obtiene de auth.users
 // (user?.email), nunca de la tabla.
 // Lista verificada contra las 53 columnas reales de la tabla (SELECT * real,
-// agosto 2026): 52 públicas + email (revocada). Si se añade una columna a la
-// tabla y el frontend la necesita, hay que añadirla aquí también.
+// agosto 2026): 51 públicas + email (revocada). show_trending se excluye
+// deliberadamente (las tendencias se eliminaron del perfil). Si se añade una
+// columna a la tabla y el frontend la necesita, hay que añadirla aquí también.
 export const PROFILE_PUBLIC_COLUMNS = [
   'id',
   'username',
@@ -59,7 +60,6 @@ export const PROFILE_PUBLIC_COLUMNS = [
   'show_accent_explore',
   'show_interests',
   'show_profile_stats',
-  'show_trending',
   'profile_background_url',
   'profile_background_position',
   'profile_background_blur',

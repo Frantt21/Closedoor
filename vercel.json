@@ -67,6 +67,10 @@
       "destination": "http://mapi.foranly.space:24633/api/music/download"
     },
     {
+      "source": "/api/image-proxy",
+      "destination": "http://mapi.foranly.space:24633/api/image-proxy"
+    },
+    {
       "source": "/cdn/(.*)",
       "destination": "http://api.foranly.space:24587/cdn/$1"
     },
