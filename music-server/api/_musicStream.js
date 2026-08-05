@@ -195,6 +195,16 @@ export function pickBestCandidate(candidates, { title, artist, duration }) {
 }
 
 // ── Resolver URL de audio ──
+// Una URL es válida si new URL() la parsea y tiene host. Se usa para
+// descartar lo que yt-dlp imprima que empiece por https:// pero NO sea una
+// URL real (p. ej. líneas de manifest parciales, o salida con BOM/\r).
+function isValidStreamUrl(url) {
+  try {
+    const u = new URL(url);
+    return !!u.hostname;
+  } catch { return false; }
+}
+
 export async function resolveBestAudioUrl(videoUrl) {
   // Selector ULTRA-permisivo: intenta todo, incluyendo video+audio
   const run = (extra, opts = {}) => runYtDlp([
@@ -202,7 +212,15 @@ export async function resolveBestAudioUrl(videoUrl) {
     '--get-url', '--no-playlist',
     ...extra, videoUrl,
   ], opts);
-  const parseUrl = (stdout) => stdout.split('\n').map((l) => l.trim()).find((l) => /^https?:\/\//.test(l));
+  const parseUrl = (stdout) => {
+    // Normalizar línea a línea: quitar BOM, \r, y espacios. Solo se acepta si
+    // new URL() la parsea — así nunca cacheamos basura que luego rompa el stream.
+    for (const raw of stdout.split('\n')) {
+      const l = raw.replace(/^\uFEFF/, '').replace(/\r$/, '').trim();
+      if (/^https?:\/\//.test(l) && isValidStreamUrl(l)) return l;
+    }
+    return null;
+  };
 
   // Intentar con cookies (si disponibles) — primer intento verbose para diagnosticar
   let isFirstAttempt = true;
@@ -307,6 +325,10 @@ export async function resolveStream({ artist = '', title, duration }, { fresh = 
     if (!best) throw new Error('No YouTube candidate found');
     if (YTDLP_COOKIES_FILE) console.info(`[music-stream] usando cookies de: ${YTDLP_COOKIES_FILE}`);
     const url = await resolveBestAudioUrl(best.url);
+    if (!isValidStreamUrl(url)) {
+      console.warn(`[music-stream] ⚠️ URL no parseable para "${query}": ${JSON.stringify(String(url).slice(0, 150))}`);
+      throw new Error('Invalid stream URL');
+    }
     const mime = getMimeFromUrl(url);
     streamCache.set(key, { url, mime, at: Date.now(), __v: CACHE_VERSION, videoTitle: best.title, videoId: best.id });
     persistCache();
@@ -385,6 +407,17 @@ function progressLogger({ label, total, startedAt }) {
 // instantáneos desde caché.
 export async function handleStreamRequest(req, res, opts) {
   return serveAudio(req, res, { ...opts, mode: 'stream' });
+}
+
+// ── Bypass de rate-limit de googlevideo ──
+// Añade ratebypass=yes a las URLs de googlevideo: evita el throttling de
+// descarga cuando se solicitan streams con rapidez desde la misma IP.
+export function withRateBypass(url) {
+  try {
+    const u = new URL(url);
+    if (/googlevideo/i.test(u.hostname)) { u.searchParams.set('ratebypass', 'yes'); return u.toString(); }
+    return url;
+  } catch { return url; }
 }
 
 // ── Descarga con caché en memoria ──
@@ -489,7 +522,17 @@ function serveBuffer(res, buf) {
 function streamDownloadToResponse(res, url, cachePath, key) {
   return new Promise((resolve, reject) => {
     let parsed;
-    try { parsed = new URL(withRateBypass(url)); } catch { reject(new Error('Invalid stream URL')); return; }
+    try {
+      parsed = new URL(withRateBypass(url));
+    } catch (err) {
+      // Diagnóstico COMPLETO: URL íntegra (escape de \n/\r/controles), el error
+      // real del parser y la versión de Node (diferencias entre versiones).
+      const full = String(url).replace(/[\u0000-\u001f\u007f]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
+      console.warn(`[music-stream] ⚠️ URL inválida (len ${String(url).length}, node ${process.version}): ${full}`);
+      console.warn(`[music-stream] ⚠️   error parser: ${err?.message || err}`);
+      reject(new Error('Invalid stream URL'));
+      return;
+    }
     const lib = parsed.protocol === 'https:' ? https : http;
     const out = lib.get(parsed, { headers: { 'User-Agent': UA } }, (upRes) => {
       if (upRes.statusCode !== 200) {
@@ -706,6 +749,11 @@ async function serveAudio(req, res, { artist = '', title = '', duration = 0, fre
     // corrompe ni se despiertan waiters en cascada).
     await acquireDownloadSlot();
     let slotAcquired = true;
+
+    // Diagnóstico del URL que entra al stream (ocasional — 1 de cada 20 para no ensuciar).
+    if (Math.random() < 0.05) {
+      console.info(`[music-stream] 🔗 ${label} · url len ${String(resolved.url).length} · ${String(resolved.url).slice(0, 80)}`);
+    }
 
     const p = (async () => {
       try {
