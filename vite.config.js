@@ -23,6 +23,12 @@ export default defineConfig({
         target: 'http://mapi.foranly.space:24633',
         changeOrigin: true,
       },
+      // Legacy fallback: /api/music-search → mismo music server
+      '/api/music-search': {
+        target: 'http://mapi.foranly.space:24633/api/music',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/music-search', '/api/music/search'),
+      },
     },
     allowedHosts: [
       '.ngrok-free.app',

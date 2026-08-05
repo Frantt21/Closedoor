@@ -197,16 +197,14 @@ export async function resolvePreviewUrl(song) {
   resolvedPreviewCache.delete(key); // entrada expirada → liberar
 
   // Candidatos en orden:
-  //   1) El server de música (túnel remoto si VITE_MUSIC_API_URL está
-  //      definida; solo se usa cuando NO es same-origin, porque en Vercel
-  //      `/api/music/search` no existe como serverless).
+  //   1) Server de música vía MUSIC_API (/api/music/search proxy, o URL remota).
   //   2) Proxy same-origin `/api/music-search` (serverless de Vercel o
-  //      server.js en dev) — cubre el caso sin túnel.
+  //      server.js en dev) — fallback si el music server no está disponible.
   const trackParam = encodeURIComponent(song.trackId);
-  const candidates = MUSIC_API !== '/api/music'
-    ? [`${MUSIC_API}/search?track=${trackParam}&provider=deezer`]
-    : [];
-  candidates.push(`/api/music-search?track=${trackParam}&provider=deezer`);
+  const candidates = [
+    `${MUSIC_API}/search?track=${trackParam}&provider=deezer`,
+    `/api/music-search?track=${trackParam}&provider=deezer`,
+  ];
 
   for (const url of candidates) {
     try {
