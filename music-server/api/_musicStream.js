@@ -519,13 +519,40 @@ function persistAudioToDisk(cachePath, buf) {
   });
 }
 
-// Sirve un Buffer completo (memoria o leído de disco).
+// Sirve un Buffer completo (memoria o leído de disco) con soporte de Range
+// (206) para que el reproductor pueda hacer seek sobre archivos cacheados.
 function serveBuffer(res, buf) {
   res.status(200);
   res.setHeader('Content-Type', 'audio/mp4');
-  res.setHeader('Content-Length', String(buf.length));
   res.setHeader('Accept-Ranges', 'bytes');
   res.setHeader('Cache-Control', 'public, max-age=3600');
+
+  const range = res.req?.headers?.range;
+  if (range) {
+    const m = /bytes=(\d*)-(\d*)/.exec(String(range));
+    if (m) {
+      const total = buf.length;
+      let start = m[1] ? parseInt(m[1], 10) : NaN;
+      let end = m[2] ? parseInt(m[2], 10) : total - 1;
+      if (!m[1] && m[2]) start = Math.max(0, total - parseInt(m[2], 10)); // sufijo bytes=-N
+      if (Number.isNaN(start) || start >= total || start > (Number.isNaN(end) ? total - 1 : end)) {
+        res.status(416);
+        res.setHeader('Content-Range', `bytes */${total}`);
+        res.end();
+        return;
+      }
+      if (Number.isNaN(end)) end = total - 1;
+      end = Math.min(end, total - 1);
+      const slice = buf.subarray(start, end + 1);
+      res.status(206);
+      res.setHeader('Content-Range', `bytes ${start}-${end}/${total}`);
+      res.setHeader('Content-Length', String(slice.length));
+      res.end(slice);
+      return;
+    }
+  }
+
+  res.setHeader('Content-Length', String(buf.length));
   res.end(buf);
 }
 

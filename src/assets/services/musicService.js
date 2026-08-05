@@ -91,6 +91,21 @@ const STREAM_DIRECT_URL = (import.meta.env.VITE_MUSIC_STREAM_URL || '').replace(
 const isHttpsPage = () =>
   typeof window !== 'undefined' && window.location?.protocol === 'https:';
 
+/**
+ * Base de la API del music server a usar:
+ *   - En prod con túnel HTTPS automático (health.tunnelUrl) → la raíz del túnel.
+ *   - Si no, same-origin (/api/music): proxy de Vite en dev, rewrites/función
+ *     serverless de Vercel en prod.
+ */
+function getMusicApiBase(health = null) {
+  const tunnel = health?.tunnelUrl;
+  if (!import.meta.env.DEV && tunnel && tunnel.startsWith('https:')) {
+    const b = tunnel.replace(/\/+$/, '');
+    return b.endsWith('/api/music') ? b : `${b}/api/music`;
+  }
+  return MUSIC_API;
+}
+
 export function getStreamUrl(song, health = null) {
   if (!song?.title || !song?.artist) return null;
   const params = new URLSearchParams({ artist: song.artist, title: song.title });
@@ -124,15 +139,42 @@ export function getStreamUrl(song, health = null) {
   //    server sirve bajo /api/music → se concatena el prefijo.
   const tunnel = health?.tunnelUrl;
   if (tunnel && tunnel.startsWith('https:')) {
-    const base = tunnel.replace(/\/+$/, '');
-    const apiBase = base.endsWith('/api/music') ? base : `${base}/api/music`;
-    return `${apiBase}/download?${params.toString()}`;
+    return `${getMusicApiBase(health)}/download?${params.toString()}`;
   }
 
-  // 4) Fallback same-origin en producción: /download vía rewrite de Vercel
-  //    (solo deja pasar respuestas de archivo completo con Content-Length; los
-  //    streams chunked dan 403).
-  return `${MUSIC_API}/download?${params.toString()}`;
+  // 4) Fallback same-origin en producción:
+  //    - /api/music/stream: función serverless de Vercel que STREMEA en tiempo
+  //      real (las functions sí soportan streaming, los rewrites no). Se
+  //      activa con VITE_MUSIC_STREAM_VIA_VERCEL=1.
+  //    - /api/music/download: rewrite de Vercel, archivo completo con
+  //      Content-Length (lo que sí deja pasar). Default para no regresar.
+  const viaVercelStream = import.meta.env.VITE_MUSIC_STREAM_VIA_VERCEL === '1';
+  return `${MUSIC_API}/${viaVercelStream ? 'stream' : 'download'}?${params.toString()}`;
+}
+
+/**
+ * Pre-warm: anticipa el trabajo del server para que el play arranque al
+ * instante. La resolución de yt-dlp tarda 5-30s en canciones nunca escuchadas;
+ * al montar la card se dispara en background:
+ *   - SIEMPRE: /resolve (resuelve y cachea la URL en el server, sin descargar).
+ *   - download=true (perfil propio): además pre-descarga completa → el server la
+ *     deja cacheada (memoria/disco) y el play sale de caché (~1s). En perfiles
+ *     ajenos NO se descarga (ahorro de banda al navegar perfiles).
+ * Fire-and-forget: nunca lanza errores al llamador.
+ */
+export function prewarmStream(song, health = null, { download = false } = {}) {
+  if (!song?.title || !song?.artist) return;
+  const params = new URLSearchParams({ artist: song.artist, title: song.title });
+  if (song.duration) params.set('duration', String(song.duration));
+  const base = getMusicApiBase(health);
+
+  // Resolución (parte lenta) en TODA card, cueste lo que cueste.
+  fetch(`${base}/resolve?${params.toString()}`, { signal: AbortSignal.timeout(15000) }).catch(() => {});
+
+  // Pre-descarga completa solo en producción y cuando se autoriza.
+  if (!import.meta.env.DEV && download) {
+    fetch(`${base}/download?${params.toString()}`, { mode: 'no-cors' }).catch(() => {});
+  }
 }
 
 // ── Health del server de stream (cache en memoria, TTL 5 min) ──

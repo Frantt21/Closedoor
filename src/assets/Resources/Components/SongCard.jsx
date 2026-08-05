@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { FaMusic, FaPlay, FaPause, FaPencilAlt, FaTrash, FaSearch, FaSpinner } from 'react-icons/fa';
 import { useI18n } from '../../services/i18n/useI18n';
 import { useAuth } from '../../../hooks/useAuth';
-import { searchMusic, resolvePreviewUrl, getStreamUrl, getStreamHealth } from '../../services/musicService';
+import { searchMusic, resolvePreviewUrl, getStreamUrl, getStreamHealth, prewarmStream } from '../../services/musicService';
 import { updateUserProfile } from '../../services/userService';
 import { toast } from 'react-toastify';
 import './css/songCard.css';
@@ -213,6 +213,16 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
       cancelled = true;
     };
   }, []);
+
+  // Pre-warm: cuando la card monta con una canción y el server está OK, se
+  // anticipa la resolución en background (5-30s de yt-dlp en canciones nuevas).
+  // En el perfil PROPIO además se pre-descarga completa → el play sale de caché
+  // del server al instante. En perfiles ajenos solo se resuelve (ahorro de banda).
+  useEffect(() => {
+    if (!selected || !streamHealth) return;
+    prewarmStream(selected, streamHealth, { download: isOwnProfile });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, streamHealth, isOwnProfile]);
 
   // Pausar al desmontar (el <audio> siempre está montado → el ref es estable).
   // blobForRef se resetea para invalidar cualquier fetch de blob en vuelo: el

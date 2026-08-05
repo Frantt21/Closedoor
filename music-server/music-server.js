@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, chmodSync, createWriteStream, unlinkSync, readFi
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
-import { combinedMusicSearch, getMusicHealth, handleStreamRequest, handleDownloadRequest, detectedCookiesFile } from './api/_musicStream.js';
+import { combinedMusicSearch, getMusicHealth, handleStreamRequest, handleDownloadRequest, resolveStream, detectedCookiesFile } from './api/_musicStream.js';
 import { resolveTrackPreview } from './api/_music.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -447,6 +447,27 @@ async function main() {
         return;
       }
 
+      // Pre-warm: resuelve la URL de audio (yt-dlp) y la cachea SIN descargar.
+      // El frontend lo llama al montar la card → el play posterior arranca al
+      // instante (sin los 5-30s de resolución).
+      if (url.pathname === '/api/music/resolve') {
+        const artist = url.searchParams.get('artist') || '';
+        const title = url.searchParams.get('title') || '';
+        const duration = url.searchParams.get('duration') || 0;
+        if (!title) {
+          res.status(400).json({ success: false, error: 'Missing ?title parameter' });
+          return;
+        }
+        try {
+          await resolveStream({ artist, title, duration });
+          res.status(200).json({ success: true });
+        } catch (err) {
+          console.warn('[music-server] resolve:', err.message);
+          res.status(502).json({ success: false, error: err.message });
+        }
+        return;
+      }
+
       res.status(404).json({
         success: false,
         error: 'Not found. Endpoints: /api/music/health, /api/music/search?q=..., /api/music/stream?artist=&title=',
@@ -464,7 +485,7 @@ async function main() {
     console.log(`   yt-dlp: ${process.env.YTDLP_BIN} ${existsSync(process.env.YTDLP_BIN) ? '✅' : '❌'}`);
     console.log(`   ffmpeg: ${process.env.FFMPEG_BIN} ${existsSync(process.env.FFMPEG_BIN) ? '✅' : '❌'}`);
     console.log(`   cookies: ${detectedCookiesFile ? detectedCookiesFile + ' ✅' : '⚠️ no detectadas (coloca cookies.txt junto a music-server.js)'}`);
-    console.log('   /api/music/health · /api/music/search?q=... · /api/music/stream?artist=&title= · /api/music/download?artist=&title=');
+    console.log('   /api/music/health · /api/music/search?q=... · /api/music/stream?artist=&title= · /api/music/download?artist=&title= · /api/music/resolve?artist=&title=');
 
     // Túnel HTTPS automático (cloudflared): sin root, solo conexión saliente.
     startTunnel(PORT).then((tunnelUrl) => {
