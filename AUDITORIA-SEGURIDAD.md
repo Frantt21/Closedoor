@@ -252,10 +252,7 @@ crear una cuenta con un correo falso/desechable (`user@tempmail.com`, dominios i
 **Aplicación:**
 - **Registro (`Register.jsx` + `AuthContext.register`):** bloquea formato inválido Y dominio fuera
   de la whitelist — evita cuentas basura nuevas.
-- **Login (`Login.jsx` + `AuthContext.login`):** valida **solo el formato** (nunca el dominio).
-  ⚠️ Decisión importante: hay cuentas *legacy* registradas antes de la whitelist con otros
-  dominios (la verificación de email estaba deshabilitada). Bloquear el dominio en el login las
-  dejaría fuera para siempre. El check negativo del test lo vigila.
+- **Login (`Login.jsx` + `AuthContext.login`):** valida **formato Y dominio** (mismo que el registro).
 - Mensajes localizados en los 5 idiomas (`auth.email_invalid`, `auth.email_domain_not_allowed`).
 
 ---
@@ -464,7 +461,7 @@ Token de sesión:  localStorage cifrado  →  se descifra solo en memoria al car
 │                                                             │
 │  Login:                                                     │
 │  - Solo email + password (login por username deshabilitado) │
-│  - Validación de formato de email (sin whitelist)           │
+│  - Validación de formato Y dominio de email (whitelist)     │
 │                                                             │
 │  Contenido:                                                 │
 │  - sanitizeContent: elimina <script>, <iframe>, <svg>,     │
@@ -512,6 +509,7 @@ Token de sesión:  localStorage cifrado  →  se descifra solo en memoria al car
 | Inflar trending | ❌ | ❌ | REVOKE + role check |
 | Inflar vistas | ❌ | ❌ | REVOKE + role check |
 | Habilitar RLS | ❌ | ❌ | REVOKE |
+| Login con email basura | ❌ | ❌ | Whitelist de proveedores |
 | Login por username | ❌ | ❌ | REVOKE (email only) |
 | Registro con email basura | ❌ | ❌ | Whitelist de proveedores |
 
@@ -533,7 +531,7 @@ Token de sesión:  localStorage cifrado  →  se descifra solo en memoria al car
 | `userService.js` | RPCs para email, PROFILE_PUBLIC_COLUMNS |
 | `AuthContext.jsx` | waitForKeyReady, validación de email |
 | `Register.jsx` | Bloquea email fuera de whitelist |
-| `Login.jsx` | Solo formato de email (sin dominio) |
+| `Login.jsx` | Valida formato Y dominio del email |
 | `supabaseclient.js` | pkce, __supabase solo DEV, storage cifrado |
 | `AuthCallback.jsx` | waitForKeyReady + re-consulta sesión |
 | `LinkPreview.jsx` | Cache cifrado |

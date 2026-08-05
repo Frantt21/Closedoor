@@ -525,7 +525,7 @@ function testWebSecurity() {
     { label: 'getEmailByUsername via RPC (sin SELECT email)', pattern: "rpc('get_email_by_username'", file: userService },
     { label: 'checkEmailExists via RPC (sin SELECT email)', pattern: "rpc('email_exists'", file: userService },
     { label: 'getUserProfile sin select("*") (columna email revocada)', pattern: 'PROFILE_PUBLIC_COLUMNS', file: userService },
-    { label: 'Login NO bloquea dominio (solo formato — cuentas legacy)', pattern: 'validateEmail(emailOrUsername) === \'invalid\'', file: loginContent },
+    { label: 'Login valida dominio del email', pattern: 'email_domain_not_allowed', file: loginContent },
   ];
 
   let pass = 0, fail = 0;
@@ -573,14 +573,13 @@ function testWebSecurity() {
     fail++;
   }
 
-  // Check NEGATIVO: el login NO debe rechazar por dominio (bloquearía cuentas
-  // legacy registradas antes de la whitelist con dominios fuera de la lista).
+  // El login DEBE validar dominio (bloquea cuentas basura con dominios no permitidos).
   if (loginContent.includes('email_domain_not_allowed')) {
-    console.log('⚠️  Login usa el error de dominio — cuentas legacy quedarían fuera (¡NO permitido!)');
-    fail++;
-  } else {
-    console.log('✅ Login solo valida formato de email (sin bloqueo por dominio)');
+    console.log('✅ Login valida dominio del email (bloquea dominios no permitidos)');
     pass++;
+  } else {
+    console.log('⚠️  Login NO valida dominio — cuentas basura podrían registrarse');
+    fail++;
   }
 
   return { pass, fail };

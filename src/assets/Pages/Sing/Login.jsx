@@ -38,15 +38,19 @@ function Login() {
       return;
     }
 
-    // Si el input es un email (contiene @), validar SOLO el formato.
-    // ⚠️ No se bloquea el dominio en el login: hay cuentas legacy registradas
-    // antes de la whitelist (la verificación de email estaba deshabilitada)
-    // con dominios fuera de la lista — bloquearlas las dejaría fuera.
-    // La restricción de dominio se aplica en el REGISTRO.
-    if (emailOrUsername.includes('@') && validateEmail(emailOrUsername) === 'invalid') {
-      setError(t('auth.email_invalid'));
-      setLoading(false);
-      return;
+    // Si el input es un email (contiene @), validar formato Y dominio.
+    if (emailOrUsername.includes('@')) {
+      const emailErr = validateEmail(emailOrUsername);
+      if (emailErr === 'invalid') {
+        setError(t('auth.email_invalid'));
+        setLoading(false);
+        return;
+      }
+      if (emailErr === 'domain') {
+        setError(t('auth.email_domain_not_allowed'));
+        setLoading(false);
+        return;
+      }
     }
 
     if (isTurnstileActive() && !captchaToken) {

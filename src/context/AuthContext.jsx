@@ -354,13 +354,19 @@ export function AuthProvider({ children }) {
       setError(null);
       let email = emailOrUsername;
 
-      // Defensa en profundidad: si el input es un email, validar SOLO formato.
-      // ⚠️ El dominio NO se bloquea en login (cuentas legacy registradas antes
-      // de la whitelist con otros dominios podrían quedar fuera).
-      if (emailOrUsername.includes('@') && validateEmail(emailOrUsername) === 'invalid') {
-        const err = 'Enter a valid email address';
-        setError(err);
-        return { success: false, error: err };
+      // Defensa en profundidad: si el input es un email, validar formato y dominio.
+      if (emailOrUsername.includes('@')) {
+        const emailErr = validateEmail(emailOrUsername);
+        if (emailErr === 'invalid') {
+          const err = 'Enter a valid email address';
+          setError(err);
+          return { success: false, error: err };
+        }
+        if (emailErr === 'domain') {
+          const err = 'Only emails from Gmail, Outlook, Yahoo, Proton and iCloud are allowed';
+          setError(err);
+          return { success: false, error: err };
+        }
       }
 
       // If input doesn't contain @, treat it as username and fetch email

@@ -1,0 +1,14 @@
+{
+  "name": "music-server",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Music streaming server (yt-dlp + ffmpeg) for FastChange",
+  "main": "music-server.js",
+  "scripts": {
+    "start": "node music-server.js",
+    "setup": "chmod +x setup.sh && ./setup.sh"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
