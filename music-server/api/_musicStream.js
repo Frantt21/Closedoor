@@ -14,7 +14,7 @@
  */
 
 import { spawn } from 'child_process';
-import { existsSync, readFileSync, writeFileSync, createReadStream, createWriteStream, mkdirSync, renameSync, unlinkSync, statSync, readdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, writeFile, mkdirSync, renameSync, unlinkSync, statSync, readdirSync } from 'fs';
 import http from 'http';
 import https from 'https';
 import { homedir } from 'os';
@@ -462,12 +462,13 @@ export async function handleStreamRequest(req, res, { artist = '', title = '', d
   }
 }
 
-// ── Descarga progresiva con caché en disco ──
-// /api/music/download sirve la canción COMPLETA (para pasar por los rewrites de
-// Vercel + HTTPS) pero de forma PROGRESIVA: los bytes van al cliente según
-// llegan de googlevideo, mientras se escriben a disco (.music-cache/) para que
-// la siguiente reproducción sea instantánea. Así el play NO espera a que
-// termine la descarga entera (antes: 90-100s de espera).
+// ── Descarga con caché en memoria ──
+// El disco de este container escribe a ~36KB/s y FRENABA el stream (80-100s de
+// espera). Ahora los bytes van al cliente según llegan de googlevideo (sin
+// backpressure de disco, igual que el proxy local → play en ~1s) y se cachean
+// EN MEMORIA (instantáneo). El disco solo se usa en background para persistir
+// entre reinicios — las LECTURAS de disco sí son rápidas.
+const MEM_AUDIO_MAX = 12;
 const DOWNLOAD_CACHE_DIR = join(ROOT_DIR, '.music-cache');
 const DOWNLOAD_CACHE_MAX_FILES = 25;
 
@@ -493,60 +494,114 @@ function evictDownloadCache() {
   } catch {}
 }
 
-// Servido PROGRESIVO: envía los bytes de googlevideo al cliente en cuanto llegan
-// (el <audio> arranca en segundos) y a la vez los escribe al archivo de caché.
-// Si el cliente se desconecta, se sigue descargando para dejar el archivo listo.
-function streamDownloadToResponse(req, res, url, cachePath) {
+// ── Caché de audio en memoria ──
+const memAudioCache = new Map(); // key → { buf, at }
+
+function getMemAudio(key) {
+  const e = memAudioCache.get(key);
+  return e && e.buf ? e.buf : null;
+}
+function setMemAudio(key, buf) {
+  memAudioCache.set(key, { buf, at: Date.now() });
+  if (memAudioCache.size > MEM_AUDIO_MAX) {
+    let oldestKey = null, oldestAt = Infinity;
+    for (const [k, v] of memAudioCache) if (v.at < oldestAt) { oldestAt = v.at; oldestKey = k; }
+    if (oldestKey) memAudioCache.delete(oldestKey);
+  }
+}
+
+// Escritura a disco EN BACKGROUND (lenta ~36KB/s pero no bloquea a nadie).
+function persistAudioToDisk(cachePath, buf) {
+  const tmp = `${cachePath}.part`;
+  writeFile(tmp, buf, (err) => {
+    if (err) { try { unlinkSync(tmp); } catch {} return; }
+    try { renameSync(tmp, cachePath); } catch { try { unlinkSync(tmp); } catch {} }
+  });
+}
+
+// Sirve un Buffer completo (memoria o leído de disco).
+function serveBuffer(res, buf) {
+  res.status(200);
+  res.setHeader('Content-Type', 'audio/mp4');
+  res.setHeader('Content-Length', String(buf.length));
+  res.setHeader('Accept-Ranges', 'bytes');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.end(buf);
+}
+
+// Descarga PROGRESIVA sin backpressure de disco: envía los bytes al cliente en
+// cuanto llegan de googlevideo. No envía headers hasta recibir el PRIMER byte
+// (si la URL está muerta —googlevideo 0 bytes— se detecta antes de mandar nada
+// y el handler reintenta con resolución fresca). Al terminar cachea en memoria
+// y persiste a disco en background.
+function streamDownloadToResponse(res, url, cachePath, key) {
   return new Promise((resolve, reject) => {
     let parsed;
     try { parsed = new URL(withRateBypass(url)); } catch { reject(new Error('Invalid stream URL')); return; }
     const lib = parsed.protocol === 'https:' ? https : http;
-    const tmp = `${cachePath}.part`;
     const out = lib.get(parsed, { headers: { 'User-Agent': UA } }, (upRes) => {
       if (upRes.statusCode !== 200) {
         upRes.resume();
         reject(new Error(`download HTTP ${upRes.statusCode}`));
         return;
       }
-      const file = createWriteStream(tmp);
-      let clientGone = false;
-      const safeWrite = (chunk) => {
-        if (clientGone || res.destroyed || res.writableEnded) return;
-        try { res.write(chunk); } catch {}
-      };
-      res.status(200);
-      res.setHeader('Content-Type', upRes.headers['content-type'] || 'audio/mp4');
-      if (upRes.headers['content-length'] !== undefined) {
-        res.setHeader('Content-Length', upRes.headers['content-length']);
-      }
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-      res.on('close', () => { clientGone = true; });
-
-      const pause = () => upRes.pause();
-      const resume = () => upRes.resume();
+      const startedAt = Date.now();
+      let started = false, finished = false, total = 0;
+      const chunks = [];
+      const firstByteTimer = setTimeout(() => {
+        // Sin datos en 12s → URL muerta (googlevideo 0 bytes)
+        out.destroy(new Error('No audio data from source'));
+      }, 12000);
       upRes.on('data', (chunk) => {
-        safeWrite(chunk);
-        if (file.write(chunk) === false) { pause(); file.once('drain', resume); }
+        clearTimeout(firstByteTimer);
+        if (!started) {
+          started = true;
+          if (!res.destroyed) {
+            res.status(200);
+            res.setHeader('Content-Type', upRes.headers['content-type'] || 'audio/mp4');
+            if (upRes.headers['content-length'] !== undefined) {
+              res.setHeader('Content-Length', upRes.headers['content-length']);
+            }
+            res.setHeader('Cache-Control', 'public, max-age=3600');
+          }
+        }
+        chunks.push(chunk);
+        total += chunk.length;
+        if (res.destroyed || res.writableEnded) return;
+        if (res.write(chunk) === false) { upRes.pause(); res.once('drain', () => upRes.resume()); }
       });
       upRes.on('end', () => {
-        file.end(() => {
-          try { renameSync(tmp, cachePath); resolve(); }
-          catch (err) { try { unlinkSync(tmp); } catch {} reject(err); }
-        });
+        clearTimeout(firstByteTimer);
+        finished = true;
+        if (total === 0) {
+          // 200 vacío (googlevideo 0 bytes) → dispara el reintento con resolución fresca
+          reject(new Error('Empty response from source'));
+          return;
+        }
+        const buf = Buffer.concat(chunks, total);
+        setMemAudio(key, buf);
+        persistAudioToDisk(cachePath, buf); // background
+        if (!res.destroyed) res.end();
+        console.info(`[music-stream] audio servido · ${(total / 1048576).toFixed(1)} MB · ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
+        resolve();
       });
-      upRes.on('error', (err) => { try { unlinkSync(tmp); } catch {} file.destroy(); reject(err); });
-      file.on('error', (err) => { try { unlinkSync(tmp); } catch {} reject(err); });
+      upRes.on('error', (err) => { clearTimeout(firstByteTimer); finished = true; reject(err); });
+      // Aborto a mitad de transferencia sin 'end' ni 'error' → no dejar colgada la promesa.
+      upRes.on('close', () => {
+        if (!finished) { clearTimeout(firstByteTimer); reject(new Error('Download aborted')); }
+      });
+      // Cliente se desconecta con backpressure activo → seguir descargando para cachear.
+      res.on('close', () => { if (!upRes.destroyed) upRes.resume(); });
     });
-    out.on('error', (err) => { try { unlinkSync(tmp); } catch {} reject(err); });
+    out.on('error', (err) => reject(err));
     out.setTimeout(120000, () => out.destroy(new Error('download timeout')));
   });
 }
 
 // Transcodifica (webm/opus → m4a 128k) PROGRESIVAMENTE: envía al cliente y
-// cachea en disco a la vez.
-function streamTranscodeToResponse(req, res, url, cachePath) {
+// cachea en memoria + disco en background al terminar.
+function streamTranscodeToResponse(res, url, cachePath, key) {
   return new Promise((resolve, reject) => {
-    const tmp = `${cachePath}.part`;
     let child;
     try {
       child = spawn(FFMPEG_BIN, [
@@ -558,49 +613,49 @@ function streamTranscodeToResponse(req, res, url, cachePath) {
         '-f', 'mp4', 'pipe:1',
       ], { stdio: ['ignore', 'pipe', 'ignore'] });
     } catch (err) { reject(err); return; }
-    const file = createWriteStream(tmp);
-    let clientGone = false;
-    const safeWrite = (chunk) => {
-      if (clientGone || res.destroyed || res.writableEnded) return;
-      try { res.write(chunk); } catch {}
-    };
-    res.status(200);
-    res.setHeader('Content-Type', 'audio/mp4');
-    res.setHeader('Cache-Control', 'public, max-age=3600');
-    res.on('close', () => { clientGone = true; });
+    const startedAt = Date.now();
+    let started = false, finished = false, total = 0;
+    const chunks = [];
+    const firstByteTimer = setTimeout(() => {
+      try { child.kill('SIGKILL'); } catch {}
+      reject(new Error('No audio data from ffmpeg'));
+    }, 12000);
+    child.stdout?.on('data', (chunk) => {
+      clearTimeout(firstByteTimer);
+      if (!started) {
+        started = true;
+        if (!res.destroyed) {
+          res.status(200);
+          res.setHeader('Content-Type', 'audio/mp4');
+          res.setHeader('Cache-Control', 'public, max-age=3600');
+        }
+      }
+      chunks.push(chunk);
+      total += chunk.length;
+      if (res.destroyed || res.writableEnded) return;
+      if (res.write(chunk) === false) { child.stdout.pause(); res.once('drain', () => child.stdout.resume()); }
+    });
     let stderr = '';
     child.stderr?.on('data', (d) => { stderr += d; });
-    child.stdout?.on('data', (chunk) => {
-      safeWrite(chunk);
-      if (file.write(chunk) === false) { child.stdout.pause(); file.once('drain', () => child.stdout.resume()); }
-    });
-    child.on('error', (err) => { try { unlinkSync(tmp); } catch {} reject(err); });
+    child.on('error', (err) => { clearTimeout(firstByteTimer); finished = true; reject(err); });
     child.on('close', (code) => {
+      clearTimeout(firstByteTimer);
+      finished = true;
       if (code === 0) {
-        file.end(() => {
-          try { renameSync(tmp, cachePath); resolve(); }
-          catch (err) { try { unlinkSync(tmp); } catch {} reject(err); }
-        });
+        if (total === 0) { reject(new Error('Empty output from ffmpeg')); return; }
+        const buf = Buffer.concat(chunks, total);
+        setMemAudio(key, buf);
+        persistAudioToDisk(cachePath, buf);
+        if (!res.destroyed) res.end();
+        console.info(`[music-stream] transcode servido · ${(total / 1048576).toFixed(1)} MB · ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
+        resolve();
       } else {
-        file.destroy();
-        try { unlinkSync(tmp); } catch {}
         reject(new Error(`ffmpeg exit ${code}: ${stderr.slice(0, 150)}`));
       }
     });
+    // Cliente se desconecta con backpressure activo → seguir cacheando.
+    res.on('close', () => { if (child.stdout && !child.stdout.destroyed) child.stdout.resume(); });
   });
-}
-
-// Sirve el archivo cacheado (reproducciones repetidas: instantáneo).
-function serveCacheFile(res, cachePath) {
-  const size = statSync(cachePath).size;
-  res.status(200);
-  res.setHeader('Content-Type', 'audio/mp4');
-  res.setHeader('Content-Length', String(size));
-  res.setHeader('Accept-Ranges', 'bytes');
-  res.setHeader('Cache-Control', 'public, max-age=3600');
-  const fileStream = createReadStream(cachePath);
-  fileStream.on('error', () => { if (!res.headersSent) res.status(500).end(); else res.end(); });
-  fileStream.pipe(res);
 }
 
 // ── Handler /api/music/download ──
@@ -619,42 +674,70 @@ export async function handleDownloadRequest(req, res, { artist = '', title = '',
     const cachePath = downloadCachePath(key);
     mkdirSync(DOWNLOAD_CACHE_DIR, { recursive: true });
 
-    // Archivo ya en disco → servirlo al instante (no re-descargar: ahorra banda
-    // y el audio es el mismo). fresh=1 fuerza regenerarlo.
-    let have = false;
-    try { have = existsSync(cachePath) && statSync(cachePath).size > 0; } catch { have = false; }
-    if (fresh && have) { try { unlinkSync(cachePath); } catch {} have = false; }
+    if (fresh) memAudioCache.delete(key); // fresh fuerza regenerar también la memoria
 
-    if (have) {
-      serveCacheFile(res, cachePath);
-      console.info(`[music-stream] ⬇ ${label} · cache ${((statSync(cachePath).size) / 1048576).toFixed(1)} MB · total ${((Date.now() - startedAt) / 1000).toFixed(1)}s (resolve ${resolveSecs}s)`);
+    // 1) Caché en memoria → instantáneo.
+    const mem = getMemAudio(key);
+    if (mem) {
+      serveBuffer(res, mem);
+      console.info(`[music-stream] ⬇ ${label} · memoria ${(mem.length / 1048576).toFixed(1)} MB · ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
       return;
     }
 
-    // Ya hay una descarga en vuelo para esta canción → esperar el archivo y servirlo.
+    // 2) Archivo en disco (persistido de reproducciones anteriores) → leer y cachear en memoria.
+    let have = false;
+    try { have = existsSync(cachePath) && statSync(cachePath).size > 0; } catch { have = false; }
+    if (fresh && have) { try { unlinkSync(cachePath); } catch {} have = false; }
+    if (have) {
+      try {
+        const diskBuf = readFileSync(cachePath);
+        setMemAudio(key, diskBuf);
+        serveBuffer(res, diskBuf);
+        console.info(`[music-stream] ⬇ ${label} · disco ${(diskBuf.length / 1048576).toFixed(1)} MB · ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
+        return;
+      } catch { /* seguir con descarga */ }
+    }
+
+    // 3) Ya hay una descarga en vuelo → esperar y servir desde memoria.
     if (inflightDownload.has(key)) {
       await inflightDownload.get(key);
-      try {
-        if (existsSync(cachePath) && statSync(cachePath).size > 0) {
-          serveCacheFile(res, cachePath);
-          console.info(`[music-stream] ⬇ ${label} · cache (en vuelo) · ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
-          return;
-        }
-      } catch {}
+      const b = getMemAudio(key);
+      if (b) { serveBuffer(res, b); return; }
       throw new Error('Background download failed');
     }
 
     const playable = isBrowserPlayableMime(resolved.mime);
-    const p = (playable
-      ? streamDownloadToResponse(req, res, resolved.url, cachePath)
-      : streamTranscodeToResponse(req, res, resolved.url, cachePath)
-    )
+    const doStream = () => (playable
+      ? streamDownloadToResponse(res, resolved.url, cachePath, key)
+      : streamTranscodeToResponse(res, resolved.url, cachePath, key)
+    );
+    let p = doStream();
+    p = p
       .then(() => {
         console.info(`[music-stream] ⬇ ${label} · servido+${playable ? 'descargado' : 'transcodificado'} y cacheado · total ${((Date.now() - startedAt) / 1000).toFixed(1)}s (resolve ${resolveSecs}s)`);
         evictDownloadCache();
       })
-      .catch((err) => {
+      .catch(async (err) => {
         console.warn(`[music-stream] ✗ ${label} · ${err.message}`);
+        // URL muerta (googlevideo 0 bytes) y aún sin headers → resolver fresca y reintentar una vez.
+        if (!res.headersSent && !res.destroyed) {
+          try {
+            console.warn(`[music-stream] ↻ ${label} · reintentando con resolución fresca...`);
+            const freshRes = await resolveStream({ artist, title, duration }, { fresh: true });
+            if (freshRes?.url) {
+              await (playable
+                ? streamDownloadToResponse(res, freshRes.url, cachePath, key)
+                : streamTranscodeToResponse(res, freshRes.url, cachePath, key));
+              evictDownloadCache();
+              return;
+            }
+          } catch (e2) {
+            console.warn(`[music-stream] ✗ ${label} · reintento falló:`, e2.message);
+          }
+          if (!res.headersSent) res.status(502).json({ success: false, error: err.message });
+          else res.end();
+          return;
+        }
         if (!res.headersSent) res.status(502).json({ success: false, error: err.message });
         else res.end();
       });
