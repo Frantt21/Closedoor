@@ -110,21 +110,29 @@ export function getStreamUrl(song, health = null) {
     );
   }
 
-  // 2) Túnel HTTPS automático (cloudflared) detectado en runtime vía /health.
-  //    El music server expone tunnelUrl en el health check; la app usa esa URL
-  //    directa (HTTPS → sin Mixed Content, sin depender de rewrites de Vercel)
-  //    y sin necesidad de redeploy cuando el túnel cambia.
-  const tunnel = health?.tunnelUrl;
-  if (tunnel && tunnel.startsWith('https:')) {
-    return `${tunnel}/download?${params.toString()}`;
+  // 2) EN DEV: same-origin /stream a través del proxy de Vite (progresivo e
+  //    instantáneo — el proxy de Vite sí maneja streams chunked). El túnel no
+  //    aporta nada en local y encima ralentiza (descarga completa por el túnel).
+  if (import.meta.env.DEV) {
+    return `${MUSIC_API}/stream?${params.toString()}`;
   }
 
-  // 3) Sin URL directa ni túnel — same-origin:
-  //    - Dev: el proxy de Vite sí proxea streams chunked → /stream.
-  //    - Producción: los rewrites de Vercel solo dejan pasar respuestas de
-  //      archivo completo (Content-Length); los streams chunked dan 403. El
-  //      server sirve /download como archivo completo → funciona por HTTPS.
-  return `${MUSIC_API}/${import.meta.env.DEV ? 'stream' : 'download'}?${params.toString()}`;
+  // 3) EN PRODUCCIÓN: túnel HTTPS automático (cloudflared) detectado en runtime
+  //    vía /health. La app usa esa URL directa (HTTPS → sin Mixed Content, sin
+  //    depender de rewrites de Vercel) y sin redeploy cuando el túnel cambia.
+  //    OJO: tunnelUrl es la RAÍZ del túnel (https://xxx.trycloudflare.com), el
+  //    server sirve bajo /api/music → se concatena el prefijo.
+  const tunnel = health?.tunnelUrl;
+  if (tunnel && tunnel.startsWith('https:')) {
+    const base = tunnel.replace(/\/+$/, '');
+    const apiBase = base.endsWith('/api/music') ? base : `${base}/api/music`;
+    return `${apiBase}/download?${params.toString()}`;
+  }
+
+  // 4) Fallback same-origin en producción: /download vía rewrite de Vercel
+  //    (solo deja pasar respuestas de archivo completo con Content-Length; los
+  //    streams chunked dan 403).
+  return `${MUSIC_API}/download?${params.toString()}`;
 }
 
 // ── Health del server de stream (cache en memoria, TTL 5 min) ──
