@@ -14,7 +14,7 @@
  */
 
 import { spawn } from 'child_process';
-import { existsSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, createReadStream, createWriteStream, mkdirSync, renameSync, unlinkSync, statSync, readdirSync } from 'fs';
 import http from 'http';
 import https from 'https';
 import { homedir } from 'os';
@@ -455,6 +455,150 @@ export async function handleStreamRequest(req, res, { artist = '', title = '', d
     console.info(`[music-stream] ▶ ${label} · resolución ${resolveSecs}s · ${resolved.mime || 'mime?'} · ${playable ? 'proxy' : 'transcode'}`);
     if (playable) proxyStream(req, res, resolved.url, label);
     else transcodeStream(req, res, resolved.url, label);
+  } catch (err) {
+    const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+    console.warn(`[music-stream] ✗ ${label} · error a los ${elapsed}s:`, err.message);
+    if (!res.headersSent) res.status(502).json({ success: false, error: err.message });
+  }
+}
+
+// ── Descarga completa a archivo (para servirse por HTTPS vía proxy) ──
+// Los rewrites de Vercel NO dejan pasar streams chunked (403) pero sí
+// respuestas de archivo completo con Content-Length. Este modo descarga la
+// canción a disco (cacheada, evictada por nº de archivos) y la sirve como
+// archivo → el navegador la reproduce sin depender de streaming por el proxy.
+const DOWNLOAD_CACHE_DIR = join(ROOT_DIR, '.music-cache');
+const DOWNLOAD_CACHE_MAX_FILES = 25;
+
+function sanitizeFileKey(key) {
+  return Buffer.from(String(key)).toString('base64url').slice(0, 80);
+}
+function downloadCachePath(key) {
+  return join(DOWNLOAD_CACHE_DIR, `${sanitizeFileKey(key)}.m4a`);
+}
+function evictDownloadCache() {
+  try {
+    const files = readdirSync(DOWNLOAD_CACHE_DIR)
+      .map((f) => {
+        const p = join(DOWNLOAD_CACHE_DIR, f);
+        try { return { p, mtime: statSync(p).mtimeMs }; } catch { return null; }
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.mtime - b.mtime);
+    while (files.length > DOWNLOAD_CACHE_MAX_FILES) {
+      const oldest = files.shift();
+      try { unlinkSync(oldest.p); } catch {}
+    }
+  } catch {}
+}
+
+// Descarga la URL directa (googlevideo) a un archivo temporal y lo renombra.
+function downloadToFile(url, destPath) {
+  return new Promise((resolve, reject) => {
+    let parsed;
+    try { parsed = new URL(withRateBypass(url)); } catch { reject(new Error('Invalid stream URL')); return; }
+    const lib = parsed.protocol === 'https:' ? https : http;
+    const tmp = `${destPath}.part`;
+    const req = lib.get(parsed, { headers: { 'User-Agent': UA } }, (upRes) => {
+      if (upRes.statusCode !== 200) {
+        upRes.resume();
+        reject(new Error(`download HTTP ${upRes.statusCode}`));
+        return;
+      }
+      const file = createWriteStream(tmp);
+      upRes.pipe(file);
+      file.on('finish', () => {
+        file.close(() => {
+          try { renameSync(tmp, destPath); resolve(); }
+          catch (err) { try { unlinkSync(tmp); } catch {} reject(err); }
+        });
+      });
+      file.on('error', (err) => { try { unlinkSync(tmp); } catch {} reject(err); });
+      upRes.on('error', (err) => { try { unlinkSync(tmp); } catch {} reject(err); });
+    });
+    req.on('error', (err) => { try { unlinkSync(tmp); } catch {} reject(err); });
+    req.setTimeout(90000, () => { req.destroy(new Error('download timeout')); });
+  });
+}
+
+// Transcodifica (webm/opus → m4a 128k) a un archivo completo.
+function transcodeToFile(url, destPath) {
+  return new Promise((resolve, reject) => {
+    const tmp = `${destPath}.part`;
+    let child;
+    try {
+      child = spawn(FFMPEG_BIN, [
+        '-hide_banner', '-loglevel', 'error',
+        '-user_agent', UA,
+        '-i', withRateBypass(url),
+        '-vn', '-acodec', 'aac', '-b:a', '128k',
+        '-y', '-f', 'mp4', tmp,
+      ], { stdio: ['ignore', 'pipe', 'ignore'] });
+    } catch (err) { reject(err); return; }
+    let stderr = '';
+    child.stderr?.on('data', (d) => { stderr += d; });
+    child.on('error', (err) => { try { unlinkSync(tmp); } catch {} reject(err); });
+    child.on('close', (code) => {
+      if (code === 0) {
+        try { renameSync(tmp, destPath); resolve(); }
+        catch (err) { try { unlinkSync(tmp); } catch {} reject(err); }
+      } else {
+        try { unlinkSync(tmp); } catch {}
+        reject(new Error(`ffmpeg exit ${code}: ${stderr.slice(0, 150)}`));
+      }
+    });
+  });
+}
+
+// ── Handler /api/music/download ──
+const inflightDownload = new Map();
+
+export async function handleDownloadRequest(req, res, { artist = '', title = '', duration = 0, fresh = false } = {}) {
+  const startedAt = Date.now();
+  const label = `${artist} - ${title}`.trim() || 'download';
+  try {
+    const resolved = await resolveStream({ artist, title, duration }, { fresh });
+    if (!resolved?.url) { res.status(404).json({ success: false, error: 'No stream found' }); return; }
+
+    const key = [String(artist || ''), String(title || '')].filter(Boolean).join(' - ').toLowerCase().trim() || String(title);
+    const cachePath = downloadCachePath(key);
+    mkdirSync(DOWNLOAD_CACHE_DIR, { recursive: true });
+
+    // Archivo ya en disco → servirlo (no re-descargar: ahorra banda y el audio
+    // es el mismo). fresh=1 fuerza regenerarlo.
+    let have = false;
+    try { have = existsSync(cachePath) && statSync(cachePath).size > 0; } catch { have = false; }
+    if (fresh && have) { try { unlinkSync(cachePath); } catch {} have = false; }
+    if (!have) {
+      if (inflightDownload.has(key)) {
+        await inflightDownload.get(key);
+      } else {
+        const p = (async () => {
+          const playable = isBrowserPlayableMime(resolved.mime);
+          if (playable) await downloadToFile(resolved.url, cachePath);
+          else await transcodeToFile(resolved.url, cachePath);
+        })();
+        inflightDownload.set(key, p);
+        try { await p; } finally { inflightDownload.delete(key); }
+      }
+      evictDownloadCache();
+    }
+
+    let size = 0;
+    try { size = statSync(cachePath).size; } catch {}
+    if (!size) throw new Error('Downloaded file is empty');
+    const secs = ((Date.now() - startedAt) / 1000).toFixed(1);
+    console.info(`[music-stream] ⬇ ${label} · ${(size / 1024 / 1024).toFixed(1)} MB · listo en ${secs}s`);
+
+    res.status(200);
+    res.setHeader('Content-Type', 'audio/mp4');
+    res.setHeader('Content-Length', String(size));
+    res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.setHeader('Content-Disposition', `inline; filename="audio-${Date.now()}.m4a"`);
+    const fileStream = createReadStream(cachePath);
+    fileStream.on('error', () => { if (!res.headersSent) res.status(500).end(); else res.end(); });
+    fileStream.pipe(res);
   } catch (err) {
     const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
     console.warn(`[music-stream] ✗ ${label} · error a los ${elapsed}s:`, err.message);

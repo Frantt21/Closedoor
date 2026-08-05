@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, chmodSync, createWriteStream, unlinkSync, readFi
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
-import { combinedMusicSearch, getMusicHealth, handleStreamRequest, detectedCookiesFile } from './api/_musicStream.js';
+import { combinedMusicSearch, getMusicHealth, handleStreamRequest, handleDownloadRequest, detectedCookiesFile } from './api/_musicStream.js';
 import { resolveTrackPreview } from './api/_music.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -317,6 +317,23 @@ async function main() {
         return;
       }
 
+      if (url.pathname === '/api/music/download') {
+        const artist = url.searchParams.get('artist') || '';
+        const title = url.searchParams.get('title') || '';
+        const duration = url.searchParams.get('duration') || 0;
+        const fresh = url.searchParams.get('fresh') === '1';
+        if (!title) {
+          res.status(400).json({ success: false, error: 'Missing ?title parameter' });
+          return;
+        }
+        if (!rateLimitStream(req)) {
+          res.status(429).json({ success: false, error: 'Too many stream requests, try again in a minute' });
+          return;
+        }
+        await handleDownloadRequest(req, res, { artist, title, duration, fresh });
+        return;
+      }
+
       res.status(404).json({
         success: false,
         error: 'Not found. Endpoints: /api/music/health, /api/music/search?q=..., /api/music/stream?artist=&title=',
@@ -334,7 +351,7 @@ async function main() {
     console.log(`   yt-dlp: ${process.env.YTDLP_BIN} ${existsSync(process.env.YTDLP_BIN) ? '✅' : '❌'}`);
     console.log(`   ffmpeg: ${process.env.FFMPEG_BIN} ${existsSync(process.env.FFMPEG_BIN) ? '✅' : '❌'}`);
     console.log(`   cookies: ${detectedCookiesFile ? detectedCookiesFile + ' ✅' : '⚠️ no detectadas (coloca cookies.txt junto a music-server.js)'}`);
-    console.log('   /api/music/health · /api/music/search?q=... · /api/music/stream?artist=&title=');
+    console.log('   /api/music/health · /api/music/search?q=... · /api/music/stream?artist=&title= · /api/music/download?artist=&title=');
   });
 }
 

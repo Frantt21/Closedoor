@@ -86,14 +86,36 @@ async function searchMusicProxy(query, provider, limit) {
  * Retorna null si el song no tiene artista/título.
  */
 const STREAM_DIRECT_URL = (import.meta.env.VITE_MUSIC_STREAM_URL || '').replace(/\/+$/, '');
+
+/** ¿La página se está sirviendo por HTTPS? (para detectar Mixed Content). */
+const isHttpsPage = () =>
+  typeof window !== 'undefined' && window.location?.protocol === 'https:';
+
 export function getStreamUrl(song) {
   if (!song?.title || !song?.artist) return null;
   const params = new URLSearchParams({ artist: song.artist, title: song.title });
   if (song.duration) params.set('duration', String(song.duration));
-  // Si hay URL directa del music server, usarla para streaming (CORS *)
-  if (STREAM_DIRECT_URL) return `${STREAM_DIRECT_URL}/stream?${params.toString()}`;
-  // Fallback: mismo origen (Vercel proxy — funciona para preview pero no para streaming largo)
-  return `${MUSIC_API}/stream?${params.toString()}`;
+
+  // 1) URL directa configurada (VITE_MUSIC_STREAM_URL). En producción DEBE ser
+  //    HTTPS: el navegador bloquea audio HTTP desde una página HTTPS (Mixed
+  //    Content). Si es HTTP sobre página HTTPS, se ignora y se cae al preview.
+  if (STREAM_DIRECT_URL) {
+    if (!isHttpsPage() || STREAM_DIRECT_URL.startsWith('https:')) {
+      return `${STREAM_DIRECT_URL}/download?${params.toString()}`;
+    }
+    console.warn(
+      '[music] VITE_MUSIC_STREAM_URL es HTTP en una página HTTPS → Mixed Content. ' +
+      'Usa un túnel/reverse-proxy HTTPS o déjalo vacío para usar el preview de 30s.'
+    );
+    return null;
+  }
+
+  // 2) Sin URL directa — same-origin:
+  //    - Dev: el proxy de Vite sí proxea streams chunked → /stream.
+  //    - Producción: los rewrites de Vercel solo dejan pasar respuestas de
+  //      archivo completo (Content-Length); los streams chunked dan 403. El
+  //      server sirve /download como archivo completo → funciona por HTTPS.
+  return `${MUSIC_API}/${import.meta.env.DEV ? 'stream' : 'download'}?${params.toString()}`;
 }
 
 // ── Health del server de stream (cache en memoria, TTL 5 min) ──

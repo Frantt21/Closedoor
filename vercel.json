@@ -63,6 +63,10 @@
       "destination": "http://mapi.foranly.space:24633/api/music/stream"
     },
     {
+      "source": "/api/music/download",
+      "destination": "http://mapi.foranly.space:24633/api/music/download"
+    },
+    {
       "source": "/cdn/(.*)",
       "destination": "http://api.foranly.space:24587/cdn/$1"
     },
