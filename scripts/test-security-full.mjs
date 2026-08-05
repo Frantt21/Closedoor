@@ -193,6 +193,68 @@ async function testDB() {
       fn: () => supabase.from('comments').delete().eq('id', '00000000-0000-0000-0000-000000000000'),
       check: (d, err) => ({ pass: !d || err, msg: err ? '✅ RLS' : '⚠️  SE BORRO' })
     },
+    // ── Migración 055: RLS en tablas de interacción social ──
+    {
+      n: '1f', label: 'Likes: ocultos para anon (migración 055)',
+      fn: () => supabase.from('likes').select('id, user_id, post_id').limit(5),
+      check: (d) => ({ pass: !d?.length, msg: !d?.length ? '✅ 0 filas (oculto para anon)' : `⚠️  ${d.length} likes visibles — fuga de grafo social` })
+    },
+    {
+      n: '1g', label: 'Reposts: ocultos para anon (migración 055)',
+      fn: () => supabase.from('reposts').select('id, user_id, post_id').limit(5),
+      check: (d) => ({ pass: !d?.length, msg: !d?.length ? '✅ 0 filas (oculto para anon)' : `⚠️  ${d.length} reposts visibles — fuga de grafo social` })
+    },
+    {
+      n: '1h', label: 'Follows: ocultos para anon (migración 055)',
+      fn: () => supabase.from('follows').select('follower_id, following_id').limit(5),
+      check: (d) => ({ pass: !d?.length, msg: !d?.length ? '✅ 0 filas (oculto para anon)' : `⚠️  ${d.length} follows visibles — fuga de grafo social` })
+    },
+    {
+      n: '1i', label: 'Dislikes: ocultos para anon (migración 055)',
+      fn: () => supabase.from('dislikes').select('id, user_id, post_id').limit(5),
+      check: (d) => ({ pass: !d?.length, msg: !d?.length ? '✅ 0 filas (oculto para anon)' : `⚠️  ${d.length} dislikes visibles — fuga de grafo social` })
+    },
+    {
+      n: '1j', label: 'Comment likes: ocultos para anon (migración 055)',
+      fn: () => supabase.from('comment_likes').select('id, user_id, comment_id').limit(5),
+      check: (d) => ({ pass: !d?.length, msg: !d?.length ? '✅ 0 filas (oculto para anon)' : `⚠️  ${d.length} comment likes visibles — fuga de grafo social` })
+    },
+    {
+      n: '1k', label: 'Comment dislikes: ocultos para anon (migración 055)',
+      fn: () => supabase.from('comment_dislikes').select('id, user_id, comment_id').limit(5),
+      check: (d) => ({ pass: !d?.length, msg: !d?.length ? '✅ 0 filas (oculto para anon)' : `⚠️  ${d.length} comment dislikes visibles — fuga de grafo social` })
+    },
+    {
+      n: '1m', label: 'posts_public: sin allowed_users (migración 055)',
+      fn: () => supabase.from('posts_public').select('allowed_users').limit(1),
+      check: (data, err) => {
+        // La columna allowed_users fue eliminada de la vista → SELECT falla o devuelve null
+        const hasAllowed = data?.some(x => x.allowed_users != null && x.allowed_users?.length > 0);
+        return hasAllowed
+          ? { pass: false, msg: '⚠️  allowed_users aún visible en la vista' }
+          : { pass: true, msg: '✅ allowed_users no expuesto en la vista' };
+      }
+    },
+    {
+      n: '1n', label: 'Posts raw table: SELECT bloqueado para anon (REVOKE 055)',
+      fn: () => supabase.from('posts').select('id').limit(1),
+      check: (data, err) => {
+        const blocked = !!err || !data?.length;
+        return blocked
+          ? { pass: true, msg: '✅ Tabla posts inaccesible directamente (REVOKE)' }
+          : { pass: false, msg: '⚠️  Tabla posts accesible sin autenticación' };
+      }
+    },
+    {
+      n: '1p', label: 'Profiles raw table: SELECT bloqueado para anon (REVOKE 055)',
+      fn: () => supabase.from('profiles').select('id').limit(1),
+      check: (data, err) => {
+        const blocked = !!err || !data?.length;
+        return blocked
+          ? { pass: true, msg: '✅ Tabla profiles inaccesible directamente (REVOKE)' }
+          : { pass: false, msg: '⚠️  Tabla profiles accesible sin autenticación' };
+      }
+    },
     {
       n: 11, label: 'Votos de encuestas: protegidos',
       fn: () => supabase.from('poll_votes').select('*').limit(10),

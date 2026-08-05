@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabaseclient';
 import { useI18n } from '../services/i18n/useI18n';
+import { waitForKeyReady } from '../services/secureStorage';
 import usePageTitle from '../../hooks/usePageTitle';
 
 function AuthCallback() {
@@ -13,6 +14,11 @@ function AuthCallback() {
   useEffect(() => {
     const handleCallback = async () => {
       try {
+        // Esperar a que la clave maestra esté lista antes de leer la sesión.
+        // Sin esto, secureStorage.getItem() devuelve null (la master key
+        // aún no se cargó de IndexedDB) y Supabase piensa que no hay sesión.
+        await waitForKeyReady();
+
         // Supabase automatically exchanges the code for a session
         // when using signInWithOAuth with the implicit flow.
         // We just need to check if we now have a session.

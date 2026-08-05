@@ -36,3 +36,4 @@ scripts/sync-music-server.mjs
 .env.example
 TERMUX_DIAGNOSTICO.md
 diagnostico-stream.sh
+servidores y ubicaciones.txt

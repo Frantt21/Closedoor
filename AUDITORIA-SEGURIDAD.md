@@ -13,7 +13,7 @@ Se realizó una auditoría de seguridad integral (DB + cliente + servidor) y se 
 
 | Área | Resultado |
 |---|---|
-| DB (RLS, columnas, RPCs) | 17/17 ✅ |
+| DB (RLS, columnas, RPCs, tablas sociales) | 27/27 ✅ |
 | SQL Injection (API REST) | 6/6 ✅ |
 | XSS (helpers reales) | 12/12 ✅ |
 | Auth (validaciones, whitelist de email) | 25/25 ✅ |
@@ -164,7 +164,37 @@ texto plano:
 
 **El test de seguridad ahora EXIGE estos bloqueos** (checks `1d`, `1d2`, `1d3`): si la migración no está aplicada, la auditoría baja de 100% y el CI bloquea el merge.
 
-### 10. Whitelist de proveedores de email (registro y login)
+### 10. Tablas de interacción social sin RLS (auditoría en vivo — migración 055)
+
+**Problema (detectado atacando `app.foranly.space` con la anon key, sin sesión):**
+
+| Tabla | Vulnerabilidad | Evidencia |
+|---|---|---|
+| `likes` | **Sin RLS habilitado** → 10+ filas con user_ids + post_ids | 200 con datos reales |
+| `comments` | **Sin RLS habilitado** → user_id, content, post_id, image_url | 200 con contenido completo |
+| `follows` | **Sin RLS habilitado** → follower_id, following_id, status | 200 con grafo social |
+| `reposts` | Solo INSERT policy, **sin SELECT restriction** | 200 con user_ids |
+| `dislikes` | Policy "Anyone can read" → user_ids expuestos | 200 con datos |
+| `comment_likes` | Policy "Anyone can view" → user_ids expuestos | 200 con datos |
+| `comment_dislikes` | Policy "Anyone can view" → user_ids expuestos | 200 con datos |
+| `posts_public` | Incluía `allowed_users` en la vista | Columna visible |
+| `posts` (raw) | SELECT accesible con anon (debería ser solo la vista) | 25 columnas |
+| `profiles` (raw) | SELECT accesible con anon (debería ser solo la vista) | Accesible |
+
+**Solución (`src/assets/services/migrations/055_hardening_table_access.sql`):**
+- `likes` → Enable RLS + SELECT solo `authenticated` (oculta grafo social de anon)
+- `comments` → Enable RLS + SELECT público (contenido visible), escritura solo `authenticated`
+- `follows` → Enable RLS + SELECT solo los involucrados (`follower_id = auth.uid() OR following_id = auth.uid()`)
+- `reposts` → SELECT solo `authenticated`
+- `dislikes`, `comment_likes`, `comment_dislikes` → SELECT solo `authenticated`
+- `posts_public` → `allowed_users` eliminado de la vista
+- `REVOKE SELECT` en `posts` y `profiles` (raw tables) → acceso solo a través de las vistas
+
+**El test de seguridad ahora EXIGE estos bloqueos** (checks `1f`–`1p`): si la migración no está aplicada, 8 checks fallan y la auditoría baja de 100%.
+
+---
+
+### 11. Whitelist de proveedores de email (registro y login)
 
 **Problema:** como la verificación de email está deshabilitada en Supabase, cualquiera podía
 crear una cuenta con un correo falso/desechable (`user@tempmail.com`, dominios inventados, etc.).
@@ -222,10 +252,10 @@ Esto eliminó los últimos 2 falsos positivos.
 ### Resultado final
 
 ```
-DB: 17/17 (100%)   SQL: 6/6 (100%)   XSS: 12/12 (100%)
+DB: 27/27 (100%)   SQL: 6/6 (100%)   XSS: 12/12 (100%)
 AUTH: 25/25 (100%)   CACHE: 14/14 (100%)   WEB: 22/22 (100%)
 
-🏁 TOTAL: 96/96 (100%)
+🏁 TOTAL: 106/106 (100%)
 🎉 TODAS LAS PRUEBAS PASARON
 ```
 
@@ -276,7 +306,8 @@ A partir de ahí, cualquier push que rompa una prueba de seguridad **bloquea el 
 | `vite.config.js` | Registra cspPlugin |
 | `vercel.json` | HSTS, Permissions-Policy, sin header CSP |
 | `server.js` | Middleware de security headers (sin header CSP) |
-| `scripts/test-security-full.mjs` | Usa helpers reales, checks negativos CSP, exit 1 si falla, env vars de CI |
+| `src/assets/services/migrations/055_hardening_table_access.sql` | **Nuevo** — RLS en likes/comments/follows/reposts/dislikes, REVOKE raw tables, fix posts_public |
+| `scripts/test-security-full.mjs` | Usa helpers reales, checks negativos CSP, exit 1 si falla, env vars de CI, 10 nuevos checks DB |
 | `.github/workflows/security-audit.yml` | **Nuevo** — auditoría en cada push/PR (exige 100%) |
 
 ---
@@ -310,6 +341,7 @@ Token de sesión:  localStorage cifrado  →  se descifra solo en memoria al car
 
 1. Aplicar la migración **053 v2** en Supabase (SQL Editor) si no está aplicada
    (también disponible en `migracion-053-email.md`).
-2. Redeploy en Vercel (headers + meta CSP del build).
-3. El PKCE aplica al próximo login con Discord (no rompe sesiones existentes).
-4. Re-ejecutar `node scripts/test-security-full.mjs` tras cualquier cambio de seguridad.
+2. Aplicar la migración **055** en Supabase (SQL Editor) — RLS en tablas de interacción social.
+3. Redeploy en Vercel (headers + meta CSP del build).
+4. El PKCE aplica al próximo login con Discord (no rompe sesiones existentes).
+5. Re-ejecutar `node scripts/test-security-full.mjs` tras cualquier cambio de seguridad.
