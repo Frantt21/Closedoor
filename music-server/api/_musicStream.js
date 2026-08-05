@@ -378,88 +378,13 @@ function progressLogger({ label, total, startedAt }) {
   };
 }
 
-// ── Proxy del stream ──
-export function withRateBypass(url) {
-  try {
-    const u = new URL(url);
-    if (/googlevideo/i.test(u.hostname)) { u.searchParams.set('ratebypass', 'yes'); return u.toString(); }
-    return url;
-  } catch { return url; }
-}
-
-export function proxyStream(req, res, url, label = 'proxy') {
-  const target = withRateBypass(url);
-  let parsed;
-  try { parsed = new URL(target); } catch { res.status(400).json({ success: false, error: 'Invalid stream URL' }); return; }
-  const lib = parsed.protocol === 'https:' ? https : http;
-  const headers = { 'User-Agent': UA };
-  if (req.headers.range) headers.Range = req.headers.range;
-
-  const proxyReq = lib.request(parsed, { method: 'GET', headers }, (upRes) => {
-    res.status(upRes.statusCode || 200);
-    ['content-type', 'content-length', 'content-range', 'accept-ranges', 'cache-control', 'etag', 'last-modified'].forEach((h) => {
-      const v = upRes.headers[h]; if (v !== undefined) res.setHeader(h, v);
-    });
-    const contentLength = Number(upRes.headers['content-length']);
-    const crMatch = String(upRes.headers['content-range'] || '').match(/\/(\d+)$/);
-    const total = crMatch ? Number(crMatch[1]) : (Number.isFinite(contentLength) ? contentLength : null);
-    const progress = progressLogger({ label, total, startedAt: Date.now() });
-    upRes.on('data', (chunk) => progress.add(chunk.length));
-    upRes.on('end', () => progress.finish());
-    upRes.on('error', () => progress.abort());
-    upRes.pipe(res);
-  });
-
-  proxyReq.on('error', (err) => {
-    console.warn('[music-stream] proxy error:', err.message);
-    if (!res.headersSent) res.status(502).json({ success: false, error: 'Stream proxy error' });
-    else res.end();
-  });
-  proxyReq.setTimeout(30000, () => { proxyReq.destroy(); if (!res.headersSent) res.status(504).json({ success: false, error: 'Stream proxy timeout' }); });
-  req.on('close', () => proxyReq.destroy());
-  proxyReq.end();
-}
-
-// ── Transcode streaming ──
-export function transcodeStream(req, res, url, label = 'transcode') {
-  let child;
-  try {
-    child = spawn(FFMPEG_BIN, [
-      '-hide_banner', '-loglevel', 'error',
-      '-user_agent', UA,
-      '-i', url,
-      '-vn', '-acodec', 'aac', '-b:a', '128k',
-      '-movflags', 'frag_keyframe+empty_moov',
-      '-f', 'mp4', 'pipe:1',
-    ], { stdio: ['ignore', 'pipe', 'ignore'] });
-  } catch { res.status(500).json({ success: false, error: 'ffmpeg unavailable' }); return; }
-  res.setHeader('Content-Type', 'audio/mp4');
-  res.setHeader('Cache-Control', 'no-store');
-  const progress = progressLogger({ label, total: null, startedAt: Date.now() });
-  if (child.stdout) { child.stdout.on('data', (chunk) => progress.add(chunk.length)); child.stdout.pipe(res); }
-  let aborted = false, failed = false;
-  child.on('error', () => { failed = true; if (!res.headersSent) res.status(500).json({ success: false, error: 'ffmpeg error' }); });
-  req.on('close', () => { aborted = true; try { child.kill('SIGKILL'); } catch {} });
-  child.on('close', () => { if (aborted || failed) progress.abort(); else progress.finish(); res.end(); });
-}
-
 // ── Handler /api/music/stream ──
-export async function handleStreamRequest(req, res, { artist = '', title = '', duration = 0, fresh = false } = {}) {
-  const startedAt = Date.now();
-  const label = `${artist} - ${title}`.trim() || 'stream';
-  try {
-    const resolved = await resolveStream({ artist, title, duration }, { fresh });
-    if (!resolved?.url) { res.status(404).json({ success: false, error: 'No stream found' }); return; }
-    const resolveSecs = ((Date.now() - startedAt) / 1000).toFixed(1);
-    const playable = isBrowserPlayableMime(resolved.mime);
-    console.info(`[music-stream] ▶ ${label} · resolución ${resolveSecs}s · ${resolved.mime || 'mime?'} · ${playable ? 'proxy' : 'transcode'}`);
-    if (playable) proxyStream(req, res, resolved.url, label);
-    else transcodeStream(req, res, resolved.url, label);
-  } catch (err) {
-    const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
-    console.warn(`[music-stream] ✗ ${label} · error a los ${elapsed}s:`, err.message);
-    if (!res.headersSent) res.status(502).json({ success: false, error: err.message });
-  }
+// Mismo pipeline unificado que /download (caché memoria/disco + descarga
+// progresiva + reintentos con backoff + resolución fresca). Así producción
+// se comporta igual que el proxy local: primeros bytes en <1s y re-plays
+// instantáneos desde caché.
+export async function handleStreamRequest(req, res, opts) {
+  return serveAudio(req, res, { ...opts, mode: 'stream' });
 }
 
 // ── Descarga con caché en memoria ──
@@ -576,9 +501,9 @@ function streamDownloadToResponse(res, url, cachePath, key) {
       let started = false, finished = false, total = 0;
       const chunks = [];
       const firstByteTimer = setTimeout(() => {
-        // Sin datos en 12s → URL muerta (googlevideo 0 bytes)
+        // Sin datos en 20s → URL muerta (googlevideo 0 bytes)
         out.destroy(new Error('No audio data from source'));
-      }, 12000);
+      }, FIRST_BYTE_TIMEOUT_MS);
       upRes.on('data', (chunk) => {
         clearTimeout(firstByteTimer);
         if (!started) {
@@ -646,7 +571,7 @@ function streamTranscodeToResponse(res, url, cachePath, key) {
     const firstByteTimer = setTimeout(() => {
       try { child.kill('SIGKILL'); } catch {}
       reject(new Error('No audio data from ffmpeg'));
-    }, 12000);
+    }, FIRST_BYTE_TIMEOUT_MS);
     child.stdout?.on('data', (chunk) => {
       clearTimeout(firstByteTimer);
       if (!started) {
@@ -688,9 +613,45 @@ function streamTranscodeToResponse(res, url, cachePath, key) {
 // ── Handler /api/music/download ──
 const inflightDownload = new Map();
 
-export async function handleDownloadRequest(req, res, { artist = '', title = '', duration = 0, fresh = false } = {}) {
+// Primer byte: 20s (antes 12s) — googlevideo con throttling tarda más en
+// empezar a mandar datos; 12s provocaba falsos "No audio data".
+const FIRST_BYTE_TIMEOUT_MS = 20000;
+
+// ── Anti rate-limit de googlevideo ──
+// El throttling se dispara con RÁFAGAS de descargas simultáneas (misma IP).
+// Límite global de descargas concurrentes: si se supera, se ESPERA a que se
+// libere un slot (cola con backoff) en vez de disparar otra en paralelo.
+const MAX_SIMULTANEOUS_DOWNLOADS = 2;
+let activeDownloads = 0;
+const downloadWaiters = [];
+
+function sleep(ms) { return new Promise((r) => setTimeout(r, ms)); }
+
+/** Espera (máx 15s) a que haya un slot de descarga libre; si no, lanza error. */
+async function acquireDownloadSlot() {
+  if (activeDownloads < MAX_SIMULTANEOUS_DOWNLOADS) { activeDownloads += 1; return; }
+  await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Too many concurrent downloads, try again')), 15000);
+    downloadWaiters.push(() => { clearTimeout(timer); resolve(); });
+  });
+  activeDownloads += 1;
+}
+function releaseDownloadSlot() {
+  activeDownloads = Math.max(0, activeDownloads - 1);
+  const next = downloadWaiters.shift();
+  if (next) next();
+}
+
+/**
+ * Pipeline unificado de audio (usado por /stream y /download):
+ *  1. Caché memoria → instantáneo. 2. Disco → leer + cachear. 3. Descarga
+ *     progresiva a googlevideo con reintentos (misma URL → con backoff →
+ *     resolución fresca) y límite de simultáneas. 4. Cachea en memoria/disco.
+ * `mode` solo cambia el prefijo de los logs ('stream' vs 'download').
+ */
+async function serveAudio(req, res, { artist = '', title = '', duration = 0, fresh = false, mode = 'download' } = {}) {
   const startedAt = Date.now();
-  const label = `${artist} - ${title}`.trim() || 'download';
+  const label = `${artist} - ${title}`.trim() || mode;
   try {
     const t0 = Date.now();
     const resolved = await resolveStream({ artist, title, duration }, { fresh });
@@ -707,7 +668,7 @@ export async function handleDownloadRequest(req, res, { artist = '', title = '',
     const mem = getMemAudio(key);
     if (mem) {
       serveBuffer(res, mem);
-      console.info(`[music-stream] ⬇ ${label} · memoria ${(mem.length / 1048576).toFixed(1)} MB · ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
+      console.info(`[music-stream] ${mode === 'stream' ? '▶' : '⬇'} ${label} · memoria ${(mem.length / 1048576).toFixed(1)} MB · ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
       return;
     }
 
@@ -720,12 +681,12 @@ export async function handleDownloadRequest(req, res, { artist = '', title = '',
         const diskBuf = readFileSync(cachePath);
         setMemAudio(key, diskBuf);
         serveBuffer(res, diskBuf);
-        console.info(`[music-stream] ⬇ ${label} · disco ${(diskBuf.length / 1048576).toFixed(1)} MB · ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
+        console.info(`[music-stream] ${mode === 'stream' ? '▶' : '⬇'} ${label} · disco ${(diskBuf.length / 1048576).toFixed(1)} MB · ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
         return;
       } catch { /* seguir con descarga */ }
     }
 
-    // 3) Ya hay una descarga en vuelo → esperar y servir desde memoria.
+    // 3) Ya hay una descarga en vuelo (misma canción) → esperar y servir desde memoria.
     if (inflightDownload.has(key)) {
       await inflightDownload.get(key);
       const b = getMemAudio(key);
@@ -734,47 +695,69 @@ export async function handleDownloadRequest(req, res, { artist = '', title = '',
     }
 
     const playable = isBrowserPlayableMime(resolved.mime);
-    const doStream = () => (playable
-      ? streamDownloadToResponse(res, resolved.url, cachePath, key)
-      : streamTranscodeToResponse(res, resolved.url, cachePath, key)
+    const doStream = (url) => (playable
+      ? streamDownloadToResponse(res, url, cachePath, key)
+      : streamTranscodeToResponse(res, url, cachePath, key)
     );
-    let p = doStream();
-    p = p
+
+    // Slot de descarga adquirido AQUÍ (mismo scope que el try/finally): si
+    // acquireDownloadSlot() rechaza (sin slot en 15s), el catch de abajo responde
+    // 502 y el finally NO libera un slot que nunca se tomó (el contador no se
+    // corrompe ni se despiertan waiters en cascada).
+    await acquireDownloadSlot();
+    let slotAcquired = true;
+
+    const p = (async () => {
+      try {
+        // Intento 1: URL resuelta (la mayoría de las veces funciona).
+        await doStream(resolved.url);
+      } catch (err) {
+        console.warn(`[music-stream] ✗ ${label} · ${err.message}`);
+        if (res.headersSent || res.destroyed) throw err;
+        // Intento 2: misma URL tras backoff (throttling puntual).
+        await sleep(1000);
+        try {
+          console.warn(`[music-stream] ↻ ${label} · reintento (backoff)...`);
+          await doStream(resolved.url);
+        } catch (err2) {
+          console.warn(`[music-stream] ✗ ${label} · ${err2.message}`);
+          if (res.headersSent || res.destroyed) throw err2;
+          // Intento 3: resolución fresca (URL caducada/0 bytes → URL nueva).
+          await sleep(2000);
+          const freshRes = await resolveStream({ artist, title, duration }, { fresh: true });
+          if (!freshRes?.url) throw err2;
+          console.warn(`[music-stream] ↻ ${label} · reintentando con resolución fresca...`);
+          await doStream(freshRes.url);
+        }
+      }
+    })();
+
+    p
       .then(() => {
         console.info(`[music-stream] ⬇ ${label} · servido+${playable ? 'descargado' : 'transcodificado'} y cacheado · total ${((Date.now() - startedAt) / 1000).toFixed(1)}s (resolve ${resolveSecs}s)`);
         evictDownloadCache();
       })
-      .catch(async (err) => {
-        console.warn(`[music-stream] ✗ ${label} · ${err.message}`);
-        // URL muerta (googlevideo 0 bytes) y aún sin headers → resolver fresca y reintentar una vez.
-        if (!res.headersSent && !res.destroyed) {
-          try {
-            console.warn(`[music-stream] ↻ ${label} · reintentando con resolución fresca...`);
-            const freshRes = await resolveStream({ artist, title, duration }, { fresh: true });
-            if (freshRes?.url) {
-              await (playable
-                ? streamDownloadToResponse(res, freshRes.url, cachePath, key)
-                : streamTranscodeToResponse(res, freshRes.url, cachePath, key));
-              evictDownloadCache();
-              return;
-            }
-          } catch (e2) {
-            console.warn(`[music-stream] ✗ ${label} · reintento falló:`, e2.message);
-          }
-          if (!res.headersSent) res.status(502).json({ success: false, error: err.message });
-          else res.end();
-          return;
-        }
-        if (!res.headersSent) res.status(502).json({ success: false, error: err.message });
-        else res.end();
+      .catch((err) => {
+        const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+        console.warn(`[music-stream] ✗ ${label} · error a los ${elapsed}s:`, err.message);
+        if (!res.headersSent && !res.destroyed) res.status(502).json({ success: false, error: err.message });
+        else if (!res.writableEnded) res.end();
       });
+
     inflightDownload.set(key, p);
-    try { await p; } finally { inflightDownload.delete(key); }
+    try { await p; } finally {
+      inflightDownload.delete(key);
+      if (slotAcquired) releaseDownloadSlot();
+    }
   } catch (err) {
     const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
     console.warn(`[music-stream] ✗ ${label} · error a los ${elapsed}s:`, err.message);
-    if (!res.headersSent) res.status(502).json({ success: false, error: err.message });
+    if (!res.headersSent && !res.destroyed) res.status(502).json({ success: false, error: err.message });
   }
+}
+
+export async function handleDownloadRequest(req, res, opts) {
+  return serveAudio(req, res, { ...opts, mode: 'download' });
 }
 
 // ── Pre-warm ──

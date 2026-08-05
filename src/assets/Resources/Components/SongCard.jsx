@@ -217,12 +217,13 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
   // Pre-warm: cuando la card monta con una canción y el server está OK, se
   // anticipa la resolución en background (5-30s de yt-dlp en canciones nuevas).
   // En el perfil PROPIO además se pre-descarga completa → el play sale de caché
-  // del server al instante. En perfiles ajenos solo se resuelve (ahorro de banda).
+  // del server al instante (la resolución es la parte lenta; el audio se
+  // descarga progresivo al dar play y queda cacheado).
   useEffect(() => {
     if (!selected || !streamHealth) return;
-    prewarmStream(selected, streamHealth, { download: isOwnProfile });
+    prewarmStream(selected, streamHealth);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, streamHealth, isOwnProfile]);
+  }, [selected, streamHealth]);
 
   // Pausar al desmontar (el <audio> siempre está montado → el ref es estable).
   // blobForRef se resetea para invalidar cualquier fetch de blob en vuelo: el

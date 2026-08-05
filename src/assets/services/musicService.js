@@ -135,11 +135,14 @@ export function getStreamUrl(song, health = null) {
   // 3) EN PRODUCCIÓN: túnel HTTPS automático (cloudflared) detectado en runtime
   //    vía /health. La app usa esa URL directa (HTTPS → sin Mixed Content, sin
   //    depender de rewrites de Vercel) y sin redeploy cuando el túnel cambia.
-  //    OJO: tunnelUrl es la RAÍZ del túnel (https://xxx.trycloudflare.com), el
-  //    server sirve bajo /api/music → se concatena el prefijo.
+  //    Se usa /stream (misma ruta que el proxy local: progresiva, primeros
+  //    bytes al instante) — el server unifica /stream y /download en el mismo
+  //    pipeline (caché + retry + backoff). OJO: tunnelUrl es la RAÍZ del túnel
+  //    (https://xxx.trycloudflare.com), el server sirve bajo /api/music → se
+  //    concatena el prefijo.
   const tunnel = health?.tunnelUrl;
   if (tunnel && tunnel.startsWith('https:')) {
-    return `${getMusicApiBase(health)}/download?${params.toString()}`;
+    return `${getMusicApiBase(health)}/stream?${params.toString()}`;
   }
 
   // 4) Fallback same-origin en producción:
@@ -153,28 +156,23 @@ export function getStreamUrl(song, health = null) {
 }
 
 /**
- * Pre-warm: anticipa el trabajo del server para que el play arranque al
- * instante. La resolución de yt-dlp tarda 5-30s en canciones nunca escuchadas;
- * al montar la card se dispara en background:
- *   - SIEMPRE: /resolve (resuelve y cachea la URL en el server, sin descargar).
- *   - download=true (perfil propio): además pre-descarga completa → el server la
- *     deja cacheada (memoria/disco) y el play sale de caché (~1s). En perfiles
- *     ajenos NO se descarga (ahorro de banda al navegar perfiles).
+ * Pre-warm: anticipa la resolución de yt-dlp (5-30s en canciones nunca
+ * escuchadas) para que el play arranque al instante. Al montar la card se
+ * llama a /resolve (resuelve y cachea la URL en el server SIN descargar).
+ *
+ * NO se pre-descarga el audio: descargas simultáneas desde la misma IP
+ * disparan el rate-limit de googlevideo (throttling) y rompen los streams
+ * (ECONNRESET / 403). El play en sí descarga (progresivo) y deja la canción
+ * cacheada para las siguientes reproducciones.
  * Fire-and-forget: nunca lanza errores al llamador.
  */
-export function prewarmStream(song, health = null, { download = false } = {}) {
+export function prewarmStream(song, health = null) {
   if (!song?.title || !song?.artist) return;
   const params = new URLSearchParams({ artist: song.artist, title: song.title });
   if (song.duration) params.set('duration', String(song.duration));
   const base = getMusicApiBase(health);
 
-  // Resolución (parte lenta) en TODA card, cueste lo que cueste.
   fetch(`${base}/resolve?${params.toString()}`, { signal: AbortSignal.timeout(15000) }).catch(() => {});
-
-  // Pre-descarga completa solo en producción y cuando se autoriza.
-  if (!import.meta.env.DEV && download) {
-    fetch(`${base}/download?${params.toString()}`, { mode: 'no-cors' }).catch(() => {});
-  }
 }
 
 // ── Health del server de stream (cache en memoria, TTL 5 min) ──

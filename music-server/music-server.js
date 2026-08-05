@@ -470,7 +470,7 @@ async function main() {
 
       res.status(404).json({
         success: false,
-        error: 'Not found. Endpoints: /api/music/health, /api/music/search?q=..., /api/music/stream?artist=&title=',
+        error: 'Not found. Endpoints: /api/music/health · /api/music/search?q=... · /api/music/stream?artist=&title= · /api/music/download?artist=&title= · /api/music/resolve?artist=&title=',
       });
     } catch (err) {
       console.warn('[music-server]', err.message);
