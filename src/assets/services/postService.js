@@ -111,7 +111,7 @@ export async function getPosts({ userId, profileUserId, limit = 20, offset = 0 }
     'is_pinned', 'pinned_at', 'is_encrypted', 'is_sensitive',
     'likes_count', 'dislikes_count', 'comments_count', 'reposts_count', 'views_count',
     'created_at', 'updated_at', 'mentions',
-    'allowed_users', 'obfuscated_display', 'comments_allowed', 'poll_data',
+    'obfuscated_display', 'comments_allowed', 'poll_data',
     'profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position)'
   ].join(',');
   let query = dbPublic.from('posts').select(feedSelect);
@@ -149,7 +149,7 @@ export async function getPost(postId) {
     'is_pinned', 'pinned_at', 'is_encrypted', 'is_sensitive',
     'likes_count', 'dislikes_count', 'comments_count', 'reposts_count', 'views_count',
     'created_at', 'updated_at', 'mentions',
-    'allowed_users', 'obfuscated_display', 'comments_allowed', 'poll_data',
+    'obfuscated_display', 'comments_allowed', 'poll_data',
     'profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position)'
   ].join(',');
   const { data, error } = await dbPublic.from('posts').select(explicitSelect)
@@ -1304,7 +1304,7 @@ export async function getScheduledPosts(userId, { limit = 50, offset = 0 } = {})
     'is_pinned', 'pinned_at', 'is_encrypted', 'is_sensitive',
     'likes_count', 'dislikes_count', 'comments_count', 'reposts_count', 'views_count',
     'created_at', 'updated_at', 'mentions',
-    'allowed_users', 'obfuscated_display', 'comments_allowed', 'poll_data',
+    'obfuscated_display', 'comments_allowed', 'poll_data',
     'profiles!posts_user_id_fkey (id, username, displayname, avatar_url, roles, is_private, avatar_position)'
   ].join(',');
   const { data, error } = await dbPublic.from('posts').select(explicitSelect)
