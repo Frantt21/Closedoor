@@ -1,7 +1,8 @@
 # 🛡️ Auditoría y Endurecimiento de Seguridad — FastChange
 
 **Fecha:** Agosto 2026
-**Estado final:** Auditoría **96/96 (100%)** ✅ — TODAS las pruebas pasan
+**Estado final:** Auditoría **107/107 (100%)** ✅ — TODAS las pruebas pasan
+**Migraciones de seguridad:** 053, 054, 055, 056, 057, 058, 059, 060
 
 ---
 
@@ -13,7 +14,7 @@ Se realizó una auditoría de seguridad integral (DB + cliente + servidor) y se 
 
 | Área | Resultado |
 |---|---|
-| DB (RLS, columnas, RPCs, tablas sociales) | 27/27 ✅ |
+| DB (RLS, columnas, RPCs, tablas sociales) | 28/28 ✅ |
 | SQL Injection (API REST) | 6/6 ✅ |
 | XSS (helpers reales) | 12/12 ✅ |
 | Auth (validaciones, whitelist de email) | 25/25 ✅ |
@@ -194,7 +195,43 @@ texto plano:
 
 ---
 
-### 11. Whitelist de proveedores de email (registro y login)
+### 11. Hardening de funciones SQL (migración 058 — Supabase Advisor)
+
+**Problema:** Supabase Advisor reportó **65 warnings** en 3 categorías:
+
+| Warning | Cantidad | Riesgo |
+|---|---|---|
+| `function_search_path_mutable` | 21 funciones | Search path poisoning |
+| `anon_security_definer_function_executable` | 20 funciones | Anon puede bypassear RLS via SECURITY DEFINER |
+| `authenticated_security_definer_function_executable` | 20 funciones | Usuarios pueden llamar funciones que solo deberían ser triggers |
+| `rls_policy_always_true` | 2 policies | INSERT sin restricción en chat |
+| `auth_leaked_password_protection` | 1 | Contraseñas comprometidas no se bloquean |
+
+**Solución (`src/assets/services/migrations/058_fix_advisor_warnings.sql`):**
+
+| Acción | Funciones | Elimina |
+|---|---|---|
+| `SET search_path = public` | 21 funciones | `function_search_path_mutable` ✅ |
+| `REVOKE EXECUTE FROM anon` + role check `auth.uid() IS NULL` | 8 funciones críticas | `anon_security_definer` ✅ |
+| `REVOKE EXECUTE FROM anon, authenticated` en triggers | 17 funciones (notify_*, increment/decrement, handle_*) | Ambos warnings ✅ |
+| Documentar `WITH CHECK (true)` en chat | `chat_participants`, `conversations` | Info (intencional) ✅ |
+
+**Funciones protegidas con role check interno (defensa en profundidad):**
+- `bump_hashtag_usage` → `IF auth.uid() IS NULL THEN RAISE EXCEPTION`
+- `unfollow_both_ways` → role check + `auth.uid() = blocker_id`
+- `increment_post_views` → role check
+- `get_email_by_username` → role check
+- `get_encrypted_post` → role check
+- `create_mention_notification` → role check
+- `cleanup_post_hashtags` → role check
+- `can_repost_post` → role check
+
+**Pendiente (configuración manual en Dashboard):**
+- Habilitar **Leaked Password Protection** en Supabase → Auth → Password Settings → "Check against HaveIBeenPwned"
+
+---
+
+### 12. Whitelist de proveedores de email (registro y login)
 
 **Problema:** como la verificación de email está deshabilitada en Supabase, cualquiera podía
 crear una cuenta con un correo falso/desechable (`user@tempmail.com`, dominios inventados, etc.).
@@ -287,31 +324,6 @@ A partir de ahí, cualquier push que rompa una prueba de seguridad **bloquea el 
 
 ---
 
-## 🗂️ Archivos tocados
-
-| Archivo | Cambio |
-|---|---|
-| `src/assets/services/migrations/053_revoke_email_column.sql` | REVOKE ALL + grants por columna + RPCs SECURITY DEFINER |
-| `src/assets/services/emailValidation.js` | **Nuevo** — whitelist de proveedores + `validateEmail` (módulo puro) |
-| `src/assets/services/userService.js` | RPCs para email, `PROFILE_PUBLIC_COLUMNS` (52 cols), re-export de emailValidation |
-| `src/context/AuthContext.jsx` | `refreshProfile` sin `select('*')`, `waitForKeyReady()`, validación de email en login/register |
-| `src/assets/Pages/Sing/Register.jsx` | Bloquea email inválido o fuera de la whitelist (mensaje localizado) |
-| `src/assets/Pages/Sing/Login.jsx` | Valida solo formato de email (nunca dominio — cuentas legacy) |
-| `src/assets/services/i18n/locales/*.json` | Keys `auth.email_invalid` y `auth.email_domain_not_allowed` en los 5 idiomas |
-| `src/assets/services/supabaseclient.js` | `flowType:'pkce'`, `__supabase` solo DEV, storage cifrado |
-| `src/assets/Pages/AuthCallback.jsx` | Re-consulta de sesión tras fallo de exchange |
-| `src/assets/Resources/Components/LinkPreview.jsx` | Cache en sessionStorage cifrado |
-| `src/assets/services/helpers.js` | `sanitizeContent` vacía href/src peligrosos |
-| `plugins/cspPlugin.js` | **Nuevo** — inyecta meta CSP en build |
-| `vite.config.js` | Registra cspPlugin |
-| `vercel.json` | HSTS, Permissions-Policy, sin header CSP |
-| `server.js` | Middleware de security headers (sin header CSP) |
-| `src/assets/services/migrations/055_hardening_table_access.sql` | **Nuevo** — RLS en likes/comments/follows/reposts/dislikes, REVOKE raw tables, fix posts_public |
-| `scripts/test-security-full.mjs` | Usa helpers reales, checks negativos CSP, exit 1 si falla, env vars de CI, 10 nuevos checks DB |
-| `.github/workflows/security-audit.yml` | **Nuevo** — auditoría en cada push/PR (exige 100%) |
-
----
-
 ## 🔒 Arquitectura de seguridad del cliente (cómo queda)
 
 ```
@@ -337,11 +349,208 @@ Token de sesión:  localStorage cifrado  →  se descifra solo en memoria al car
 
 ---
 
+## 🔐 Flujo completo de seguridad — Cómo funciona
+
+### Capa 1: Cliente (navegador)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  NAVEGADOR                                                 │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  secureStorage.js                                   │   │
+│  │  ┌──────────────────────────────────────────────┐   │   │
+│  │  │ Master Key (32B CSPRNG) ── SOLO EN MEMORIA  │   │   │
+│  │  │         │                                    │   │   │
+│  │  │         └── envuelta con AES-GCM ──► IDB     │   │   │
+│  │  │              (CryptoKey no-extraíble)         │   │   │
+│  │  └──────────────────────────────────────────────┘   │   │
+│  │                                                     │   │
+│  │  localStorage cifrado:                              │   │
+│  │  - Token de sesión (sb-xxx-auth-token)              │   │
+│  │  - Cache de feed, posts, perfil                     │   │
+│  │  - Datos de usuario                                 │   │
+│  │  Cada entrada: SHA-256(masterKey ‖ salt) + XOR      │   │
+│  └─────────────────────────────────────────────────────┘   │
+│                                                             │
+│  ┌─────────────────────────────────────────────────────┐   │
+│  │  supabaseclient.js                                  │   │
+│  │  - flowType: 'pkce' (OAuth sin token en URL)        │   │
+│  │  - storage: secureSupabaseStorage (cifrado)         │   │
+│  │  - __supabase SOLO en DEV                           │   │
+│  └─────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Capa 2: Red (headers de seguridad)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  RESPONSE HEADERS                                           │
+│                                                             │
+│  X-Frame-Options: DENY                    (anti-clickjack) │
+│  X-Content-Type-Options: nosniff           (anti-MIME sniff)│
+│  Referrer-Policy: strict-origin-when-cross-origin          │
+│  Strict-Transport-Security: max-age=31536000  (HSTS)       │
+│  Permissions-Policy: camera=(self), microphone=(self)       │
+│                                                             │
+│  Meta CSP (inyectada por cspPlugin.js solo en build):       │
+│  - script-src: 'self' + Turnstile (sin unsafe-*)            │
+│  - connect-src: Supabase, LiveKit, iTunes, túneles         │
+│  - object-src: 'none'                                       │
+│  - NO hay header CSP HTTP (evita shadowing de la meta)      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Capa 3: Base de datos (RLS + GRANT + RPCs)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  SUPABASE DATABASE                                          │
+│                                                             │
+│  ┌─── ANON KEY (sin sesión) ────────────────────────────┐  │
+│  │                                                       │  │
+│  │  ✅ PUEDE:                                            │  │
+│  │  - Leer profiles_public (sin email)                   │  │
+│  │  - Leer posts_public (sin encrypted_content)          │  │
+│  │  - Leer comments (contenido público)                  │  │
+│  │  - Llamar email_exists (necesario para registro)      │  │
+│  │  - Llamar get_trending_words (datos agregados)        │  │
+│  │                                                       │  │
+│  │  ❌ NO PUEDE:                                         │  │
+│  │  - Leer email de profiles (REVOKE columna)            │  │
+│  │  - Leer likes, follows, reposts (REVOKE tabla)        │  │
+│  │  - Leer conversations, messages (RLS)                 │  │
+│  │  - Leer notifications (RLS)                           │  │
+│  │  - INSERT/UPDATE/DELETE en cualquier tabla (RLS)       │  │
+│  │  - Llamar get_email_by_username (REVOKE)              │  │
+│  │  - Llamar bump_hashtag_usage (REVOKE + role check)    │  │
+│  │  - Llamar increment_post_views (REVOKE + role check)  │  │
+│  │  - Llamar unfollow_both_ways (REVOKE + role check)    │  │
+│  │  - Llamar rls_auto_enable (REVOKE)                    │  │
+│  └───────────────────────────────────────────────────────┘  │
+│                                                             │
+│  ┌─── AUTHENTICATED (con sesión) ───────────────────────┐  │
+│  │                                                       │  │
+│  │  ✅ PUEDE:                                            │  │
+│  │  - Todo lo que puede anon                             │  │
+│  │  - CRUD en sus propios datos (RLS: user_id=auth.uid)  │  │
+│  │  - Leer likes, follows, reposts (authenticated only)  │  │
+│  │  - Leer conversations/messages (si es participante)   │  │
+│  │  - Leer notifications propias (RLS)                   │  │
+│  │  - Llamar RPCs con role check (auth.uid() IS NOT NULL)│  │
+│  │                                                       │  │
+│  │  ❌ NO PUEDE:                                         │  │
+│  │  - Leer email de otros (REVOKE columna + RPC)         │  │
+│  │  - Leer posts encriptados ajenos (RLS: allowed_users) │  │
+│  │  - Modificar datos de otros (RLS)                     │  │
+│  │  - Des-followear otros (role check: uid=blocker_id)   │  │
+│  │  - Ejecutar rls_auto_enable (REVOKE)                  │  │
+│  └───────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Capa 4: Validación de entrada
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  VALIDACIÓN                                                │
+│                                                             │
+│  Registro:                                                  │
+│  - Password: mínimo 6 caracteres                           │
+│  - Username: 3-20 chars, solo [a-zA-Z0-9_]                │
+│  - Email: whitelist de proveedores (Gmail, Outlook, etc.)  │
+│  - Turnstile CAPTCHA (protección contra bots)              │
+│                                                             │
+│  Login:                                                     │
+│  - Solo email + password (login por username deshabilitado) │
+│  - Validación de formato de email (sin whitelist)           │
+│                                                             │
+│  Contenido:                                                 │
+│  - sanitizeContent: elimina <script>, <iframe>, <svg>,     │
+│    javascript:, onerror=, etc.                              │
+│  - sanitizeUrl: bloquea protocolos peligrosos              │
+│  - Mencion(@) y hashtag(#) procesados vía regex            │
+│                                                             │
+│  SQL Injection:                                             │
+│  - Supabase REST API sanitiza automáticamente              │
+│  - Payloads como ' OR '1'='1 retornan 0 resultados         │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Capa 5: CI/CD (automatización)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  GITHUB ACTIONS (security-audit.yml)                        │
+│                                                             │
+│  En cada push/PR a main:                                    │
+│  1. npm ci                                                  │
+│  2. node scripts/test-security-full.mjs (107 checks)        │
+│  3. npx vite build (verifica CSP + build)                   │
+│                                                             │
+│  Si ALGUNO falla → exit 1 → merge bloqueado                │
+│  PRs desde forks: fallan con aviso claro (sin secrets)      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Tabla resumen: Qué puede hacer cada rol
+
+| Acción | Anon | Authenticated | Protegido por |
+|---|---|---|---|
+| Ver perfil público | ✅ | ✅ | Vista `profiles_public` |
+| Ver posts públicos | ✅ | ✅ | Vista `posts_public` |
+| Ver comentarios | ✅ | ✅ | RLS público en SELECT |
+| Ver emails | ❌ | ❌ | REVOKE columna + RPC |
+| Ver likes/follows/reposts | ❌ | ✅ (propios) | REVOKE + RLS |
+| Ver posts encriptados | ❌ | ✅ (si está en allowed_users) | RLS |
+| Ver conversaciones | ❌ | ✅ (si es participante) | RLS |
+| Ver notificaciones | ❌ | ✅ (propias) | RLS |
+| Crear/editar/borrar posts | ❌ | ✅ (propios) | RLS |
+| Crear likes/comments | ❌ | ✅ | RLS |
+| Des-followear otros | ❌ | ❌ | Role check: `uid = blocker_id` |
+| Inflar trending | ❌ | ❌ | REVOKE + role check |
+| Inflar vistas | ❌ | ❌ | REVOKE + role check |
+| Habilitar RLS | ❌ | ❌ | REVOKE |
+| Login por username | ❌ | ❌ | REVOKE (email only) |
+| Registro con email basura | ❌ | ❌ | Whitelist de proveedores |
+
+---
+
+## 🗂️ Archivos tocados (completo)
+
+| Archivo | Cambio |
+|---|---|
+| `migrations/053_revoke_email_column.sql` | REVOKE ALL + grants por columna + RPCs |
+| `migrations/054_secure_rpcs.sql` | REVOKE de anon en RPCs críticas |
+| `migrations/055_hardening_table_access.sql` | RLS en tablas sociales, fix vistas |
+| `migrations/056_fix_rls_likes_reposts_follows.sql` | REVOKE explícito + FORCE RLS |
+| `migrations/057_restore_view_access.sql` | Restaura GRANT en vistas |
+| `migrations/058_fix_advisor_warnings.sql` | SET search_path, role checks, REVOKE triggers |
+| `migrations/059_fix_remaining_advisor_warnings.sql` | REVOKE post-CREATE OR REPLACE |
+| `migrations/060_close_final_gaps.sql` | REVOKE get_email_by_username + rls_auto_enable de authenticated |
+| `emailValidation.js` | Whitelist de proveedores de email |
+| `userService.js` | RPCs para email, PROFILE_PUBLIC_COLUMNS |
+| `AuthContext.jsx` | waitForKeyReady, validación de email |
+| `Register.jsx` | Bloquea email fuera de whitelist |
+| `Login.jsx` | Solo formato de email (sin dominio) |
+| `supabaseclient.js` | pkce, __supabase solo DEV, storage cifrado |
+| `AuthCallback.jsx` | waitForKeyReady + re-consulta sesión |
+| `LinkPreview.jsx` | Cache cifrado |
+| `helpers.js` | sanitizeContent mejorado |
+| `postService.js` | Eliminado allowed_users de SELECTs |
+| `cspPlugin.js` | Meta CSP en build |
+| `vercel.json` | HSTS, Permissions-Policy |
+| `server.js` | Security headers |
+| `test-security-full.mjs` | 107 checks, helpers reales, CI exit code |
+| `security-audit.yml` | CI en cada push/PR |
+
+---
+
 ## 🚀 Para producción
 
-1. Aplicar la migración **053 v2** en Supabase (SQL Editor) si no está aplicada
-   (también disponible en `migracion-053-email.md`).
-2. Aplicar la migración **055** en Supabase (SQL Editor) — RLS en tablas de interacción social.
-3. Redeploy en Vercel (headers + meta CSP del build).
-4. El PKCE aplica al próximo login con Discord (no rompe sesiones existentes).
-5. Re-ejecutar `node scripts/test-security-full.mjs` tras cualquier cambio de seguridad.
+1. ✅ Migraciones 053-060 aplicadas en Supabase
+2. ⚠️ Habilitar **Leaked Password Protection** en Supabase → Auth → Password Settings
+3. ✅ Redeploy en Vercel (headers + CSP)
+4. ✅ CI activo en GitHub Actions
+5. Re-ejecutar `node scripts/test-security-full.mjs` tras cualquier cambio
