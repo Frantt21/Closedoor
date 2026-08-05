@@ -400,13 +400,172 @@ function progressLogger({ label, total, startedAt }) {
   };
 }
 
+// ── Respuestas JSON sin depender del shim Express-lite de music-server.js ──
+// El ServerResponse nativo de Node NO tiene .status()/.json() (son de Express).
+// music-server.js los inyecta en cada request (adapt()), pero estos handlers
+// usan la API nativa para funcionar en cualquier contexto (test, reutilización).
+function sendJson(res, code, obj) {
+  res.statusCode = code;
+  res.setHeader('Content-Type', 'application/json; charset=utf-8');
+  res.end(JSON.stringify(obj));
+}
+
 // ── Handler /api/music/stream ──
-// Mismo pipeline unificado que /download (caché memoria/disco + descarga
-// progresiva + reintentos con backoff + resolución fresca). Así producción
-// se comporta igual que el proxy local: primeros bytes en <1s y re-plays
-// instantáneos desde caché.
-export async function handleStreamRequest(req, res, opts) {
-  return serveAudio(req, res, { ...opts, mode: 'stream' });
+// STREAM EN VIVO (proxy real): pipea googlevideo → cliente byte a byte con el
+// PRIMER byte al instante. NO bufferiza la canción completa (que con el
+// throttling de googlevideo tardaba 90-170s en llegar). Mantiene la cadena de
+// reintentos: misma URL con backoff → resolución fresca (URL caducada/403/0
+// bytes). /api/music/download conserva el pipeline cacheado (memoria/disco)
+// para re-producciones instantáneas.
+export async function handleStreamRequest(req, res, { artist = '', title = '', duration = 0, fresh = false } = {}) {
+  const startedAt = Date.now();
+  const label = `${artist} - ${title}`.trim() || 'stream';
+  try {
+    const resolved = await resolveStream({ artist, title, duration }, { fresh });
+    if (!resolved?.url) { sendJson(res, 404, { success: false, error: 'No stream found' }); return; }
+    const resolveSecs = ((Date.now() - startedAt) / 1000).toFixed(1);
+    const playable = isBrowserPlayableMime(resolved.mime);
+    console.info(`[music-stream] ▶ ${label} · resolución ${resolveSecs}s · ${resolved.mime || 'mime?'} · ${playable ? 'proxy' : 'transcode'}`);
+
+    const doStream = (url) => (playable
+      ? proxyStream(req, res, url, label)
+      : transcodeStream(req, res, url, label)
+    );
+
+    try {
+      // Intento 1: URL resuelta (la mayoría de las veces funciona).
+      await doStream(resolved.url);
+    } catch (err) {
+      console.warn(`[music-stream] ✗ ${label} · ${err.message}`);
+      if (res.headersSent || res.destroyed) throw err;
+      // Intento 2: misma URL tras backoff (throttling puntual).
+      await sleep(1000);
+      try {
+        console.warn(`[music-stream] ↻ ${label} · reintento (backoff)...`);
+        await doStream(resolved.url);
+      } catch (err2) {
+        console.warn(`[music-stream] ✗ ${label} · ${err2.message}`);
+        if (res.headersSent || res.destroyed) throw err2;
+        // Intento 3: resolución fresca (URL caducada/403/0 bytes → URL nueva).
+        await sleep(2000);
+        const freshRes = await resolveStream({ artist, title, duration }, { fresh: true });
+        if (!freshRes?.url) throw err2;
+        console.warn(`[music-stream] ↻ ${label} · reintentando con resolución fresca...`);
+        await doStream(freshRes.url);
+      }
+    }
+    console.info(`[music-stream] ▶ ${label} · stream en vivo completo · ${((Date.now() - startedAt) / 1000).toFixed(1)}s (resolve ${resolveSecs}s)`);
+  } catch (err) {
+    const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+    console.warn(`[music-stream] ✗ ${label} · error a los ${elapsed}s:`, err.message);
+    if (!res.headersSent && !res.destroyed) sendJson(res, 502, { success: false, error: err.message });
+    else if (!res.writableEnded) res.end();
+  }
+}
+
+// ── Proxy en vivo (googlevideo → cliente) ──
+// Devuelve una promesa que resuelve al terminar el stream o RECHAZA si el
+// upstream rechaza (403/404) o muere ANTES de mandar datos → el handler
+// reintenta con backoff y resolución fresca.
+export function proxyStream(req, res, url, label = 'proxy') {
+  return new Promise((resolve, reject) => {
+    const target = withRateBypass(url);
+    let parsed;
+    try {
+      parsed = new URL(target);
+    } catch {
+      sendJson(res, 400, { success: false, error: 'Invalid stream URL' });
+      reject(new Error('Invalid stream URL'));
+      return;
+    }
+    const lib = parsed.protocol === 'https:' ? https : http;
+    const headers = { 'User-Agent': UA };
+    if (req.headers.range) headers.Range = req.headers.range;
+    let firstByteTimer = null;
+
+    const proxyReq = lib.request(parsed, { method: 'GET', headers }, (upRes) => {
+      // Upstream rechaza (403/404) ANTES de mandar datos → reintentar.
+      if (upRes.statusCode < 200 || upRes.statusCode >= 300) {
+        clearTimeout(firstByteTimer);
+        upRes.resume();
+        reject(new Error(`download HTTP ${upRes.statusCode}`));
+        return;
+      }
+      res.statusCode = upRes.statusCode || 200;
+      ['content-type', 'content-length', 'content-range', 'accept-ranges', 'cache-control', 'etag', 'last-modified'].forEach((h) => {
+        const v = upRes.headers[h];
+        if (v !== undefined) res.setHeader(h, v);
+      });
+      const contentLength = Number(upRes.headers['content-length']);
+      const crMatch = String(upRes.headers['content-range'] || '').match(/\/(\d+)$/);
+      const total = crMatch ? Number(crMatch[1]) : (Number.isFinite(contentLength) ? contentLength : null);
+      const progress = progressLogger({ label, total, startedAt: Date.now() });
+      let finished = false;
+      firstByteTimer = setTimeout(() => {
+        proxyReq.destroy(new Error('No audio data from source'));
+      }, FIRST_BYTE_TIMEOUT_MS);
+      upRes.on('data', (chunk) => { clearTimeout(firstByteTimer); progress.add(chunk.length); });
+      upRes.on('end', () => { clearTimeout(firstByteTimer); finished = true; progress.finish(); resolve(); });
+      upRes.on('error', (err) => { clearTimeout(firstByteTimer); finished = true; progress.abort(); reject(err); });
+      // Aborto a mitad sin 'end' ni 'error' → no dejar colgada la promesa.
+      upRes.on('close', () => {
+        clearTimeout(firstByteTimer);
+        if (!finished) { finished = true; progress.abort(); reject(new Error('Stream aborted')); }
+      });
+      upRes.pipe(res);
+    });
+
+    proxyReq.on('error', (err) => { clearTimeout(firstByteTimer); reject(err); });
+    proxyReq.setTimeout(120000, () => proxyReq.destroy(new Error('proxy timeout')));
+    // Liberar la conexión upstream si el cliente se desconecta.
+    req.on('close', () => { if (!proxyReq.destroyed) proxyReq.destroy(); });
+    proxyReq.end();
+  });
+}
+
+// ── Transcode en vivo a m4a (para webm/opus que Safari no reproduce) ──
+export function transcodeStream(req, res, url, label = 'transcode') {
+  return new Promise((resolve, reject) => {
+    let child;
+    try {
+      child = spawn(FFMPEG_BIN, [
+        '-hide_banner', '-loglevel', 'error',
+        '-user_agent', UA,
+        '-i', withRateBypass(url),
+        '-vn', '-acodec', 'aac', '-b:a', '128k',
+        '-movflags', 'frag_keyframe+empty_moov',
+        '-f', 'mp4', 'pipe:1',
+      ], { stdio: ['ignore', 'pipe', 'ignore'] });
+    } catch { reject(new Error('ffmpeg unavailable')); return; }
+    res.setHeader('Content-Type', 'audio/mp4');
+    res.setHeader('Cache-Control', 'no-store');
+    const progress = progressLogger({ label, total: null, startedAt: Date.now() });
+    let finished = false, failed = false, aborted = false;
+    let stderr = '';
+    const firstByteTimer = setTimeout(() => {
+      try { child.kill('SIGKILL'); } catch {}
+      reject(new Error('No audio data from ffmpeg'));
+    }, FIRST_BYTE_TIMEOUT_MS);
+    if (child.stdout) {
+      child.stdout.on('data', (chunk) => { clearTimeout(firstByteTimer); progress.add(chunk.length); });
+      child.stdout.pipe(res);
+    }
+    child.stderr?.on('data', (d) => { stderr += d; });
+    child.on('error', (err) => { clearTimeout(firstByteTimer); failed = true; reject(err); });
+    req.on('close', () => {
+      aborted = true; // el cliente se fue → no fue una finalización natural
+      try { child.kill('SIGKILL'); } catch {}
+    });
+    child.on('close', (code) => {
+      clearTimeout(firstByteTimer);
+      finished = true;
+      if (aborted) { progress.abort(); resolve(); return; }
+      if (failed) { progress.abort(); reject(new Error('ffmpeg error')); return; }
+      if (code === 0) { progress.finish(); resolve(); }
+      else { progress.abort(); reject(new Error(`ffmpeg exit ${code}: ${stderr.slice(0, 150)}`)); }
+      res.end();
+    });
+  });
 }
 
 // ── Bypass de rate-limit de googlevideo ──
