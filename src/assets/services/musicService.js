@@ -79,13 +79,20 @@ async function searchMusicProxy(query, provider, limit) {
 }
 
 /**
- * URL de stream completo de una canción (server yt-dlp, mismo origen).
- * Retorna null si el song no tiene artista/título (imposible de resolver).
+ * URL de stream completo de una canción (server yt-dlp).
+ * Para streaming se usa conexión DIRECTA al music server (Vercel rewrites
+ * no soportan respuestas de streaming largas → timeout/403).
+ * El music server tiene CORS `*` así que las peticiones cross-origin funcionan.
+ * Retorna null si el song no tiene artista/título.
  */
+const STREAM_DIRECT_URL = (import.meta.env.VITE_MUSIC_STREAM_URL || '').replace(/\/+$/, '');
 export function getStreamUrl(song) {
   if (!song?.title || !song?.artist) return null;
   const params = new URLSearchParams({ artist: song.artist, title: song.title });
   if (song.duration) params.set('duration', String(song.duration));
+  // Si hay URL directa del music server, usarla para streaming (CORS *)
+  if (STREAM_DIRECT_URL) return `${STREAM_DIRECT_URL}/stream?${params.toString()}`;
+  // Fallback: mismo origen (Vercel proxy — funciona para preview pero no para streaming largo)
   return `${MUSIC_API}/stream?${params.toString()}`;
 }
 

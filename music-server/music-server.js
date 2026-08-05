@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, chmodSync, createWriteStream, unlinkSync, readFi
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
-import { combinedMusicSearch, getMusicHealth, handleStreamRequest } from './api/_musicStream.js';
+import { combinedMusicSearch, getMusicHealth, handleStreamRequest, detectedCookiesFile } from './api/_musicStream.js';
 import { resolveTrackPreview } from './api/_music.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -81,11 +81,31 @@ async function autoSetup() {
   const ffmpegPath = join(BIN_DIR, 'ffmpeg');
 
   // ── yt-dlp ──
-  // Formato correcto: yt-dlp_linux_aarch64 (guión bajo)
-  if (!existsSync(ytdlpPath)) {
-    const version = '2025.06.09';
-    const url = `https://github.com/yt-dlp/yt-dlp/releases/download/${version}/yt-dlp_linux_${arch}`;
-    console.log(`[setup] 📦 Descargando yt-dlp ${version} (${arch})...`);
+  // Siempre descargar la versión más reciente si no existe o es muy vieja.
+  // La versión 2025.06.09 no puede extraer formatos de YouTube en 2026.
+  const YT_DLP_VERSION = '2026.07.04';
+  let needYtdlp = !existsSync(ytdlpPath);
+  if (!needYtdlp) {
+    try {
+      const { stdout } = await new Promise((resolve, reject) => {
+        const child = spawn(ytdlpPath, ['--version'], { stdio: ['ignore', 'pipe', 'pipe'] });
+        let out = '', err = '';
+        child.stdout?.on('data', (d) => { out += d; });
+        child.stderr?.on('data', (d) => { err += d; });
+        child.on('close', (code) => code === 0 ? resolve({ stdout: out }) : reject(new Error(err)));
+        child.on('error', reject);
+      });
+      const installedVersion = stdout.trim().split('\n')[0];
+      if (installedVersion < YT_DLP_VERSION) {
+        console.log(`[setup] 📦 yt-dlp ${installedVersion} obsoleto → actualizando a ${YT_DLP_VERSION}...`);
+        needYtdlp = true;
+      }
+    } catch { needYtdlp = true; }
+  }
+  if (needYtdlp) {
+    // Binary específico por arquitectura (compilado standalone, no necesita Python)
+    const url = `https://github.com/yt-dlp/yt-dlp/releases/download/${YT_DLP_VERSION}/yt-dlp_linux_${arch}`;
+    console.log(`[setup] 📦 Descargando yt-dlp ${YT_DLP_VERSION} (${arch})...`);
     try {
       await downloadFile(url, ytdlpPath);
       chmodSync(ytdlpPath, 0o755);
@@ -116,7 +136,73 @@ async function autoSetup() {
     }
   }
 
-  console.log(`[setup] yt-dlp: ${existsSync(ytdlpPath) ? '✅' : '❌'} | ffmpeg: ${existsSync(ffmpegPath) ? '✅' : '❌'}`);
+  // ── PO Token provider (anti-bot para IPs de datacenter) ──
+  // YouTube requiere PO Tokens para extraer formatos desde IPs de datacenter.
+  // Sin ellos, yt-dlp devuelve "Requested format is not available".
+  const bgutilPath = join(BIN_DIR, 'bgutil-pot');
+  const pluginsDir = join(__dirname, 'yt-dlp-plugins');
+  const potPluginDir = join(pluginsDir, 'bgutil-ytdlp-pot-provider');
+  const POT_VERSION = 'v0.8.1';
+  
+  if (!existsSync(bgutilPath)) {
+    const potUrl = arch === 'aarch64'
+      ? `https://github.com/jim60105/bgutil-ytdlp-pot-provider-rs/releases/download/${POT_VERSION}/bgutil-pot-linux-aarch64`
+      : `https://github.com/jim60105/bgutil-ytdlp-pot-provider-rs/releases/download/${POT_VERSION}/bgutil-pot-linux-x86_64`;
+    console.log(`[setup] 📦 Descargando PO Token provider (${arch})...`);
+    try {
+      await downloadFile(potUrl, bgutilPath);
+      chmodSync(bgutilPath, 0o755);
+      console.log('[setup] ✅ PO Token provider instalado');
+    } catch (err) {
+      console.warn(`[setup] ⚠️ No se pudo descargar PO Token provider: ${err.message}`);
+    }
+  }
+  
+  // Descargar plugin de yt-dlp si no existe
+  // Los plugins DEBEN estar en un directorio que yt-dlp escanee:
+  //   1. Junto al binario: ./bin/yt-dlp-plugins/
+  //   2. ~/.config/yt-dlp-plugins/
+  //   3. ~/yt-dlp-plugins/
+  const binPluginsDir = join(BIN_DIR, 'yt-dlp-plugins');
+  const binPotPluginDir = join(binPluginsDir, 'bgutil-ytdlp-pot-provider');
+  if (!existsSync(binPotPluginDir) && existsSync(bgutilPath)) {
+    const pluginZipUrl = `https://github.com/jim60105/bgutil-ytdlp-pot-provider-rs/releases/download/${POT_VERSION}/bgutil-ytdlp-pot-provider-rs.zip`;
+    const tmpZip = `/tmp/bgutil-pot-plugin.zip`;
+    console.log('[setup] 📦 Descargando PO Token plugin para yt-dlp...');
+    try {
+      await downloadFile(pluginZipUrl, tmpZip);
+      mkdirSync(binPluginsDir, { recursive: true });
+      await new Promise((resolve, reject) => {
+        const child = spawn('unzip', ['-o', tmpZip, '-d', binPluginsDir], { stdio: ['ignore', 'pipe', 'pipe'] });
+        let stderr = '';
+        child.stderr?.on('data', (d) => { stderr += d; });
+        child.on('close', (code) => code === 0 ? resolve() : reject(new Error(stderr.slice(0, 200))));
+        child.on('error', reject);
+      });
+      try { unlinkSync(tmpZip); } catch {}
+      console.log('[setup] ✅ PO Token plugin instalado');
+    } catch (err) {
+      console.warn(`[setup] ⚠️ No se pudo instalar PO Token plugin: ${err.message}`);
+    }
+  }
+  
+  // Iniciar servidor PO Token en background si el binario existe
+  if (existsSync(bgutilPath) && !process.env.BGUTIL_POT_PORT) {
+    try {
+      const potServer = spawn(bgutilPath, ['server', '--port', '4416'], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: true,
+      });
+      potServer.unref();
+      // Configurar yt-dlp para usar el provider
+      process.env.BGUTIL_POT_BASE_URL = 'http://127.0.0.1:4416';
+      console.log('[setup] ✅ PO Token server iniciado en puerto 4416');
+    } catch (err) {
+      console.warn(`[setup] ⚠️ No se pudo iniciar PO Token server: ${err.message}`);
+    }
+  }
+
+  console.log(`[setup] yt-dlp: ${existsSync(ytdlpPath) ? '✅' : '❌'} | ffmpeg: ${existsSync(ffmpegPath) ? '✅' : '❌'} | pot: ${existsSync(bgutilPath) ? '✅' : '❌'}`);
 }
 
 const PORT = process.env.PORT || 24633;
@@ -125,7 +211,7 @@ const PORT = process.env.PORT || 24633;
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range, ngrok-skip-browser-warning');
 }
 
 // ── Shims Express-lite ──
@@ -247,6 +333,7 @@ async function main() {
     console.log(`   Plataforma: ${process.platform} ${process.arch}`);
     console.log(`   yt-dlp: ${process.env.YTDLP_BIN} ${existsSync(process.env.YTDLP_BIN) ? '✅' : '❌'}`);
     console.log(`   ffmpeg: ${process.env.FFMPEG_BIN} ${existsSync(process.env.FFMPEG_BIN) ? '✅' : '❌'}`);
+    console.log(`   cookies: ${detectedCookiesFile ? detectedCookiesFile + ' ✅' : '⚠️ no detectadas (coloca cookies.txt junto a music-server.js)'}`);
     console.log('   /api/music/health · /api/music/search?q=... · /api/music/stream?artist=&title=');
   });
 }

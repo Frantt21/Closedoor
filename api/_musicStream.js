@@ -93,7 +93,7 @@ function runYtDlp(args, { timeoutMs = 30000, maxBuffer = 8 * 1024 * 1024 } = {})
     // ⚠️ NOTA: `--no-call-home` fue ELIMINADO de yt-dlp (2026): en versiones
     // nuevas da error "deprecated option". El call-home ya no existe, así que
     // simplemente no se pasa.
-    const baseArgs = ['--no-warnings', '--js-runtimes', 'node'];
+    const baseArgs = ['--no-warnings'];
     if (YTDLP_COOKIES_FILE) baseArgs.push('--cookies', YTDLP_COOKIES_FILE);
     try {
       child = spawn(YTDLP_BIN, [...baseArgs, ...args], {
@@ -209,8 +209,9 @@ export function pickBestCandidate(candidates, { title, artist, duration }) {
 // viejo (`bestaudio[ext=m4a]/bestaudio[ext=mp4]/bestaudio`) aborta con
 // "Requested format is not available" cuando el client exige po_token.
 export async function resolveBestAudioUrl(videoUrl) {
+  // Selector robusto: m4a → mp4 audio → bestaudio → best (siempre resuelve)
   const run = (extra) => runYtDlp([
-    '-f', 'ba[ext=m4a]/ba/b',
+    '-f', 'ba[ext=m4a]/ba[ext=mp4]/bestaudio/best',
     '--get-url',
     '--no-playlist',
     ...extra,

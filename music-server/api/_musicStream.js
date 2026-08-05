@@ -67,27 +67,51 @@ const YTDLP_COOKIES_FILE = (() => {
   return existsSync(localCookies) ? localCookies : '';
 })();
 
-// ── YouTube client chain ──
+// Exportado para que music-server.js pueda loguear el estado
+export const detectedCookiesFile = YTDLP_COOKIES_FILE;
+
+// ── YouTube client chain + anti-bot ──
+// IPs de datacenter requieren PO Tokens para extraer formatos. Sin PO Tokens,
+// YouTube devuelve "Requested format is not available" para TODOS los selectores.
+// Estrategia: usar clients menos restringidos + player_skip=webpage para reducir
+// la huella de detección. Los clients embebidos y mediaconnect son los más
+// tolerantes con IPs de datacenter.
 const YTDLP_CLIENTS = (() => {
   if (process.env.YTDLP_EXTRACTOR_ARGS) {
     return process.env.YTDLP_EXTRACTOR_ARGS.split(',').map((s) => s.trim()).filter(Boolean);
   }
   const base = [
-    'youtube:player_client=web_embedded',
-    'youtube:player_client=mweb',
-    'youtube:player_client=tv_embedded',
-    'youtube:player_client=android',
-    ...(YTDLP_COOKIES_FILE ? ['youtube:player_client=web'] : []),
+    // mediaconnect: client nuevo, menos restricciones en datacenters
+    'youtube:player_client=mediaconnect;player_skip=webpage,configs',
+    // web_embedded: client embebido, tolera más IPs
+    'youtube:player_client=web_embedded;player_skip=webpage,configs',
+    // mweb: mobile web, menos bloqueado
+    'youtube:player_client=mweb;player_skip=webpage,configs',
+    // tv_embedded: smart TV client, bypasses many checks
+    'youtube:player_client=tv_embedded;player_skip=webpage,configs',
+    // android: fallback final
+    'youtube:player_client=android;player_skip=webpage,configs',
   ];
   return base;
 })();
 
 // ── Ejecutar yt-dlp ──
-function runYtDlp(args, { timeoutMs = 30000, maxBuffer = 8 * 1024 * 1024 } = {}) {
+const YTDLP_PLUGINS_DIR = join(ROOT_DIR, 'bin', 'yt-dlp-plugins');
+function runYtDlp(args, { timeoutMs = 30000, maxBuffer = 8 * 1024 * 1024, skipCookies = false, verbose = false } = {}) {
   return new Promise((resolve, reject) => {
     let child;
-    const baseArgs = ['--no-warnings', '--js-runtimes', 'node'];
-    if (YTDLP_COOKIES_FILE) baseArgs.push('--cookies', YTDLP_COOKIES_FILE);
+    const baseArgs = verbose ? ['--verbose', '--no-warnings'] : ['--no-warnings'];
+    // --js-runtimes node: necesario para extraer formatos de YouTube en versiones recientes
+    baseArgs.push('--js-runtimes', 'node');
+    // PO Token plugin: indicar directorio de plugins si existe
+    if (existsSync(YTDLP_PLUGINS_DIR)) {
+      baseArgs.push('--plugin-dirs', YTDLP_PLUGINS_DIR);
+    }
+    // PO Token server URL (si está configurado)
+    if (process.env.BGUTIL_POT_BASE_URL) {
+      baseArgs.push('--extractor-args', `youtubepot-bgutilhttp:base_url=${process.env.BGUTIL_POT_BASE_URL}`);
+    }
+    if (!skipCookies && YTDLP_COOKIES_FILE) baseArgs.push('--cookies', YTDLP_COOKIES_FILE);
     try {
       child = spawn(YTDLP_BIN, [...baseArgs, ...args], {
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -172,16 +196,25 @@ export function pickBestCandidate(candidates, { title, artist, duration }) {
 
 // ── Resolver URL de audio ──
 export async function resolveBestAudioUrl(videoUrl) {
-  const run = (extra) => runYtDlp([
-    '-f', 'ba[ext=m4a]/ba/b',
+  // Selector ULTRA-permisivo: intenta todo, incluyendo video+audio
+  const run = (extra, opts = {}) => runYtDlp([
+    '-f', 'bestaudio[ext=m4a]/bestaudio[ext=mp4]/bestaudio/bestvideo[ext=m4a]+bestaudio/best',
     '--get-url', '--no-playlist',
     ...extra, videoUrl,
-  ]);
+  ], opts);
   const parseUrl = (stdout) => stdout.split('\n').map((l) => l.trim()).find((l) => /^https?:\/\//.test(l));
 
+  // Intentar con cookies (si disponibles) — primer intento verbose para diagnosticar
+  let isFirstAttempt = true;
   for (const client of YTDLP_CLIENTS) {
     try {
-      const { stdout } = await run(['--extractor-args', client]);
+      const { stdout, stderr } = await run(['--extractor-args', client], isFirstAttempt ? { verbose: true, timeoutMs: 45000 } : {});
+      if (isFirstAttempt && stderr) {
+        // Loguear info del plugin PO Token si está presente
+        const potLines = stderr.split('\n').filter(l => l.includes('[pot]') || l.includes('PO Token') || l.includes('plugin'));
+        if (potLines.length) console.info('[music-stream] PO Token info:', potLines.slice(0, 3).join(' | '));
+      }
+      isFirstAttempt = false;
       const line = parseUrl(stdout);
       if (line) {
         console.info(`[music-stream] resuelto con client: ${client.replace('youtube:player_client=', '')}`);
@@ -191,8 +224,27 @@ export async function resolveBestAudioUrl(videoUrl) {
   }
   const { stdout } = await run([]);
   const line = parseUrl(stdout);
-  if (!line) throw new Error('No audio URL resolved');
-  return line;
+  if (line) return line;
+
+  // Fallback: intentar SIN cookies (puede que las cookies estén causando el problema)
+  if (YTDLP_COOKIES_FILE) {
+    console.warn('[music-stream] intentando sin cookies...');
+    const runNoCookies = (extra) => runYtDlp([
+      '-f', 'bestaudio[ext=m4a]/bestaudio[ext=mp4]/bestaudio/best',
+      '--get-url', '--no-playlist',
+      ...extra, videoUrl,
+    ], { timeoutMs: 30000, skipCookies: true });
+    try {
+      const { stdout: out2 } = await runNoCookies([]);
+      const line2 = parseUrl(out2);
+      if (line2) {
+        console.info('[music-stream] resuelto SIN cookies');
+        return line2;
+      }
+    } catch {}
+  }
+
+  throw new Error('No audio URL resolved');
 }
 
 // ── Cache de URLs ──
