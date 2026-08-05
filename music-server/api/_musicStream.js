@@ -799,6 +799,21 @@ function hasBinary(bin, args) {
   });
 }
 
+// ── Túnel HTTPS automático (cloudflared) ──
+// La URL la escribe music-server.js en .tunnel-url.txt al arrancar el túnel.
+// Se expone en /health para que el frontend la detecte en runtime (sin redeploy).
+const TUNNEL_URL_FILE = join(ROOT_DIR, '.tunnel-url.txt');
+
+export function getTunnelUrl() {
+  try {
+    if (existsSync(TUNNEL_URL_FILE)) {
+      const u = readFileSync(TUNNEL_URL_FILE, 'utf8').trim();
+      if (u && /^https?:\/\//.test(u)) return u.replace(/\/+$/, '');
+    }
+  } catch {}
+  return null;
+}
+
 export async function getMusicHealth({ ttlMs = 60000 } = {}) {
   const now = Date.now();
   if (healthCache.data && now - healthCache.at < ttlMs) return healthCache.data;
@@ -806,7 +821,14 @@ export async function getMusicHealth({ ttlMs = 60000 } = {}) {
     hasBinary(YTDLP_BIN, ['--version']),
     hasBinary(FFMPEG_BIN, ['-version']),
   ]);
-  const data = { ok: ytdlp && ffmpeg, ytdlp, ffmpeg, ytdlpBin: YTDLP_BIN, ffmpegBin: FFMPEG_BIN };
+  const data = {
+    ok: ytdlp && ffmpeg,
+    ytdlp,
+    ffmpeg,
+    ytdlpBin: YTDLP_BIN,
+    ffmpegBin: FFMPEG_BIN,
+    tunnelUrl: getTunnelUrl(),
+  };
   if (ytdlp) {
     try { const { stdout } = await runYtDlp(['--version']); data.ytdlpVersion = stdout.trim().split('\n')[0] || null; } catch {}
   }

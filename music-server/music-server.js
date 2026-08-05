@@ -8,7 +8,7 @@
 
 import http from 'http';
 import https from 'https';
-import { existsSync, mkdirSync, chmodSync, createWriteStream, unlinkSync, readFileSync } from 'fs';
+import { existsSync, mkdirSync, chmodSync, createWriteStream, unlinkSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
@@ -202,7 +202,31 @@ async function autoSetup() {
     }
   }
 
-  console.log(`[setup] yt-dlp: ${existsSync(ytdlpPath) ? '✅' : '❌'} | ffmpeg: ${existsSync(ffmpegPath) ? '✅' : '❌'} | pot: ${existsSync(bgutilPath) ? '✅' : '❌'}`);
+  // ── cloudflared (túnel HTTPS automático, sin root) ──
+  // Exponer el server HTTP interno por HTTPS (https://xxx.trycloudflare.com).
+  // El frontend detecta la URL vía /health en runtime → sin redeploy.
+  // Solo hace conexiones salientes → NO necesita root ni abrir puertos.
+  // Desactivable con CLOUDFLARED_DISABLE=1; URL estable con CLOUDFLARED_URL.
+  const cloudflaredPath = join(BIN_DIR, 'cloudflared');
+  const needCloudflared =
+    !existsSync(cloudflaredPath) &&
+    process.env.CLOUDFLARED_DISABLE !== '1' &&
+    !process.env.CLOUDFLARED_URL;
+  if (needCloudflared) {
+    const cfUrl = arch === 'aarch64'
+      ? 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64'
+      : 'https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64';
+    console.log(`[setup] 📦 Descargando cloudflared (${arch})...`);
+    try {
+      await downloadFile(cfUrl, cloudflaredPath);
+      chmodSync(cloudflaredPath, 0o755);
+      console.log('[setup] ✅ cloudflared instalado');
+    } catch (err) {
+      console.warn(`[setup] ⚠️ No se pudo descargar cloudflared: ${err.message}`);
+    }
+  }
+
+  console.log(`[setup] yt-dlp: ${existsSync(ytdlpPath) ? '✅' : '❌'} | ffmpeg: ${existsSync(ffmpegPath) ? '✅' : '❌'} | pot: ${existsSync(bgutilPath) ? '✅' : '❌'} | cf: ${existsSync(cloudflaredPath) ? '✅' : '❌'}`);
 }
 
 const PORT = process.env.PORT || 24633;
@@ -246,6 +270,95 @@ function findBinary(envVar, localName, systemName) {
   const localPath = join(BIN_DIR, localName);
   if (existsSync(localPath)) return localPath;
   return systemName;
+}
+
+// ── Túnel HTTPS automático (cloudflared) ──
+// Guarda el PID y la URL en archivos para reutilizar entre reinicios.
+const TUNNEL_URL_FILE = join(__dirname, '.tunnel-url.txt');
+const TUNNEL_PID_FILE = join(__dirname, '.tunnel.pid');
+
+function readTunnelUrl() {
+  try {
+    if (existsSync(TUNNEL_URL_FILE)) {
+      const u = readFileSync(TUNNEL_URL_FILE, 'utf8').trim();
+      if (u && /^https?:\/\//.test(u)) return u.replace(/\/+$/, '');
+    }
+  } catch {}
+  return null;
+}
+
+function isProcessAlive(pid) {
+  if (!pid) return false;
+  try { process.kill(pid, 0); return true; } catch { return false; }
+}
+
+function startTunnel(port) {
+  return new Promise((resolve) => {
+    // Desactivado por env var
+    if (process.env.CLOUDFLARED_DISABLE === '1') return resolve(null);
+    // URL estable configurada manualmente (p. ej. music.foranly.space) → no
+    // hace falta túnel dinámico; se registra la URL tal cual.
+    if (process.env.CLOUDFLARED_URL) {
+      const stable = String(process.env.CLOUDFLARED_URL).trim().replace(/\/+$/, '');
+      if (stable) {
+        try { writeFileSync(TUNNEL_URL_FILE, stable, 'utf8'); } catch {}
+        return resolve(stable);
+      }
+    }
+    const cloudflaredPath = join(BIN_DIR, 'cloudflared');
+    if (!existsSync(cloudflaredPath)) return resolve(null);
+
+    // Túnel ya corriendo (arranque anterior) → reutilizarlo.
+    let pid = null;
+    try { pid = Number(readFileSync(TUNNEL_PID_FILE, 'utf8')); } catch {}
+    if (isProcessAlive(pid)) {
+      const existing = readTunnelUrl();
+      if (existing) return resolve(existing);
+      // Vive pero sin URL registrada aún (arranque interrumpido): esperar a que
+      // la registre — NO lanzar un segundo cloudflared (túnel huérfano).
+      const deadline = Date.now() + 25000;
+      const poll = () => {
+        const u = readTunnelUrl();
+        if (u) return resolve(u);
+        if (Date.now() >= deadline) return resolve(null);
+        setTimeout(poll, 2000);
+      };
+      poll();
+      return;
+    }
+
+    const child = spawn(cloudflaredPath, ['tunnel', '--url', `http://localhost:${port}`], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      detached: true,
+    });
+    child.unref();
+    try { writeFileSync(TUNNEL_PID_FILE, String(child.pid), 'utf8'); } catch {}
+
+    let resolved = false;
+    const finish = (url) => { if (!resolved) { resolved = true; resolve(url); } };
+    const onData = (d) => {
+      const m = String(d).match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/);
+      if (m) {
+        try { writeFileSync(TUNNEL_URL_FILE, m[0], 'utf8'); } catch {}
+        finish(m[0]);
+      }
+    };
+    child.stdout?.on('data', onData);
+    child.stderr?.on('data', onData);
+    child.on('exit', () => finish(null));
+    child.on('error', () => finish(null));
+    // Si tarda en asignar URL, no bloqueamos el arranque: el túnel sigue
+    // corriendo y la URL queda registrada cuando Cloudflare la asigne.
+    setTimeout(() => {
+      const u = readTunnelUrl();
+      if (u) {
+        finish(u);
+        console.log(`   tunnel HTTPS (tarde): ${u} ✅`);
+      } else {
+        finish(null);
+      }
+    }, 25000);
+  });
 }
 
 async function main() {
@@ -352,6 +465,20 @@ async function main() {
     console.log(`   ffmpeg: ${process.env.FFMPEG_BIN} ${existsSync(process.env.FFMPEG_BIN) ? '✅' : '❌'}`);
     console.log(`   cookies: ${detectedCookiesFile ? detectedCookiesFile + ' ✅' : '⚠️ no detectadas (coloca cookies.txt junto a music-server.js)'}`);
     console.log('   /api/music/health · /api/music/search?q=... · /api/music/stream?artist=&title= · /api/music/download?artist=&title=');
+
+    // Túnel HTTPS automático (cloudflared): sin root, solo conexión saliente.
+    startTunnel(PORT).then((tunnelUrl) => {
+      if (tunnelUrl) {
+        console.log(`   tunnel HTTPS: ${tunnelUrl} ✅`);
+        console.log('   El frontend detecta esta URL vía /api/music/health (sin redeploy).');
+      } else if (process.env.CLOUDFLARED_DISABLE === '1') {
+        console.log('   tunnel HTTPS: desactivado (CLOUDFLARED_DISABLE=1) → la app usa preview 30s');
+      } else if (!existsSync(join(BIN_DIR, 'cloudflared')) && !process.env.CLOUDFLARED_URL) {
+        console.log('   tunnel HTTPS: no disponible (cloudflared no descargado) → la app usa preview 30s');
+      } else {
+        console.log('   tunnel HTTPS: aún sin URL asignada (se registra en .tunnel-url.txt al llegar)');
+      }
+    });
   });
 }
 

@@ -91,26 +91,35 @@ const STREAM_DIRECT_URL = (import.meta.env.VITE_MUSIC_STREAM_URL || '').replace(
 const isHttpsPage = () =>
   typeof window !== 'undefined' && window.location?.protocol === 'https:';
 
-export function getStreamUrl(song) {
+export function getStreamUrl(song, health = null) {
   if (!song?.title || !song?.artist) return null;
   const params = new URLSearchParams({ artist: song.artist, title: song.title });
   if (song.duration) params.set('duration', String(song.duration));
 
   // 1) URL directa configurada (VITE_MUSIC_STREAM_URL). En producción DEBE ser
   //    HTTPS: el navegador bloquea audio HTTP desde una página HTTPS (Mixed
-  //    Content). Si es HTTP sobre página HTTPS, se ignora y se cae al preview.
+  //    Content). Si es HTTP sobre página HTTPS se IGNORA (no se devuelve null):
+  //    se cae al túnel automático o al same-origin, no al preview.
   if (STREAM_DIRECT_URL) {
     if (!isHttpsPage() || STREAM_DIRECT_URL.startsWith('https:')) {
       return `${STREAM_DIRECT_URL}/download?${params.toString()}`;
     }
     console.warn(
       '[music] VITE_MUSIC_STREAM_URL es HTTP en una página HTTPS → Mixed Content. ' +
-      'Usa un túnel/reverse-proxy HTTPS o déjalo vacío para usar el preview de 30s.'
+      'Se ignora: usa el túnel automático de cloudflared (o el preview de 30s).'
     );
-    return null;
   }
 
-  // 2) Sin URL directa — same-origin:
+  // 2) Túnel HTTPS automático (cloudflared) detectado en runtime vía /health.
+  //    El music server expone tunnelUrl en el health check; la app usa esa URL
+  //    directa (HTTPS → sin Mixed Content, sin depender de rewrites de Vercel)
+  //    y sin necesidad de redeploy cuando el túnel cambia.
+  const tunnel = health?.tunnelUrl;
+  if (tunnel && tunnel.startsWith('https:')) {
+    return `${tunnel}/download?${params.toString()}`;
+  }
+
+  // 3) Sin URL directa ni túnel — same-origin:
   //    - Dev: el proxy de Vite sí proxea streams chunked → /stream.
   //    - Producción: los rewrites de Vercel solo dejan pasar respuestas de
   //      archivo completo (Content-Length); los streams chunked dan 403. El
@@ -132,6 +141,8 @@ export async function getStreamHealth() {
       signal: AbortSignal.timeout(4000),
     });
     const data = await res.json().catch(() => null);
+    // Se guarda el objeto COMPLETO (incluye tunnelUrl) para que el streaming
+    // pueda usar el túnel HTTPS detectado en runtime.
     streamHealthCache = { at: Date.now(), data: data?.ok ? data : null };
     return streamHealthCache.data;
   } catch (err) {

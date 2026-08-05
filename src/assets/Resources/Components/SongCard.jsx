@@ -118,7 +118,9 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
   // ¿El server de stream (yt-dlp) está disponible? Gate: si solo corre vite
   // (sin server.js), reproducir directamente el preview de 30s y evitar
   // intentar una URL de stream que devolvería 502 / "no supported source".
-  const [streamHealthy, setStreamHealthy] = useState(false);
+  // Se guarda el objeto COMPLETO del health (incluye tunnelUrl del túnel HTTPS
+  // automático de cloudflared) para que getStreamUrl use esa URL en runtime.
+  const [streamHealth, setStreamHealth] = useState(null);
   // Fallback para túneles free (ngrok): el <audio> no puede mandar headers y
   // el interstitial de ngrok rompe la carga directa → se baja el stream con
   // fetch + header de bypass y se reproduce desde un blob local.
@@ -201,8 +203,11 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
     let cancelled = false;
     getStreamHealth().then((h) => {
       if (cancelled) return;
-      setStreamHealthy(!!h);
-      console.info('[song] stream health:', h ? 'OK — stream completo disponible' : 'no disponible → preview 30s');
+      setStreamHealth(h);
+      console.info(
+        '[song] stream health:',
+        h ? `OK — stream completo disponible${h.tunnelUrl ? ` · tunnel ${h.tunnelUrl}` : ''}` : 'no disponible → preview 30s'
+      );
     });
     return () => {
       cancelled = true;
@@ -229,7 +234,7 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
   //   2. Blob (fetch + Object URL): solo como fallback para túneles con
   //      interstitial (ngrok free) donde el <audio> no puede cargar directo.
   //   3. Preview de 30s: último recurso si todo falla.
-  const streamUrl = streamHealthy ? getStreamUrl(selected) : null;
+  const streamUrl = streamHealth ? getStreamUrl(selected, streamHealth) : null;
   const isRemoteStream = !!streamUrl && (() => {
     try {
       return new URL(streamUrl, window.location.href).origin !== window.location.origin;
