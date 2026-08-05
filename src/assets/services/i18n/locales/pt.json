@@ -511,7 +511,9 @@
   "settings.cache_clear_confirm": "Isso excluirá todos os dados em cache local (posts, perfis, imagens, etc.). Suas configurações de conta não serão afetadas. Continuar?",
   "settings.cache_cleared": "Cache limpo com sucesso!",
   "settings.cache_desc": "Gerencie os dados armazenados localmente para liberar espaço.",
-  "settings.cache_size": "Tamanho do cache: {size}",
+
+  "settings.show_global_bg": "Fundo de perfil em todo o app",
+  "settings.show_global_bg_desc": "Mostra seu fundo de perfil como papel de parede em todas as páginas (só você vê).",  "settings.cache_size": "Tamanho do cache: {size}",
   "settings.discord_title": "Conexão com Discord",
   "settings.discord_linked_desc": "Sua conta está vinculada ao Discord. Você pode entrar com Discord.",
   "settings.discord_not_linked_desc": "Vincule sua conta do Discord para login mais rápido.",

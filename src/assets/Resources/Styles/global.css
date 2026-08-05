@@ -212,6 +212,44 @@ body:has(.sidebar--collapsed) .app-layout--chat {
 }
 
 /* ==========================================
+   Fondo de perfil GLOBAL (todas las páginas)
+   ==========================================
+   Capas montadas por GlobalProfileBg.jsx vía createPortal a <body>.
+   Reutilizan las MISMAS CSS vars --profile-bg-* que .profile-page::before
+   (definidas inline por el componente), así el render es idéntico al del
+   perfil: imagen fija a pantalla completa, detrás de todo el contenido.
+   z-index -2 = imagen (detrás del contenido y del dim overlay -1),
+   encima del fondo del body. ---- */
+.app-global-bg {
+    position: fixed;
+    inset: 0;
+    background-color: var(--color-bg);
+    background-image: var(--profile-bg-image, none);
+    background-position: var(--profile-bg-position, center center);
+    background-size: var(--profile-bg-size, cover);
+    background-repeat: no-repeat;
+    filter: blur(var(--profile-bg-blur, 0px));
+    pointer-events: none;
+    z-index: -2;
+    transform: translateZ(0);
+}
+
+.app-global-bg-dim {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+}
+
+/* Móvil y tablets (<= 1024px): igual que el perfil, el fondo siempre hace
+   cover para llenar la pantalla sin bandas vacías. */
+@media (max-width: 1024px) {
+    .app-global-bg {
+        background-size: cover;
+    }
+}
+
+/* ==========================================
    Status Dot Indicators
    ========================================== */
 .avatar-wrapper {

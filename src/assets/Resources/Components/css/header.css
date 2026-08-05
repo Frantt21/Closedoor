@@ -14,11 +14,19 @@
     display: flex;
     flex-direction: column;
     gap: 20px;
-    border-right: 1px solid var(--color-border, #2a2a2a);
-    background: var(--color-bg, #000000);
+    /* ── Translúcido con blur (como el modo glass de las cards de perfil) ──
+       AppSurfaceTheme aplica --accent-surface-* directamente sobre este
+       elemento cuando el usuario tiene glass/color de superficie activo, así
+       el sidebar usa exactamente el mismo tratamiento que las cards. Si no,
+       fallback: color-mix del color de fondo del tema al 60% + blur 16px,
+       así el sidebar siempre difumina lo que pasa por detrás. */
+    border-right: var(--accent-surface-border, 1px solid var(--color-border, #2a2a2a));
+    background: var(--accent-surface-rgba, color-mix(in srgb, var(--color-bg, #000000) 60%, transparent));
+    backdrop-filter: var(--accent-surface-blur, blur(16px));
+    -webkit-backdrop-filter: var(--accent-surface-blur, blur(16px));
     color: var(--color-text-secondary, #9ca3af);
     overflow-y: auto;
-    transition: width 0.3s ease, padding 0.3s ease;
+    transition: width 0.3s ease, padding 0.3s ease, background 0.2s ease, backdrop-filter 0.2s ease, border 0.2s ease;
 }
 
 /* ---- Estado colapsado ---- */
@@ -82,7 +90,7 @@
 }
 
 .sidebar-footer .sidebar-link:hover {
-    background: var(--color-surface-hover, #252525);
+    background: var(--overlay-bg-hover);
     color: var(--color-text, #ffffff);
 }
 
@@ -183,12 +191,12 @@
 }
 
 .sidebar-link:hover {
-    background: var(--color-surface-hover, #252525);
+    background: var(--overlay-bg-hover);
     color: var(--color-text, #ffffff);
 }
 
 .sidebar-link.active {
-    background: var(--color-surface-hover, #252525);
+    background: var(--overlay-bg);
     color: var(--color-text, #ffffff);
 }
 

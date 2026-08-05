@@ -6,6 +6,8 @@ import BlockRealtimeWatcher from './assets/Resources/Components/BlockRealtimeWat
 import { I18nProvider } from './assets/services/i18n/I18nContext';
 import { CallProvider } from './context/CallContext';
 import RightPanel from './assets/Resources/Components/RightPanel';
+import GlobalProfileBg from './assets/Resources/Components/GlobalProfileBg';
+import AppSurfaceTheme from './assets/Resources/Components/AppSurfaceTheme';
 import AppLoader from './assets/Resources/Components/AppLoader';
 import MobileNav from './assets/Resources/Components/MobileNav';
 import { ToastContainer } from 'react-toastify';
@@ -140,6 +142,13 @@ function App() {
         <div className={isChatRoute ? "app-layout app-layout--chat" : "app-layout"}>
           {/* Components */}
           <ScrollToTop />
+          {/* Fondo de perfil del usuario a pantalla completa en todo el app
+              (solo si la preferencia fc_show_global_bg está activa; excluye
+              rutas /profile donde el fondo ya lo pinta la propia página) */}
+          <GlobalProfileBg />
+          {/* Aplica el tratamiento translúcido/glass del perfil al sidebar
+              (mismo estilo que las cards cuando accent_surface_glass está activo) */}
+          <AppSurfaceTheme />
           <Header />
           {!isChatRoute && <FollowCountsWatcher />}
           {!isChatRoute && <BlockRealtimeWatcher />}

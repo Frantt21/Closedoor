@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { getItem } from '../services/secureStorage';
 import { supabase } from '../services/supabaseclient';
 import { getNicknames, getCachedNicknames, cacheNicknames, setNickname, removeNickname } from '../services/chatService';
-import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaHeartBroken, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaChartBar, FaBell, FaBrush, FaBan, FaClock, FaAt, FaTrashAlt, FaTimes, FaDiscord, FaEdit } from 'react-icons/fa';
+import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaHeartBroken, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaChartBar, FaBell, FaBrush, FaBan, FaClock, FaAt, FaTrashAlt, FaTimes, FaDiscord, FaEdit, FaImage } from 'react-icons/fa';
 import { MdLogout } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import ConfirmModal from '../Resources/Components/ConfirmModal';
@@ -80,7 +80,7 @@ const CATEGORIES = [
 /* ── Main Settings Component ── */
 
 export default function Settings() {
-  const { locale, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showPushNotifications, setShowPushNotifications, showLikes, setShowLikes, filterEncrypted, setFilterEncrypted, allowMention, setAllowMention, allowEncryptedAdd, setAllowEncryptedAdd, hour24, setHour24, showBadges, setShowBadges, theme, setTheme, t } = useI18n();
+  const { locale, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showGlobalBg, setShowGlobalBg, showPushNotifications, setShowPushNotifications, showLikes, setShowLikes, filterEncrypted, setFilterEncrypted, allowMention, setAllowMention, allowEncryptedAdd, setAllowEncryptedAdd, hour24, setHour24, showBadges, setShowBadges, theme, setTheme, t } = useI18n();
   usePageTitle(t('settings.title'));
   const { user, profile, profileLoading, refreshProfile, logout, linkDiscord, isDiscordLinked } = useAuth();
   const navigate = useNavigate();
@@ -562,6 +562,29 @@ export default function Settings() {
                     <FaSun style={{ marginRight: 6 }} />{t('settings.theme_light')}
                   </button>
                 </div>
+              </div>
+
+              <div className="settings-row-divider" />
+
+              {/* Fondo de perfil en todo el app (preferencia personal local) */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaImage /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.show_global_bg')}</h2>
+                    <p className="settings-section-desc">{t('settings.show_global_bg_desc')}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={`settings-toggle ${showGlobalBg ? 'settings-toggle--active' : ''}`}
+                  onClick={() => setShowGlobalBg(!showGlobalBg)}
+                  aria-pressed={showGlobalBg}
+                >
+                  <span className="settings-toggle-track">
+                    <span className="settings-toggle-thumb" />
+                  </span>
+                </button>
               </div>
 
               <div className="settings-row-divider" />

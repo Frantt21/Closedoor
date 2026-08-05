@@ -526,7 +526,9 @@
   "settings.cache_clear_confirm": "This will delete all locally cached data (posts, profiles, images, etc.). Your account settings will not be affected. Continue?",
   "settings.cache_cleared": "Cache cleared successfully!",
   "settings.cache_desc": "Manage locally stored data to free up space.",
-  "settings.cache_size": "Cache size: {size}",
+
+  "settings.show_global_bg": "Profile background across the app",
+  "settings.show_global_bg_desc": "Show your profile background as a fullscreen wallpaper on every page (only visible to you).",  "settings.cache_size": "Cache size: {size}",
   "settings.discord_title": "Discord Connection",
   "settings.discord_linked_desc": "Your account is linked with Discord. You can log in with Discord.",
   "settings.discord_not_linked_desc": "Link your Discord account for faster login.",

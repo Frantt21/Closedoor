@@ -202,10 +202,6 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
     getStreamHealth().then((h) => {
       if (cancelled) return;
       setStreamHealth(h);
-      console.info(
-        '[song] stream health:',
-        h ? `OK — stream completo disponible${h.tunnelUrl ? ` · tunnel ${h.tunnelUrl}` : ''}` : 'no disponible → preview 30s'
-      );
     });
     return () => {
       cancelled = true;
@@ -281,7 +277,6 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
     blobForRef.current = selSig;
     setBlobFailed(true);
     setLoadingStream(true);
-    console.info(`[song] stream: descargando blob (intento ${attempt + 1})...`);
     fetchStreamBlob(url)
       .then((blob) => {
         // La canción cambió mientras se descargaba → descartar
@@ -291,7 +286,6 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
         blobUrlRef.current = objectUrl;
         setBlobSrc(objectUrl);
         setLoadingStream(false);
-        console.info(`[song] stream blob listo (${Math.round(blob.size / 1024)} KB)`);
         const a = audioRef.current;
         if (a) {
           a.src = objectUrl; // src imperativo: no esperar al re-render de React
@@ -648,7 +642,6 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
           // 2. Si el stream directo ya falló y hay que bajar blob → iniciar blob
           // 3. Si ya es blob o preview → no hacer nada (no más fallbacks)
           if (streamUrl && isRemoteStream && !directStreamFailed && !usePreview) {
-            console.info('[song] stream directo falló → bajando blob como fallback');
             setDirectStreamFailed(true);
             return;
           }

@@ -135,6 +135,34 @@ export default function Modal({
   const [hasChanges, setHasChanges] = useState(false);
   const [extracting, setExtracting] = useState(false);
 
+  // ── Ratio del viewport del cliente ──
+  // El fondo del perfil se renderiza a pantalla completa (.profile-page::before,
+  // position: fixed; inset: 0), así que su contenedor real tiene el ratio de la
+  // pantalla del usuario. El editor de fondo usa este ratio (en vez de un 16:9
+  // fijo) para que la posición ajustada coincida exactamente con lo que se ve
+  // en el perfil, sea cual sea la resolución del cliente.
+  const [clientViewportRatio, setClientViewportRatio] = useState(() => {
+    const w = window.innerWidth || 16;
+    const h = window.innerHeight || 9;
+    return w / h;
+  });
+  useEffect(() => {
+    let raf = 0;
+    const onResize = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const w = window.innerWidth || 16;
+        const h = window.innerHeight || 9;
+        setClientViewportRatio(w / h);
+      });
+    };
+    window.addEventListener('resize', onResize);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', onResize);
+    };
+  }, []);
+
 
   // Submodal state: null | { type: 'avatar' | 'banner', value: string }
   const [showUrlModal, setShowUrlModal] = useState(null);
@@ -1689,8 +1717,9 @@ export default function Modal({
               key="profile-bg"
               imageUrl={profileBgUrlInput.trim()}
               initialPosition={profileBgPosition}
-              aspectRatio={16 / 9}
+              aspectRatio={clientViewportRatio}
               circular={false}
+              backgroundMode
               onPositionChange={(pos) => setProfileBgPosition(pos)}
             />
           </div>

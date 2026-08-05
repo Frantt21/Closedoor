@@ -11,6 +11,7 @@ const ACCENT_VISIBILITY_KEY = 'fc_accent_visibility';
 const SHOW_INTERESTS_KEY = 'fc_show_interests';
 const SHOW_PROFILE_STATS_KEY = 'fc_show_profile_stats';
 const SHOW_TOAST_NOTIFS_KEY = 'fc_show_toast_notifications';
+const SHOW_GLOBAL_BG_KEY = 'fc_show_global_bg';
 const SHOW_PUSH_NOTIFS_KEY = 'fc_show_push_notifications';
 const SHOW_LIKES_KEY = 'fc_show_likes';
 const FILTER_ENCRYPTED_KEY = 'fc_filter_encrypted';
@@ -119,6 +120,13 @@ function getSavedShowProfileStats() {
   }
 }
 
+function getSavedShowGlobalBg() {
+  try {
+    const val = getItem(SHOW_GLOBAL_BG_KEY);
+    return val === null ? false : val === 'true';
+  } catch { return false; }
+}
+
 function getSavedShowToastNotifications() {
   try {
     const val = getItem(SHOW_TOAST_NOTIFS_KEY);
@@ -201,6 +209,8 @@ export const I18nContext = createContext({
   setShowProfileStats: () => {},
   showToastNotifications: true,
   setShowToastNotifications: () => {},
+  showGlobalBg: false,
+  setShowGlobalBg: () => {},
   showPushNotifications: false,
   setShowPushNotifications: () => {},
   showLikes: false,
@@ -229,6 +239,7 @@ export function I18nProvider({ children }) {
   const [showInterests, setShowInterestsState] = useState(getSavedShowInterests);
   const [showProfileStats, setShowProfileStatsState] = useState(getSavedShowProfileStats);
   const [showToastNotifications, setShowToastNotificationsState] = useState(getSavedShowToastNotifications);
+  const [showGlobalBg, setShowGlobalBgState] = useState(getSavedShowGlobalBg);
   const [showPushNotifications, setShowPushNotificationsState] = useState(getSavedShowPushNotifications);
   const [showLikes, setShowLikesState] = useState(getSavedShowLikes);
   const [filterEncrypted, setFilterEncryptedState] = useState(getSavedFilterEncrypted);
@@ -311,6 +322,13 @@ export function I18nProvider({ children }) {
     } catch {}
   }, []);
 
+  const setShowGlobalBg = useCallback((value) => {
+    setShowGlobalBgState(value);
+    try {
+      setItem(SHOW_GLOBAL_BG_KEY, String(value));
+    } catch {}
+  }, []);
+
   const setShowPushNotifications = useCallback((value) => {
     setShowPushNotificationsState(value);
     try {
@@ -384,7 +402,7 @@ export function I18nProvider({ children }) {
   }, [translations]);
 
   return (
-    <I18nContext.Provider      value={{ locale, t, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showPushNotifications, setShowPushNotifications, showLikes, setShowLikes, filterEncrypted, setFilterEncrypted, allowMention, setAllowMention, allowEncryptedAdd, setAllowEncryptedAdd, hour24, setHour24, showBadges, setShowBadges, theme, setTheme }}>
+    <I18nContext.Provider      value={{ locale, t, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showGlobalBg, setShowGlobalBg, showPushNotifications, setShowPushNotifications, showLikes, setShowLikes, filterEncrypted, setFilterEncrypted, allowMention, setAllowMention, allowEncryptedAdd, setAllowEncryptedAdd, hour24, setHour24, showBadges, setShowBadges, theme, setTheme }}>
       {children}
     </I18nContext.Provider>
   );

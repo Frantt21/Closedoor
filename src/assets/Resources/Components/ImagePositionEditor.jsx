@@ -15,8 +15,16 @@ import { FaSearchPlus, FaSearchMinus } from 'react-icons/fa';
  * Props:
  *   imageUrl        – URL de la imagen a editar
  *   initialPosition – String JSON: {"x":50,"y":50,"zoom":1}
- *   aspectRatio     – Ratio del contenedor (ej: 1 para avatar, 3 para banner)
+ *   aspectRatio     – Ratio del contenedor (ej: 1 para avatar, 3 para banner).
+ *                     Para el fondo del perfil pasar el ratio del viewport del
+ *                     cliente (window.innerWidth / window.innerHeight), porque
+ *                     el fondo real se renderiza a pantalla completa.
  *   circular        – true para mascara circular (avatar)
+ *   backgroundMode  – true para imitar el fondo del perfil (.profile-page::before):
+ *                     el ancho de la imagen es siempre z*100% del contenedor y el
+ *                     alto conserva el ratio natural (background-size: z*100%), y la
+ *                     posición x% de la imagen se alinea con el x% del contenedor
+ *                     (background-position). En vez de object-fit: contain.
  *   onPositionChange – callback(positionString)
  *   style           – estilo adicional para el contenedor
  */
@@ -25,6 +33,7 @@ export default function ImagePositionEditor({
   initialPosition,
   aspectRatio = 3,
   circular = false,
+  backgroundMode = false,
   onPositionChange,
   style,
 }) {
@@ -102,6 +111,18 @@ export default function ImagePositionEditor({
   const posToTranslate = useCallback((posX, posY, z) => {
     const { width: cw, height: ch } = containerSizeRef.current;
     const nat = imgNaturalRef.current;
+    if (backgroundMode) {
+      // Imita .profile-page::before (background-size: z*100% + background-position):
+      // el ancho de la imagen es siempre z*100% del contenedor y el alto conserva
+      // el ratio natural; la posición x% de la imagen se alinea con el x% del
+      // contenedor (offset = (contenedor - imagen) * %).
+      const elemW = z * cw;
+      const elemH = nat.w > 0 ? elemW * (nat.h / nat.w) : z * ch;
+      return {
+        x: (cw - elemW) * (posX / 100),
+        y: (ch - elemH) * (posY / 100),
+      };
+    }
     const elemW = z * cw;
     const elemH = z * ch;
     const layout = getContainedLayout(elemW, elemH, nat.w, nat.h);
@@ -109,7 +130,7 @@ export default function ImagePositionEditor({
       x: (cw / 2) - layout.ox - (posX * layout.w) / 100,
       y: (ch / 2) - layout.oy - (posY * layout.h) / 100,
     };
-  }, [getContainedLayout]);
+  }, [backgroundMode, getContainedLayout]);
 
   // Convertir translate en píxeles a posición (SIN límite 0-100).
   // La posición puede ser menor a 0 o mayor a 100 si la imagen se
@@ -119,6 +140,15 @@ export default function ImagePositionEditor({
   const translateToPos = useCallback((tx, ty, z) => {
     const { width: cw, height: ch } = containerSizeRef.current;
     const nat = imgNaturalRef.current;
+    if (backgroundMode) {
+      // Inversa de posToTranslate en backgroundMode.
+      const elemW = z * cw;
+      const elemH = nat.w > 0 ? elemW * (nat.h / nat.w) : z * ch;
+      return {
+        x: Math.abs(cw - elemW) < 0.5 ? 50 : Math.round((tx * 100) / (cw - elemW)),
+        y: Math.abs(ch - elemH) < 0.5 ? 50 : Math.round((ty * 100) / (ch - elemH)),
+      };
+    }
     const elemW = z * cw;
     const elemH = z * ch;
     const layout = getContainedLayout(elemW, elemH, nat.w, nat.h);
@@ -128,7 +158,7 @@ export default function ImagePositionEditor({
       x: Math.round(posX),
       y: Math.round(posY),
     };
-  }, [getContainedLayout]);
+  }, [backgroundMode, getContainedLayout]);
 
   // ── clampTranslate ──
   // El arrastre es LIBRE: la imagen puede moverse a cualquier posición,
@@ -140,8 +170,17 @@ export default function ImagePositionEditor({
   const clampTranslate = useCallback((tx, ty, z) => {
     const { width: cw, height: ch } = containerSizeRef.current;
     const nat = imgNaturalRef.current;
-    const layout = getContainedLayout(z * cw, z * ch, nat.w, nat.h);
     const M = 1; // margen de seguridad: un sliver siempre visible
+    if (backgroundMode) {
+      // En backgroundMode la caja de la imagen empieza en (0,0) del elemento
+      // (ancho z*cw, alto según ratio natural).
+      const elemW = z * cw;
+      const elemH = nat.w > 0 ? elemW * (nat.h / nat.w) : z * ch;
+      const clampX = (v) => Math.max(M - elemW, Math.min(cw - M, v));
+      const clampY = (v) => Math.max(M - elemH, Math.min(ch - M, v));
+      return { x: clampX(tx), y: clampY(ty) };
+    }
+    const layout = getContainedLayout(z * cw, z * ch, nat.w, nat.h);
     // rango: borde derecho del contenido → borde izquierdo del
     // contenedor, y borde izquierdo del contenido → borde derecho.
     const clampX = (v) => {
@@ -155,7 +194,7 @@ export default function ImagePositionEditor({
       return Math.max(lo, Math.min(hi, v));
     };
     return { x: clampX(tx), y: clampY(ty) };
-  }, [getContainedLayout]);
+  }, [backgroundMode, getContainedLayout]);
 
   // Aplicar transform al DOM
   const applyTransform = useCallback((tx, ty) => {
@@ -359,13 +398,14 @@ export default function ImagePositionEditor({
   useEffect(() => {
     if (imageUrl !== prevUrlRef.current) {
       prevUrlRef.current = imageUrl;
-      // Reset a centro y zoom=1 para que la NUEVA imagen se vea completa
+      // Reset a centro y zoom mínimo para que la NUEVA imagen se vea completa
+      const z0 = backgroundMode ? 1.05 : 1;
       setX(50);
       setY(50);
-      setZoom(1);
+      setZoom(z0);
       xRef.current = 50;
       yRef.current = 50;
-      zoomRef.current = 1;
+      zoomRef.current = z0;
       // Limpiar translate del DOM para que la nueva imagen no herede
       // la posicion de la anterior (evita flash visual)
       if (imgRef.current) {
@@ -374,7 +414,7 @@ export default function ImagePositionEditor({
       }
       // El translate lo aplica handleImgLoad cuando la imagen cargue
     }
-  }, [imageUrl]);
+  }, [imageUrl, backgroundMode]);
 
   // ── Zoom ──
   const handleZoomChange = useCallback((e) => {
@@ -390,20 +430,25 @@ export default function ImagePositionEditor({
 
   // Reset
   const handleReset = useCallback(() => {
+    const z0 = backgroundMode ? 1.05 : 1;
     setX(50);
     setY(50);
-    setZoom(1);
+    setZoom(z0);
     xRef.current = 50;
     yRef.current = 50;
-    zoomRef.current = 1;
-    panTo(50, 50, 1);
+    zoomRef.current = z0;
+    panTo(50, 50, z0);
     notify();
-  }, [panTo, notify]);
+  }, [backgroundMode, panTo, notify]);
 
   if (!imageUrl) return null;
 
   const borderRadius = circular ? '50%' : 'var(--radius-sm, 6px)';
   const z = zoom;
+  // El perfil real fuerza zoom mínimo 1.05 (getBackgroundStyle / profile.jsx
+  // usan Math.max(p.zoom, 1.05)); el slider arranca ahí en backgroundMode para
+  // que el preview coincida con el render real a cualquier zoom.
+  const MIN_ZOOM = backgroundMode ? 1.05 : 1;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, ...style }}>
@@ -433,10 +478,13 @@ export default function ImagePositionEditor({
           style={{
             display: 'block',
             width: `${z * 100}%`,
-            height: `${z * 100}%`,
+            height: backgroundMode ? 'auto' : `${z * 100}%`,
+            aspectRatio: backgroundMode && imgNaturalSize.w > 0
+              ? `${imgNaturalSize.w} / ${imgNaturalSize.h}`
+              : undefined,
             maxWidth: 'none',
             maxHeight: 'none',
-            objectFit: 'contain',
+            objectFit: backgroundMode ? 'fill' : 'contain',
             transformOrigin: 'center center',
             pointerEvents: 'none',
           }}
@@ -451,7 +499,7 @@ export default function ImagePositionEditor({
         <div className="fc-modal-range-control" style={{ flex: 1 }}>
           <input
             type="range"
-            min="1"
+            min={MIN_ZOOM}
             max="3"
             step="0.1"
             value={zoom}

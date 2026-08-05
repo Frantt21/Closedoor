@@ -147,7 +147,6 @@ export async function uploadImage(file, userId, type) {
   // ── Check local cache first (instant return for re-uploads) ──
   const cached = await getCachedUpload(userId, type, file);
   if (cached) {
-    console.debug('⚡ CDN cache hit:', file.name);
     // Normalizar URLs cacheadas de sesiones anteriores (forceHttps → relativa)
     return { ...cached, url: normalizeCdnUrl(cached.url) };
   }

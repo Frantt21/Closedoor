@@ -113,10 +113,6 @@ export default function GifPicker({ onSelect, onClose }) {
       }
 
       const items = json.data?.data || [];
-      // Debug: log first item keys to help identify the actual response format
-      if (items.length > 0 && import.meta.env.DEV) {
-        console.debug('Klipy response sample:', items[0]);
-      }
       setGifs(items);
     } catch (err) {
       if (err.name === 'AbortError') return;

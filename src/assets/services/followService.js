@@ -131,7 +131,6 @@ export async function acceptFollowRequest(requesterId, targetId) {
   clearVisibleIdsCache(targetId);
 
   // Notify the requester that their request was accepted
-  console.log('Creating follow_request_accepted notification:', { user_id: requesterId, actor_id: targetId });
   const { error: notifError } = await supabase
     .from('notifications')
     .insert({
@@ -165,7 +164,6 @@ export async function rejectFollowRequest(requesterId, targetId) {
   }
 
   // Notify the requester that their request was rejected
-  console.log('Creating follow_request_rejected notification:', { user_id: requesterId, actor_id: targetId });
   const { error: notifError } = await supabase
     .from('notifications')
     .insert({
