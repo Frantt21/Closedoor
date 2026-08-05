@@ -32,7 +32,7 @@
         },
         {
           "key": "Permissions-Policy",
-          "value": "camera=(self), microphone=(self), notifications=(self), geolocation=(), interest-cohort=()"
+          "value": "camera=(self), microphone=(self), geolocation=()"
         }
       ]
     }

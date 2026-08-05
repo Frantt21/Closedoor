@@ -231,7 +231,20 @@ texto plano:
 
 ---
 
-### 12. Whitelist de proveedores de email (registro y login)
+### 12. Login valida dominio del email (hardenamiento de login)
+
+**Cambio:** el login ahora valida **formato Y dominio** del email (mismo que el registro).
+Cualquier intento de login con un dominio fuera de la whitelist (`user@tempmail.com`,
+`user@random.com`, etc.) es rechazado con el error `auth.email_domain_not_allowed`.
+
+**Archivos modificados:**
+- `Login.jsx` — agrega check de `validateEmail() === 'domain'`
+- `AuthContext.jsx` — agrega check de dominio en la función `login()`
+- `test-security-full.mjs` — check negativo invertido (ahora espera validación de dominio)
+
+---
+
+### 13. Whitelist de proveedores de email (registro y login)
 
 **Problema:** como la verificación de email está deshabilitada en Supabase, cualquiera podía
 crear una cuenta con un correo falso/desechable (`user@tempmail.com`, dominios inventados, etc.).
@@ -532,6 +545,12 @@ Token de sesión:  localStorage cifrado  →  se descifra solo en memoria al car
 | `AuthContext.jsx` | waitForKeyReady, validación de email |
 | `Register.jsx` | Bloquea email fuera de whitelist |
 | `Login.jsx` | Valida formato Y dominio del email |
+| `music-server.js` | Servidor de música standalone (yt-dlp + ffmpeg) |
+| `music-server/setup.sh` | Auto-setup de binarios (linux arm64/x64) |
+| `music-server/music-server.js` | Server HTTP con auto-download de binarios |
+| `music-server/api/_musicStream.js` | Lógica de stream para container |
+| `music-server/package.json` | Configuración npm |
+| `music-server/README.md` | Documentación de migración |
 | `supabaseclient.js` | pkce, __supabase solo DEV, storage cifrado |
 | `AuthCallback.jsx` | waitForKeyReady + re-consulta sesión |
 | `LinkPreview.jsx` | Cache cifrado |
@@ -551,4 +570,5 @@ Token de sesión:  localStorage cifrado  →  se descifra solo en memoria al car
 2. ⚠️ Habilitar **Leaked Password Protection** en Supabase → Auth → Password Settings
 3. ✅ Redeploy en Vercel (headers + CSP)
 4. ✅ CI activo en GitHub Actions
-5. Re-ejecutar `node scripts/test-security-full.mjs` tras cualquier cambio
+5. Actualizar `.env.local` con `VITE_MUSIC_API_URL=http://mapi.foranly.space:24633/api/music`
+6. Re-ejecutar `node scripts/test-security-full.mjs` tras cualquier cambio

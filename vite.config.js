@@ -16,11 +16,11 @@ export default defineConfig({
         changeOrigin: true,
       },
       // API de música (búsqueda Deezer, stream yt-dlp, health) en dev:
-      // requiere `npm run start` (server.js) levantado junto al dev server.
-      // Si no está corriendo, la petición falla rápido y el frontend usa el
+      // Apunta al servidor remoto (migrado de Termux a servidor con más ancho de banda).
+      // Si no está disponible, la petición falla rápido y el frontend usa el
       // fallback de previews (iTunes directo funciona en dev sin server).
       '/api/music': {
-        target: 'http://localhost:3000',
+        target: 'http://mapi.foranly.space:24633',
         changeOrigin: true,
       },
     },

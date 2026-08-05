@@ -43,6 +43,8 @@ function buildCSP() {
     'https://itunes.apple.com',
     'https://api.klipy.com',
     'https://challenges.cloudflare.com',
+    // Music server (migrado de Termux a servidor con más ancho de banda)
+    'http://mapi.foranly.space:24633',
     // Túneles dinámicos del music-server (subdominio aleatorio)
     'https://*.ngrok-free.app', 'wss://*.ngrok-free.app',
     'https://*.ngrok.io', 'wss://*.ngrok.io',
