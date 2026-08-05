@@ -15,6 +15,13 @@ export default defineConfig({
         target: 'http://api.foranly.space:24587',
         changeOrigin: true,
       },
+      // Legacy fallback: /api/music-search → /api/music/search en el music server.
+      // DEBE ir ANTES de /api/music para que no matchee por prefijo.
+      '/api/music-search': {
+        target: 'http://mapi.foranly.space:24633',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/music-search', '/api/music/search'),
+      },
       // API de música (búsqueda Deezer, stream yt-dlp, health) en dev:
       // Apunta al servidor remoto (migrado de Termux a servidor con más ancho de banda).
       // Si no está disponible, la petición falla rápido y el frontend usa el
@@ -22,12 +29,6 @@ export default defineConfig({
       '/api/music': {
         target: 'http://mapi.foranly.space:24633',
         changeOrigin: true,
-      },
-      // Legacy fallback: /api/music-search → mismo music server
-      '/api/music-search': {
-        target: 'http://mapi.foranly.space:24633/api/music',
-        changeOrigin: true,
-        rewrite: (path) => path.replace('/api/music-search', '/api/music/search'),
       },
     },
     allowedHosts: [

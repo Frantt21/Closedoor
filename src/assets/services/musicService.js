@@ -22,10 +22,10 @@
 const MUSIC_API = (import.meta.env.VITE_MUSIC_API_URL || '/api/music').replace(/\/+$/, '');
 const ITUNES_SEARCH_URL = 'https://itunes.apple.com/search';
 
-// Header para saltarse el interstitial de ngrok free en peticiones fetch
-// (inofensivo con otros túneles o el server local; no va en <audio>, que se
-// resuelve con fetch+blob en SongCard cuando el túnel lo requiere).
-const TUNNEL_HEADERS = { 'ngrok-skip-browser-warning': '1' };
+// Header para saltarse el interstitial de ngrok free en peticiones cross-origin.
+// Solo se envía cuando MUSIC_API apunta a un server remoto (no same-origin).
+const IS_CROSS_ORIGIN = MUSIC_API.startsWith('http');
+const TUNNEL_HEADERS = IS_CROSS_ORIGIN ? { 'ngrok-skip-browser-warning': '1' } : {};
 
 /** Escala la URL de arte de iTunes (ej. 100x100bb.jpg → 600x600bb.jpg). */
 function upscaleArtwork(url, size = 600) {
