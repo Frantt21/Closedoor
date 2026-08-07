@@ -171,9 +171,30 @@ function buildCookieHeader(cookiesFile) {
     return null;
   }
 }
-const COOKIE_HEADER = buildCookieHeader(YTDLP_COOKIES_FILE);
-if (COOKIE_HEADER) {
-  console.info(`[music-stream] cookies de sesión cargadas para el fetch del media (${COOKIE_HEADER.split(';').length} pares auth)`);
+// Header de cookies del fetch del media, con RECARGA DINÁMICA: la sesión de
+// YouTube se revoca rápido (el usuario reexporta cookies.txt y lo sube al
+// container SIN reiniciar). El header se re-lee si el archivo cambió (mtime)
+// en cada fetch — así nunca se usa una sesión revocada para el media.
+let cookieHeaderCache = buildCookieHeader(YTDLP_COOKIES_FILE);
+let cookieHeaderMtime = 0;
+function getCookieHeader() {
+  try {
+    if (YTDLP_COOKIES_FILE && existsSync(YTDLP_COOKIES_FILE)) {
+      const m = statSync(YTDLP_COOKIES_FILE).mtimeMs;
+      if (m !== cookieHeaderMtime) {
+        cookieHeaderMtime = m;
+        const rebuilt = buildCookieHeader(YTDLP_COOKIES_FILE);
+        if (rebuilt && rebuilt !== cookieHeaderCache) {
+          cookieHeaderCache = rebuilt;
+          console.info(`[music-stream] cookies de sesión recargadas (${rebuilt.split(';').length} pares auth)`);
+        }
+      }
+    }
+  } catch {}
+  return cookieHeaderCache;
+}
+if (cookieHeaderCache) {
+  console.info(`[music-stream] cookies de sesión cargadas para el fetch del media (${cookieHeaderCache.split(';').length} pares auth)`);
 } else {
   console.warn('[music-stream] ⚠️ sin cookies de auth para el fetch del media → el primer play puede fallar con 403 transitorio');
 }
@@ -776,22 +797,73 @@ function sendJson(res, code, obj) {
 }
 
 // ── Cadena de reintentos resiliente (proxy y download) ──
-// googlevideo rechaza con 403 TEMPORAL (cooldown anti-abuso, ~30s) el media de
-// una IP justo después de un burst de resolución de yt-dlp — pasa en el PRIMER
-// play de una canción sin cache (resolve 3-7s → fetch inmediato → 403). El
-// bloqueo afecta a TODAS las URLs de la IP mientras está activo, incluidas las
-// RE-resueltas con token nuevo (verificado en producción: URL fresca → 403;
-// la MISMA URL tras ~20s de cooldown → 200). Estrategia:
-//   1. URL actual (cache hit fuera del cooldown → instantáneo).
-//   2. Misma URL tras 1s (throttling puntual).
-//   3. MISMA URL tras RETRY_BACKOFF_LONG_MS: la URL no está muerta; esperando
-//      el cooldown vuelve a funcionar. Re-resolver aquí sería contraproducente
-//      (añade burst y alarga el bloqueo). Solo si sigue fallando tras el
-//      cooldown se invalida la caché (URL poisoned real).
-//   4. Resolución fresca (URL caducada/poisoned) como último recurso.
+// googlevideo responde 403 en DOS casos distintos, que el flujo distingue por
+// resultado:
+//   A) URL POISONED (la dominante): la URL cacheada fue resuelta con un token
+//      POT inválido (p. ej. el primer token generado tras relanzar el server
+//      bgutil-pot) → 403 PERMANENTE aunque pase el cooldown. La única salida
+//      es RE-resolver con token nuevo, que funciona al instante (verificado en
+//      producción: URL cacheada 403 durante 51s → fresh resolve → 200 en 0.5s).
+//   B) Cooldown de IP (~30s anti-abuso por burst de resolución): afecta a
+//      TODAS las URLs mientras dura, incluidas las re-resueltas.
+// Estrategia:
+//   1. URL actual (cache hit fuera de cooldown → instantáneo).
+//   2. Misma URL tras 1s (throttling puntual / blip).
+//   3. Invalidar caché + resolución fresca INMEDIATA (arregla A en ~15s).
+//   4. Si el fresh también falla → cooldown de IP (B): esperar
+//      RETRY_BACKOFF_LONG_MS y reintentar con la misma URL fresca.
+//   5. Último recurso: resolución fresca de nuevo.
+// ── Diagnóstico de errores de red ──
+// Los errores de socket de Node (especialmente tras reinicios del container o
+// en Node 26) pueden llegar con message VACÍO → el log quedaba ciego
+// ("✗ canción · "). describeErr() siempre produce un mensaje accionable y
+// logErrDetail() imprime code/errno/syscall + stack la primera vez que aparece
+// cada error.
+const errDetailLogged = new Set();
+function describeErr(err) {
+  if (!err) return '(sin error)';
+  const parts = [];
+  if (err.message) parts.push(String(err.message));
+  if (err.code) parts.push(`code=${err.code}`);
+  if (err.errno) parts.push(`errno=${err.errno}`);
+  if (err.syscall) parts.push(`syscall=${err.syscall}`);
+  // AggregateError (p. ej. connect Happy Eyeballs de Node): listar cada
+  // dirección que falló para distinguir IPv4 vs IPv6 vs red del container.
+  if (Array.isArray(err.errors) && err.errors.length) {
+    const ips = err.errors.slice(0, 6).map((e) => e.address || e.host || e.message || String(e));
+    if (ips.length) parts.push(`ips=[${ips.join(', ')}]`);
+  }
+  return parts.join(' · ') || '(error sin detalles)';
+}
+function isConnError(err) {
+  if (!err) return false;
+  if (!err.message) return true; // error vacío = nivel socket
+  const c = String(err.code || '').toUpperCase();
+  return ['ECONNRESET', 'EPIPE', 'ECONNREFUSED', 'ETIMEDOUT', 'ENOTFOUND', 'EAI_AGAIN', 'EHOSTUNREACH', 'ENETUNREACH', 'EPROTO', 'ECONNABORTED', 'ERR_SOCKET_CLOSED'].includes(c)
+    || /socket hang up|aborted|premature close/i.test(String(err.message));
+}
+function logErrDetail(tag, err) {
+  const key = `${tag}|${err?.code || err?.message || '?'}`;
+  if (errDetailLogged.has(key)) return;
+  errDetailLogged.add(key);
+  const stack = err?.stack ? `\n${String(err.stack).split('\n').slice(0, 5).join('\n')}` : '';
+  console.warn(`[music-stream] 🐞 ${tag} → ${describeErr(err)}${stack}`);
+}
+
 async function attemptStreamWithRetries({ label, url, doStream, refresh, res, onPoisoned } = {}) {
+  let lastErr = null;
+  let connHintShown = false;
   const guard = (err) => {
-    console.warn(`[music-stream] ✗ ${label} · ${err.message}`);
+    lastErr = err;
+    console.warn(`[music-stream] ✗ ${label} · ${describeErr(err)}`);
+    logErrDetail(label, err);
+    // Error de CONEXIÓN (ETIMEDOUT/ECONNRESET/…) → no es cooldown HTTP: la IP
+    // del container está bloqueada a nivel TCP por el CDN. Pista accionable UNA
+    // vez por request.
+    if (isConnError(err) && !connHintShown) {
+      connHintShown = true;
+      console.warn(`[music-stream] ⚠️ error de CONEXIÓN a googlevideo (${describeErr(err)}) → la IP del container parece bloqueada a nivel TCP por el CDN. Reinicia/recrea el container para renovar la IP, o configura YTDLP_PROXY (proxy residencial/ISP) — resolve y media saldrán por otra IP y el bloqueo/bot-check desaparecen.`);
+    }
     if (res.headersSent || res.destroyed) throw err;
   };
   // 1) URL actual. Con cookies y cache hit fuera del cooldown → al instante.
@@ -799,43 +871,125 @@ async function attemptStreamWithRetries({ label, url, doStream, refresh, res, on
     await doStream(url);
     return;
   } catch (err) { guard(err); }
-  // 2) MISMA URL tras 1s (throttling puntual). NO se re-resuelve aún: el 403
-  //    del primer play de una canción sin cache es el COOLDOWN temporal de
-  //    googlevideo (~30s, anti-abuso por burst de resolución) que afecta a
-  //    TODAS las URLs de la IP — verificado en producción: la URL que dio 403
-  //    a los ~5s del resolve funcionó a los ~25s, y una URL RE-resuelta con
-  //    token nuevo también dio 403 mientras duró el cooldown. Re-resolver aquí
-  //    solo añade burst (más player responses) y alarga el bloqueo.
+  // 2) MISMA URL tras 1s (throttling puntual / blip puntual).
   await sleep(1000);
   try {
     console.warn(`[music-stream] ↻ ${label} · reintento (backoff)...`);
     await doStream(url);
     return;
   } catch (err) { guard(err); }
-  // 3) MISMA URL tras RETRY_BACKOFF_LONG_MS: esperando el cooldown la URL
-  //    vuelve a funcionar (no está muerta).
-  await sleep(RETRY_BACKOFF_LONG_MS);
+  // 3) Tras 2 fallos la URL cacheada está MUERTA (poisoned — resuelta con un
+  //    token POT inválido, p. ej. el primero tras relanzar el server) o hay
+  //    cooldown de IP. VERIFICADO en producción: la URL cacheada dio 403
+  //    PERMANENTE (incluso tras 20s+) y la RE-resuelta con token nuevo funcionó
+  //    al instante. Se invalida la caché y se re-resuelve de inmediato: si es
+  //    poisoned, el audio suena en ~15s (antes: 51s + varios reloads).
+  try { onPoisoned?.(); } catch {}
+  let freshUrl = null;
   try {
-    console.warn(`[music-stream] ↻ ${label} · reintento (backoff largo, cooldown googlevideo)...`);
-    await doStream(url);
-    return;
-  } catch (err) {
-    guard(err);
-    // Tras el cooldown sigue fallando → la URL sí está muerta (poisoned):
-    // fuera de la caché para que las próximas request no la reusen.
-    try { onPoisoned?.(); } catch {}
-  }
-  // 4) Resolución fresca (URL caducada/poisoned) como último recurso. La URL
-  //    nueva inicia su PROPIO cooldown (nuevo burst de player responses), así
-  //    que también hay que esperarlo antes de fetchear — si no, repetiría el
-  //    403 y el request moriría sin más reintentos.
-  const fresh = await refresh();
-  if (!fresh?.url) throw new Error('No stream found after retries');
-  await sleep(RETRY_BACKOFF_LONG_MS);
-  try {
+    const fresh = await refresh();
+    freshUrl = fresh?.url || null;
+    if (!freshUrl) throw new Error('No stream found after retries');
     console.warn(`[music-stream] ↻ ${label} · reintentando con resolución fresca...`);
-    await doStream(fresh.url);
+    await doStream(freshUrl);
+    return;
+  } catch (err) { guard(err); }
+  // 4) El fresh también falló. Dos casos distintos:
+  //    - HTTP 403 → cooldown de googlevideo (~30s, afecta a todas las URLs):
+  //      esperar el backoff y reintentar la MISMA URL fresca.
+  //    - ETIMEDOUT/ECONNRESET (conexión) → IP bloqueada a nivel TCP:
+  //      reintentar no ayuda, se salta el backoff largo (verificado en
+  //      producción: los 5 intentos fallaron en <1s cada uno).
+  if (!lastErr || !isConnError(lastErr)) {
+    await sleep(RETRY_BACKOFF_LONG_MS);
+  }
+  try {
+    if (freshUrl) {
+      console.warn(`[music-stream] ↻ ${label} · reintento (backoff largo, cooldown googlevideo)...`);
+      await doStream(freshUrl);
+      return;
+    }
+  } catch (err) { guard(err); }
+  // 5) Último recurso: resolución fresca de nuevo tras esperar el cooldown.
+  await sleep(2000);
+  try {
+    const fresh2 = await refresh();
+    if (!fresh2?.url) throw new Error('No stream found after retries');
+    console.warn(`[music-stream] ↻ ${label} · reintentando con resolución fresca (último)...`);
+    // Respiro corto: el fresh resolve es un nuevo burst que puede rearmar el
+    // cooldown — un hedge de 3s antes del fetch final.
+    await sleep(3000);
+    await doStream(fresh2.url);
   } catch (err) { guard(err); throw err; }
+}
+
+// ── Fallback de proxy vía undici (fetch nativo) ──
+// El http/https.request de Node puede fallar a nivel de SOCKET con errores de
+// message vacío (p. ej. tras reinicios del container, sockets keep-alive
+// envenenados del agente global, o cambios en Node 26). fetch (undici) usa una
+// pila de red totalmente distinta → suele pasar donde request falla. Devuelve
+// errores NUNCA vacíos (message + code + causa) para diagnóstico.
+async function proxyViaFetch(req, res, url, label = 'fetch') {
+  const target = withRateBypass(url);
+  const headers = { 'User-Agent': UA, 'Accept': '*/*' };
+  const cookieHeader = getCookieHeader();
+  if (cookieHeader) headers.Cookie = cookieHeader;
+  if (req.headers.range) headers.Range = req.headers.range;
+  let upRes;
+  try {
+    upRes = await fetch(target, { headers, redirect: 'follow', signal: AbortSignal.timeout(120000) });
+  } catch (err) {
+    throw new Error(`fetch: ${describeErr(err?.cause || err)}`, { cause: err });
+  }
+  if (!upRes.ok) {
+    upRes.body?.cancel?.().catch?.(() => {});
+    throw new Error(`download HTTP ${upRes.status}`);
+  }
+  res.statusCode = upRes.status || 200;
+  const pass = ['content-type', 'content-length', 'content-range', 'accept-ranges', 'cache-control', 'etag', 'last-modified'];
+  for (const h of pass) {
+    const v = upRes.headers.get(h);
+    if (v) res.setHeader(h, v);
+  }
+  const total = (() => {
+    const cl = Number(upRes.headers.get('content-length'));
+    const cr = String(upRes.headers.get('content-range') || '').match(/\/(\d+)$/);
+    return cr ? Number(cr[1]) : (Number.isFinite(cl) ? cl : null);
+  })();
+  const progress = progressLogger({ label, total, startedAt: Date.now() });
+  const reader = upRes.body.getReader();
+  let finished = false;
+  const firstByteTimer = setTimeout(() => { reader.cancel().catch(() => {}); }, FIRST_BYTE_TIMEOUT_MS);
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      clearTimeout(firstByteTimer);
+      progress.add(value.byteLength);
+      if (res.destroyed || res.writableEnded) { reader.cancel().catch(() => {}); progress.abort(); return; }
+      if (res.write(Buffer.from(value)) === false && !res.destroyed) {
+        // Backpressure: esperar 'drain' SIN colgarse — si el cliente se
+        // desconecta a mitad, 'drain' jamás llega (un stream destruido no lo
+        // emite); se compite con 'close'/'error' para salir siempre.
+        await new Promise((r) => {
+          const done = () => r();
+          res.once('drain', done);
+          res.once('close', done);
+          res.once('error', done);
+        });
+      }
+    }
+    clearTimeout(firstByteTimer);
+    finished = true;
+    progress.finish();
+    if (!res.writableEnded) res.end();
+  } catch (err) {
+    clearTimeout(firstByteTimer);
+    if (!finished) {
+      progress.abort();
+      throw new Error(describeErr(err), { cause: err });
+    }
+  }
 }
 
 // ── Handler /api/music/stream ──
@@ -855,10 +1009,22 @@ export async function handleStreamRequest(req, res, { artist = '', title = '', d
     const playable = isBrowserPlayableMime(resolved.mime);
     console.info(`[music-stream] ▶ ${label} · resolución ${resolveSecs}s · ${resolved.mime || 'mime?'} · ${playable ? 'proxy' : 'transcode'}`);
 
-    const doStream = (url) => (playable
-      ? proxyStream(req, res, url, label)
-      : transcodeStream(req, res, url, label)
-    );
+    // El fallback undici SOLO se intenta una vez por request: si el error de
+    // conexión es sistémico (IP bloqueada, egress del container), reintentarlo
+    // en cada uno de los 5 intentos serían 10 tries de red por play inútil.
+    let fetchFallbackTried = false;
+    const doStream = (url) => {
+      if (!playable) return transcodeStream(req, res, url, label);
+      // Fallback vía undici (fetch): si el error es de CONEXIÓN (ECONNRESET,
+      // socket hang up, message vacío en Node 26...) se reintenta por una ruta
+      // de sockets totalmente distinta antes de tirar el intento.
+      return proxyStream(req, res, url, label).catch((err) => {
+        if (!isConnError(err) || fetchFallbackTried) throw err;
+        fetchFallbackTried = true;
+        logErrDetail(`${label} → fallback undici`, err);
+        return proxyViaFetch(req, res, url, label);
+      });
+    };
 
     await attemptStreamWithRetries({
       label,
@@ -872,8 +1038,8 @@ export async function handleStreamRequest(req, res, { artist = '', title = '', d
     console.info(`[music-stream] ▶ ${label} · stream en vivo completo · ${((Date.now() - startedAt) / 1000).toFixed(1)}s (resolve ${resolveSecs}s)`);
   } catch (err) {
     const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
-    console.warn(`[music-stream] ✗ ${label} · error a los ${elapsed}s:`, err.message);
-    if (!res.headersSent && !res.destroyed) sendJson(res, 502, { success: false, error: err.message });
+    console.warn(`[music-stream] ✗ ${label} · error a los ${elapsed}s:`, describeErr(err));
+    if (!res.headersSent && !res.destroyed) sendJson(res, 502, { success: false, error: describeErr(err) });
     else if (!res.writableEnded) res.end();
   }
 }
@@ -895,15 +1061,19 @@ export function proxyStream(req, res, url, label = 'proxy') {
     }
     const lib = parsed.protocol === 'https:' ? https : http;
     const headers = { 'User-Agent': UA };
-    // Cookies de sesión: el fetch del media autenticado esquiva el 403
-    // transitorio de googlevideo (anti-abuso por burst de resolución).
-    if (COOKIE_HEADER) headers.Cookie = COOKIE_HEADER;
+    // Cookies de sesión (recargadas si cookies.txt cambió): el fetch autenticado
+    // esquiva el 403 transitorio de googlevideo (anti-abuso por burst).
+    const cookieHeader = getCookieHeader();
+    if (cookieHeader) headers.Cookie = cookieHeader;
     if (req.headers.range) headers.Range = req.headers.range;
     let firstByteTimer = null;
     // La URL de googlevideo está ligada a la IP que la resolvió: si el resolve
     // usó proxy residencial, el media DEBE salir por el mismo proxy (si no → 403).
     const agent = getProxyAgent();
-    const proxyReq = lib.request(parsed, { method: 'GET', headers, ...(agent ? { agent } : {}) }, (upRes) => {
+    // agent: false → conexión FRESCA por intento (el agente global reutiliza
+    // sockets keep-alive que tras reinicios del container / en Node 26 pueden
+    // llegar envenenados y fallar con errores de conexión de message vacío).
+    const proxyReq = lib.request(parsed, { method: 'GET', headers, agent: agent || false }, (upRes) => {
       // Upstream rechaza (403/404) ANTES de mandar datos → reintentar.
       if (upRes.statusCode < 200 || upRes.statusCode >= 300) {
         clearTimeout(firstByteTimer);
@@ -926,7 +1096,7 @@ export function proxyStream(req, res, url, label = 'proxy') {
       }, FIRST_BYTE_TIMEOUT_MS);
       upRes.on('data', (chunk) => { clearTimeout(firstByteTimer); progress.add(chunk.length); });
       upRes.on('end', () => { clearTimeout(firstByteTimer); finished = true; progress.finish(); resolve(); });
-      upRes.on('error', (err) => { clearTimeout(firstByteTimer); finished = true; progress.abort(); reject(err); });
+      upRes.on('error', (err) => { clearTimeout(firstByteTimer); finished = true; progress.abort(); logErrDetail(`${label} upRes`, err); reject(new Error(describeErr(err), { cause: err })); });
       // Aborto a mitad sin 'end' ni 'error' → no dejar colgada la promesa.
       upRes.on('close', () => {
         clearTimeout(firstByteTimer);
@@ -935,7 +1105,7 @@ export function proxyStream(req, res, url, label = 'proxy') {
       upRes.pipe(res);
     });
 
-    proxyReq.on('error', (err) => { clearTimeout(firstByteTimer); reject(err); });
+    proxyReq.on('error', (err) => { clearTimeout(firstByteTimer); logErrDetail(`${label} proxyReq`, err); reject(new Error(describeErr(err), { cause: err })); });
     proxyReq.setTimeout(120000, () => proxyReq.destroy(new Error('proxy timeout')));
     // Liberar la conexión upstream si el cliente se desconecta.
     req.on('close', () => { if (!proxyReq.destroyed) proxyReq.destroy(); });
@@ -954,7 +1124,7 @@ export function transcodeStream(req, res, url, label = 'transcode') {
         // ffmpeg soporta -http_proxy (solo http/https, no socks): el media
         // transcodeado también debe salir por la IP del resolve si hay proxy.
         ...(YTDLP_PROXY_HTTP ? ['-http_proxy', YTDLP_PROXY_HTTP] : []),
-        ...(COOKIE_HEADER ? ['-cookies', COOKIE_HEADER] : []),
+        ...(getCookieHeader() ? ['-cookies', getCookieHeader()] : []),
         '-i', withRateBypass(url),
         '-vn', '-acodec', 'aac', '-b:a', '128k',
         '-movflags', 'frag_keyframe+empty_moov',
@@ -975,7 +1145,7 @@ export function transcodeStream(req, res, url, label = 'transcode') {
       child.stdout.pipe(res);
     }
     child.stderr?.on('data', (d) => { stderr += d; });
-    child.on('error', (err) => { clearTimeout(firstByteTimer); failed = true; reject(err); });
+    child.on('error', (err) => { clearTimeout(firstByteTimer); failed = true; logErrDetail(`${label} ffmpeg`, err); reject(new Error(describeErr(err), { cause: err })); });
     req.on('close', () => {
       aborted = true; // el cliente se fue → no fue una finalización natural
       try { child.kill('SIGKILL'); } catch {}
@@ -1120,9 +1290,10 @@ function streamDownloadToResponse(res, url, cachePath, key) {
     // Proxy residencial: mismo requisito que en proxyStream — la URL está ligada
     // a la IP del resolve y el media debe salir por el mismo proxy.
     const agent = getProxyAgent();
+    const cookieHeader = getCookieHeader();
     const out = lib.get(parsed, {
-      headers: COOKIE_HEADER ? { 'User-Agent': UA, Cookie: COOKIE_HEADER } : { 'User-Agent': UA },
-      ...(agent ? { agent } : {}),
+      headers: cookieHeader ? { 'User-Agent': UA, Cookie: cookieHeader } : { 'User-Agent': UA },
+      agent: agent || false,
     }, (upRes) => {
       if (upRes.statusCode !== 200) {
         upRes.resume();
@@ -1169,7 +1340,7 @@ function streamDownloadToResponse(res, url, cachePath, key) {
         console.info(`[music-stream] audio servido · ${(total / 1048576).toFixed(1)} MB · ${((Date.now() - startedAt) / 1000).toFixed(1)}s`);
         resolve();
       });
-      upRes.on('error', (err) => { clearTimeout(firstByteTimer); finished = true; reject(err); });
+      upRes.on('error', (err) => { clearTimeout(firstByteTimer); finished = true; logErrDetail(`${label} download upRes`, err); reject(new Error(describeErr(err), { cause: err })); });
       // Aborto a mitad de transferencia sin 'end' ni 'error' → no dejar colgada la promesa.
       upRes.on('close', () => {
         if (!finished) { clearTimeout(firstByteTimer); reject(new Error('Download aborted')); }
@@ -1177,7 +1348,7 @@ function streamDownloadToResponse(res, url, cachePath, key) {
       // Cliente se desconecta con backpressure activo → seguir descargando para cachear.
       res.on('close', () => { if (!upRes.destroyed) upRes.resume(); });
     });
-    out.on('error', (err) => reject(err));
+    out.on('error', (err) => { logErrDetail(`${label} download out`, err); reject(new Error(describeErr(err), { cause: err })); });
     out.setTimeout(120000, () => out.destroy(new Error('download timeout')));
   });
 }
@@ -1194,7 +1365,7 @@ function streamTranscodeToResponse(res, url, cachePath, key) {
         // ffmpeg soporta -http_proxy (solo http/https, no socks): el media
         // transcodeado también debe salir por la IP del resolve si hay proxy.
         ...(YTDLP_PROXY_HTTP ? ['-http_proxy', YTDLP_PROXY_HTTP] : []),
-        ...(COOKIE_HEADER ? ['-cookies', COOKIE_HEADER] : []),
+        ...(getCookieHeader() ? ['-cookies', getCookieHeader()] : []),
         '-i', withRateBypass(url),
         '-vn', '-acodec', 'aac', '-b:a', '128k',
         '-movflags', 'frag_keyframe+empty_moov',
@@ -1225,7 +1396,7 @@ function streamTranscodeToResponse(res, url, cachePath, key) {
     });
     let stderr = '';
     child.stderr?.on('data', (d) => { stderr += d; });
-    child.on('error', (err) => { clearTimeout(firstByteTimer); finished = true; reject(err); });
+    child.on('error', (err) => { clearTimeout(firstByteTimer); finished = true; logErrDetail(`${label} transcode`, err); reject(new Error(describeErr(err), { cause: err })); });
     child.on('close', (code) => {
       clearTimeout(firstByteTimer);
       finished = true;
@@ -1362,6 +1533,8 @@ async function serveAudio(req, res, { artist = '', title = '', duration = 0, fre
       doStream,
       res,
       refresh: () => resolveStream({ artist, title, duration }, { fresh: true }),
+      // La URL poisoned también sale de la caché en el path de descarga.
+      onPoisoned: () => invalidateStreamCache(artist, title),
     });
 
     p
@@ -1371,8 +1544,8 @@ async function serveAudio(req, res, { artist = '', title = '', duration = 0, fre
       })
       .catch((err) => {
         const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
-        console.warn(`[music-stream] ✗ ${label} · error a los ${elapsed}s:`, err.message);
-        if (!res.headersSent && !res.destroyed) res.status(502).json({ success: false, error: err.message });
+        console.warn(`[music-stream] ✗ ${label} · error a los ${elapsed}s:`, describeErr(err));
+        if (!res.headersSent && !res.destroyed) res.status(502).json({ success: false, error: describeErr(err) });
         else if (!res.writableEnded) res.end();
       });
 
@@ -1383,8 +1556,8 @@ async function serveAudio(req, res, { artist = '', title = '', duration = 0, fre
     }
   } catch (err) {
     const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
-    console.warn(`[music-stream] ✗ ${label} · error a los ${elapsed}s:`, err.message);
-    if (!res.headersSent && !res.destroyed) res.status(502).json({ success: false, error: err.message });
+    console.warn(`[music-stream] ✗ ${label} · error a los ${elapsed}s:`, describeErr(err));
+    if (!res.headersSent && !res.destroyed) res.status(502).json({ success: false, error: describeErr(err) });
   }
 }
 
