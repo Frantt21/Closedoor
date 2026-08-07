@@ -33,6 +33,15 @@ TERMUX_SETUP.md
 music-server.zip
 /backend-music-server
 scripts/sync-music-server.mjs
+
+# Music server: secretos y archivos regenerables
+music-server/cookies.txt
+music-server/.music-cache/
+music-server/.tunnel.pid
+music-server/.tunnel-url.txt
+music-server/.ytdlp-debug.log
+music-server/bin/bgutil-pot.log
+music-server/bin/.bgutil-pot.pid
 .env.example
 TERMUX_DIAGNOSTICO.md
 diagnostico-stream.sh

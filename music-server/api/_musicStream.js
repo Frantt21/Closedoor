@@ -14,12 +14,14 @@
  */
 
 import { spawn } from 'child_process';
-import { existsSync, readFileSync, writeFileSync, writeFile, mkdirSync, renameSync, unlinkSync, statSync, readdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, writeFile, mkdirSync, renameSync, unlinkSync, statSync, readdirSync, appendFileSync } from 'fs';
 import http from 'http';
 import https from 'https';
 import { homedir } from 'os';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { HttpsProxyAgent } from 'https-proxy-agent';
+import { SocksProxyAgent } from 'socks-proxy-agent';
 import { searchMusicServer } from './_music.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -51,6 +53,44 @@ const FFMPEG_BIN = findBinary('FFMPEG_BIN', 'ffmpeg', 'ffmpeg');
 const UA =
   'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 
+// ── Proxy residencial/ISP (anti bot-check en IPs de datacenter) ──
+// HidenCloud asigna IPs de datacenter marcadas por YouTube: "Sign in to confirm
+// you're not a bot" (LOGIN_REQUIRED) en TODOS los clients aunque el PO token
+// esté generándose — la IP está bloqueada a nivel de red y ningún token la
+// salva (yt-dlp FAQ). Con un proxy residencial/ISP la IP de salida parece banda
+// ancha normal → el bot-check desaparece.
+// ⚠️ CRÍTICO: la URL de googlevideo queda ligada a la IP que la resolvió, así
+// que el fetch del media (proxyStream/download) DEBE salir por el MISMO proxy
+// (si el media sale por la IP del container → 403). Por eso aquí se configura
+// un agente de Node para el media y --proxy para yt-dlp, con la misma URL.
+// Configuración: variable de entorno YTDLP_PROXY con esquema http(s)://user:pass
+// @host:port o socks5://user:pass@host:port.
+const YTDLP_PROXY = process.env.YTDLP_PROXY || '';
+// ffmpeg solo soporta -http_proxy con proxy HTTP PLANO (no https:// ni socks):
+// se pasa solo cuando el esquema es http:// (la mayoría de proveedores residenciales).
+const YTDLP_PROXY_HTTP = /^http:\/\//i.test(YTDLP_PROXY) ? YTDLP_PROXY : '';
+// El agente NO depende del host de destino: depende solo de YTDLP_PROXY (fijo al
+// cargar el módulo). Un único singleton evita filtrar un agente + socket pool por
+// cada hostname distinto de googlevideo (rr1---sn-..., rr4---sn-... → leak).
+const PROXY_AGENT = (() => {
+  if (!YTDLP_PROXY) return null;
+  try {
+    if (/^socks(4|4a|5|5h):\/\//i.test(YTDLP_PROXY)) return new SocksProxyAgent(YTDLP_PROXY);
+    if (/^https?:\/\//i.test(YTDLP_PROXY)) return new HttpsProxyAgent(YTDLP_PROXY);
+    console.warn(`[music-stream] ⚠️ YTDLP_PROXY con esquema no soportado (esperado http:// o socks5://): ${YTDLP_PROXY.slice(0, 40)}…`);
+    return null;
+  } catch (err) {
+    console.warn(`[music-stream] ⚠️ YTDLP_PROXY inválido: ${err.message}`);
+    return null;
+  }
+})();
+function getProxyAgent() {
+  return PROXY_AGENT;
+}
+if (YTDLP_PROXY && PROXY_AGENT) {
+  console.info(`[music-stream] proxy configurado: ${YTDLP_PROXY.replace(/\/\/[^:@]+:[^@]+@/, '//***:***@')}`);
+}
+
 // ── Cookies de cuenta logueada (ANTI-THROTTLE) ──
 const localCookies = join(homedir(), '.config', 'yt-dlp', 'cookies.txt');
 const containerCookies = join(ROOT_DIR, 'cookies.txt');
@@ -70,6 +110,74 @@ const YTDLP_COOKIES_FILE = (() => {
 // Exportado para que music-server.js pueda loguear el estado
 export const detectedCookiesFile = YTDLP_COOKIES_FILE;
 
+// ── Cookies de sesión para el FETCH del media (ANTI-403 transitorio) ──
+// googlevideo rechaza con 403 TEMPORAL (anti-abuso, ~30s) las peticiones de
+// audio que llegan de una IP justo después de un burst de resolución de yt-dlp
+// (pasa en el PRIMER play de una canción sin cache). El fetch del media manda
+// las cookies de la sesión logueada → la petición se ve autenticada y esquiva
+// el anti-abuso. Se parsea el mismo cookies.txt que usa yt-dlp (formato
+// Netscape: dominio \t subdominios \t path \t secure \t expiry \t nombre \t valor).
+function buildCookieHeader(cookiesFile) {
+  try {
+    if (!cookiesFile || !existsSync(cookiesFile)) return null;
+    // ⚠️ CRÍTICO: el cookies.txt exportado con la extensión "Get cookies.txt
+    // LOCALLY" incluye TODAS las cookies del navegador (vercel_session_id,
+    // curr-account, _GRECAPTCHA… → 900+ pares, ~150KB). Mandar ese header al
+    // fetch del media hace que googlevideo responda HTTP 400 Bad Request
+    // (límite de header ~8KB). Solo se envía el subconjunto de AUTENTICACIÓN
+    // de YouTube/Google (SID, LOGIN_INFO…) — suficiente para esquivar el 403
+    // transitorio y el anti-bot, y cabe en ~1KB.
+    const AUTH_COOKIES = new Set([
+      'SID', '__Secure-3PSID', '__Secure-1PSID', '__Secure-3PAPISID', '__Secure-1PAPISID',
+      'HSID', 'SSID', 'APISID', 'SAPISID', 'LOGIN_INFO',
+      'SIDCC', '__Secure-3PSIDCC', '__Secure-1PSIDCC',
+      '__Secure-1PSIDTS', '__Secure-3PSIDTS',
+      'PREF', 'VISITOR_INFO1_LIVE', 'CONSENT', 'YSC', 'OTZ',
+    ]);
+    const seen = new Set();
+    const pairs = [];
+    for (const raw of readFileSync(cookiesFile, 'utf8').split('\n')) {
+      let line = raw.trim();
+      if (!line) continue;
+      // El prefijo #HttpOnly_ (curl y la mayoría de exportadores) NO es un
+      // comentario: son las cookies HttpOnly (SID, HSID, LOGIN_INFO…), las
+      // críticas para autenticar el fetch. Sin esto se perdían y el 403
+      // transitorio no se esquivaba.
+      if (line.startsWith('#HttpOnly_')) line = line.slice('#HttpOnly_'.length).trimStart();
+      else if (line.startsWith('#')) continue;
+      const parts = line.split('\t');
+      if (parts.length < 7) continue;
+      const name = parts[5]?.trim();
+      const value = parts[6]?.trim();
+      // Solo cookies de auth de YouTube/Google, UNA por nombre (el cookies.txt
+      // exportado repite SID/OTZ/… por cada dominio — dedupe para header mínimo).
+      if (name && value && AUTH_COOKIES.has(name) && !seen.has(name)) {
+        seen.add(name);
+        pairs.push(`${name}=${value}`);
+      }
+    }
+    if (!pairs.length) return null;
+    let header = pairs.join('; ');
+    // Tope duro de seguridad: nunca mandar más de ~6KB (límite googlevideo ~8KB).
+    // Se corta en el último par completo (nunca partir una cookie a la mitad:
+    // un header malformado también provocaría 400).
+    while (Buffer.byteLength(header) > 6000) {
+      const cut = header.lastIndexOf('; ', 6000);
+      if (cut <= 0) break;
+      header = header.slice(0, cut);
+    }
+    return header;
+  } catch {
+    return null;
+  }
+}
+const COOKIE_HEADER = buildCookieHeader(YTDLP_COOKIES_FILE);
+if (COOKIE_HEADER) {
+  console.info(`[music-stream] cookies de sesión cargadas para el fetch del media (${COOKIE_HEADER.split(';').length} pares auth)`);
+} else {
+  console.warn('[music-stream] ⚠️ sin cookies de auth para el fetch del media → el primer play puede fallar con 403 transitorio');
+}
+
 // ── YouTube client chain + anti-bot ──
 // IPs de datacenter requieren PO Tokens para extraer formatos. Sin PO Tokens,
 // YouTube devuelve "Requested format is not available" para TODOS los selectores.
@@ -80,17 +188,32 @@ const YTDLP_CLIENTS = (() => {
   if (process.env.YTDLP_EXTRACTOR_ARGS) {
     return process.env.YTDLP_EXTRACTOR_ARGS.split(',').map((s) => s.trim()).filter(Boolean);
   }
+  // ⚠️ Verificado empíricamente con yt-dlp 2026.07.04 + binario bgutil-pot 0.8.1:
+  //   - web (WEBPO) es el ÚNICO de la cadena que solicita PO tokens: con
+  //     youtube:fetch_pot=always genera el token (provider bgutil:cli, sin
+  //     server HTTP) y resuelve URL directa itag=140 en IPs de datacenter. En
+  //     IPs limpias también funciona (audio puro con URL directa).
+  //   - tv_embedded NO existe en INNERTUBE_CLIENTS de yt-dlp 2026.07.04: se
+  //     salta con "Skipping unsupported client" y cae a android_vr/web_safari
+  //     (que NO piden token → LOGIN_REQUIRED en IP de datacenter).
+  //   - mediaconnect con player_skip fue la ruta clásica (IPs limpias) pero en
+  //     IPs de datacenter marcadas recibe "Sign in to confirm you're not a bot".
+  //   - android/tv: URLs directas pero NO piden PO token (no están en
+  //     WEBPO_CLIENTS) → fallan en IP de datacenter. Se conservan como fallback
+  //     para IPs limpias y videos DRM-ish.
   const base = [
-    // mediaconnect: client nuevo, menos restricciones en datacenters
+    // mweb: WEBPO + fetch_pot=always → token vía bgutil → esquiva bot-check.
+    // Verificado empíricamente con youtube:client=mweb + fetch_pot=always +
+    // cookies: token generado + URL itag=140 resuelta (IP limpia).
+    'youtube:player_client=mweb',
+    // web: WEBPO, mismo mecanismo de token que mweb.
+    'youtube:player_client=web',
+    // mediaconnect: ruta clásica rápida (IPs limpias)
     'youtube:player_client=mediaconnect;player_skip=webpage,configs',
-    // web_embedded: client embebido, tolera más IPs
-    'youtube:player_client=web_embedded;player_skip=webpage,configs',
-    // mweb: mobile web, menos bloqueado
-    'youtube:player_client=mweb;player_skip=webpage,configs',
-    // tv_embedded: smart TV client, bypasses many checks
-    'youtube:player_client=tv_embedded;player_skip=webpage,configs',
-    // android: fallback final
-    'youtube:player_client=android;player_skip=webpage,configs',
+    // android: URLs directas (a veces video+audio combinado)
+    'youtube:player_client=android',
+    // tv: último recurso (algunos videos son DRM)
+    'youtube:player_client=tv',
   ];
   return base;
 })();
@@ -107,10 +230,36 @@ function runYtDlp(args, { timeoutMs = 30000, maxBuffer = 8 * 1024 * 1024, skipCo
     if (existsSync(YTDLP_PLUGINS_DIR)) {
       baseArgs.push('--plugin-dirs', YTDLP_PLUGINS_DIR);
     }
+    // PO Token providers — DOBLE vía, verificado empíricamente con v0.8.1:
+    //   - bgutil:cli (SIN server): genera el token POR PETICIÓN invocando el
+    //     binario (--content-binding). Robusto aunque el server HTTP esté
+    //     caído: HidenCloud mata el server cada ~20-40s con SIGKILL silencioso
+    //     (el log de bgutil-pot se corta en seco sin error) y el modo script no
+    //     deja ningún proceso vivo que matar. Este es el provider de RESERVA.
+    //   - bgutil:http: rápido si el server responde (tokens cacheados).
+    // yt-dlp usa http primero y cae a cli automáticamente si no responde.
+    const potBin = join(localBin, 'bgutil-pot');
+    if (existsSync(potBin)) {
+      // El provider CLI (yt-dlp) invoca el binario por petición: sin el bit +x
+      // (se pierde al copiar la carpeta por panel) el spawn falla con EACCES.
+      try { chmodSync(potBin, 0o755); } catch {}
+      baseArgs.push('--extractor-args', `youtubepot-bgutilcli:cli_path=${potBin}`);
+    }
     // PO Token server URL (si está configurado)
     if (process.env.BGUTIL_POT_BASE_URL) {
       baseArgs.push('--extractor-args', `youtubepot-bgutilhttp:base_url=${process.env.BGUTIL_POT_BASE_URL}`);
     }
+    // youtube:fetch_pot=always — CRÍTICO para IPs de datacenter. Por defecto
+    // (auto) yt-dlp solo pide el token tras un fallo del player, y ese reintento
+    // no se dispara para los clients no-WEBPO (android/tv) ni tras el skip de
+    // tv_embedded → LOGIN_REQUIRED → bot-check. Forzando la petición SIEMPRE,
+    // el client web genera el token por adelantado (provider bgutil:cli) y la
+    // resolución pasa aunque la IP esté marcada. Verificado localmente: token
+    // generado + URL itag=140 resuelta sin server HTTP.
+    baseArgs.push('--extractor-args', 'youtube:fetch_pot=always');
+    // Proxy residencial/ISP: TODAS las llamadas de yt-dlp (resolve + search)
+    // salen por él → la IP que ve YouTube es residencial → sin bot-check.
+    if (YTDLP_PROXY) baseArgs.push('--proxy', YTDLP_PROXY);
     if (!skipCookies && YTDLP_COOKIES_FILE) baseArgs.push('--cookies', YTDLP_COOKIES_FILE);
     try {
       child = spawn(YTDLP_BIN, [...baseArgs, ...args], {
@@ -141,7 +290,20 @@ function runYtDlp(args, { timeoutMs = 30000, maxBuffer = 8 * 1024 * 1024, skipCo
     child.on('error', (err) => finish(reject, err));
     child.on('close', (code) => {
       if (code === 0) finish(resolve, { stdout, stderr });
-      else finish(reject, new Error(`yt-dlp exit ${code}: ${stderr.split('\n').filter(Boolean).slice(0, 2).join(' | ')}`));
+      else {
+        // ⚠️ El error REAL va al FINAL del verbose (el inicio es el Command-line
+        // config, que antes ocultaba la causa). Se extraen las líneas
+        // significativas (ERROR/Sign in/403/playability/…[pot]) y si no hay, la
+        // cola. Además se adjunta el stderr COMPLETO al error (err.stderr) para
+        // que el diagnóstico pueda volcarlo aunque el intento FALLE.
+        const lines = stderr.split('\n').filter(Boolean);
+        const interesting = lines.filter((l) => /ERROR|WARNING|Sign in|Requested format|not available|playability|HTTP \d{3}|\[pot/i.test(l)).slice(-4).join(' | ');
+        const fallback = lines.slice(-3).join(' | ');
+        const e = new Error(`yt-dlp exit ${code}: ${(interesting || fallback).slice(0, 600)}`);
+        e.stderr = stderr;
+        e.stdout = stdout;
+        finish(reject, e);
+      }
     });
   });
 }
@@ -205,6 +367,129 @@ function isValidStreamUrl(url) {
   } catch { return false; }
 }
 
+// ── Asegurar el server POT antes de resolver ──
+// El bot-check en IP de datacenter solo se esquiva si el server bgutil-pot
+// responde (sin él el plugin no puede generar el token). Este server tiende a
+// caerse en el container → se relanza aquí mismo si el ping falla y se espera
+// a que responda (mismo patrón detached + log + pid file que music-server.js).
+function potPing(base, timeoutMs = 2000) {
+  try {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), timeoutMs);
+    return fetch(`${base}/ping`, { signal: controller.signal })
+      .then(async (res) => ({ ok: res.ok, version: res.ok ? ((await res.json().catch(() => ({}))).version || '') : '' }))
+      .catch((err) => ({ ok: false, version: '', err: err.cause?.code || err.message }))
+      .finally(() => clearTimeout(t));
+  } catch { return Promise.resolve({ ok: false, version: '' }); }
+}
+
+// Warm-up REAL: POST /get_pot genera un token de prueba. El ping solo engaña:
+// el server relanzado responde al ping antes de estar listo para GENERAR
+// tokens (o HidenCloud lo mata justo después) — verificado en producción: el
+// log mostraba providers registrados pero SIN "Generating a gvs PO Token" →
+// LOGIN_REQUIRED en todos los clients. El POST confirma que sirve tokens de
+// verdad. (Endpoint verificado: POST {content_binding} → 200 {poToken,...}
+// en ~700ms; el token queda cacheado por content_binding en el server.)
+async function potWarmup(base, timeoutMs = 10000) {
+  try {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), timeoutMs);
+    const res = await fetch(`${base}/get_pot`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content_binding: 'dQw4w9WgXcQ' }),
+      signal: controller.signal,
+    });
+    clearTimeout(t);
+    if (!res.ok) return false;
+    const j = await res.json().catch(() => null);
+    return !!(j && j.poToken);
+  } catch {
+    return false;
+  }
+}
+
+// Momento del último relanzamiento del server POT (0 = nunca relanzado en esta
+// sesión). resolveStream lo usa para reintentar el resolve cuando un bot-check
+// ocurre justo tras el relanzamiento: el ping ya responde ('up') pero el server
+// aún no genera tokens.
+let potLastStartedAt = 0;
+// Lock: dos resolves concurrentes podrían relanzar el server a la vez (uno gana
+// el puerto 4416, el otro falla con EADDRINUSE). El segundo espera al primero.
+let potLaunching = null;
+
+// Mata el proceso POT anterior si sigue vivo: el caso "vivo pero roto" (responde
+// ping pero no sirve tokens — el estado exacto de producción) ocupa el puerto y
+// el spawn nuevo fallaría con EADDRINUSE. Se usa el pid file compartido con
+// music-server.js.
+function killPotProcess() {
+  try {
+    const pidFile = join(localBin, '.bgutil-pot.pid');
+    const pid = Number(readFileSync(pidFile, 'utf8'));
+    if (pid > 0) {
+      try { process.kill(pid, 'SIGKILL'); } catch {}
+      try { unlinkSync(pidFile); } catch {}
+    }
+  } catch {}
+}
+
+async function ensurePotServerUp({ maxWaitMs = 15000 } = {}) {
+  const base = process.env.BGUTIL_POT_BASE_URL;
+  if (!base) return 'n/a';
+  // Sano = responde al ping Y genera un token de prueba (el ping solo engaña).
+  const healthy = async () => (await potPing(base)).ok && (await potWarmup(base));
+  if (await healthy()) return 'up';
+  const bin = join(localBin, 'bgutil-pot');
+  if (!existsSync(bin)) return 'failed';
+  // Auto-reparar el bit +x (la subida por panel lo quita → spawn EACCES).
+  try { chmodSync(bin, 0o755); } catch {}
+  // Otro resolve ya está relanzando: esperar y re-evaluar (el server del
+  // ganador servirá para ambos).
+  if (potLaunching) {
+    try { await potLaunching; } catch {}
+    return (await healthy()) ? 'up' : 'failed';
+  }
+  console.warn('[music-stream] PO Token server caído o sin servir tokens → lanzándolo antes de resolver...');
+  potLaunching = (async () => {
+    // El proceso anterior puede seguir vivo pero roto ocupando el puerto.
+    killPotProcess();
+    await sleep(500);
+    try {
+      const child = spawn(bin, ['server', '--port', '4416', '--verbose'], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: true,
+      });
+      child.unref();
+      const logFile = join(localBin, 'bgutil-pot.log');
+      // Rotar si crece (mismo criterio que music-server.js) — --verbose escribe por request.
+      try { if (statSync(logFile).size > 1_000_000) writeFileSync(logFile, ''); } catch {}
+      child.stdout?.on('data', (d) => { try { appendFileSync(logFile, d); } catch {} });
+      child.stderr?.on('data', (d) => { try { appendFileSync(logFile, d); } catch {} });
+      // Limpiar el pid file solo si sigue apuntando a ESTE proceso (race con
+      // music-server.js, que comparte el mismo archivo para su auto-reparación).
+      child.on('exit', () => {
+        try {
+          if (Number(readFileSync(join(localBin, '.bgutil-pot.pid'), 'utf8')) === child.pid) unlinkSync(join(localBin, '.bgutil-pot.pid'));
+        } catch {}
+      });
+      try { writeFileSync(join(localBin, '.bgutil-pot.pid'), String(child.pid), 'utf8'); } catch {}
+    } catch (err) {
+      console.warn('[music-stream] ⚠️ no se pudo lanzar el POT server:', err.message);
+    }
+  })();
+  try { await potLaunching; } finally { potLaunching = null; }
+  const deadline = Date.now() + maxWaitMs;
+  while (Date.now() < deadline) {
+    if (await healthy()) {
+      potLastStartedAt = Date.now();
+      return 'started';
+    }
+    await sleep(1000);
+  }
+  console.warn('[music-stream] ⚠️ POT server no sirve tokens tras relanzarlo');
+  return 'failed';
+}
+
 export async function resolveBestAudioUrl(videoUrl) {
   // Selector ULTRA-permisivo: intenta todo, incluyendo video+audio
   const run = (extra, opts = {}) => runYtDlp([
@@ -222,47 +507,94 @@ export async function resolveBestAudioUrl(videoUrl) {
     return null;
   };
 
-  // Intentar con cookies (si disponibles) — primer intento verbose para diagnosticar
+  // El bot-check en IP de datacenter necesita el server POT vivo: si está
+  // caído, relanzarlo ANTES de intentar los clients (si no, es bot-check seguro).
+  if (process.env.BGUTIL_POT_BASE_URL) {
+    const st = await ensurePotServerUp();
+    if (st === 'failed') console.warn('[music-stream] ⚠️ POT server no disponible → el bot-check puede fallar');
+  }
+
+  // Intentar con cookies (si disponibles) — primer intento verbose para diagnosticar.
+  // ⚠️ El volcado y el estado del provider se llaman TAMBIÉN en el fallo
+  // (err.stderr): en producción todos los clients salen con exit 1 y el bloque
+  // del try (post-await) solo se ejecuta cuando yt-dlp sale con exit 0 — sin
+  // esto el diagnóstico nunca llegaría al caso que nos interesa.
   let isFirstAttempt = true;
-  for (const client of YTDLP_CLIENTS) {
-    try {
-      const { stdout, stderr } = await run(['--extractor-args', client], isFirstAttempt ? { verbose: true, timeoutMs: 45000 } : {});
-      if (isFirstAttempt && stderr) {
-        // Loguear info del plugin PO Token si está presente
-        const potLines = stderr.split('\n').filter(l => l.includes('[pot]') || l.includes('PO Token') || l.includes('plugin'));
-        if (potLines.length) console.info('[music-stream] PO Token info:', potLines.slice(0, 3).join(' | '));
+  const logFirstAttempt = (stderr) => {
+    if (!stderr) return;
+    // Volcado COMPLETO del verbose del primer client a .ytdlp-debug.log:
+    // ahí se ve la causa real sin truncar (bot-check, provider POT cargado o
+    // "none", formato no disponible, 403…). Se sobreescribe en cada resolve.
+    try { writeFileSync(join(ROOT_DIR, '.ytdlp-debug.log'), stderr, 'utf8'); } catch {}
+    // Estado del PO Token provider (plugin bgutil) + intentos de generación.
+    // Solo prefijos [pot]... (nunca el cuerpo de un token si se activara trace logging)
+    const potLines = stderr.split('\n').filter(l => /\[pot\]|\[pot:/i.test(l));
+    if (potLines.length) console.info('[music-stream] PO Token info:', potLines.slice(0, 8).join(' | '));
+    // ¿El plugin está REGISTRADO como provider? ("bgutil:http-0.8.1 (external)"
+    // vs "none") — la diferencia es el bot-check que sí se puede esquivar.
+    const provLine = stderr.split('\n').find((l) => /PO Token Providers/i.test(l));
+    if (provLine) console.info('[music-stream] POT providers:', provLine.replace(/^\[debug\]\s*\[youtube\]\s*/i, '').trim());
+  };
+  // Prueba la cadena de clients (con o sin cookies). Devuelve la URL o lanza el
+  // último error. El paso "sin cookies" reintenta con la MISMA cadena (antes
+  // usaba los clients por defecto de yt-dlp → SABR → nunca daba URL): sirve
+  // para el caso "la cuenta está marcada pero la ruta anónima + PO token pasa".
+  const tryClients = async ({ skipCookies }) => {
+    let lastErr = null;
+    for (const client of YTDLP_CLIENTS) {
+      const clientName = client.replace('youtube:player_client=', '').replace(/;.*/, '');
+      try {
+        const { stdout, stderr } = await run(['--extractor-args', client], {
+          // Primer intento (client web, verbose para diagnóstico): timeout 30s —
+          // en cache-miss si web falla transitoriamente ("Only images"), no
+          // quemar 45s antes de caer al siguiente client. Los resolves reales
+          // tardan 5-25s (token vía bgutil:cli incluido).
+          ...(isFirstAttempt ? { verbose: true, timeoutMs: 30000 } : {}),
+          skipCookies,
+        });
+        if (isFirstAttempt && stderr) logFirstAttempt(stderr);
+        isFirstAttempt = false;
+        const line = parseUrl(stdout);
+        if (line) {
+          console.info(`[music-stream] resuelto con client: ${clientName}${skipCookies ? ' (sin cookies)' : ''}`);
+          return line;
+        }
+        // El client respondió pero sin URL → loguear la razón real (p. ej. playability)
+        const errLine = (stderr.split('\n').find(l => /ERROR:|WARNING:/i.test(l)) || '').trim().slice(0, 220);
+        console.warn(`[music-stream] client ${clientName}: sin URL de audio${errLine ? ` — ${errLine}` : ''}`);
+      } catch (err) {
+        if (isFirstAttempt && err?.stderr) logFirstAttempt(err.stderr);
+        isFirstAttempt = false;
+        // El error REAL de cada client (bot-check, provider POT caído, 403, timeout…)
+        const reason = String(err?.message || err).replace(/\s+/g, ' ').slice(0, 700);
+        console.warn(`[music-stream] client ${clientName} falló: ${reason}`);
+        lastErr = err;
       }
-      isFirstAttempt = false;
-      const line = parseUrl(stdout);
-      if (line) {
-        console.info(`[music-stream] resuelto con client: ${client.replace('youtube:player_client=', '')}`);
-        return line;
-      }
-    } catch {}
-  }
-  const { stdout } = await run([]);
-  const line = parseUrl(stdout);
-  if (line) return line;
+    }
+    throw lastErr || new Error('No audio URL resolved');
+  };
 
-  // Fallback: intentar SIN cookies (puede que las cookies estén causando el problema)
-  if (YTDLP_COOKIES_FILE) {
-    console.warn('[music-stream] intentando sin cookies...');
-    const runNoCookies = (extra) => runYtDlp([
-      '-f', 'bestaudio[ext=m4a]/bestaudio[ext=mp4]/bestaudio/best',
-      '--get-url', '--no-playlist',
-      ...extra, videoUrl,
-    ], { timeoutMs: 30000, skipCookies: true });
-    try {
-      const { stdout: out2 } = await runNoCookies([]);
-      const line2 = parseUrl(out2);
-      if (line2) {
-        console.info('[music-stream] resuelto SIN cookies');
-        return line2;
-      }
-    } catch {}
+  // 1) Con cookies.
+  try {
+    return await tryClients({ skipCookies: false });
+  } catch (err) {
+    // 2) Sin cookies SOLO si el fallo huele a bot-check (cuenta/IP marcada): así no
+    //    se duplica la latencia en fallos por timeout/403, que no se arreglarían
+    //    quitando cookies.
+    if (YTDLP_COOKIES_FILE && /Sign in to confirm|confirm you're not a bot|not a bot/i.test(String(err.message || ''))) {
+      console.warn('[music-stream] intentando sin cookies...');
+      try {
+        return await tryClients({ skipCookies: true });
+      } catch {}
+    }
+    // Bot-check de YouTube: con --cookies presente suele ser cookies inválidas/
+    // expiradas o SIN las de autenticación (SID/LOGIN_INFO), o IP de datacenter
+    // sin PO token activo (el log de arranque lo indica: "PO Token plugin").
+    if (err && /Sign in to confirm|confirm you're not a bot|not a bot/i.test(String(err.message || ''))) {
+      throw new Error('YouTube pide login (bot check): con --cookies presente suele ser cookies inválidas/expiradas o sin las de autenticación (SID/LOGIN_INFO — exporta con HttpOnly), o IP de datacenter sin PO token activo (revisa el log de arranque "PO Token plugin").');
+    }
+    throw err;
   }
-
-  throw new Error('No audio URL resolved');
 }
 
 // ── Cache de URLs ──
@@ -308,6 +640,18 @@ function persistCache() {
   }
 })();
 
+// Invalida la entrada de caché de una canción (URL poisoned tras un 403 del
+// media). Se exporta para que handleStreamRequest la conecte a la cadena de
+// reintentos: si la URL cacheada da 403, se borra para que la siguiente
+// request no la reutilice y re-resuelva con token fresco. NO se toca
+// inflightStream: sus entradas son transitorias (se limpian al resolver) y
+// borrarlas abriría una ventana de resolución duplicada para requests
+// concurrentes.
+export function invalidateStreamCache(artist, title) {
+  const query = [String(artist || '').trim(), String(title || '').trim()].filter(Boolean).join(' - ') || String(title || '');
+  streamCache.delete(query.toLowerCase());
+}
+
 export async function resolveStream({ artist = '', title, duration }, { fresh = false } = {}) {
   if (!title) throw new Error('Missing title');
   const query = [String(artist || '').trim(), String(title).trim()].filter(Boolean).join(' - ') || String(title);
@@ -324,15 +668,36 @@ export async function resolveStream({ artist = '', title, duration }, { fresh = 
     const best = pickBestCandidate(candidates, { artist: String(artist || ''), title: String(title), duration: Number(duration) || 0 });
     if (!best) throw new Error('No YouTube candidate found');
     if (YTDLP_COOKIES_FILE) console.info(`[music-stream] usando cookies de: ${YTDLP_COOKIES_FILE}`);
-    const url = await resolveBestAudioUrl(best.url);
-    if (!isValidStreamUrl(url)) {
-      console.warn(`[music-stream] ⚠️ URL no parseable para "${query}": ${JSON.stringify(String(url).slice(0, 150))}`);
-      throw new Error('Invalid stream URL');
+    const resolveAndCache = async () => {
+      const url = await resolveBestAudioUrl(best.url);
+      if (!isValidStreamUrl(url)) {
+        console.warn(`[music-stream] ⚠️ URL no parseable para "${query}": ${JSON.stringify(String(url).slice(0, 150))}`);
+        throw new Error('Invalid stream URL');
+      }
+      const mime = getMimeFromUrl(url);
+      streamCache.set(key, { url, mime, at: Date.now(), __v: CACHE_VERSION, videoTitle: best.title, videoId: best.id });
+      persistCache();
+      return { url, mime, videoTitle: best.title, videoId: best.id };
+    };
+    try {
+      return await resolveAndCache();
+    } catch (err) {
+      // Bot-check: sin token el resolve no puede pasar. Se asegura el server POT
+      // y se reintenta UNA vez si el server acaba de ser relanzado (potLastStartedAt
+      // reciente): el relanzado responde al ping pero puede no estar listo para
+      // generar tokens en el primer intento — verificado en producción (log con
+      // providers registrados pero SIN "Generating" → LOGIN_REQUIRED en todos
+      // los clients). Si el server estaba estable y el token fue rechazado, el
+      // reintento no ayuda — no se insiste más.
+      if (/bot check|pide login|Sign in to confirm/i.test(String(err.message || ''))) {
+        const st = await ensurePotServerUp();
+        if (st === 'started' || (potLastStartedAt > 0 && Date.now() - potLastStartedAt < 20000)) {
+          console.warn('[music-stream] ↻ reintentando resolución con POT server activo...');
+          return await resolveAndCache();
+        }
+      }
+      throw err;
     }
-    const mime = getMimeFromUrl(url);
-    streamCache.set(key, { url, mime, at: Date.now(), __v: CACHE_VERSION, videoTitle: best.title, videoId: best.id });
-    persistCache();
-    return { url, mime, videoTitle: best.title, videoId: best.id };
   })();
   inflightStream.set(key, p);
   try { return await p; } finally { if (inflightStream.get(key) === p) inflightStream.delete(key); }
@@ -410,13 +775,76 @@ function sendJson(res, code, obj) {
   res.end(JSON.stringify(obj));
 }
 
+// ── Cadena de reintentos resiliente (proxy y download) ──
+// googlevideo rechaza con 403 TEMPORAL (cooldown anti-abuso, ~30s) el media de
+// una IP justo después de un burst de resolución de yt-dlp — pasa en el PRIMER
+// play de una canción sin cache (resolve 3-7s → fetch inmediato → 403). El
+// bloqueo afecta a TODAS las URLs de la IP mientras está activo, incluidas las
+// RE-resueltas con token nuevo (verificado en producción: URL fresca → 403;
+// la MISMA URL tras ~20s de cooldown → 200). Estrategia:
+//   1. URL actual (cache hit fuera del cooldown → instantáneo).
+//   2. Misma URL tras 1s (throttling puntual).
+//   3. MISMA URL tras RETRY_BACKOFF_LONG_MS: la URL no está muerta; esperando
+//      el cooldown vuelve a funcionar. Re-resolver aquí sería contraproducente
+//      (añade burst y alarga el bloqueo). Solo si sigue fallando tras el
+//      cooldown se invalida la caché (URL poisoned real).
+//   4. Resolución fresca (URL caducada/poisoned) como último recurso.
+async function attemptStreamWithRetries({ label, url, doStream, refresh, res, onPoisoned } = {}) {
+  const guard = (err) => {
+    console.warn(`[music-stream] ✗ ${label} · ${err.message}`);
+    if (res.headersSent || res.destroyed) throw err;
+  };
+  // 1) URL actual. Con cookies y cache hit fuera del cooldown → al instante.
+  try {
+    await doStream(url);
+    return;
+  } catch (err) { guard(err); }
+  // 2) MISMA URL tras 1s (throttling puntual). NO se re-resuelve aún: el 403
+  //    del primer play de una canción sin cache es el COOLDOWN temporal de
+  //    googlevideo (~30s, anti-abuso por burst de resolución) que afecta a
+  //    TODAS las URLs de la IP — verificado en producción: la URL que dio 403
+  //    a los ~5s del resolve funcionó a los ~25s, y una URL RE-resuelta con
+  //    token nuevo también dio 403 mientras duró el cooldown. Re-resolver aquí
+  //    solo añade burst (más player responses) y alarga el bloqueo.
+  await sleep(1000);
+  try {
+    console.warn(`[music-stream] ↻ ${label} · reintento (backoff)...`);
+    await doStream(url);
+    return;
+  } catch (err) { guard(err); }
+  // 3) MISMA URL tras RETRY_BACKOFF_LONG_MS: esperando el cooldown la URL
+  //    vuelve a funcionar (no está muerta).
+  await sleep(RETRY_BACKOFF_LONG_MS);
+  try {
+    console.warn(`[music-stream] ↻ ${label} · reintento (backoff largo, cooldown googlevideo)...`);
+    await doStream(url);
+    return;
+  } catch (err) {
+    guard(err);
+    // Tras el cooldown sigue fallando → la URL sí está muerta (poisoned):
+    // fuera de la caché para que las próximas request no la reusen.
+    try { onPoisoned?.(); } catch {}
+  }
+  // 4) Resolución fresca (URL caducada/poisoned) como último recurso. La URL
+  //    nueva inicia su PROPIO cooldown (nuevo burst de player responses), así
+  //    que también hay que esperarlo antes de fetchear — si no, repetiría el
+  //    403 y el request moriría sin más reintentos.
+  const fresh = await refresh();
+  if (!fresh?.url) throw new Error('No stream found after retries');
+  await sleep(RETRY_BACKOFF_LONG_MS);
+  try {
+    console.warn(`[music-stream] ↻ ${label} · reintentando con resolución fresca...`);
+    await doStream(fresh.url);
+  } catch (err) { guard(err); throw err; }
+}
+
 // ── Handler /api/music/stream ──
 // STREAM EN VIVO (proxy real): pipea googlevideo → cliente byte a byte con el
 // PRIMER byte al instante. NO bufferiza la canción completa (que con el
 // throttling de googlevideo tardaba 90-170s en llegar). Mantiene la cadena de
-// reintentos: misma URL con backoff → resolución fresca (URL caducada/403/0
-// bytes). /api/music/download conserva el pipeline cacheado (memoria/disco)
-// para re-producciones instantáneas.
+// reintentos: misma URL con backoff corto → backoff largo (cooldown 403) →
+// resolución fresca (URL caducada/403/0 bytes). /api/music/download conserva
+// el pipeline cacheado (memoria/disco) para re-producciones instantáneas.
 export async function handleStreamRequest(req, res, { artist = '', title = '', duration = 0, fresh = false } = {}) {
   const startedAt = Date.now();
   const label = `${artist} - ${title}`.trim() || 'stream';
@@ -432,28 +860,15 @@ export async function handleStreamRequest(req, res, { artist = '', title = '', d
       : transcodeStream(req, res, url, label)
     );
 
-    try {
-      // Intento 1: URL resuelta (la mayoría de las veces funciona).
-      await doStream(resolved.url);
-    } catch (err) {
-      console.warn(`[music-stream] ✗ ${label} · ${err.message}`);
-      if (res.headersSent || res.destroyed) throw err;
-      // Intento 2: misma URL tras backoff (throttling puntual).
-      await sleep(1000);
-      try {
-        console.warn(`[music-stream] ↻ ${label} · reintento (backoff)...`);
-        await doStream(resolved.url);
-      } catch (err2) {
-        console.warn(`[music-stream] ✗ ${label} · ${err2.message}`);
-        if (res.headersSent || res.destroyed) throw err2;
-        // Intento 3: resolución fresca (URL caducada/403/0 bytes → URL nueva).
-        await sleep(2000);
-        const freshRes = await resolveStream({ artist, title, duration }, { fresh: true });
-        if (!freshRes?.url) throw err2;
-        console.warn(`[music-stream] ↻ ${label} · reintentando con resolución fresca...`);
-        await doStream(freshRes.url);
-      }
-    }
+    await attemptStreamWithRetries({
+      label,
+      url: resolved.url,
+      doStream,
+      res,
+      refresh: () => resolveStream({ artist, title, duration }, { fresh: true }),
+      // La URL cacheada que dio 403 queda fuera de la caché al instante.
+      onPoisoned: () => invalidateStreamCache(artist, title),
+    });
     console.info(`[music-stream] ▶ ${label} · stream en vivo completo · ${((Date.now() - startedAt) / 1000).toFixed(1)}s (resolve ${resolveSecs}s)`);
   } catch (err) {
     const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
@@ -480,10 +895,15 @@ export function proxyStream(req, res, url, label = 'proxy') {
     }
     const lib = parsed.protocol === 'https:' ? https : http;
     const headers = { 'User-Agent': UA };
+    // Cookies de sesión: el fetch del media autenticado esquiva el 403
+    // transitorio de googlevideo (anti-abuso por burst de resolución).
+    if (COOKIE_HEADER) headers.Cookie = COOKIE_HEADER;
     if (req.headers.range) headers.Range = req.headers.range;
     let firstByteTimer = null;
-
-    const proxyReq = lib.request(parsed, { method: 'GET', headers }, (upRes) => {
+    // La URL de googlevideo está ligada a la IP que la resolvió: si el resolve
+    // usó proxy residencial, el media DEBE salir por el mismo proxy (si no → 403).
+    const agent = getProxyAgent();
+    const proxyReq = lib.request(parsed, { method: 'GET', headers, ...(agent ? { agent } : {}) }, (upRes) => {
       // Upstream rechaza (403/404) ANTES de mandar datos → reintentar.
       if (upRes.statusCode < 200 || upRes.statusCode >= 300) {
         clearTimeout(firstByteTimer);
@@ -531,6 +951,10 @@ export function transcodeStream(req, res, url, label = 'transcode') {
       child = spawn(FFMPEG_BIN, [
         '-hide_banner', '-loglevel', 'error',
         '-user_agent', UA,
+        // ffmpeg soporta -http_proxy (solo http/https, no socks): el media
+        // transcodeado también debe salir por la IP del resolve si hay proxy.
+        ...(YTDLP_PROXY_HTTP ? ['-http_proxy', YTDLP_PROXY_HTTP] : []),
+        ...(COOKIE_HEADER ? ['-cookies', COOKIE_HEADER] : []),
         '-i', withRateBypass(url),
         '-vn', '-acodec', 'aac', '-b:a', '128k',
         '-movflags', 'frag_keyframe+empty_moov',
@@ -693,7 +1117,13 @@ function streamDownloadToResponse(res, url, cachePath, key) {
       return;
     }
     const lib = parsed.protocol === 'https:' ? https : http;
-    const out = lib.get(parsed, { headers: { 'User-Agent': UA } }, (upRes) => {
+    // Proxy residencial: mismo requisito que en proxyStream — la URL está ligada
+    // a la IP del resolve y el media debe salir por el mismo proxy.
+    const agent = getProxyAgent();
+    const out = lib.get(parsed, {
+      headers: COOKIE_HEADER ? { 'User-Agent': UA, Cookie: COOKIE_HEADER } : { 'User-Agent': UA },
+      ...(agent ? { agent } : {}),
+    }, (upRes) => {
       if (upRes.statusCode !== 200) {
         upRes.resume();
         reject(new Error(`download HTTP ${upRes.statusCode}`));
@@ -761,6 +1191,10 @@ function streamTranscodeToResponse(res, url, cachePath, key) {
       child = spawn(FFMPEG_BIN, [
         '-hide_banner', '-loglevel', 'error',
         '-user_agent', UA,
+        // ffmpeg soporta -http_proxy (solo http/https, no socks): el media
+        // transcodeado también debe salir por la IP del resolve si hay proxy.
+        ...(YTDLP_PROXY_HTTP ? ['-http_proxy', YTDLP_PROXY_HTTP] : []),
+        ...(COOKIE_HEADER ? ['-cookies', COOKIE_HEADER] : []),
         '-i', withRateBypass(url),
         '-vn', '-acodec', 'aac', '-b:a', '128k',
         '-movflags', 'frag_keyframe+empty_moov',
@@ -818,6 +1252,14 @@ const inflightDownload = new Map();
 // Primer byte: 20s (antes 12s) — googlevideo con throttling tarda más en
 // empezar a mandar datos; 12s provocaba falsos "No audio data".
 const FIRST_BYTE_TIMEOUT_MS = 20000;
+
+// ── Backoff largo de reintento ──
+// El 403 transitorio de googlevideo (anti-abuso por burst de resolución de
+// yt-dlp) dura ~30s y afecta a TODAS las URLs (incluso frescas) mientras está
+// activo. Los reintentos cortos (1-2s) nunca lo sobreviven → el primer play de
+// una canción sin cache fallaba y el app caía al preview de 30s. Este backoff
+// espera el cooldown y reintenta la MISMA URL (que no está muerta).
+const RETRY_BACKOFF_LONG_MS = 20000;
 
 // ── Anti rate-limit de googlevideo ──
 // El throttling se dispara con RÁFAGAS de descargas simultáneas (misma IP).
@@ -914,30 +1356,13 @@ async function serveAudio(req, res, { artist = '', title = '', duration = 0, fre
       console.info(`[music-stream] 🔗 ${label} · url len ${String(resolved.url).length} · ${String(resolved.url).slice(0, 80)}`);
     }
 
-    const p = (async () => {
-      try {
-        // Intento 1: URL resuelta (la mayoría de las veces funciona).
-        await doStream(resolved.url);
-      } catch (err) {
-        console.warn(`[music-stream] ✗ ${label} · ${err.message}`);
-        if (res.headersSent || res.destroyed) throw err;
-        // Intento 2: misma URL tras backoff (throttling puntual).
-        await sleep(1000);
-        try {
-          console.warn(`[music-stream] ↻ ${label} · reintento (backoff)...`);
-          await doStream(resolved.url);
-        } catch (err2) {
-          console.warn(`[music-stream] ✗ ${label} · ${err2.message}`);
-          if (res.headersSent || res.destroyed) throw err2;
-          // Intento 3: resolución fresca (URL caducada/0 bytes → URL nueva).
-          await sleep(2000);
-          const freshRes = await resolveStream({ artist, title, duration }, { fresh: true });
-          if (!freshRes?.url) throw err2;
-          console.warn(`[music-stream] ↻ ${label} · reintentando con resolución fresca...`);
-          await doStream(freshRes.url);
-        }
-      }
-    })();
+    const p = attemptStreamWithRetries({
+      label,
+      url: resolved.url,
+      doStream,
+      res,
+      refresh: () => resolveStream({ artist, title, duration }, { fresh: true }),
+    });
 
     p
       .then(() => {

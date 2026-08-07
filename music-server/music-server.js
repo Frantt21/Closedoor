@@ -9,7 +9,7 @@
 import http from 'http';
 import https from 'https';
 import dns from 'dns';
-import { existsSync, mkdirSync, chmodSync, createWriteStream, unlinkSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, chmodSync, createWriteStream, unlinkSync, readFileSync, writeFileSync, rmSync, appendFileSync, statSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
@@ -120,6 +120,9 @@ async function autoSetup() {
 
   // ── ffmpeg ──
   // Formato: ffmpeg-VERSION-ARCH-static.tar.xz
+  // Re-aplicar el +x aunque exista: la subida por panel lo quita de TODOS los
+  // binarios (EACCES en el spawn del transcode, que falla en silencio).
+  try { chmodSync(ffmpegPath, 0o755); } catch {}
   if (!existsSync(ffmpegPath)) {
     const ffmpegUrl = arch === 'aarch64'
       ? 'https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-arm64-static.tar.xz'
@@ -143,40 +146,108 @@ async function autoSetup() {
   // YouTube requiere PO Tokens para extraer formatos desde IPs de datacenter.
   // Sin ellos, yt-dlp devuelve "Requested format is not available".
   const bgutilPath = join(BIN_DIR, 'bgutil-pot');
-  const pluginsDir = join(__dirname, 'yt-dlp-plugins');
-  const potPluginDir = join(pluginsDir, 'bgutil-ytdlp-pot-provider');
   const POT_VERSION = 'v0.8.1';
-  
-  if (!existsSync(bgutilPath)) {
-    const potUrl = arch === 'aarch64'
-      ? `https://github.com/jim60105/bgutil-ytdlp-pot-provider-rs/releases/download/${POT_VERSION}/bgutil-pot-linux-aarch64`
-      : `https://github.com/jim60105/bgutil-ytdlp-pot-provider-rs/releases/download/${POT_VERSION}/bgutil-pot-linux-x86_64`;
-    console.log(`[setup] 📦 Descargando PO Token provider (${arch})...`);
-    try {
-      await downloadFile(potUrl, bgutilPath);
-      chmodSync(bgutilPath, 0o755);
-      console.log('[setup] ✅ PO Token provider instalado');
-    } catch (err) {
-      console.warn(`[setup] ⚠️ No se pudo descargar PO Token provider: ${err.message}`);
+  const potUrl = arch === 'aarch64'
+    ? `https://github.com/jim60105/bgutil-ytdlp-pot-provider-rs/releases/download/${POT_VERSION}/bgutil-pot-linux-aarch64`
+    : `https://github.com/jim60105/bgutil-ytdlp-pot-provider-rs/releases/download/${POT_VERSION}/bgutil-pot-linux-x86_64`;
+
+  // Verificación del binario PO Token provider.
+  // IMPORTANTE (diagnóstico real): el binario oficial es DINÁMICO y exige
+  // GLIBC_2.38 (verificado con readelf: interp /lib/ld-linux-aarch64.so.1 +
+  // NEEDED libgcc_s/libm/libc). En containers con glibc más viejo o musl
+  // (Alpine) NO ejecuta: `--version` sale con exit 1. Eso NO es truncamiento
+  // (el archivo se descarga íntegro, 54.1MB) — por eso aquí se captura el
+  // stderr real y se distingue 'corrupt' (tamaño corto → re-descargar) de
+  // 'incompatible' (tamaño ok pero no ejecuta → NO re-descargar en bucle).
+  const POT_EXPECTED_SIZE = { aarch64: 54147304, x86_64: 50990856 };
+  const verifyPotBinary = async () => {
+    if (!existsSync(bgutilPath)) return 'missing';
+    // Auto-reparar permisos de ejecución: al copiar la carpeta al container
+    // (subida por panel/zip) el bit +x se pierde fácilmente → spawn EACCES.
+    // El chmod debe ir ANTES del spawn, no solo tras descargar.
+    try { chmodSync(bgutilPath, 0o755); } catch {}
+    let realSize = 0;
+    try { realSize = statSync(bgutilPath).size; } catch {}
+    const res = await new Promise((resolve) => {
+      const c = spawn(bgutilPath, ['--version'], { stdio: ['ignore', 'pipe', 'pipe'] });
+      let out = '', err = '';
+      c.stdout?.on('data', (d) => { out += d; });
+      c.stderr?.on('data', (d) => { err += d; });
+      const to = setTimeout(() => { try { c.kill('SIGKILL'); } catch {} resolve({ code: 'timeout', out, err }); }, 10000);
+      c.on('close', (code) => { clearTimeout(to); resolve({ code, out, err }); });
+      c.on('error', (e) => { clearTimeout(to); resolve({ code: 'spawn-error', out, err, msg: e.message }); });
+    });
+    if (res.code === 0) return 'ok';
+    const expected = POT_EXPECTED_SIZE[arch];
+    const firstLine = String(res.err || res.out || res.msg || '').toString().trim().split('\n')[0] || '';
+    // EACCES tras el chmod → el binario NO tiene permiso de ejecución (el
+    // filesystem del container lo niega) — distinto del clásico "glibc viejo".
+    if (res.code === 'spawn-error' && /EACCES|permission denied/i.test(res.msg || '')) {
+      console.warn(`[setup] ⚠️ PO Token provider SIN permiso de ejecución (EACCES) — el chmod 755 previo no tuvo efecto`);
+      console.warn(`   ${firstLine}`);
+      console.warn('      → el filesystem del container lo niega (¿montado con noexec, o el archivo es');
+      console.warn('        root-owned sin escritura?). Copia el binario de nuevo: la subida por panel');
+      console.warn('        suele quitar el +x, y el server ya lo re-aplica solo al arrancar.');
+      return 'incompatible';
     }
+    if (expected && realSize > 0 && realSize < expected) {
+      // Descarga cortada → borrar y re-descargar (self-heal).
+      console.warn(`[setup] ⚠️ PO Token provider corrupto: ${realSize} bytes (esperado ${expected}) → re-descargando...`);
+      try { unlinkSync(bgutilPath); } catch {}
+      return 'corrupt';
+    }
+    // Tamaño íntegro pero NO ejecuta → incompatibilidad de libc, no corrupción.
+    console.warn(`[setup] ⚠️ PO Token provider NO EJECUTA en este container (--version exit ${res.code})${firstLine ? `:\n   ${firstLine}` : ''}`);
+    console.warn('      → el binario oficial exige GLIBC_2.38 (dinámico). Si el container tiene glibc');
+    console.warn('        más viejo o es Alpine/musl, hay que usar una imagen con glibc ≥ 2.38');
+    console.warn('        (p. ej. node:23-trixie, node:24, ubuntu:24.04) o un build estático.');
+    return 'incompatible';
+  };
+
+  const downloadPotBinary = async () => {
+    console.log(`[setup] 📦 Descargando PO Token provider (${arch})...`);
+    await downloadFile(potUrl, bgutilPath);
+    chmodSync(bgutilPath, 0o755);
+  };
+
+  // potOk = el binario existe y ejecuta → solo entonces arrancar el server.
+  // (variable global: la usa también checkPotServer para relanzar si se cae)
+  potOk = false;
+  try {
+    let state = existsSync(bgutilPath) ? await verifyPotBinary() : 'missing';
+    if (state === 'missing' || state === 'corrupt') {
+      await downloadPotBinary();
+      state = await verifyPotBinary();
+      if (state === 'ok') console.log('[setup] ✅ PO Token provider instalado');
+      else console.warn('[setup] ⚠️ PO Token provider no usable; se reintentará en el próximo arranque');
+    }
+    potOk = state === 'ok';
+  } catch (err) {
+    console.warn(`[setup] ⚠️ No se pudo descargar PO Token provider: ${err.message}`);
   }
   
-  // Descargar plugin de yt-dlp si no existe
-  // Los plugins DEBEN estar en un directorio que yt-dlp escanee:
-  //   1. Junto al binario: ./bin/yt-dlp-plugins/
-  //   2. ~/.config/yt-dlp-plugins/
-  //   3. ~/yt-dlp-plugins/
+  // Descargar plugin de yt-dlp si no existe.
+  // ⚠️ IMPORTANTE (yt-dlp ≥2025): el sistema de plugins exige que cada plugin
+  // viva en SU PROPIA CARPETA dentro del --plugin-dirs, con yt_dlp_plugins/
+  // DENTRO. Extraer el zip "plano" (yt_dlp_plugins/ suelto en el dir) NO carga
+  // el plugin → yt-dlp reporta "PO Token Providers: none" y el bot-check de
+  // YouTube (IP de datacenter) no se puede esquivar. Estructura correcta:
+  //   bin/yt-dlp-plugins/bgutil-ytdlp-pot-provider/yt_dlp_plugins/extractor/*.py
   const binPluginsDir = join(BIN_DIR, 'yt-dlp-plugins');
   const binPotPluginDir = join(binPluginsDir, 'bgutil-ytdlp-pot-provider');
-  if (!existsSync(binPotPluginDir) && existsSync(bgutilPath)) {
+  // Gate por ARCHIVO (no por carpeta): si una instalación falló a medias
+  // (mkdir creado pero unzip roto), la carpeta vacía no debe bloquear el
+  // reintento en el próximo arranque.
+  const potProviderFile = join(binPotPluginDir, 'yt_dlp_plugins', 'extractor', 'getpot_bgutil_http.py');
+  if (!existsSync(potProviderFile) && potOk) {
     const pluginZipUrl = `https://github.com/jim60105/bgutil-ytdlp-pot-provider-rs/releases/download/${POT_VERSION}/bgutil-ytdlp-pot-provider-rs.zip`;
     const tmpZip = `/tmp/bgutil-pot-plugin.zip`;
     console.log('[setup] 📦 Descargando PO Token plugin para yt-dlp...');
     try {
       await downloadFile(pluginZipUrl, tmpZip);
-      mkdirSync(binPluginsDir, { recursive: true });
+      mkdirSync(binPotPluginDir, { recursive: true });
       await new Promise((resolve, reject) => {
-        const child = spawn('unzip', ['-o', tmpZip, '-d', binPluginsDir], { stdio: ['ignore', 'pipe', 'pipe'] });
+        const child = spawn('unzip', ['-o', tmpZip, '-d', binPotPluginDir], { stdio: ['ignore', 'pipe', 'pipe'] });
         let stderr = '';
         child.stderr?.on('data', (d) => { stderr += d; });
         child.on('close', (code) => code === 0 ? resolve() : reject(new Error(stderr.slice(0, 200))));
@@ -188,20 +259,44 @@ async function autoSetup() {
       console.warn(`[setup] ⚠️ No se pudo instalar PO Token plugin: ${err.message}`);
     }
   }
-  
-  // Iniciar servidor PO Token en background si el binario existe
-  if (existsSync(bgutilPath) && !process.env.BGUTIL_POT_PORT) {
+  // Migración: si una instalación anterior dejó yt_dlp_plugins/ "plano" (roto,
+  // sin carpeta envolvente), limpiarlo para que el escaneo no se confunda.
+  if (existsSync(binPotPluginDir)) {
     try {
-      const potServer = spawn(bgutilPath, ['server', '--port', '4416'], {
-        stdio: ['ignore', 'pipe', 'pipe'],
-        detached: true,
-      });
-      potServer.unref();
-      // Configurar yt-dlp para usar el provider
-      process.env.BGUTIL_POT_BASE_URL = 'http://127.0.0.1:4416';
-      console.log('[setup] ✅ PO Token server iniciado en puerto 4416');
-    } catch (err) {
-      console.warn(`[setup] ⚠️ No se pudo iniciar PO Token server: ${err.message}`);
+      const legacyFlat = join(binPluginsDir, 'yt_dlp_plugins');
+      if (existsSync(legacyFlat)) rmSync(legacyFlat, { recursive: true, force: true });
+    } catch {}
+  }
+  
+  // Iniciar servidor PO Token en background si el binario existe Y ejecuta.
+  // ⚠️ "spawn OK" NO significa "puerto escuchando": el binario embebe un
+  // navegador y tarda segundos en arrancar; si muere al inicio o el puerto está
+  // ocupado por una instancia rota previa, el ping falla para siempre. Este
+  // bloque reutiliza una instancia sana, mata una instancia vieja sin responder,
+  // y registra su salida en bin/bgutil-pot.log (crash = visible).
+  if (potOk && !process.env.BGUTIL_POT_PORT) {
+    const base = 'http://127.0.0.1:4416';
+    const port = '4416';
+    const potPidFile = join(BIN_DIR, '.bgutil-pot.pid');
+
+    // 1) Ya responde (instancia de un arranque anterior aún viva) → reutilizar.
+    if (await pingPot(base, 1500)) {
+      console.log(`[setup] ✅ PO Token server ya respondiendo en ${base} (reutilizado)`);
+      process.env.BGUTIL_POT_BASE_URL = base;
+    } else {
+      // 2) PID viejo vivo pero sin responder → instancia rota ocupando el puerto;
+      //    matarla antes de lanzar una nueva (si no, la nueva muere por EADDRINUSE).
+      //    ⚠️ Seguridad: el PID reciclado podría apuntar a OTRO proceso — solo se
+      //    mata si /proc/<pid>/cmdline contiene 'bgutil-pot' (identidad verificada).
+      let oldPid = null;
+      try { oldPid = Number(readFileSync(potPidFile, 'utf8')); } catch {}
+      if (oldPid && isProcessAlive(oldPid) && isPotProcess(oldPid)) {
+        try { process.kill(oldPid, 'SIGKILL'); } catch {}
+        console.log(`[setup] ♻️  PO Token server previo (pid ${oldPid}) sin responder → reiniciado`);
+        await sleep(400);
+      }
+      // 3) Lanzar el server (con --verbose + log de stdout/stderr → crash visible).
+      spawnPotServer(port);
     }
   }
 
@@ -229,7 +324,7 @@ async function autoSetup() {
     }
   }
 
-  console.log(`[setup] yt-dlp: ${existsSync(ytdlpPath) ? '✅' : '❌'} | ffmpeg: ${existsSync(ffmpegPath) ? '✅' : '❌'} | pot: ${existsSync(bgutilPath) ? '✅' : '❌'} | cf: ${existsSync(cloudflaredPath) ? '✅' : '❌'}`);
+  console.log(`[setup] yt-dlp: ${existsSync(ytdlpPath) ? '✅' : '❌'} | ffmpeg: ${existsSync(ffmpegPath) ? '✅' : '❌'} | pot: ${potOk ? '✅' : '❌'} | cf: ${existsSync(cloudflaredPath) ? '✅' : '❌'}`);
 }
 
 const PORT = process.env.PORT || 24633;
@@ -324,6 +419,248 @@ function findBinary(envVar, localName, systemName) {
   return systemName;
 }
 
+// ── Diagnóstico de cookies (bot-check "Sign in to confirm you're not a bot") ──
+// YouTube pide login aunque se pase --cookies cuando el archivo está mal
+// formado o NO incluye las cookies de autenticación (SID, __Secure-3PSID,
+// LOGIN_INFO, HSID, SSID, APISID, SAPISID, __Secure-3PAPISID). Muchos
+// exportadores solo guardan las no-HttpOnly → el archivo existe y parece
+// "reciente" pero no sirve para nada. Este check lo dice claro al arrancar.
+function logCookiesDiagnostics() {
+  if (!detectedCookiesFile || !existsSync(detectedCookiesFile)) {
+    console.warn('   cookies: ❌ no detectadas (coloca cookies.txt junto a music-server.js)');
+    return;
+  }
+  try {
+    const raw = readFileSync(detectedCookiesFile, 'utf8');
+    let total = 0;
+    const names = new Set();
+    for (let line of raw.split('\n')) {
+      line = line.trim();
+      if (!line) continue;
+      if (line.startsWith('#HttpOnly_')) line = line.slice('#HttpOnly_'.length).trimStart();
+      else if (line.startsWith('#')) continue;
+      const parts = line.split('\t');
+      if (parts.length < 7) continue;
+      total += 1;
+      names.add(parts[5]);
+    }
+    const critical = ['SID', '__Secure-3PSID', 'LOGIN_INFO', 'HSID', 'SSID', 'APISID', 'SAPISID', '__Secure-3PAPISID'];
+    const found = critical.filter((c) => names.has(c));
+    const missing = critical.filter((c) => !names.has(c));
+    if (total > 0 && found.length > 0) {
+      console.log(`   cookies: ✅ ${detectedCookiesFile} · ${total} cookies · auth: ${found.join(', ')}`);
+    } else {
+      console.warn(`   cookies: ⚠️ ${detectedCookiesFile} · ${total} cookies detectadas pero FALTAN las de autenticación (${missing.join(', ')})`);
+      console.warn('      → YouTube pedirá login (bot check) aunque exista el archivo.');
+      console.warn('      → Exporta cookies.txt con un método que incluya HttpOnly (extensión "Get cookies.txt LOCALLY" o yt-dlp --cookies-from-browser).');
+    }
+  } catch (err) {
+    console.warn(`   cookies: ⚠️ error leyendo archivo: ${err.message}`);
+  }
+}
+
+// ── Detecta el libc del container (glibc vs musl + versión) ──
+// El binario bgutil-pot es dinámico y exige GLIBC_2.38. Si el container es
+// Alpine (musl) o tiene glibc más viejo, el binario NO ejecuta. Esto imprime
+// la distro y el libc para que el motivo sea visible sin adivinar.
+function detectLibc() {
+  let osLine = '';
+  try {
+    const release = readFileSync('/etc/os-release', 'utf8');
+    const pretty = release.split('\n').find((l) => l.startsWith('PRETTY_NAME='));
+    if (pretty) osLine = pretty.slice('PRETTY_NAME='.length).replace(/"/g, '').trim();
+  } catch {}
+  const check = () => {
+    try {
+      const child = spawn('ldd', ['--version'], { stdio: ['ignore', 'pipe', 'pipe'] });
+      let out = '';
+      child.stdout?.on('data', (d) => { out += d; });
+      child.stderr?.on('data', (d) => { out += d; });
+      child.on('close', () => {
+        const first = String(out).trim().split('\n')[0] || '';
+        console.log(`   libc: ${first || 'no detectado'}${osLine ? ` · ${osLine}` : ''}`);
+      });
+      child.on('error', () => {
+        console.log(`   libc: no detectado${osLine ? ` · ${osLine}` : ''}`);
+      });
+    } catch {
+      console.log(`   libc: no detectado${osLine ? ` · ${osLine}` : ''}`);
+    }
+  };
+  check();
+}
+
+// ── Diagnóstico del plugin PO Token (anti bot-check en IPs de datacenter) ──
+function logPotPluginDiagnostics() {
+  const providerFile = join(BIN_DIR, 'yt-dlp-plugins', 'bgutil-ytdlp-pot-provider', 'yt_dlp_plugins', 'extractor', 'getpot_bgutil_http.py');
+  if (existsSync(providerFile)) {
+    console.log('   PO Token plugin: ✅ bgutil:http registrado (esquiva el bot-check en IPs de datacenter)');
+  } else {
+    console.warn('   PO Token plugin: ⚠️ no instalado o estructura rota → el bot-check de YouTube puede fallar aunque haya cookies');
+  }
+}
+
+// ── Ping al servidor bgutil-pot (sin lanzar excepciones) ──
+function pingPot(base, timeoutMs = 2500) {
+  try {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), timeoutMs);
+    return fetch(`${base}/ping`, { signal: controller.signal })
+      .then(async (res) => {
+        if (!res.ok) return { ok: false, err: `HTTP ${res.status}` };
+        let version = '';
+        try { version = (await res.json()).version || ''; } catch {}
+        return { ok: true, version };
+      })
+      .catch((err) => ({ ok: false, err: err.name === 'AbortError' ? 'timeout' : (err.cause?.code || err.message) }))
+      .finally(() => clearTimeout(t));
+  } catch {
+    return Promise.resolve({ ok: false, err: 'error' });
+  }
+}
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+// ── Comprueba que el servidor bgutil-pot (puerto 4416) responde ──
+// El provider bgutil:http necesita ese server para generar PO tokens. Si está
+// caído, el bot-check no se puede esquivar aunque el plugin esté instalado y
+// las cookies sean válidas. El binario embebe un navegador → tarda en arrancar
+// (más en arm64): la espera inicial es de 30s y, si falla, se reintenta en
+// background por si arranca tarde o se cae y vuelve.
+// ── Estado global del POT server (lo usan autoSetup y checkPotServer) ──
+let potOk = false;
+let lastPotSpawnAt = 0;
+let potSpawnCount = 0;
+const POT_SPAWN_COOLDOWN_MS = 60000;   // mínimo entre reintentos
+const POT_SPAWN_MAX_TOTAL = 10;        // tope TOTAL anti-bucle (boot + reintentos, nunca decae)
+
+// ── Lanzar el server POT ──
+// Con --verbose (el log por defecto es info) y capturando stdout+stderr en
+// bin/bgutil-pot.log: un crash deja la causa EXACTA visible (antes el log
+// salía vacío porque los logs de Rust van a stdout y solo mirábamos stderr).
+// El pid file permite a checkPotServer saber si el proceso sigue vivo.
+function spawnPotServer(port = '4416') {
+  const bgutilPath = join(BIN_DIR, 'bgutil-pot');
+  const base = `http://127.0.0.1:${port}`;
+  const potPidFile = join(BIN_DIR, '.bgutil-pot.pid');
+  const potLogFile = join(BIN_DIR, 'bgutil-pot.log');
+  // Re-asegurar el bit +x antes de cada spawn (la subida por panel lo quita).
+  try { chmodSync(bgutilPath, 0o755); } catch {}
+  lastPotSpawnAt = Date.now();
+  potSpawnCount += 1;
+  // Rotar el log si crece (--verbose escribe cada request).
+  try { if (statSync(potLogFile).size > 1_000_000) writeFileSync(potLogFile, ''); } catch {}
+
+  const child = spawn(bgutilPath, ['server', '--port', port, '--verbose'], {
+    stdio: ['ignore', 'pipe', 'pipe'],
+    detached: true,
+  });
+  child.unref();
+  let tail = '';
+  const onData = (d) => {
+    tail = (tail + d).slice(-2000);
+    try { appendFileSync(potLogFile, d); } catch {}
+  };
+  child.stdout?.on('data', onData);
+  child.stderr?.on('data', onData);
+  child.on('exit', (code, sig) => {
+    if (code !== 0 || sig) {
+      console.warn(`[setup] ⚠️ PO Token server salió (${sig ? `signal ${sig}` : `code ${code}`}) → mira ${potLogFile}`);
+      console.warn(`   → último output: ${tail.trim().slice(-250) || '(vacío)'}`);
+    }
+    // Limpiar el pid file SOLO si sigue apuntando a ESTE proceso (race: un
+    // arranque posterior pudo escribir el pid de una instancia nueva).
+    try {
+      if (Number(readFileSync(potPidFile, 'utf8')) === child.pid) unlinkSync(potPidFile);
+    } catch {}
+  });
+  try { writeFileSync(potPidFile, String(child.pid), 'utf8'); } catch {}
+  process.env.BGUTIL_POT_BASE_URL = base;
+  console.log(`[setup] ✅ PO Token server iniciado en puerto ${port} (pid ${child.pid})`);
+  return child;
+}
+
+// ── Comprueba que el servidor bgutil-pot (puerto 4416) responde ──
+// El provider bgutil:http necesita ese server para generar PO tokens. Si está
+// caído, el bot-check no se puede esquivar aunque el plugin esté instalado y
+// las cookies sean válidas. El binario tarda en arrancar: espera inicial de
+// 30s y, si el server se cae después (OOM, crash), lo RELANZA solo con
+// cooldown + tope para no entrar en bucle infinito.
+function checkPotServer() {
+  const base = process.env.BGUTIL_POT_BASE_URL || 'http://127.0.0.1:4416';
+  const potPidFile = join(BIN_DIR, '.bgutil-pot.pid');
+  let ok = false;
+  let lastErr = 'sin respuesta';
+
+  const potProcessAlive = () => {
+    try {
+      const pid = Number(readFileSync(potPidFile, 'utf8'));
+      return pid ? isProcessAlive(pid) : false;
+    } catch { return false; }
+  };
+
+  let deadPings = 0; // pings fallidos consecutivos con el proceso vivo (colgado)
+  const tryRespawn = () => {
+    if (!potOk) return;
+    if (Date.now() - lastPotSpawnAt < POT_SPAWN_COOLDOWN_MS) return;
+    if (potSpawnCount >= POT_SPAWN_MAX_TOTAL) return;
+    if (potProcessAlive()) {
+      // Vivo pero sin responder → colgado. Tras 3 ciclos (~60s) matarlo con
+      // identidad verificada (isPotProcess) para que el cooldown lo relance.
+      deadPings += 1;
+      if (deadPings >= 3) {
+        deadPings = 0;
+        try {
+          const pid = Number(readFileSync(potPidFile, 'utf8'));
+          if (pid && isProcessAlive(pid) && isPotProcess(pid)) {
+            process.kill(pid, 'SIGKILL');
+            console.warn(`   PO Token server colgado (pid ${pid}) → SIGKILL para relanzarlo`);
+          }
+        } catch {}
+      }
+      return; // esperar al siguiente ciclo
+    }
+    deadPings = 0;
+    console.warn('   PO Token server caído → relanzándolo...');
+    spawnPotServer('4416');
+  };
+
+  (async () => {
+    // Fase 1: espera inicial (hasta 30s) — el server tarda en arrancar.
+    const deadline = Date.now() + 30000;
+    while (Date.now() < deadline && !ok) {
+      const r = await pingPot(base);
+      if (r.ok) {
+        ok = true;
+        console.log(`   PO Token server: ✅ ${base} responde${r.version ? ` (${r.version})` : ''}`);
+        return;
+      }
+      lastErr = r.err;
+      await sleep(2000);
+    }
+    if (ok) return;
+    const alive = potProcessAlive();
+    console.warn(`   PO Token server: ⚠️ ${base} no responde · ${alive ? 'proceso iniciado pero' : 'proceso NO corriendo'} · ${lastErr}`);
+    console.warn('      → mira bin/bgutil-pot.log (ahora con --verbose) para la causa exacta.');
+    console.warn('        Si murió con SIGKILL y el log quedó cortado → posible OOM: revisa la RAM');
+    console.warn('        del container (free -m) y sube el límite si está justo.');
+    // Fase 2: reintento + auto-reparación (si se cae, relanza solo, con tope).
+    const iv = setInterval(async () => {
+      const r = await pingPot(base);
+      if (r.ok && !ok) {
+        ok = true;
+        console.log(`   PO Token server: ✅ ${base} responde ahora${r.version ? ` (${r.version})` : ''} → PO tokens OK`);
+        clearInterval(iv);
+        return;
+      }
+      lastErr = r.err;
+      tryRespawn();
+    }, 20000);
+  })();
+}
+
 // ── Túnel HTTPS automático (cloudflared) ──
 // Guarda el PID y la URL en archivos para reutilizar entre reinicios.
 const TUNNEL_URL_FILE = join(__dirname, '.tunnel-url.txt');
@@ -342,6 +679,19 @@ function readTunnelUrl() {
 function isProcessAlive(pid) {
   if (!pid) return false;
   try { process.kill(pid, 0); return true; } catch { return false; }
+}
+
+// ── ¿El proceso del pid es realmente bgutil-pot? ──
+// Protección ante PID reciclado: un pid file viejo podría apuntar a un proceso
+// inocente con ese mismo PID tras un reinicio. Solo se debe matar si el
+// ejecutable (primer token del cmdline) es exactamente bgutil-pot.
+function isPotProcess(pid) {
+  if (!pid) return false;
+  try {
+    const cmdline = readFileSync(`/proc/${pid}/cmdline`, 'utf8');
+    const exe = cmdline.split('\0')[0] || '';
+    return exe.includes('bgutil-pot') || exe.includes('/bgutil-pot');
+  } catch { return false; }
 }
 
 function startTunnel(port) {
@@ -645,7 +995,11 @@ async function main() {
     console.log(`   Plataforma: ${process.platform} ${process.arch}`);
     console.log(`   yt-dlp: ${process.env.YTDLP_BIN} ${existsSync(process.env.YTDLP_BIN) ? '✅' : '❌'}`);
     console.log(`   ffmpeg: ${process.env.FFMPEG_BIN} ${existsSync(process.env.FFMPEG_BIN) ? '✅' : '❌'}`);
-    console.log(`   cookies: ${detectedCookiesFile ? detectedCookiesFile + ' ✅' : '⚠️ no detectadas (coloca cookies.txt junto a music-server.js)'}`);
+    // ── Diagnóstico de cookies, plugin POT y server POT (bot-check de YouTube) ──
+    logCookiesDiagnostics();
+    logPotPluginDiagnostics();
+    detectLibc();
+    checkPotServer();
     console.log('   /api/music/health · /api/music/search?q=... · /api/music/stream?artist=&title= · /api/music/download?artist=&title= · /api/music/resolve?artist=&title=');
 
     // Túnel HTTPS automático (cloudflared): sin root, solo conexión saliente.
