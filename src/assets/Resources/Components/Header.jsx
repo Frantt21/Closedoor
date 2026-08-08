@@ -32,7 +32,7 @@ function getInitialMode() {
 function Header() {
   const { isAuthenticated } = useAuth();
   const { unreadCount, unreadChatCount } = useContext(NotificationContext);
-  const { t } = useI18n();
+  const { t, showGlobalBg } = useI18n();
   const [mode, setMode] = useState(getInitialMode);
   const [hovering, setHovering] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -93,7 +93,7 @@ function Header() {
   return (
     <aside
       ref={asideRef}
-      className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}`}
+      className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}${!showGlobalBg ? ' sidebar--solid' : ''}`}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       onFocus={onFocus}

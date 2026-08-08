@@ -29,6 +29,16 @@
     transition: width 0.3s ease, padding 0.3s ease, background 0.2s ease, backdrop-filter 0.2s ease, border 0.2s ease;
 }
 
+/* ---- Sólido (fondo global desactivado) ---- */
+/* Sin "ver fondo en toda la app" (showGlobalBg off) el sidebar deja de ser
+   translúcido y usa el fondo sólido del tema (negro total en tema oscuro).
+   Al activar showGlobalBg vuelve al modo translúcido/blur de arriba. */
+.sidebar--solid {
+    background: var(--color-bg, #000000);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
 /* ---- Estado colapsado ---- */
 .sidebar--collapsed {
     width: 76px;
