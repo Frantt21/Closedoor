@@ -328,7 +328,7 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
   useEffect(() => {
     if (!canStartBlob || !streamUrl) return;
     startBlobDownload(streamUrl);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-depss
   }, [canStartBlob, selSig]);
 
   // Perfil ajeno sin canción → no mostrar la card (después de los hooks)
