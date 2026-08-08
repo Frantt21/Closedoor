@@ -2723,6 +2723,7 @@ export default function Chat() {
                   data-msg-id={msg.id}
                   className={`chat-message ${isOwn ? 'chat-message--own' : 'chat-message--other'}`}
                   onContextMenu={(e) => handleMsgContextMenu(e, msg)}
+                  onDoubleClick={() => handleStartReply(msg)}
                   onTouchStart={handleMsgTouchStart}
                   onTouchEnd={(e) => handleMsgTouchEnd(e, msg)}
                   onTouchCancel={handleMsgTouchCancel}
