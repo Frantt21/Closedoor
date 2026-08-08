@@ -838,3 +838,76 @@ export function clearCachedNicknames(userId) {
   } catch {}
 }
 
+// ── Bubble colors (per-conversation, per-user) ──
+
+const BUBBLE_CACHE_PREFIX = 'fc_bubble_cfg_';
+const BUBBLE_CACHE_TTL = 1000 * 60 * 60 * 24; // 24h
+
+/**
+ * Get all bubble color settings for the current user.
+ * Returns { [conversation_id]: { own: '#hex'|null, other: '#hex'|null } }
+ */
+export async function getBubbleColors(userId) {
+  if (!userId) return {};
+  const { data, error } = await supabase
+    .from('chat_bubble_settings')
+    .select('conversation_id, own_color, other_color')
+    .eq('user_id', userId);
+  if (error) {
+    console.warn('[Chat] Error fetching bubble colors:', error);
+    return {};
+  }
+  const map = {};
+  (data || []).forEach((r) => {
+    map[r.conversation_id] = { own: r.own_color || null, other: r.other_color || null };
+  });
+  return map;
+}
+
+/**
+ * Set bubble colors for a conversation (upsert).
+ * colors: { own: '#hex'|null, other: '#hex'|null } — null restores the default.
+ */
+export async function setBubbleColors(userId, conversationId, colors = {}) {
+  if (!userId || !conversationId) return;
+  const { error } = await supabase
+    .from('chat_bubble_settings')
+    .upsert(
+      {
+        user_id: userId,
+        conversation_id: conversationId,
+        own_color: colors.own || null,
+        other_color: colors.other || null,
+      },
+      { onConflict: 'user_id,conversation_id' }
+    );
+  if (error) throw error;
+}
+
+/**
+ * Cache the bubble colors map for a user in localStorage.
+ */
+export function cacheBubbleColors(userId, map) {
+  if (!userId) return;
+  try {
+    setItem(BUBBLE_CACHE_PREFIX + userId, { ts: Date.now(), ttl: BUBBLE_CACHE_TTL, data: map });
+  } catch {}
+}
+
+/**
+ * Read cached bubble colors from localStorage.
+ * Returns { [conversation_id]: { own, other } } or null if expired/missing.
+ */
+export function getCachedBubbleColors(userId) {
+  if (!userId) return null;
+  try {
+    const p = getItem(BUBBLE_CACHE_PREFIX + userId);
+    if (!p || !p.ts) return null;
+    if (Date.now() - p.ts > (p.ttl || BUBBLE_CACHE_TTL)) {
+      removeItem(BUBBLE_CACHE_PREFIX + userId);
+      return null;
+    }
+    return p.data || null;
+  } catch { return null; }
+}
+

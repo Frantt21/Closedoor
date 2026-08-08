@@ -21,19 +21,22 @@ import {
   broadcastTyping,
   subscribeToTyping,
   getNicknames, getCachedNicknames, cacheNicknames,
+  getBubbleColors, getCachedBubbleColors, cacheBubbleColors,
 } from '../services/chatService';
 import { getFollowing } from '../services/followService';
-import { isBlocked, getCachedBlockStatus, cacheBlockStatus } from '../services/blockService';
+import { isBlocked, blockUser, unblockUser, unfollowBothWays, getCachedBlockStatus, cacheBlockStatus } from '../services/blockService';
 import FollowButton from '../Resources/Components/FollowButton';
 import ModalShell from '../Resources/Components/ModalShell';
-import { FaComment, FaSearch, FaArrowLeft, FaPlus, FaTimes, FaUserPlus, FaUsers, FaTrash, FaThumbtack, FaCopy, FaEdit, FaCheck, FaSmile, FaReply, FaImage, FaMusic, FaUser, FaPhone, FaLock, FaUpload, FaSpinner, FaEllipsisH, FaArrowDown, FaPhoneSlash, FaMicrophone, FaMicrophoneSlash } from 'react-icons/fa';
+import { FaComment, FaSearch, FaArrowLeft, FaPlus, FaTimes, FaUserPlus, FaUsers, FaTrash, FaPalette, FaBan, FaThumbtack, FaCopy, FaEdit, FaCheck, FaSmile, FaReply, FaImage, FaMusic, FaUser, FaPhone, FaLock, FaUpload, FaSpinner, FaEllipsisH, FaArrowDown, FaPhoneSlash, FaMicrophone, FaMicrophoneSlash } from 'react-icons/fa';
 import Avatar from '../Resources/Components/Avatar';
 import Badge from '../Resources/Components/Badge';
 import Tooltip from '../Resources/Components/Tooltip';
 import GifPicker from '../Resources/Components/GifPicker';
 import { getTimeAgo, IMG_RE, detectMediaFromContent, getImageStyle, sanitizeUrl } from '../services/helpers';
 import NicknameModal from '../Resources/Components/NicknameModal';
+import BubbleColorModal from '../Resources/Components/BubbleColorModal';
 import { getPost } from '../services/postService';
+import { getContrastFromHex } from '../services/colorExtractor';
 import RichText from '../Resources/Components/RichText';
 import SafeImage from '../Resources/Components/SafeImage';
 import ConfirmModal from '../Resources/Components/ConfirmModal';
@@ -164,6 +167,17 @@ export default function Chat() {
   });
   // Nickname modal state
   const [nicknameModal, setNicknameModal] = useState({ open: false, targetUserId: null, currentName: '', userData: null });
+  // Bubble colors: map conversation_id → { own, other } (cache-first)
+  const [bubbleColors, setBubbleColors] = useState(() => {
+    const cached = getCachedBubbleColors(user?.id);
+    return cached || {};
+  });
+  // Bubble color modal state
+  const [bubbleColorModal, setBubbleColorModal] = useState({ open: false, convId: null });
+  // ── Chat header dropdown (desktop): más opciones ──
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+  const headerMenuRef = useRef(null);
+  const [confirmBlock, setConfirmBlock] = useState(false);
 
   // Helper: get display name with nickname override
   const getDisplayName = useCallback((otherUser) => {
@@ -276,6 +290,9 @@ export default function Chat() {
       if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target)) {
         setEmojiPickerMsgId(null);
       }
+      if (headerMenuRef.current && !headerMenuRef.current.contains(e.target)) {
+        setHeaderMenuOpen(false);
+      }
     };
 
     // Scroll handler will close menus only when the scroll event does NOT originate
@@ -293,6 +310,7 @@ export default function Chat() {
       setMsgMenu({ open: false, x: 0, y: 0, msg: null });
       setEmojiPickerMsgId(null);
       setShowMobileMenu(false);
+      setHeaderMenuOpen(false);
     };
 
     document.addEventListener('click', handleClick);
@@ -585,6 +603,11 @@ export default function Chat() {
         setNicknames(map);
         cacheNicknames(user.id, map);
       }).catch(() => {});
+      // Load bubble colors (cache-first — DB fetch refreshes cache)
+      getBubbleColors(user.id).then((map) => {
+        setBubbleColors(map);
+        cacheBubbleColors(user.id, map);
+      }).catch(() => {});
       // Limpiar overrides locales para conversaciones donde la DB tiene mensajes más nuevos
       for (const conv of convs) {
         const override = localConvOverridesRef.current[conv.id];
@@ -662,6 +685,44 @@ export default function Chat() {
     return () => {
       supabase.removeChannel(nicknameChannelRef.current);
       nicknameChannelRef.current = null;
+    };
+  }, [user?.id]);
+
+  // ── Bubble colors channel ref: evita recrear la suscripción en re-renders ──
+  const bubbleColorsChannelRef = useRef(null);
+
+  // Real-time subscription to bubble color changes (syncs across tabs)
+  useEffect(() => {
+    if (!user?.id) return;
+    if (bubbleColorsChannelRef.current) return;
+
+    bubbleColorsChannelRef.current = supabase
+      .channel(`bubble-colors-${user.id}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'chat_bubble_settings', filter: `user_id=eq.${user.id}` },
+        async (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const { conversation_id, own_color, other_color } = payload.new;
+            if (conversation_id) {
+              setBubbleColors(prev => ({ ...prev, [conversation_id]: { own: own_color || null, other: other_color || null } }));
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const conversation_id = payload.old?.conversation_id;
+            if (conversation_id) {
+              setBubbleColors(prev => {
+                const next = { ...prev };
+                delete next[conversation_id];
+                return next;
+              });
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(bubbleColorsChannelRef.current);
+      bubbleColorsChannelRef.current = null;
     };
   }, [user?.id]);
 
@@ -1241,6 +1302,36 @@ export default function Chat() {
     const currentNick = nicknames[targetUserId] || '';
     setNicknameModal({ open: true, targetUserId, currentName: currentNick, userData: userData || null });
   }, [nicknames]);
+
+  // ── Block/unblock the chat partner (header dropdown) ──
+  const handleBlockFromChat = useCallback(async (targetUser) => {
+    if (!targetUser?.id || !user?.id) return;
+    try {
+      const blocked = await isBlocked(user.id, targetUser.id);
+      if (blocked) {
+        await unblockUser(user.id, targetUser.id);
+        cacheBlockStatus(user.id, targetUser.id, false);
+        toast.success(t('block.unblock') || 'Unblocked');
+      } else {
+        await blockUser(user.id, targetUser.id);
+        try { await unfollowBothWays(user.id, targetUser.id); } catch (e) { console.warn('Could not unfollow on block:', e); }
+        cacheBlockStatus(user.id, targetUser.id, true);
+        toast.success(t('block.blocked_user', { user: targetUser.username || '' }));
+      }
+      goBackToList();
+    } catch (err) {
+      console.error('Error toggling block:', err);
+      toast.error(err?.message || t('common.error') || 'Error');
+    } finally {
+      setConfirmBlock(false);
+    }
+  }, [user?.id, t]);
+
+  // ── Open bubble colors modal for any conversation (header/dropdown) ──
+  const openBubbleColorModal = useCallback((convId) => {
+    if (!convId) return;
+    setBubbleColorModal({ open: true, convId });
+  }, []);
 
   // ── Pin/unpin conversation ──
   const handlePinConversation = useCallback(async () => {
@@ -2494,6 +2585,28 @@ export default function Chat() {
                 <FaPhone />
               </button>
             </Tooltip>
+            <div className="chat-header-menu-wrap" ref={headerMenuRef}>
+              <Tooltip text={t('chat.header_more') || 'More'} placement="bottom">
+                <button
+                  className={`chat-header-action-btn ${headerMenuOpen ? 'chat-header-action-btn--active' : ''}`}
+                  onClick={() => setHeaderMenuOpen(s => !s)}
+                >
+                  <FaEllipsisH />
+                </button>
+              </Tooltip>
+              {headerMenuOpen && (
+                <div className="chat-header-dropdown">
+                  <button className="chat-context-menu-btn" onClick={() => { setHeaderMenuOpen(false); setConfirmBlock(true); }}>
+                    <FaBan />
+                    <span>{getCachedBlockStatus(user?.id, otherUser?.id) === true ? t('block.unblock') : t('block.block')}</span>
+                  </button>
+                  <button className="chat-context-menu-btn" onClick={() => { setHeaderMenuOpen(false); openBubbleColorModal(activeConvId); }}>
+                    <FaPalette />
+                    <span>{t('chat.bubble_colors') || 'Bubble colors'}</span>
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
           <button
             className="chat-header-mobile-menu-btn"
@@ -2538,6 +2651,18 @@ export default function Chat() {
             <FaPhone /> {t('chat.call') || 'Call'}
           </button>
           <button
+            className="chat-mobile-header-menu-item"
+            onClick={() => { setShowMobileMenu(false); openBubbleColorModal(activeConvId); }}
+          >
+            <FaPalette /> {t('chat.bubble_colors') || 'Bubble colors'}
+          </button>
+          <button
+            className="chat-mobile-header-menu-item"
+            onClick={() => { setShowMobileMenu(false); setConfirmBlock(true); }}
+          >
+            <FaBan /> {getCachedBlockStatus(user?.id, otherUser?.id) === true ? t('block.unblock') : t('block.block')}
+          </button>
+          <button
             className={`chat-mobile-header-menu-item ${showProfileCard ? 'active' : ''}`}
             onClick={() => { setShowProfileCard(s => !s); setShowMobileMenu(false); setShowMsgSearch(false); setShowMediaGallery(false); setShowPinnedPanel(false); }}
           >
@@ -2547,7 +2672,12 @@ export default function Chat() {
       )}
 
       {/* Messages — key=activeConvId fuerza remount completo al cambiar de chat */}
-      <div className="chat-messages-body" ref={messagesContainerRef}>
+      <div className="chat-messages-body" ref={messagesContainerRef} style={{
+        '--chat-bubble-own': bubbleColors[activeConvId]?.own || '#111111',
+        '--chat-bubble-own-text': getContrastFromHex(bubbleColors[activeConvId]?.own),
+        '--chat-bubble-other': bubbleColors[activeConvId]?.other || 'var(--color-surface, #1a1a1a)',
+        '--chat-bubble-other-text': getContrastFromHex(bubbleColors[activeConvId]?.other),
+      }}>
         {msgsLoading ? (
           <div className="chat-messages-loading">
             {[0, 1, 2, 3, 4].map((i) => {
@@ -3593,6 +3723,17 @@ export default function Chat() {
         document.body
       )}
 
+      {confirmBlock && createPortal(
+        <ConfirmModal
+          message={getCachedBlockStatus(user?.id, otherUser?.id) === true
+            ? (t('block.confirm_unblock', { user: otherUser?.username || 'user' }) || 'Unblock this user?')
+            : t('block.confirm_block', { user: otherUser?.username || 'user' })}
+          onConfirm={() => handleBlockFromChat(otherUser)}
+          onCancel={() => setConfirmBlock(false)}
+        />,
+        document.body
+      )}
+
       {nicknameModal.open && nicknameModal.userData && (
         <NicknameModal
           userData={nicknameModal.userData}
@@ -3613,6 +3754,21 @@ export default function Chat() {
           }}
         />
       )}
+
+      {bubbleColorModal.open && bubbleColorModal.convId && (() => {
+        const conv = conversations.find(c => c.id === bubbleColorModal.convId);
+        return (
+          <BubbleColorModal
+            conversationId={bubbleColorModal.convId}
+            currentColors={bubbleColors[bubbleColorModal.convId] || {}}
+            otherName={conv?.otherUser?.displayname || conv?.otherUser?.username || ''}
+            onClose={() => setBubbleColorModal({ open: false, convId: null })}
+            onSaved={(colors) => {
+              setBubbleColors(prev => ({ ...prev, [bubbleColorModal.convId]: colors }));
+            }}
+          />
+        );
+      })()}
     </div>
   );
 }

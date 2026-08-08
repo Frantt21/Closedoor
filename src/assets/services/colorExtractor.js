@@ -202,7 +202,7 @@ export async function getContrastForBg(imageUrl) {
  * Returns '#000000' for light backgrounds, '#ffffff' for dark backgrounds.
  * Standalone version so colorExtractor doesn't depend on helpers.js.
  */
-function getContrastFromHex(hex) {
+export function getContrastFromHex(hex) {
   if (!hex) return '#ffffff';
   let r, g, b;
   if (hex.startsWith('#')) {

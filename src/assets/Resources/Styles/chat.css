@@ -783,13 +783,13 @@
 }
 
 .chat-message--own .chat-message-bubble {
-    background: #111111;
-    color: #fff;
+    background: var(--chat-bubble-own, #111111);
+    color: var(--chat-bubble-own-text, #fff);
 }
 
 .chat-message--other .chat-message-bubble {
-    background: var(--color-surface, #1a1a1a);
-    color: var(--color-text, #ffffff);
+    background: var(--chat-bubble-other, var(--color-surface, #1a1a1a));
+    color: var(--chat-bubble-other-text, var(--color-text, #ffffff));
 }
 
 /* ── Bubble corner variants ── */
@@ -3423,4 +3423,119 @@ dialog.fc-modal.chat-followers-modal {
 
 .chat-call-mini-btn--end:hover {
     background: #dc2626;
+}
+
+/* ── Chat header dropdown (3 puntos, desktop) ── */
+.chat-header-menu-wrap {
+    position: relative;
+    display: flex;
+}
+
+.chat-header-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 160px;
+    z-index: 1100;
+    background: var(--color-surface, #1a1a1a);
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius-sm, 6px);
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    animation: fcFadeIn 0.1s ease;
+}
+
+/* ── Bubble color modal (chat) ── */
+.chat-bubble-color-row {
+    margin-bottom: 18px;
+}
+
+.chat-bubble-color-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 0.82rem;
+    color: var(--color-text-muted, #6b7280);
+}
+
+.chat-bubble-color-reset {
+    background: none;
+    border: none;
+    color: var(--color-text-muted, #6b7280);
+    font-size: 0.72rem;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 6px;
+    transition: color 0.15s ease, background 0.15s ease;
+}
+
+.chat-bubble-color-reset:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--color-text, #ffffff);
+}
+
+.chat-bubble-color-swatches {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.chat-bubble-color-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    padding: 0;
+    position: relative;
+    transition: transform 0.12s ease, border-color 0.12s ease;
+}
+
+.chat-bubble-color-swatch:hover {
+    transform: scale(1.12);
+    border-color: rgba(255, 255, 255, 0.35);
+}
+
+.chat-bubble-color-swatch--selected {
+    border-color: var(--color-text, #ffffff);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25);
+}
+
+.chat-bubble-color-custom {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--color-surface-2, #262626);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: var(--color-text, #ffffff);
+}
+
+.chat-bubble-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px;
+    border-radius: 12px;
+    background: var(--color-surface-2, #141414);
+    margin-bottom: 18px;
+}
+
+.chat-bubble-preview-row {
+    display: flex;
+}
+
+.chat-bubble-preview-row--own {
+    justify-content: flex-end;
+}
+
+.chat-bubble-preview-row--other {
+    justify-content: flex-start;
+}
+
+.chat-bubble-preview-bubble {
+    padding: 8px 12px;
+    border-radius: 16px;
+    font-size: 0.82rem;
+    max-width: 75%;
 }
