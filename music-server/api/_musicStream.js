@@ -63,16 +63,30 @@ const UA =
 // que el fetch del media (proxyStream/download) DEBE salir por el MISMO proxy
 // (si el media sale por la IP del container → 403). Por eso aquí se configura
 // un agente de Node para el media y --proxy para yt-dlp, con la misma URL.
-// Configuración: variable de entorno YTDLP_PROXY con esquema http(s)://user:pass
-// @host:port o socks5://user:pass@host:port.
-const YTDLP_PROXY = process.env.YTDLP_PROXY || '';
+// Configuración: variable de entorno YTDLP_PROXY O archivo proxy.conf en la
+// raíz del music-server (útil en hosts donde no se pueden setear env vars,
+// como la web console de HidenCloud). Esquema http(s)://user:pass@host:port o
+// socks5://user:pass@host:port.
+const PROXY_CONF_FILE = join(ROOT_DIR, 'proxy.conf');
+function resolveProxyUrl() {
+  const fromEnv = process.env.YTDLP_PROXY || '';
+  if (fromEnv) return fromEnv;
+  try {
+    if (existsSync(PROXY_CONF_FILE)) {
+      const line = readFileSync(PROXY_CONF_FILE, 'utf8').split(/\r?\n/)[0].trim();
+      if (line && !line.startsWith('#')) return line;
+    }
+  } catch {}
+  return '';
+}
+let YTDLP_PROXY = resolveProxyUrl();
 // ffmpeg solo soporta -http_proxy con proxy HTTP PLANO (no https:// ni socks):
 // se pasa solo cuando el esquema es http:// (la mayoría de proveedores residenciales).
-const YTDLP_PROXY_HTTP = /^http:\/\//i.test(YTDLP_PROXY) ? YTDLP_PROXY : '';
+let YTDLP_PROXY_HTTP = /^http:\/\//i.test(YTDLP_PROXY) ? YTDLP_PROXY : '';
 // El agente NO depende del host de destino: depende solo de YTDLP_PROXY (fijo al
 // cargar el módulo). Un único singleton evita filtrar un agente + socket pool por
 // cada hostname distinto de googlevideo (rr1---sn-..., rr4---sn-... → leak).
-const PROXY_AGENT = (() => {
+let PROXY_AGENT = (() => {
   if (!YTDLP_PROXY) return null;
   try {
     if (/^socks(4|4a|5|5h):\/\//i.test(YTDLP_PROXY)) return new SocksProxyAgent(YTDLP_PROXY);
@@ -87,8 +101,60 @@ const PROXY_AGENT = (() => {
 function getProxyAgent() {
   return PROXY_AGENT;
 }
+function getProxyUrl() {
+  return YTDLP_PROXY;
+}
+// Estado del proxy para /api/music/health: permite diagnosticar sin mirar logs
+// si el túnel del teléfono (Termux/Tailscale) está vivo y configurado.
+export function getProxyStatus() {
+  const configured = !!(YTDLP_PROXY && PROXY_AGENT);
+  return {
+    configured,
+    url: configured ? YTDLP_PROXY.replace(/\/\/[^:@]+:[^@]+@/, '//***:***@') : null,
+    scheme: YTDLP_PROXY ? YTDLP_PROXY.split(':')[0] : null,
+    configFile: existsSync(PROXY_CONF_FILE) ? PROXY_CONF_FILE : null,
+  };
+}
+
+// Test de conectividad real a través del proxy (sin cookies): verifica que el
+// túnel (p. ej. SOCKS5 del teléfono vía Tailscale) está vivo y deja pasar
+// tráfico HTTPS. Solo para diagnóstico — nunca bloquea el arranque.
+export async function checkProxyReachability({ timeoutMs = 8000 } = {}) {
+  if (!YTDLP_PROXY || !PROXY_AGENT) return { configured: false, reachable: false, error: 'no configurado' };
+  try {
+    const result = await new Promise((resolve) => {
+      // Timer independiente como red de seguridad: el timeout del request y el
+      // AbortSignal no siempre cortan el connect vía agente SOCKS (verificado:
+      // colgaba >30s). El timer RESUELVE la promesa siempre, no deja colgado.
+      let settled = false;
+      const done = (v) => { if (settled) return; settled = true; resolve(v); };
+      const t = setTimeout(() => done({ reachable: false, error: 'timeout' }), timeoutMs);
+      const req = https.get('https://www.google.com/generate_204', {
+        agent: PROXY_AGENT,
+        headers: { 'User-Agent': UA },
+      }, (res) => {
+        res.resume();
+        done({ reachable: res.statusCode === 204 || (res.statusCode >= 200 && res.statusCode < 400), status: res.statusCode });
+      });
+      req.on('timeout', () => { req.destroy(); done({ reachable: false, error: 'timeout' }); });
+      req.on('error', (err) => done({ reachable: false, error: String(err?.code || err?.message || err).slice(0, 120) }));
+      // Después de resolver, intentar destruir el socket colgado (best effort).
+      t.unref?.();
+    });
+    return { configured: true, ...result };
+  } catch (err) {
+    return { configured: true, reachable: false, error: String(err?.message || err).slice(0, 120) };
+  }
+}
 if (YTDLP_PROXY && PROXY_AGENT) {
   console.info(`[music-stream] proxy configurado: ${YTDLP_PROXY.replace(/\/\/[^:@]+:[^@]+@/, '//***:***@')}`);
+} else if (YTDLP_PROXY && !PROXY_AGENT) {
+  console.warn('[music-stream] ⚠️ YTDLP_PROXY presente pero inválido → se seguirá SIN proxy');
+} else if (!process.env.YTDLP_PROXY && existsSync(PROXY_CONF_FILE)) {
+  // proxy.conf existe pero sin URL válida (p. ej. se copió proxy.conf.example
+  // tal cual y la primera línea es un comentario) → avisar, no fallar en silencio.
+  console.warn(`[music-stream] ⚠️ ${PROXY_CONF_FILE} existe pero no contiene una URL de proxy válida en la primera línea`);
+  console.warn('   → edítalo con el formato socks5://user:pass@host:port o http://user:pass@host:port (ver proxy.conf.example)');
 }
 
 // ── Cookies de cuenta logueada (ANTI-THROTTLE) ──
@@ -871,19 +937,25 @@ async function attemptStreamWithRetries({ label, url, doStream, refresh, res, on
     await doStream(url);
     return;
   } catch (err) { guard(err); }
-  // 2) MISMA URL tras 1s (throttling puntual / blip puntual).
-  await sleep(1000);
-  try {
-    console.warn(`[music-stream] ↻ ${label} · reintento (backoff)...`);
-    await doStream(url);
-    return;
-  } catch (err) { guard(err); }
-  // 3) Tras 2 fallos la URL cacheada está MUERTA (poisoned — resuelta con un
-  //    token POT inválido, p. ej. el primero tras relanzar el server) o hay
-  //    cooldown de IP. VERIFICADO en producción: la URL cacheada dio 403
-  //    PERMANENTE (incluso tras 20s+) y la RE-resuelta con token nuevo funcionó
-  //    al instante. Se invalida la caché y se re-resuelve de inmediato: si es
-  //    poisoned, el audio suena en ~15s (antes: 51s + varios reloads).
+  // 2) Misma URL tras 1s — SOLO si el fallo fue HTTP (403 transitorio / blip
+  //    puntual). Si fue error de CONEXIÓN (ETIMEDOUT…) la IP está bloqueada a
+  //    nivel TCP: reintentar la MISMA URL es perder 10-30s en un intento que
+  //    no puede ganar (verificado en producción: 5 ETIMEDOUT seguidos con la
+  //    misma IP hasta que el cooldown expiró). Se salta directo al fresh.
+  if (!isConnError(lastErr)) {
+    await sleep(1000);
+    try {
+      console.warn(`[music-stream] ↻ ${label} · reintento (backoff)...`);
+      await doStream(url);
+      return;
+    } catch (err) { guard(err); }
+  } else {
+    console.warn(`[music-stream] ↻ ${label} · error de conexión → salto a resolución fresca (la misma URL no se re-intenta)`);
+  }
+  // 3) Tras fallar la URL actual (poisoned o IP en cooldown) se invalida la
+  //    caché y se re-resuelve. En el caso 403-poisoned la URL fresca con token
+  //    nuevo funciona al instante (verificado en producción). En el caso de
+  //    cooldown de IP la URL fresca puede fallar igual → cae al paso 4.
   try { onPoisoned?.(); } catch {}
   let freshUrl = null;
   try {
@@ -894,15 +966,12 @@ async function attemptStreamWithRetries({ label, url, doStream, refresh, res, on
     await doStream(freshUrl);
     return;
   } catch (err) { guard(err); }
-  // 4) El fresh también falló. Dos casos distintos:
-  //    - HTTP 403 → cooldown de googlevideo (~30s, afecta a todas las URLs):
-  //      esperar el backoff y reintentar la MISMA URL fresca.
-  //    - ETIMEDOUT/ECONNRESET (conexión) → IP bloqueada a nivel TCP:
-  //      reintentar no ayuda, se salta el backoff largo (verificado en
-  //      producción: los 5 intentos fallaron en <1s cada uno).
-  if (!lastErr || !isConnError(lastErr)) {
-    await sleep(RETRY_BACKOFF_LONG_MS);
-  }
+  // 4) El fresh también falló → cooldown de googlevideo (~30s) que afecta a
+  //    TODAS las URLs mientras dura. SIEMPRE se espera el backoff antes del
+  //    siguiente intento (también con errores de conexión: es el tiempo que
+  //    tarda en expirar el bloqueo TCP de la IP — sin esta espera el intento
+  //    cae inevitablemente en el mismo ETIMEDOUT).
+  await sleep(RETRY_BACKOFF_LONG_MS);
   try {
     if (freshUrl) {
       console.warn(`[music-stream] ↻ ${label} · reintento (backoff largo, cooldown googlevideo)...`);
@@ -1643,6 +1712,7 @@ export async function getMusicHealth({ ttlMs = 60000 } = {}) {
     ytdlpBin: YTDLP_BIN,
     ffmpegBin: FFMPEG_BIN,
     tunnelUrl: getTunnelUrl(),
+    proxy: getProxyStatus(),
   };
   if (ytdlp) {
     try { const { stdout } = await runYtDlp(['--version']); data.ytdlpVersion = stdout.trim().split('\n')[0] || null; } catch {}

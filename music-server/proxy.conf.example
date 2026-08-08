@@ -1,0 +1,4 @@
+# El music-server lee este archivo en la raíz si no existe YTDLP_PROXY.
+# La IP es la del teléfono (Termux) dentro de la red Tailscale.
+# Esquemas: socks5://  o  http://user:pass@host:port
+socks5://100.x.y.z:1080

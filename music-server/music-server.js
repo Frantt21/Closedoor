@@ -15,7 +15,7 @@ import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 
 const dnsLookup = dns.promises.lookup;
-import { combinedMusicSearch, getMusicHealth, handleStreamRequest, handleDownloadRequest, resolveStream, detectedCookiesFile } from './api/_musicStream.js';
+import { combinedMusicSearch, getMusicHealth, handleStreamRequest, handleDownloadRequest, resolveStream, detectedCookiesFile, getProxyStatus, checkProxyReachability } from './api/_musicStream.js';
 import { resolveTrackPreview } from './api/_music.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -661,6 +661,29 @@ function checkPotServer() {
   })();
 }
 
+// ── Diagnóstico del proxy (Termux/Tailscale o residencial) ──
+// Solo informativo: no bloquea el arranque. Prueba el túnel con una petición
+// HTTPS real (generate_204 de Google, ~1KB) y reporta si YouTube vería una IP
+// residencial (el bot-check desaparece) o si el túnel está caído.
+function checkProxyDiagnostics() {
+  const st = getProxyStatus();
+  if (!st.configured) {
+    console.warn('   proxy: ❌ sin configurar (YTDLP_PROXY o proxy.conf) → resolve/media salen por la IP del container');
+    console.warn('      → si googlevideo bloquea esta IP (ETIMEDOUT/403), configura un proxy residencial');
+    console.warn('        (Termux+Tailscale o residencial de pago) en proxy.conf — mira TERMUX_PROXY.md');
+    return;
+  }
+  console.log(`   proxy: ${st.url} (${st.scheme})`);
+  checkProxyReachability().then((r) => {
+    if (r.reachable) {
+      console.log(`   proxy: ✅ alcanzable vía ${st.url} → YouTube verá IP residencial`);
+    } else {
+      console.warn(`   proxy: ⚠️ configurado pero NO responde (${r.error || 'sin datos'})`);
+      console.warn('      → revisa que el teléfono (Termux) esté online y el túnel Tailscale activo');
+    }
+  }).catch(() => {});
+}
+
 // ── Túnel HTTPS automático (cloudflared) ──
 // Guarda el PID y la URL en archivos para reutilizar entre reinicios.
 const TUNNEL_URL_FILE = join(__dirname, '.tunnel-url.txt');
@@ -1000,6 +1023,8 @@ async function main() {
     logPotPluginDiagnostics();
     detectLibc();
     checkPotServer();
+    // ── Diagnóstico del proxy (Termux/Tailscale o residencial) ──
+    checkProxyDiagnostics();
     console.log('   /api/music/health · /api/music/search?q=... · /api/music/stream?artist=&title= · /api/music/download?artist=&title= · /api/music/resolve?artist=&title=');
 
     // Túnel HTTPS automático (cloudflared): sin root, solo conexión saliente.
