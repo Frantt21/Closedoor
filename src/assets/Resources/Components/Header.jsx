@@ -36,6 +36,9 @@ function Header() {
   const [mode, setMode] = useState(getInitialMode);
   const [hovering, setHovering] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
+  const menuRef = useRef(null);
   const asideRef = useRef(null);
   const location = useLocation();
 
@@ -68,27 +71,52 @@ function Header() {
     setFocused(el.contains(document.activeElement) && document.activeElement !== document.body);
   }, [mode]);
 
-  const cycleMode = () => {
-    setMode((prev) => MODES[(MODES.indexOf(prev) + 1) % MODES.length]);
-    setHovering(false);
-    setFocused(false);
+  // Cerrar el menú de modos al hacer clic fuera o con Escape
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClick = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) setMenuOpen(false);
+    };
+    const handleKey = (e) => { if (e.key === 'Escape') setMenuOpen(false); };
+    document.addEventListener('click', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('click', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [menuOpen]);
+
+  // Abre el menú de modos junto al botón (position: fixed, fuera del scroll del sidebar)
+  const openSidebarMenu = (e) => {
+    e.stopPropagation();
+    const r = e.currentTarget.getBoundingClientRect();
+    const MENU_W = 168;
+    const MENU_H = 124;
+    let x = r.right + 8;
+    let y = r.bottom - MENU_H;
+    x = Math.max(8, Math.min(x, window.innerWidth - MENU_W - 8));
+    y = Math.max(8, Math.min(y, window.innerHeight - MENU_H - 8));
+    setMenuPos({ x, y });
+    setMenuOpen((s) => !s);
   };
+
+  const modeLabelFor = (m) =>
+    m === 'expanded' ? t('nav.sidebar_expanded') :
+    m === 'collapsed' ? t('nav.sidebar_collapsed') :
+    t('nav.sidebar_hover');
 
   // Al salir con el ratón también se quita el foco expandido: el modo hover solo
   // se mantiene expandido mientras el ratón está encima (los usuarios de teclado
   // no disparan mouseleave, así que su expansión por foco sigue intacta).
   const onMouseEnter = mode === 'hover' ? () => setHovering(true) : undefined;
-  const onMouseLeave = mode === 'hover' ? () => { setHovering(false); setFocused(false); } : undefined;
+  const onMouseLeave = mode === 'hover' ? () => { setHovering(false); setFocused(false); setMenuOpen(false); } : undefined;
   const onFocus = mode === 'hover' ? () => setFocused(true) : undefined;
   const onBlur = mode === 'hover' ? () => setFocused(false) : undefined;
 
   // En modo 'hover' no hay tooltips: basta pasar el ratón (o tabular) para ver las etiquetas
   const tooltipText = (labelKey) => (collapsed && mode !== 'hover' ? t(labelKey) : '');
 
-  const modeLabel =
-    mode === 'expanded' ? t('nav.sidebar_expanded') :
-    mode === 'collapsed' ? t('nav.sidebar_collapsed') :
-    t('nav.sidebar_hover');
+  const modeLabel = modeLabelFor(mode);
 
   return (
     <aside
@@ -184,17 +212,45 @@ function Header() {
       </nav>
 
       <div className="sidebar-footer">
-        <Tooltip text={collapsed && mode !== 'hover' ? t('nav.sidebar_cycle') : ''} placement="right">
-        <button
-          type="button"
-          className="sidebar-link"
-          onClick={cycleMode}
-          aria-label={`${modeLabel} — ${t('nav.sidebar_cycle')}`}
-        >
-          <span className="sidebar-icon"><IconBars /></span>
-          <span className="sidebar-footer-label">{modeLabel}</span>
-        </button>
-        </Tooltip>
+        <div className="sidebar-mode-wrap">
+          <Tooltip text={collapsed && mode !== 'hover' ? t('nav.sidebar_cycle') : ''} placement="right">
+            <button
+              type="button"
+              className="sidebar-link"
+              onClick={openSidebarMenu}
+              aria-label={`${modeLabel} — ${t('nav.sidebar_cycle')}`}
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+            >
+              <span className="sidebar-icon"><IconBars /></span>
+              <span className="sidebar-footer-label">{modeLabel}</span>
+            </button>
+          </Tooltip>
+          {menuOpen && (
+            <div className="sidebar-mode-menu" style={{ left: menuPos.x, top: menuPos.y }} ref={menuRef} role="menu">
+              {MODES.map((m) => {
+                const isActive = m === mode;
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    role="menuitem"
+                    className={`sidebar-mode-menu-item${isActive ? ' sidebar-mode-menu-item--active' : ''}`}
+                    onClick={() => { setMode(m); setMenuOpen(false); setHovering(false); setFocused(false); }}
+                  >
+                    <span className="sidebar-icon"><IconBars /></span>
+                    <span>{modeLabelFor(m)}</span>
+                    {isActive && (
+                      <svg className="sidebar-mode-menu-check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     </aside>
   );
