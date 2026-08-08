@@ -87,7 +87,7 @@
     align-items: center;
     gap: 0;
     padding: 10px 12px;
-    color: var(--color-text-secondary, #9ca3af);
+    color: var(--color-text, #ffffff);
     border-radius: var(--radius, 10px);
     text-decoration: none;
     transition: background 0.2s ease, color 0.2s ease;
@@ -188,7 +188,7 @@
     align-items: center;
     gap: 0;
     padding: 10px 12px;
-    color: var(--color-text-secondary, #9ca3af);
+    color: var(--color-text, #ffffff);
     border-radius: var(--radius, 10px);
     text-decoration: none;
     transition: background 0.2s ease, color 0.2s ease;
