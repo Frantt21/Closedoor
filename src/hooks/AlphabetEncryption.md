@@ -39,11 +39,11 @@ También incluye caracteres extendidos (espacio, puntuación, números).
 2. Activa toggle "Ofuscar contenido"
 3. Selecciona usuarios que pueden verlo (autocompletado de seguidos)
 4. Al guardar:
-   - `content` → se guarda el texto original (para los que tienen permiso)
-   - `is_encrypted = true`
-   - `encrypted_content` → AES-256-GCM del contenido (base64)
-   - `allowed_users` → array de UUIDs de usuarios seleccionados
-   - `obfuscated_display` → encoding alfabético del contenido
+ - `content` se guarda el texto original (para los que tienen permiso)
+ - `is_encrypted = true`
+ - `encrypted_content` AES-256-GCM del contenido (base64)
+ - `allowed_users` array de UUIDs de usuarios seleccionados
+ - `obfuscated_display` encoding alfabético del contenido
 5. Se renderiza normal para el autor
 
 ## Flujo de visualización
@@ -51,7 +51,7 @@ También incluye caracteres extendidos (espacio, puntuación, números).
 - **Autor del post**: ve el contenido original
 - **Usuario en allowed_users**: se descifra automáticamente con AES
 - **Usuario NO autorizado**: ve el texto ofuscado (código numérico)
-- **Usuario no autenticado**: ve "🔒" con mensaje de bloqueo
+- **Usuario no autenticado**: ve "" con mensaje de bloqueo
 
 ## DerivationKey
 
@@ -70,8 +70,8 @@ Esto significa que:
 import { encode, decode, encryptForUsers, decryptForUser } from '../services/alphabetEncryption';
 
 // Ofuscación visual
-const encoded = encode('hola mundo');     // → "161116..."
-const decoded = decode(encoded);          // → "hola mundo"
+const encoded = encode('hola mundo');     //  "161116..."
+const decoded = decode(encoded);          //  "hola mundo"
 
 // Encriptación real (AES)
 const { ciphertext, iv } = await encryptForUsers(content, postId, [user1Id, user2Id]);

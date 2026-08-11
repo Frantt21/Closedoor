@@ -1,4 +1,4 @@
-# 📱 Teléfono como IP residencial (Termux + Tailscale)
+# Teléfono como IP residencial (Termux + Tailscale)
 
 El music-server en HidenCloud tiene una **IP de datacenter** que googlevideo
 bloquea a nivel TCP (`ETIMEDOUT`) o con bot-check (`Sign in to confirm you're
@@ -7,7 +7,7 @@ residencial del teléfono**, y HidenCloud hace el trabajo pesado (buscar,
 elegir candidato, servir al cliente).
 
 ```
-App (frontend) → HidenCloud (music-server) → SOCKS5 del teléfono → YouTube
+App (frontend)  HidenCloud (music-server)  SOCKS5 del teléfono  YouTube
                     │                            (yt-dlp: search + resolve)
                     │                            (media: fetch del audio)
                     └── sirve el stream al cliente
@@ -35,12 +35,12 @@ deja el autostart en `~/.termux/boot/`.
 
 ```bash
 tailscale up --hostname=termux-phone
-# → te da un link login.tailscale.com/...  Ábrelo y acepta.
+#  te da un link login.tailscale.com/...  Ábrelo y acepta.
 tailscale ip -4
-# → 100.x.y.z   (APUNTA este IP)
+#  100.x.y.z   (APUNTA este IP)
 ```
 
-> 💡 **Termux:Boot**: al instalar la app, al reiniciar el teléfono el script
+> **Termux:Boot**: al instalar la app, al reiniciar el teléfono el script
 > `start-music-proxy.sh` re-arranca microsocks + tailscaled solo. Usa
 > `termux-wake-lock` para que Android no mate el proceso (ya va en el script).
 
@@ -52,29 +52,29 @@ Solo sube los archivos del `music-server/` actualizado (incluye
 `api/_tailscaleSetup.js`). Al arrancar, `node music-server.js` hace **todo**
 solo — no necesitas lanzar ningún comando en la web console:
 
-1. Detecta que no hay proxy → descarga el binario estático de Tailscale
-   (auto-detecta la arquitectura; formato real del tarball
-   `tailscale_<ver>_<arch>.tgz`, sin "linux").
+1. Detecta que no hay proxy descarga el binario estático de Tailscale
+ (auto-detecta la arquitectura; formato real del tarball
+ `tailscale_<ver>_<arch>.tgz`, sin "linux").
 2. Arranca `tailscaled` en userspace (`--tun=userspace-networking`, sin root).
 3. Lanza `tailscale up --hostname=hidencloud-music` y **imprime el link de
-   login EN LOS LOGS** (busca `AUTENTICA TAILSCALE DEL CONTAINER`):
+ login EN LOS LOGS** (busca `AUTENTICA TAILSCALE DEL CONTAINER`):
    ```
-   🔗 AUTENTICA TAILSCALE DEL CONTAINER (una vez):
+    AUTENTICA TAILSCALE DEL CONTAINER (una vez):
    Abre este link en tu navegador y acepta con la MISMA cuenta
    con la que autenticaste el teléfono (termux-phone):
 
        https://login.tailscale.com/a/xxxxxxxxxxxx
-   ```
-   Abre ese link en el navegador de tu PC/teléfono y acepta (solo la primera
-   vez). El link se reimprime si expira.
+ ```
+ Abre ese link en el navegador de tu PC/teléfono y acepta (solo la primera
+ vez). El link se reimprime si expira.
 4. Detecta la autenticación por polling, encuentra el teléfono
-   (`tailscale status --json` → peer `termux-phone`) y escribe `proxy.conf`
-   solo: `socks5://<IP-del-teléfono>:1080`.
-5. Verifica el túnel y lo reporta: `proxy: ✅ alcanzable`.
+ (`tailscale status --json` peer `termux-phone`) y escribe `proxy.conf`
+ solo: `socks5://<IP-del-teléfono>:1080`.
+5. Verifica el túnel y lo reporta: `proxy: alcanzable`.
 6. Watchdog: cada minuto re-verifica; si el teléfono se duerme o cambia de IP,
-   re-detecta solo. Nunca bloquea el arranque ni los streams.
+ re-detecta solo. Nunca bloquea el arranque ni los streams.
 
-> 💡 **¿Quieres hacerlo a mano igualmente?** El script `setup-container.sh`
+> **¿Quieres hacerlo a mano igualmente?** El script `setup-container.sh`
 > sigue disponible (hace los pasos 1-5 en un comando), pero ya es opcional: el
 > propio server hace lo mismo al arrancar.
 
@@ -95,7 +95,7 @@ teléfono hacia un relay intermedio:
 
 ```bash
 # En el TELÉFONO: expón 0.0.0.0:1080 como túnel TCP público
-npx localtunnel --port 1080   # → https://xxx.loca.lt  (frágil)
+npx localtunnel --port 1080   #  https://xxx.loca.lt  (frágil)
 # O mejor: cloudflared quick tunnel TCP (requiere el binario en Termux)
 ```
 
@@ -106,14 +106,14 @@ Tailscale es **mucho** más fiable — recomendado).
 
 ## 3) Verificar
 
-1. `GET /api/music/health` → debe aparecer `"proxy": { "configured": true, ... }`.
+1. `GET /api/music/health` debe aparecer `"proxy": { "configured": true, ... }`.
 2. En los logs de arranque:
    ```
    proxy: socks5://100.x.y.z:1080 (socks5)
-   proxy: ✅ alcanzable vía socks5://100.x.y.z:1080 → YouTube verá IP residencial
-   ```
+   proxy:  alcanzable vía socks5://100.x.y.z:1080  YouTube verá IP residencial
+ ```
 3. Haz un play: la resolución debe pasar **sin** `Sign in to confirm` y el
-   fetch del media **sin** `ETIMEDOUT`/`403`.
+ fetch del media **sin** `ETIMEDOUT`/`403`.
 
 ---
 
@@ -121,16 +121,16 @@ Tailscale es **mucho** más fiable — recomendado).
 
 | Síntoma | Causa | Fix |
 |---|---|---|
-| `proxy: ⚠️ configurado pero NO responde` | Teléfono dormido / Tailscale caído / IP vieja en proxy.conf | Despierta el teléfono, `tailscale status` en ambos lados, actualiza proxy.conf |
+| `proxy: configurado pero NO responde` | Teléfono dormido / Tailscale caído / IP vieja en proxy.conf | Despierta el teléfono, `tailscale status` en ambos lados, actualiza proxy.conf |
 | `ETIMEDOUT` persiste | proxy.conf apunta a IP equivocada | `tailscale ip -4` en el teléfono y actualiza |
 | La app usa preview 30s | health no reporta proxy / server reiniciado sin proxy.conf | Revisa logs de arranque |
 
 ## Notas
 
 - El audio fluye por el túnel del teléfono (~16-32 KB/s a 128-256 kbps): el
-  WiFi/4G del teléfono sobra de sobra.
-- Las URLs de googlevideo quedan ligadas a la IP que resuelve → **todo** debe
-  salir por el mismo proxy (resolve + media) — el server ya lo garantiza con
-  `--proxy` (yt-dlp) + `PROXY_AGENT` (fetch del media).
+ WiFi/4G del teléfono sobra de sobra.
+- Las URLs de googlevideo quedan ligadas a la IP que resuelve **todo** debe
+ salir por el mismo proxy (resolve + media) — el server ya lo garantiza con
+ `--proxy` (yt-dlp) + `PROXY_AGENT` (fetch del media).
 - Si el teléfono se queda sin batería, el server reintenta y **no** cae: la
-  cadena de reintentos sigue funcionando (aunque con la IP del container).
+ cadena de reintentos sigue funcionando (aunque con la IP del container).

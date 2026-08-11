@@ -1,4 +1,4 @@
-# ▲ Deploy a Vercel — FastChange con OG Tags
+# Deploy a Vercel — FastChange con OG Tags
 
 Guía para desplegar la app en [Vercel](https://vercel.com) con Open Graph meta tags
 funcionando para previews en Discord, Twitter, Facebook, WhatsApp, etc.
@@ -78,8 +78,8 @@ git push
 4. **Build Command:** `npm run build`
 5. **Output Directory:** `dist`
 6. **Environment Variables** (sumamente importante):
-   - `VITE_SUPABASE_URL` → tu URL de Supabase
-   - `VITE_SUPABASE_ANON_KEY` → tu anon key de Supabase
+ - `VITE_SUPABASE_URL` tu URL de Supabase
+ - `VITE_SUPABASE_ANON_KEY` tu anon key de Supabase
 7. Haz clic en **Deploy**
 
 ---
@@ -121,6 +121,6 @@ También puedes probar con:
 ## Notas importantes
 
 - La serverless function **lee el `index.html` de `dist/`** que se generó en el build
-- Las env vars deben configurarse en el dashboard de Vercel (Project Settings → Environment Variables)
+- Las env vars deben configurarse en el dashboard de Vercel (Project Settings Environment Variables)
 - Vercel cachea las serverless functions, los primeros requests pueden ser lentos (cold start)
 - Los crawlers de Discord/Twitter no tienen problemas de CORS ni nada — solo leen el HTML

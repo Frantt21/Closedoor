@@ -8,13 +8,11 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-
 # Caché en disco del server de música (URLs de stream resueltas)
 .music-stream-cache.json
 dist
 dist-ssr
 *.local
-
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
@@ -29,11 +27,13 @@ dist-ssr
 /cdn-server
 /.freebuff
 nul
-TERMUX_SETUP.md
 music-server.zip
 /backend-music-server
 scripts/sync-music-server.mjs
-
+# Credenciales de servidores (no subir nunca)
+docs/INFRAESTRUCTURA.md
+# Entorno virtual Python
+.venv
 # Music server: secretos y archivos regenerables
 music-server/cookies.txt
 music-server/.music-cache/
@@ -42,7 +42,7 @@ music-server/.tunnel-url.txt
 music-server/.ytdlp-debug.log
 music-server/bin/bgutil-pot.log
 music-server/bin/.bgutil-pot.pid
-.env.example
-TERMUX_DIAGNOSTICO.md
-diagnostico-stream.sh
-servidores y ubicaciones.txt
+# Documentacion de musica (se genera desde backend-music-server/termux)
+docs/music/TERMUX_SETUP.md
+docs/music/TERMUX_DIAGNOSTICO.md
+scripts/diagnostico-stream.sh

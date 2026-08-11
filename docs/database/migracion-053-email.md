@@ -1,6 +1,6 @@
 # Migración 053 (v2) — Proteger columna email (a prueba de balas)
 
-**Dónde:** Supabase → SQL Editor → New query → pegar todo → Run
+**Dónde:** Supabase SQL Editor New query pegar todo Run
 **Nota:** la v1 (REVOKE de columna simple) no surtió efecto. Esta versión revoca TODO y regrantea por columna. Es idempotente — se puede ejecutar de nuevo sin error.
 
 ```sql

@@ -8,7 +8,7 @@ Guia unificada de configuracion, esquema de base de datos y consultas SQL para e
 
 1. [Configuracion inicial](#1-configuracion-inicial)
 2. [Esquema de base de datos](#2-esquema-de-base-de-datos)
-   - [Diagrama de relaciones (ER)](#diagrama-de-relaciones-er)
+ - [Diagrama de relaciones (ER)](#diagrama-de-relaciones-er)
 3. [Politicas de seguridad a nivel de fila (RLS)](#3-politicas-de-seguridad-a-nivel-de-fila-rls)
 4. [Funciones y triggers](#4-funciones-y-triggers)
 5. [Realtime](#5-realtime)

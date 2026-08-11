@@ -1,4 +1,4 @@
-# 🚇 Probar OG Tags con ngrok (Windows)
+# Probar OG Tags con ngrok (Windows)
 
 Usa ngrok para exponer tu servidor local y que Discord/Twitter/Facebook puedan scrabear las Open Graph meta tags y mostrar un preview card del perfil.
 
@@ -87,14 +87,14 @@ Esa URL `https://a1b2c3d4.ngrok.io` es tu **URL pública temporal**.
 
    ```
    https://a1b2c3d4.ngrok.io/profile/miusuario
-   ```
+ ```
 
 3. Pégalo en Discord
-4. ⏳ Espera unos segundos — Discord scrabeará la URL y mostrará el preview card con:
-   - **Avatar o banner** del usuario
-   - **Username** con @
-   - **Bio** (descripción)
-   - **Título** de la página
+4. Espera unos segundos — Discord scrabeará la URL y mostrará el preview card con:
+ - **Avatar o banner** del usuario
+ - **Username** con @
+ - **Bio** (descripción)
+ - **Título** de la página
 
 ---
 
@@ -110,11 +110,11 @@ Si no ves el preview en Discord inmediatamente, puedes debuggear con:
 
 ## Notas importantes
 
-- ⚠️ La URL ngrok **cambia cada vez que reinicias ngrok** (a menos que tengas plan pago)
-- ⚠️ Mientras ngrok esté corriendo, **cualquier persona con la URL puede acceder a tu servidor local**. Apágalo cuando termines (`Ctrl+C`)
-- ✅ El plugin de Vite inyecta OG tags para rutas `/profile/:username` en **dev mode**
-- ✅ El `server.js` hace lo mismo en **producción** (build + start)
-- ❌ Discord **NO puede scrabear `localhost`** — ngrok o un deploy son necesarios para probar
+- La URL ngrok **cambia cada vez que reinicias ngrok** (a menos que tengas plan pago)
+- Mientras ngrok esté corriendo, **cualquier persona con la URL puede acceder a tu servidor local**. Apágalo cuando termines (`Ctrl+C`)
+- El plugin de Vite inyecta OG tags para rutas `/profile/:username` en **dev mode**
+- El `server.js` hace lo mismo en **producción** (build + start)
+- Discord **NO puede scrabear `localhost`** — ngrok o un deploy son necesarios para probar
 
 ---
 
