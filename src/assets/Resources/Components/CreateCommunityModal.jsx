@@ -253,43 +253,11 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
         </div>
       </div>
 
-      {/* Sin max-height/overflow propios: el <dialog> nativo (fc-modal) ya
-          scrollea con overflow-y:auto + max-height:90vh. Un scroll anidado
-          aquí provocaba doble barra. padding-right reducido (4px) para dar
-          respiro junto al scrollbar del dialog. */}
+      {/* Sin padding propio: el <dialog> nativo (fc-modal) ya tiene padding
+          (28px) y scrollea solo con overflow-y:auto + max-height:90vh — así
+          el grid queda alineado exactamente como el modal de edit profile
+          (Modal.jsx), donde el grid es hijo directo del dialog. */}
       <div className="community-create-body">
-        {/* ── Aviso compacto del requisito de seguidores / límite (fallback) ── */}
-        {needsLimit ? (
-          <div className="community-create-gate">
-            <FaLock className="community-create-gate-icon" />
-            <div className="community-create-gate-texts">
-              <p className="community-create-gate-text">
-                {t('comunidades.limit_reached', { n: MAX_COMMUNITIES_PER_USER })}
-              </p>
-              <p className="community-create-gate-sub">{t('comunidades.limit_hint', { n: MAX_COMMUNITIES_PER_USER })}</p>
-            </div>
-          </div>
-        ) : needsFollowers ? (
-          <div className="community-create-gate">
-            <FaLock className="community-create-gate-icon" />
-            <div className="community-create-gate-texts">
-              <p className="community-create-gate-text">
-                {t('comunidades.followers_required', { n: MIN_FOLLOWERS_TO_CREATE })}
-              </p>
-              <p className="community-create-gate-sub">
-                {t('comunidades.followers_current', { n: followers || 0 })}
-              </p>
-            </div>
-          </div>
-        ) : isAdmin ? (
-          <div className="community-create-gate community-create-gate--admin">
-            <FaUsers className="community-create-gate-icon" />
-            <div className="community-create-gate-texts">
-              <p className="community-create-gate-text">{t('comunidades.admin_unlimited')}</p>
-            </div>
-          </div>
-        ) : null}
-
         {/* ── Two-column grid (mismas clases que el modal de perfil Modal.jsx) ── */}
         <div className="fc-modal-grid">
           {/* ── LEFT COLUMN ── */}
@@ -364,7 +332,7 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
               </div>
             </div>
 
-            {/* ── Nombre ── */}
+            {/* ── Nombre + Descripción + Reglas (un solo card, patrón edit profile) ── */}
             <div className="fc-modal-card">
               <label className="fc-modal-label">
                 {t('comunidades.name')}
@@ -380,10 +348,7 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
               {slugState === 'checking' && <p className="community-create-slug-status">{t('common.loading')}</p>}
               {slugState === 'taken' && <p className="community-create-slug-status community-create-slug-status--bad">{t('comunidades.name_taken')}</p>}
               {slugState === 'available' && <p className="community-create-slug-status community-create-slug-status--ok">{t('comunidades.name_available', { slug })}</p>}
-            </div>
 
-            {/* ── Descripción ── */}
-            <div className="fc-modal-card">
               <label className="fc-modal-label">
                 {t('comunidades.description')}
                 <textarea
@@ -396,11 +361,8 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
                 />
                 <span className="fc-modal-char-count">{description.length}/{COMMUNITY_DESC_MAX}</span>
               </label>
-            </div>
 
-            {/* ── Reglas ── */}
-            <div className="fc-modal-card">
-              <label className="fc-modal-label">
+              <label className="fc-modal-label" style={{ marginTop: 2 }}>
                 {t('comunidades.rules')}
                 <textarea
                   className="fc-modal-input"
@@ -413,7 +375,10 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
                 <span className="fc-modal-input-hint">{t('comunidades.rules_hint')}</span>
               </label>
             </div>
+          </div>
 
+          {/* ── RIGHT COLUMN ── */}
+          <div className="fc-modal-grid-right">
             {/* ── Intereses ── */}
             <div className="fc-modal-card">
               <label className="fc-modal-label">{t('comunidades.interests')}</label>
@@ -488,10 +453,6 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* ── RIGHT COLUMN ── */}
-          <div className="fc-modal-grid-right">
             {/* ── Color acento ── */}
             <div className="fc-modal-card">
               <label className="fc-modal-label">{t('comunidades.accent_color')}</label>
@@ -572,6 +533,40 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
             </div>
           </div>
         </div>
+
+        {/* ── Aviso compacto del requisito de seguidores / límite (fallback).
+            Va DESPUÉS del grid (bajo privacidad) para no crear espacio
+            innecesario entre el header y el contenido del modal. ── */}
+        {needsLimit ? (
+          <div className="community-create-gate">
+            <FaLock className="community-create-gate-icon" />
+            <div className="community-create-gate-texts">
+              <p className="community-create-gate-text">
+                {t('comunidades.limit_reached', { n: MAX_COMMUNITIES_PER_USER })}
+              </p>
+              <p className="community-create-gate-sub">{t('comunidades.limit_hint', { n: MAX_COMMUNITIES_PER_USER })}</p>
+            </div>
+          </div>
+        ) : needsFollowers ? (
+          <div className="community-create-gate">
+            <FaLock className="community-create-gate-icon" />
+            <div className="community-create-gate-texts">
+              <p className="community-create-gate-text">
+                {t('comunidades.followers_required', { n: MIN_FOLLOWERS_TO_CREATE })}
+              </p>
+              <p className="community-create-gate-sub">
+                {t('comunidades.followers_current', { n: followers || 0 })}
+              </p>
+            </div>
+          </div>
+        ) : isAdmin ? (
+          <div className="community-create-gate community-create-gate--admin">
+            <FaUsers className="community-create-gate-icon" />
+            <div className="community-create-gate-texts">
+              <p className="community-create-gate-text">{t('comunidades.admin_unlimited')}</p>
+            </div>
+          </div>
+        ) : null}
       </div>
     </ModalShell>
   );

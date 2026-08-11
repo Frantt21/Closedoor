@@ -8,7 +8,9 @@
    ancho de hasta ~1300px. */
 .comunidades-page {
   width: 100%;
-  padding: 16px;
+  padding: 0;
+  /* padding 0: igual que explore-page para que el contenido arranque en el
+     mismo top que las demás rutas (el buscador ya tiene margin-bottom). */
 }
 
 /* Botón Crear al final de la página (mismo estilo que los botones de Explore) */
@@ -72,11 +74,11 @@
 .community-create-body {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 16px 4px 16px 16px;
-  /* Sin max-height ni overflow propios: el <dialog> nativo (fc-modal) ya
-     scrollea con overflow-y: auto + max-height: 90vh. Un scroll anidado
-     aquí provocaba doble barra de scroll. */
+  /* Sin padding ni gap propios: el <dialog> nativo (fc-modal) ya aporta su
+     padding (28px) y scrollea solo (overflow-y: auto + max-height: 90vh),
+     igual que el modal de edit profile (Modal.jsx) donde el grid es hijo
+     directo del dialog. El aviso de seguidores que va después del grid
+     separa con margin-top propio. */
 }
 
 /* ── Aviso compacto del requisito de seguidores ── */
@@ -84,6 +86,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  margin-top: 16px;
   padding: 10px 14px;
   border-radius: 10px;
   background: rgba(245, 158, 11, 0.08);
