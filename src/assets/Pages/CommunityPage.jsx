@@ -9,6 +9,11 @@ import { toast } from 'react-toastify';
 import { FaUsers, FaLock, FaPlus, FaCheck, FaTimes, FaSpinner, FaCamera, FaLink, FaTrophy, FaTrash, FaShieldAlt, FaRegComments, FaEllipsisH, FaCog } from 'react-icons/fa';
 import {
   getCommunity,
+  getCachedCommunity,
+  getCachedCommunityMembers,
+  getCachedCommunityRoles,
+  getCachedCommunityRanking,
+  clearCommunityRankingCache,
   getMyMembership,
   joinCommunity,
   leaveCommunity,
@@ -33,6 +38,9 @@ import {
   getRepostedPostIds,
   getSavedPostIds,
   getDislikedPostIds,
+  getCachedFeed,
+  setCachedFeed,
+  clearFeedCache,
 } from '../services/postService';
 import { uploadWithLocalPreview } from '../services/cdnService';
 import VirtualPostList from '../Resources/Components/VirtualPostList';
@@ -45,31 +53,45 @@ const BUILTIN_MODERATOR_ROLES = ['owner', 'admin', 'moderator'];
 const SORT_OPTIONS = ['recent', 'relevance', 'likes', 'comments', 'dislikes', 'reposts'];
 const TIME_OPTIONS = ['all', 'today', 'week', 'month'];
 
+// Clave de cache del feed de una comunidad (mismo patrón que profile_posts_${userId},
+// pero con variantes de orden y rango de fecha).
+const communityFeedKey = (cId, sort, time) => `community_posts_${cId}_${sort}_${time}`;
+
 export default function CommunityPage() {
   const { slug } = useParams();
   const navigate = useNavigate();
   const { t } = useI18n();
   const { user } = useAuth();
 
-  const [community, setCommunity] = useState(null);
+  // Cache-first: la comunidad + miembros/roles/ranking cacheados se muestran
+  // al instante (loading=false) y se refrescan en segundo plano.
+  const [seed] = useState(() => getCachedCommunity(slug));
+  const [community, setCommunity] = useState(() => seed);
   const [notFound, setNotFound] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !seed);
   const [membership, setMembership] = useState(null); // null | { role, status }
-  const [members, setMembers] = useState([]);
+  const [members, setMembers] = useState(() => (seed ? getCachedCommunityMembers(seed.id) || [] : []));
   const [requests, setRequests] = useState([]);
-  const [roles, setRoles] = useState([]);
+  const [roles, setRoles] = useState(() => (seed ? getCachedCommunityRoles(seed.id) || [] : []));
   const [invites, setInvites] = useState([]);
-  const [ranking, setRanking] = useState([]);
+  const [ranking, setRanking] = useState(() => (seed ? getCachedCommunityRanking(seed.id) || [] : []));
 
-  // Feed
-  const [posts, setPosts] = useState([]);
-  const [likedIds, setLikedIds] = useState([]);
-  const [repostedIds, setRepostedIds] = useState([]);
-  const [savedIds, setSavedIds] = useState([]);
-  const [dislikedIds, setDislikedIds] = useState([]);
-  const [feedLoading, setFeedLoading] = useState(true);
+  // Feed (cache-first, mismo patrón que el feed del perfil): la cache siembra
+  // posts + estados de interacción al instante y se refresca en segundo plano.
+  const [feedSeed] = useState(() => (seed ? getCachedFeed(communityFeedKey(seed.id, 'recent', 'all')) : null));
+  const [posts, setPosts] = useState(() => feedSeed?.items || []);
+  const [likedIds, setLikedIds] = useState(() => feedSeed?.likedIds || []);
+  const [repostedIds, setRepostedIds] = useState(() => feedSeed?.repostedIds || []);
+  const [savedIds, setSavedIds] = useState(() => feedSeed?.savedIds || []);
+  const [dislikedIds, setDislikedIds] = useState(() => feedSeed?.dislikedIds || []);
+  const [feedLoading, setFeedLoading] = useState(() => !feedSeed);
   const [sort, setSort] = useState('recent');
   const [timeRange, setTimeRange] = useState('all');
+  // Ref con la vista actual del feed (sort/timeRange) para los handlers de
+  // Realtime, que se suscriben con deps [community.id, user.id] y no deben
+  // depender de closures stale.
+  const feedViewRef = useRef({ sort, timeRange });
+  useEffect(() => { feedViewRef.current = { sort, timeRange }; }, [sort, timeRange]);
 
   // Composer
   const [composerText, setComposerText] = useState('');
@@ -125,12 +147,23 @@ export default function CommunityPage() {
 
   usePageTitle(community ? `c/${community.slug} · ${community.name}` : 'Community');
 
-  // ── Carga inicial ──
+  // ── Carga inicial (cache-first + refresco en segundo plano) ──
   const loadCommunity = useCallback(async () => {
     if (!slug) return;
-    setLoading(true);
+    // Re-seed del estado con la cache del slug actual (al navegar entre
+    // comunidades el useState inicial no se re-ejecuta, y así nunca se ve
+    // la comunidad anterior mientras carga la nueva). Miembros/roles/ranking
+    // se re-seedean (o se vacían) para el slug actual por lo mismo.
+    const cached = getCachedCommunity(slug);
+    if (cached) setCommunity(cached);
+    if (!cached) setLoading(true);
+    setMembers(cached ? getCachedCommunityMembers(cached.id) || [] : []);
+    setRoles(cached ? getCachedCommunityRoles(cached.id) || [] : []);
+    setRanking(cached ? getCachedCommunityRanking(cached.id) || [] : []);
+    setRequests([]);
+    setInvites([]);
     try {
-      const c = await getCommunity(slug);
+      const c = await getCommunity(slug, { refresh: true });
       if (!c) {
         setNotFound(true);
         return;
@@ -142,9 +175,11 @@ export default function CommunityPage() {
         setMembership(m);
       }
       const [membersRes, rolesRes, rankingRes] = await Promise.all([
-        getCommunityMembers(c.id).catch(() => []),
-        getCommunityRoles(c.id).catch(() => []),
-        getActiveMembersRanking(c.id).catch(() => []),
+        // refresh: true → los datos cacheados se muestran ya, y aquí se
+        // actualizan en segundo plano (y se re-cachean).
+        getCommunityMembers(c.id, { refresh: true }).catch(() => []),
+        getCommunityRoles(c.id, { refresh: true }).catch(() => []),
+        getActiveMembersRanking(c.id, { refresh: true }).catch(() => []),
       ]);
       setMembers(membersRes);
       setRoles(rolesRes);
@@ -164,16 +199,29 @@ export default function CommunityPage() {
 
   useEffect(() => { loadCommunity(); }, [loadCommunity]);
 
-  // ── Feed ──
+  // ── Feed (cache-first + refresco en segundo plano, como el feed del perfil) ──
   const loadFeed = useCallback(async (cId, whichSort, whichTime) => {
     if (!cId) return;
-    setFeedLoading(true);
+    const key = communityFeedKey(cId, whichSort, whichTime);
+    // Restaurar la cache al instante (skeleton solo si no hay cache válida)
+    const cached = getCachedFeed(key);
+    if (cached) {
+      setPosts(cached.items || []);
+      setLikedIds(cached.likedIds || []);
+      setRepostedIds(cached.repostedIds || []);
+      setSavedIds(cached.savedIds || []);
+      setDislikedIds(cached.dislikedIds || []);
+      setFeedLoading(false);
+    } else {
+      setFeedLoading(true);
+    }
     try {
       const data = await getCommunityPosts(cId, { sort: whichSort, timeRange: whichTime, limit: 50 });
       setPosts(data);
+      let l = [], r = [], s = [], d = [];
       if (user?.id && data.length > 0) {
         const ids = data.map((p) => p.id);
-        const [l, r, s, d] = await Promise.all([
+        [l, r, s, d] = await Promise.all([
           getLikedPostIds(ids, user.id),
           getRepostedPostIds(ids, user.id),
           getSavedPostIds(ids, user.id),
@@ -181,6 +229,7 @@ export default function CommunityPage() {
         ]);
         setLikedIds(l); setRepostedIds(r); setSavedIds(s); setDislikedIds(d);
       }
+      setCachedFeed(key, data, l, r, s, d);
     } catch (err) {
       console.error('[Community] Error loading feed:', err);
     } finally {
@@ -254,6 +303,13 @@ export default function CommunityPage() {
         if (to === 'pending') {
           getJoinRequests(community.id).then(setRequests).catch(() => {});
         }
+        // El propio usuario fue aprobado estando en la página (pending → active):
+        // su feed ahora es visible → invalidar la cache actual y recargarlo.
+        if (to === 'active' && from === 'pending' && payload.new.user_id === user?.id) {
+          const v = feedViewRef.current;
+          clearFeedCache(communityFeedKey(community.id, v.sort, v.timeRange));
+          loadFeed(community.id, v.sort, v.timeRange);
+        }
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'community_members' }, (payload) => {
         if (payload.old?.community_id !== community.id) return;
@@ -275,6 +331,10 @@ export default function CommunityPage() {
       // member_count se sincroniza vía realtime (INSERT/UPDATE de community_members)
       if (!res.isPending) {
         getCommunityMembers(community.id).then(setMembers).catch(() => {});
+        // La visibilidad del feed puede cambiar (privada) → invalidar la cache
+        // del feed actual y recargarlo para que no sirva la lista vacía vieja
+        clearFeedCache(communityFeedKey(community.id, sort, timeRange));
+        loadFeed(community.id, sort, timeRange);
       }
       toast.success(res.isPending ? t('comunidades.request_sent') : t('comunidades.joined'));
     } catch (err) {
@@ -294,6 +354,9 @@ export default function CommunityPage() {
       setMembership({ role: res.role || 'member', status: res.status || 'active' });
       // member_count se sincroniza vía realtime
       getCommunityMembers(community.id).then(setMembers).catch(() => {});
+      // El alta cambia la visibilidad del feed → invalidar cache y recargar
+      clearFeedCache(communityFeedKey(community.id, sort, timeRange));
+      loadFeed(community.id, sort, timeRange);
       toast.success(t('comunidades.joined'));
     } catch (err) {
       console.error(err);
@@ -315,6 +378,8 @@ export default function CommunityPage() {
       // member_count se sincroniza vía realtime (DELETE de community_members)
       setMembers((prev) => prev.filter((m) => m.user_id !== user?.id));
       setPosts([]);
+      // Ya no se ve el contenido de la comunidad → invalidar cache del feed
+      clearFeedCache(communityFeedKey(community.id, sort, timeRange));
       toast.success(t('comunidades.left'));
     } catch (err) {
       console.error(err);
@@ -463,6 +528,10 @@ export default function CommunityPage() {
       setComposerText('');
       setComposerImage('');
       setCommunity((prev) => (prev ? { ...prev, post_count: (prev.post_count || 0) + 1 } : prev));
+      // Publicar cambia la actividad → el ranking cacheado queda obsoleto
+      clearCommunityRankingCache(community.id);
+      // El feed cacheado no incluye el post nuevo → invalidar clave actual
+      clearFeedCache(communityFeedKey(community.id, sort, timeRange));
       toast.success(t('create_post.posted'));
     } catch (err) {
       console.error(err);
@@ -483,6 +552,10 @@ export default function CommunityPage() {
       await deleteCommunityPost(deletingPost);
       setPosts((prev) => prev.filter((p) => p.id !== deletingPost));
       setCommunity((prev) => (prev ? { ...prev, post_count: Math.max((prev.post_count || 0) - 1, 0) } : prev));
+      // Borrar cambia la actividad → el ranking cacheado queda obsoleto
+      clearCommunityRankingCache(community.id);
+      // El feed cacheado aún contiene el post borrado → invalidar clave actual
+      clearFeedCache(communityFeedKey(community.id, sort, timeRange));
       toast.success(t('comunidades.post_deleted'));
     } catch (err) {
       console.error(err);
@@ -499,8 +572,30 @@ export default function CommunityPage() {
   // ── Render ──
   if (loading) {
     return (
-      <div className="community-page-loading">
-        <FaSpinner className="fc-spin" />
+      <div className="community-page community-skeleton-page">
+        {/* Skeleton del header (mismo patrón de skeleton que el resto del app) */}
+        <div className="community-skeleton-header">
+          <div className="skeleton community-skeleton-banner" />
+          <div className="community-skeleton-header-main">
+            <div className="skeleton skeleton--circle community-skeleton-avatar" />
+            <div className="community-skeleton-header-lines">
+              <div className="skeleton community-skeleton-line community-skeleton-line--title" />
+              <div className="skeleton community-skeleton-line community-skeleton-line--slug" />
+              <div className="skeleton community-skeleton-line community-skeleton-line--desc" />
+            </div>
+          </div>
+        </div>
+        <div className="community-body">
+          <div className="community-main">
+            <div className="skeleton community-skeleton-card" />
+            <div className="skeleton community-skeleton-card" />
+            <div className="skeleton community-skeleton-card" />
+          </div>
+          <div className="community-sidebar">
+            <div className="skeleton community-skeleton-sidebar-card" />
+            <div className="skeleton community-skeleton-sidebar-card" />
+          </div>
+        </div>
       </div>
     );
   }

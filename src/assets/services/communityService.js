@@ -2,12 +2,163 @@ import { supabase, dbPublic } from './supabaseclient';
 import { getCdnUrl } from './cdnService';
 import { sanitizeContent } from './helpers';
 import { createPost } from './postService';
+import { getItem, setItem, removeItem } from './secureStorage';
 
 // ── Constantes ──
 export const MIN_FOLLOWERS_TO_CREATE = 100;
 export const MAX_COMMUNITIES_PER_USER = 3;
 export const COMMUNITY_NAME_MAX = 50;
 export const COMMUNITY_DESC_MAX = 300;
+
+// ── Cache localStorage (mismo patrón que perfiles/explore) ──
+const COMM_LIST_PREFIX = 'fc_comm_list_';
+const COMM_DETAIL_PREFIX = 'fc_comm_';
+const COMM_CACHE_TTL = 1000 * 60 * 10; // 10 min
+
+/** Cache del listado (por usuario + sort). Los contadores se refrescan con Realtime. */
+export function getCachedCommunities(userId, sort) {
+  try {
+    const key = COMM_LIST_PREFIX + (userId || 'anon') + '_' + (sort || 'popular');
+    const payload = getItem(key);
+    if (!payload?.ts) return null;
+    if (Date.now() - payload.ts > (payload.ttl || COMM_CACHE_TTL)) {
+      removeItem(key);
+      return null;
+    }
+    return payload.data || null;
+  } catch {
+    return null;
+  }
+}
+
+export function setCachedCommunities(userId, sort, data) {
+  if (!Array.isArray(data)) return;
+  try {
+    const key = COMM_LIST_PREFIX + (userId || 'anon') + '_' + (sort || 'popular');
+    setItem(key, { ts: Date.now(), ttl: COMM_CACHE_TTL, data });
+  } catch (err) {
+    console.warn('Could not cache communities list:', err);
+  }
+}
+
+/** Invalida el cache del listado del usuario (p. ej. tras crear una comunidad). */
+export function clearCommunitiesListCache(userId) {
+  try {
+    ['popular', 'newest', 'active'].forEach((sort) => {
+      removeItem(COMM_LIST_PREFIX + (userId || 'anon') + '_' + sort);
+    });
+  } catch {
+    // Ignorar
+  }
+}
+
+/** Cache del detalle de una comunidad (por slug). */
+export function getCachedCommunity(slug) {
+  if (!slug) return null;
+  try {
+    const payload = getItem(COMM_DETAIL_PREFIX + slug);
+    if (!payload?.ts) return null;
+    if (Date.now() - payload.ts > (payload.ttl || COMM_CACHE_TTL)) {
+      removeItem(COMM_DETAIL_PREFIX + slug);
+      return null;
+    }
+    return payload.data || null;
+  } catch {
+    return null;
+  }
+}
+
+export function setCachedCommunity(slug, community) {
+  if (!slug || !community) return;
+  try {
+    setItem(COMM_DETAIL_PREFIX + slug, { ts: Date.now(), ttl: COMM_CACHE_TTL, data: community });
+  } catch (err) {
+    console.warn('Could not cache community:', err);
+  }
+}
+
+export function clearCommunityCache(slug) {
+  if (!slug) return;
+  try {
+    removeItem(COMM_DETAIL_PREFIX + slug);
+  } catch {
+    // Ignorar
+  }
+}
+
+// ── Cache de detalle extendido: miembros, roles y ranking (por communityId) ──
+// Mismo patrón que el detalle: el detalle de la comunidad siembra la página al
+// instante y estos 3 se refrescan en segundo plano con { refresh: true }.
+const COMM_MEMBERS_PREFIX = 'fc_comm_members_';
+const COMM_ROLES_PREFIX = 'fc_comm_roles_';
+const COMM_RANKING_PREFIX = 'fc_comm_ranking_';
+
+function readCachePayload(key) {
+  const payload = getItem(key);
+  if (!payload?.ts) return null;
+  if (Date.now() - payload.ts > (payload.ttl || COMM_CACHE_TTL)) {
+    removeItem(key);
+    return null;
+  }
+  return payload.data || null;
+}
+
+export function getCachedCommunityMembers(communityId) {
+  if (!communityId) return null;
+  try { return readCachePayload(COMM_MEMBERS_PREFIX + communityId); } catch { return null; }
+}
+
+export function setCachedCommunityMembers(communityId, data) {
+  if (!communityId || !Array.isArray(data)) return;
+  try {
+    setItem(COMM_MEMBERS_PREFIX + communityId, { ts: Date.now(), ttl: COMM_CACHE_TTL, data });
+  } catch (err) {
+    console.warn('Could not cache community members:', err);
+  }
+}
+
+export function clearCommunityMembersCache(communityId) {
+  if (!communityId) return;
+  try { removeItem(COMM_MEMBERS_PREFIX + communityId); } catch { /* Ignorar */ }
+}
+
+export function getCachedCommunityRoles(communityId) {
+  if (!communityId) return null;
+  try { return readCachePayload(COMM_ROLES_PREFIX + communityId); } catch { return null; }
+}
+
+export function setCachedCommunityRoles(communityId, data) {
+  if (!communityId || !Array.isArray(data)) return;
+  try {
+    setItem(COMM_ROLES_PREFIX + communityId, { ts: Date.now(), ttl: COMM_CACHE_TTL, data });
+  } catch (err) {
+    console.warn('Could not cache community roles:', err);
+  }
+}
+
+export function clearCommunityRolesCache(communityId) {
+  if (!communityId) return;
+  try { removeItem(COMM_ROLES_PREFIX + communityId); } catch { /* Ignorar */ }
+}
+
+export function getCachedCommunityRanking(communityId) {
+  if (!communityId) return null;
+  try { return readCachePayload(COMM_RANKING_PREFIX + communityId); } catch { return null; }
+}
+
+export function setCachedCommunityRanking(communityId, data) {
+  if (!communityId || !Array.isArray(data)) return;
+  try {
+    setItem(COMM_RANKING_PREFIX + communityId, { ts: Date.now(), ttl: COMM_CACHE_TTL, data });
+  } catch (err) {
+    console.warn('Could not cache community ranking:', err);
+  }
+}
+
+export function clearCommunityRankingCache(communityId) {
+  if (!communityId) return;
+  try { removeItem(COMM_RANKING_PREFIX + communityId); } catch { /* Ignorar */ }
+}
 
 // ¿El usuario tiene rol admin? (bypass de followers y de límite)
 export function isAdminRole(roles) {
@@ -197,11 +348,18 @@ export async function createCommunity({ userId, name, description, rules, intere
     // No romper la creación: el owner se re-sincroniza al consultar
   }
 
+  // Invalidar el cache del listado para que la nueva comunidad aparezca
+  clearCommunitiesListCache(userId);
   return normalizeCommunityUrls(community);
 }
 
-// ── Consultar comunidad ──
-export async function getCommunity(slug) {
+// ── Consultar comunidad (cache-first: devuelve la cache si es válida y
+//    refresca en segundo plano si se pide con { refresh: true }) ──
+export async function getCommunity(slug, { refresh = false } = {}) {
+  if (!refresh) {
+    const cached = getCachedCommunity(slug);
+    if (cached) return cached;
+  }
   const { data, error } = await dbPublic
     .from('communities')
     .select(COMMUNITY_SELECT)
@@ -212,7 +370,9 @@ export async function getCommunity(slug) {
     console.error('[Communities] Error fetching community:', error);
     throw error;
   }
-  return normalizeCommunityUrls(data);
+  const normalized = normalizeCommunityUrls(data);
+  if (normalized) setCachedCommunity(slug, normalized);
+  return normalized;
 }
 
 export async function getCommunityById(id) {
@@ -225,7 +385,9 @@ export async function getCommunityById(id) {
     console.error('[Communities] Error fetching community by id:', error);
     throw error;
   }
-  return normalizeCommunityUrls(data);
+  const normalized = normalizeCommunityUrls(data);
+  if (normalized) setCachedCommunity(normalized.slug, normalized);
+  return normalized;
 }
 
 export async function isCommunitySlugAvailable(slug) {
@@ -241,7 +403,14 @@ export async function isCommunitySlugAvailable(slug) {
 
 // ── Listado / búsqueda ──
 // sort: 'popular' (member_count) | 'newest' (created_at) | 'active' (post_count)
-export async function getCommunities({ search = '', sort = 'popular', limit = 30, offset = 0 } = {}) {
+export async function getCommunities({ search = '', sort = 'popular', limit = 30, offset = 0, userId = null, refresh = false } = {}) {
+  // Cache-first: solo para el listado por defecto sin búsqueda ni paginación
+  // (igual que el detalle). El componente siembra el estado con la misma cache,
+  // así que refresh:true fuerza el fetch aquí y re-cachea después.
+  if (!refresh && !search.trim() && offset === 0) {
+    const cached = getCachedCommunities(userId, sort);
+    if (cached) return cached;
+  }
   const orderMap = {
     popular: ['member_count', false],
     newest: ['created_at', false],
@@ -264,7 +433,11 @@ export async function getCommunities({ search = '', sort = 'popular', limit = 30
     console.error('[Communities] Error listing communities:', error);
     throw error;
   }
-  return (data || []).map(normalizeCommunityUrls);
+  const normalized = (data || []).map(normalizeCommunityUrls);
+  // Cachear listados SIN búsqueda (los buscados son volátiles); así el
+  // listado vuelve al instante y Realtime refresca los contadores.
+  if (!search.trim()) setCachedCommunities(userId, sort, normalized);
+  return normalized;
 }
 
 // ── Membresía ──
@@ -332,6 +505,7 @@ export async function joinCommunity(communityId, userId) {
     console.error('[Communities] Error joining community:', error);
     throw error;
   }
+  clearCommunityMembersCache(communityId);
   return { ...data, isPending: status === 'pending' };
 }
 
@@ -346,6 +520,7 @@ export async function leaveCommunity(communityId, userId) {
     console.error('[Communities] Error leaving community:', error);
     throw error;
   }
+  clearCommunityMembersCache(communityId);
 }
 
 // ── Solicitudes de unión (comunidades privadas) ──
@@ -380,6 +555,7 @@ export async function respondJoinRequest(communityId, userId, { approve }) {
       console.error('[Communities] Error approving request:', error);
       throw error;
     }
+    clearCommunityMembersCache(communityId);
   } else {
     const { error } = await supabase
       .from('community_members')
@@ -395,7 +571,13 @@ export async function respondJoinRequest(communityId, userId, { approve }) {
 }
 
 // ── Miembros ──
-export async function getCommunityMembers(communityId, { limit = 100, status = 'active' } = {}) {
+export async function getCommunityMembers(communityId, { limit = 100, status = 'active', refresh = false } = {}) {
+  // Cache-first solo para la vista activa por defecto (la lista del detalle).
+  // Las solicitudes pending son de moderación y no se cachean.
+  if (!refresh && status === 'active' && limit >= 100) {
+    const cached = getCachedCommunityMembers(communityId);
+    if (cached) return cached;
+  }
   const { data, error } = await supabase
     .from('community_members')
     .select(MEMBER_SELECT)
@@ -408,7 +590,9 @@ export async function getCommunityMembers(communityId, { limit = 100, status = '
     console.error('[Communities] Error fetching members:', error);
     throw error;
   }
-  return (data || []).map(normalizeMemberUrls);
+  const normalized = (data || []).map(normalizeMemberUrls);
+  if (status === 'active') setCachedCommunityMembers(communityId, normalized);
+  return normalized;
 }
 
 /**
@@ -425,6 +609,7 @@ export async function setMemberRole(communityId, targetUserId, role) {
     console.error('[Communities] Error setting member role:', error);
     throw error;
   }
+  clearCommunityMembersCache(communityId);
 }
 
 export async function removeMember(communityId, targetUserId) {
@@ -437,10 +622,15 @@ export async function removeMember(communityId, targetUserId) {
     console.error('[Communities] Error removing member:', error);
     throw error;
   }
+  clearCommunityMembersCache(communityId);
 }
 
 // ── Roles custom ──
-export async function getCommunityRoles(communityId) {
+export async function getCommunityRoles(communityId, { refresh = false } = {}) {
+  if (!refresh) {
+    const cached = getCachedCommunityRoles(communityId);
+    if (cached) return cached;
+  }
   const { data, error } = await supabase
     .from('community_roles')
     .select('id, community_id, name, color, permissions, created_at')
@@ -450,7 +640,9 @@ export async function getCommunityRoles(communityId) {
     console.error('[Communities] Error fetching roles:', error);
     throw error;
   }
-  return data || [];
+  const roles = data || [];
+  setCachedCommunityRoles(communityId, roles);
+  return roles;
 }
 
 export async function createCommunityRole(communityId, { name, color, permissions }) {
@@ -468,6 +660,7 @@ export async function createCommunityRole(communityId, { name, color, permission
     console.error('[Communities] Error creating role:', error);
     throw error;
   }
+  clearCommunityRolesCache(communityId);
   return data;
 }
 
@@ -481,6 +674,8 @@ export async function deleteCommunityRole(communityId, roleId, roleName) {
     console.error('[Communities] Error deleting role:', error);
     throw error;
   }
+  clearCommunityRolesCache(communityId);
+  clearCommunityMembersCache(communityId);
   // Los miembros con ese rol vuelven a 'member'
   if (roleName) {
     const { error: resetError } = await supabase
@@ -577,6 +772,8 @@ export async function redeemInvite(token, userId) {
     .update({ uses: invite.uses + 1 })
     .eq('id', invite.id);
 
+  // El alta directa no pasa por joinCommunity → invalidar el cache de miembros
+  clearCommunityMembersCache(invite.community_id);
   return { community_id: invite.community_id, role: membership?.role || 'member', status: membership?.status || 'active' };
 }
 
@@ -600,7 +797,9 @@ export async function updateCommunity(communityId, updates) {
     console.error('[Communities] Error updating community:', error);
     throw error;
   }
-  return normalizeCommunityUrls(data);
+  const normalized = normalizeCommunityUrls(data);
+  if (normalized) setCachedCommunity(normalized.slug, normalized);
+  return normalized;
 }
 
 // ── Feed de la comunidad ──
@@ -735,7 +934,11 @@ export async function deleteCommunityPost(postId) {
  * por miembro dentro de la comunidad, y devuelve un ranking.
  * Se calcula sobre los posts de la comunidad (denormalizado en posts).
  */
-export async function getActiveMembersRanking(communityId, { limit = 10 } = {}) {
+export async function getActiveMembersRanking(communityId, { limit = 10, refresh = false } = {}) {
+  if (!refresh && limit >= 10) {
+    const cached = getCachedCommunityRanking(communityId);
+    if (cached) return cached;
+  }
   // Agrupar posts por autor dentro de la comunidad
   const { data: posts, error } = await dbPublic
     .from('posts')
@@ -771,7 +974,10 @@ export async function getActiveMembersRanking(communityId, { limit = 10 } = {}) 
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
 
-  if (rows.length === 0) return [];
+  if (rows.length === 0) {
+    setCachedCommunityRanking(communityId, []);
+    return [];
+  }
 
   // Fetch perfiles en batch
   const userIds = rows.map((r) => r.user_id);
@@ -786,5 +992,7 @@ export async function getActiveMembersRanking(communityId, { limit = 10 } = {}) 
     profileMap[p.id] = p;
   }
 
-  return rows.map((r) => ({ ...r, profile: profileMap[r.user_id] || null }));
+  const result = rows.map((r) => ({ ...r, profile: profileMap[r.user_id] || null }));
+  setCachedCommunityRanking(communityId, result);
+  return result;
 }

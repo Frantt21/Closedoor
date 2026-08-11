@@ -213,6 +213,7 @@
   "comunidades.privacy_public_hint": "Todos pueden ver el contenido y unirse.",
   "comunidades.private": "Privada",
   "comunidades.private_hint": "Esta es una comunidad privada. Únete para ver su contenido.",
+  "comunidades.refresh": "Actualizar listado",
   "comunidades.request_approved": "Solicitud aceptada",
   "comunidades.request_rejected": "Solicitud rechazada",
   "comunidades.request_sent": "Solicitud de unión enviada",

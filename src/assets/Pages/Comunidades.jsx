@@ -2,9 +2,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useI18n } from '../services/i18n/useI18n';
 import usePageTitle from '../../hooks/usePageTitle';
-import { FaUsers, FaPlus, FaSpinner, FaLock, FaSearch } from 'react-icons/fa';
+import { FaUsers, FaPlus, FaSpinner, FaLock, FaSearch, FaSyncAlt } from 'react-icons/fa';
 import { useAuth } from '../../hooks/useAuth';
-import { getCommunities, getCommunityById, canCreateCommunity, MIN_FOLLOWERS_TO_CREATE, MAX_COMMUNITIES_PER_USER } from '../services/communityService';
+import { getCommunities, getCommunityById, canCreateCommunity, getCachedCommunities, MIN_FOLLOWERS_TO_CREATE, MAX_COMMUNITIES_PER_USER } from '../services/communityService';
 import { supabase } from '../services/supabaseclient';
 import CreateCommunityModal from '../Resources/Components/CreateCommunityModal';
 import { toast } from 'react-toastify';
@@ -17,18 +17,26 @@ export default function Comunidades() {
   usePageTitle(t('comunidades.title'));
   const { user, profile } = useAuth();
 
-  const [communities, setCommunities] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Cache-first: si hay cache válida del listado popular, se muestra al
+  // instante (loading=false) y Realtime refresca los contadores después.
+  const [communities, setCommunities] = useState(() => getCachedCommunities(user?.id, 'popular') || []);
+  const [loading, setLoading] = useState(() => !getCachedCommunities(user?.id, 'popular'));
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('popular');
   const [showCreate, setShowCreate] = useState(false);
   const [checkingPerms, setCheckingPerms] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const searchTimerRef = useRef(null);
 
   const load = useCallback(async (query = '', sort = 'popular') => {
-    setLoading(true);
+    // Cache-first: solo mostrar skeleton si no hay cache válida para este
+    // sort o si es una búsqueda (los buscados nunca se cachean). Así la
+    // cache del listado se aprovecha de verdad en cada visita.
+    if (query || !getCachedCommunities(user?.id, sort)) setLoading(true);
     try {
-      const data = await getCommunities({ search: query, sort, limit: 60 });
+      // refresh: true → la cache siembra el estado al instante (skeleton se
+      // decide en el cliente) y aquí siempre se consulta DB y se re-cachea.
+      const data = await getCommunities({ search: query, sort, limit: 60, userId: user?.id, refresh: true });
       setCommunities(data);
     } catch (err) {
       console.error('[Comunidades] Error loading:', err);
@@ -36,7 +44,7 @@ export default function Comunidades() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => { load('', activeFilter); }, [load, activeFilter]);
 
@@ -45,6 +53,28 @@ export default function Comunidades() {
     setSearch(value);
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     searchTimerRef.current = setTimeout(() => load(value, activeFilter), 350);
+  };
+
+  // ── Refresco manual: fuerza getCommunities({ refresh: true }) saltándose el
+  //    cache del listado (mantiene la lista visible, solo gira el icono) ──
+  const handleRefresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      const data = await getCommunities({
+        search,
+        sort: activeFilter,
+        limit: 60,
+        userId: user?.id,
+        refresh: true,
+      });
+      setCommunities(data);
+    } catch (err) {
+      console.error('[Comunidades] Error refreshing:', err);
+      toast.error(t('comunidades.error'));
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   // Realtime: actualizar contadores de miembros/posts en el listado
@@ -101,7 +131,7 @@ export default function Comunidades() {
 
   return (
     <div className="comunidades-page">
-      <div className="explore-search">
+      <div className="explore-search comunidades-search-row">
         <div className="explore-search-wrap">
           <FaSearch className="explore-search-icon" />
           <input
@@ -112,6 +142,16 @@ export default function Comunidades() {
             placeholder={t('comunidades.search_placeholder')}
           />
         </div>
+        <button
+          type="button"
+          className="comunidades-refresh-btn"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          title={t('comunidades.refresh')}
+          aria-label={t('comunidades.refresh')}
+        >
+          <FaSyncAlt className={refreshing ? 'fc-spin' : ''} />
+        </button>
       </div>
 
       {/* ── Fila de filtros (mismo patrón que Explore) ── */}

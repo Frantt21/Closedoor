@@ -213,6 +213,7 @@
   "comunidades.privacy_public_hint": "Everyone can see content and join.",
   "comunidades.private": "Private",
   "comunidades.private_hint": "This is a private community. Join to see its content.",
+  "comunidades.refresh": "Refresh list",
   "comunidades.request_approved": "Request approved",
   "comunidades.request_rejected": "Request rejected",
   "comunidades.request_sent": "Join request sent",
