@@ -160,25 +160,26 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 16px;
-  max-height: 70vh;
-  overflow-y: auto;
+  padding: 16px 4px 16px 16px;
+  /* Sin max-height ni overflow propios: el <dialog> nativo (fc-modal) ya
+     scrollea con overflow-y: auto + max-height: 90vh. Un scroll anidado
+     aquí provocaba doble barra de scroll. */
 }
 
+/* ── Aviso compacto del requisito de seguidores ── */
 .community-create-gate {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  text-align: center;
-  gap: 6px;
-  padding: 18px;
-  border-radius: 12px;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
   background: rgba(245, 158, 11, 0.08);
   border: 1px solid rgba(245, 158, 11, 0.3);
 }
-.community-create-gate-icon { font-size: 1.4rem; color: #f59e0b; }
-.community-create-gate-text { margin: 0; font-size: 0.9rem; font-weight: 600; color: #f59e0b; }
-.community-create-gate-sub { margin: 0; font-size: 0.8rem; color: var(--color-text-muted, #6b7280); }
+.community-create-gate-icon { font-size: 1.1rem; color: #f59e0b; flex-shrink: 0; }
+.community-create-gate-texts { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.community-create-gate-text { margin: 0; font-size: 0.82rem; font-weight: 600; color: #f59e0b; }
+.community-create-gate-sub { margin: 0; font-size: 0.72rem; color: var(--color-text-muted, #6b7280); }
 
 .community-create-preview {
   border-radius: 14px;

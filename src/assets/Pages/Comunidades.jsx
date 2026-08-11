@@ -4,7 +4,7 @@ import { useI18n } from '../services/i18n/useI18n';
 import usePageTitle from '../../hooks/usePageTitle';
 import { FaUsers, FaPlus, FaSpinner, FaLock, FaSearch } from 'react-icons/fa';
 import { useAuth } from '../../hooks/useAuth';
-import { getCommunities, getCommunityById } from '../services/communityService';
+import { getCommunities, getCommunityById, canCreateCommunity, MIN_FOLLOWERS_TO_CREATE } from '../services/communityService';
 import { supabase } from '../services/supabaseclient';
 import CreateCommunityModal from '../Resources/Components/CreateCommunityModal';
 import { toast } from 'react-toastify';
@@ -19,6 +19,7 @@ export default function Comunidades() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
+  const [checkingFollowers, setCheckingFollowers] = useState(false);
   const searchTimerRef = useRef(null);
 
   const load = useCallback(async (query = '') => {
@@ -66,6 +67,24 @@ export default function Comunidades() {
     toast.success(t('comunidades.created'));
   };
 
+  // ── Aviso ANTES de abrir el modal: si no cumple los 100 seguidores, no abre ──
+  const handleCreateClick = async () => {
+    if (!user?.id) return;
+    setCheckingFollowers(true);
+    try {
+      const res = await canCreateCommunity(user.id);
+      if (!res.allowed) {
+        toast.error(t('comunidades.followers_required', { n: MIN_FOLLOWERS_TO_CREATE }));
+        return;
+      }
+      setShowCreate(true);
+    } catch {
+      setShowCreate(true);
+    } finally {
+      setCheckingFollowers(false);
+    }
+  };
+
   return (
     <div className="comunidades-page">
       <div className="comunidades-header">
@@ -73,14 +92,11 @@ export default function Comunidades() {
         <button
           type="button"
           className="comunidades-create-btn"
-          onClick={() => {
-            if (!user?.id) return;
-            setShowCreate(true);
-          }}
-          disabled={!user?.id}
+          onClick={handleCreateClick}
+          disabled={!user?.id || checkingFollowers}
           title={user?.id ? '' : t('auth.login_btn')}
         >
-          <FaPlus /> {t('comunidades.create_btn')}
+          {checkingFollowers ? <FaSpinner className="fc-spin" /> : <FaPlus />} {t('comunidades.create_btn')}
         </button>
       </div>
 
