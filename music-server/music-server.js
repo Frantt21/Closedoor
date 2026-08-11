@@ -15,7 +15,8 @@ import { fileURLToPath } from 'url';
 import { spawn } from 'child_process';
 
 const dnsLookup = dns.promises.lookup;
-import { combinedMusicSearch, getMusicHealth, handleStreamRequest, handleDownloadRequest, resolveStream, detectedCookiesFile, getProxyStatus, checkProxyReachability } from './api/_musicStream.js';
+import { combinedMusicSearch, getMusicHealth, handleStreamRequest, handleDownloadRequest, resolveStream, detectedCookiesFile, getProxyStatus, checkProxyReachability, autoConfigureProxy } from './api/_musicStream.js';
+import { startTailscaleAutoSetup, startProxyWatchdog } from './api/_tailscaleSetup.js';
 import { resolveTrackPreview } from './api/_music.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -661,6 +662,45 @@ function checkPotServer() {
   })();
 }
 
+// ── Auto-configuración del proxy (Termux/Tailscale) — SIN consola ──
+// Si no hay YTDLP_PROXY/proxy.conf, se DELEGA en _tailscaleSetup.js, que hace
+// todo solo: descarga el binario Tailscale, arranca el daemon userspace, lanza
+// el login (imprime el link en los logs), espera a que el usuario autentique y
+// detecta el teléfono. onProxyReady re-ejecuta autoConfigureProxy() (que ya
+// consulta la tailnet local) para escribir proxy.conf + aplicar el agente.
+async function autoConfigureProxyDiagnostics() {
+  // onProxyReady({ force }) — force=true cuando el watchdog detecta un proxy
+  // configurado pero NO alcanzable (teléfono dormido/IP vieja): fuerza la
+  // re-detección del teléfono y actualiza proxy.conf (sin esto, autoConfigureProxy
+  // haría early-return y nunca re-detectaría una IP nueva).
+  const onProxyReady = async ({ force = false } = {}) => {
+    try {
+      const r = await autoConfigureProxy({ force });
+      if (r.configured) {
+        console.log(`   proxy: auto-configurado (${r.source}) → ${r.url}`);
+        checkProxyReachability().then((rr) => {
+          if (rr.reachable) console.log(`   proxy: ✅ alcanzable vía ${r.url} → YouTube verá IP residencial`);
+          else console.warn(`   proxy: ⚠️ configurado pero NO responde todavía (${rr.error || 'sin datos'}) — el watchdog lo reintentará`);
+        }).catch(() => {});
+      } else {
+        console.warn('   proxy: sin configurar — el auto-setup de Tailscale está en marcha en background');
+        console.warn(`      → ${r.error || 'sin detalles'}`);
+      }
+    } catch (err) {
+      console.warn('   proxy: auto-configuración falló:', err.message);
+    }
+  };
+  // Arranque: si ya hay proxy → nada que hacer. Si no → auto-setup completo
+  // (descarga/daemon/login) en background, y watchdog de reconexión.
+  const alreadyConfigured = () => !!(getProxyStatus().configured);
+  const reachable = () => checkProxyReachability().then((r) => r.reachable);
+  // El watchdog siempre arranca (también con proxy ya configurado): si el
+  // túnel cae (teléfono offline/IP cambiada), re-detecta con force.
+  startProxyWatchdog({ onProxyReady, checkProxyConfigured: alreadyConfigured, checkReachable: reachable, intervalMs: 60000 });
+  if (alreadyConfigured()) return;
+  startTailscaleAutoSetup({ onProxyReady, checkProxyConfigured: alreadyConfigured });
+}
+
 // ── Diagnóstico del proxy (Termux/Tailscale o residencial) ──
 // Solo informativo: no bloquea el arranque. Prueba el túnel con una petición
 // HTTPS real (generate_204 de Google, ~1KB) y reporta si YouTube vería una IP
@@ -668,9 +708,11 @@ function checkPotServer() {
 function checkProxyDiagnostics() {
   const st = getProxyStatus();
   if (!st.configured) {
-    console.warn('   proxy: ❌ sin configurar (YTDLP_PROXY o proxy.conf) → resolve/media salen por la IP del container');
-    console.warn('      → si googlevideo bloquea esta IP (ETIMEDOUT/403), configura un proxy residencial');
-    console.warn('        (Termux+Tailscale o residencial de pago) en proxy.conf — mira TERMUX_PROXY.md');
+    console.warn('   proxy: ❌ sin configurar todavía → resolve/media salen por la IP del container');
+    console.warn('      → el auto-setup de Tailscale está en marcha en background (sin consola):');
+    console.warn('        descarga el binario, arranca el daemon y te imprime el link de login en los logs.');
+    console.warn('        Abre ese link en el navegador con la MISMA cuenta del teléfono (termux-phone) y');
+    console.warn('        el server escribirá proxy.conf solo. Detalles: TERMUX_PROXY.md');
     return;
   }
   console.log(`   proxy: ${st.url} (${st.scheme})`);
@@ -1023,8 +1065,11 @@ async function main() {
     logPotPluginDiagnostics();
     detectLibc();
     checkPotServer();
-    // ── Diagnóstico del proxy (Termux/Tailscale o residencial) ──
-    checkProxyDiagnostics();
+    // ── Auto-configuración del proxy (detecta el teléfono vía Tailscale) ──
+    autoConfigureProxyDiagnostics().finally(() => {
+      // ── Diagnóstico del proxy (Termux/Tailscale o residencial) ──
+      checkProxyDiagnostics();
+    });
     console.log('   /api/music/health · /api/music/search?q=... · /api/music/stream?artist=&title= · /api/music/download?artist=&title= · /api/music/resolve?artist=&title=');
 
     // Túnel HTTPS automático (cloudflared): sin root, solo conexión saliente.

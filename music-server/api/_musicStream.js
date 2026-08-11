@@ -83,27 +83,124 @@ let YTDLP_PROXY = resolveProxyUrl();
 // ffmpeg solo soporta -http_proxy con proxy HTTP PLANO (no https:// ni socks):
 // se pasa solo cuando el esquema es http:// (la mayoría de proveedores residenciales).
 let YTDLP_PROXY_HTTP = /^http:\/\//i.test(YTDLP_PROXY) ? YTDLP_PROXY : '';
-// El agente NO depende del host de destino: depende solo de YTDLP_PROXY (fijo al
-// cargar el módulo). Un único singleton evita filtrar un agente + socket pool por
-// cada hostname distinto de googlevideo (rr1---sn-..., rr4---sn-... → leak).
-let PROXY_AGENT = (() => {
-  if (!YTDLP_PROXY) return null;
+// El agente NO depende del host de destino: depende solo de YTDLP_PROXY. Un único
+// singleton evita filtrar un agente + socket pool por cada hostname distinto de
+// googlevideo (rr1---sn-..., rr4---sn-... → leak). Se reconstruye en runtime
+// cuando autoConfigureProxy detecta el teléfono (applyProxyUrl).
+function buildProxyAgent(url) {
+  if (!url) return null;
   try {
-    if (/^socks(4|4a|5|5h):\/\//i.test(YTDLP_PROXY)) return new SocksProxyAgent(YTDLP_PROXY);
-    if (/^https?:\/\//i.test(YTDLP_PROXY)) return new HttpsProxyAgent(YTDLP_PROXY);
-    console.warn(`[music-stream] ⚠️ YTDLP_PROXY con esquema no soportado (esperado http:// o socks5://): ${YTDLP_PROXY.slice(0, 40)}…`);
+    if (/^socks(4|4a|5|5h):\/\//i.test(url)) return new SocksProxyAgent(url);
+    if (/^https?:\/\//i.test(url)) return new HttpsProxyAgent(url);
+    console.warn(`[music-stream] ⚠️ YTDLP_PROXY con esquema no soportado (esperado http:// o socks5://): ${url.slice(0, 40)}…`);
     return null;
   } catch (err) {
     console.warn(`[music-stream] ⚠️ YTDLP_PROXY inválido: ${err.message}`);
     return null;
   }
-})();
+}
+let PROXY_AGENT = buildProxyAgent(YTDLP_PROXY);
+// Aplica (o cambia en runtime) la URL del proxy: reconstruye el agente y la
+// copia HTTP para ffmpeg. La usa autoConfigureProxy al detectar el teléfono.
+function applyProxyUrl(url) {
+  YTDLP_PROXY = String(url || '').trim();
+  YTDLP_PROXY_HTTP = /^http:\/\//i.test(YTDLP_PROXY) ? YTDLP_PROXY : '';
+  PROXY_AGENT = buildProxyAgent(YTDLP_PROXY);
+}
 function getProxyAgent() {
   return PROXY_AGENT;
 }
 function getProxyUrl() {
   return YTDLP_PROXY;
 }
+// ── Auto-detección del teléfono (Termux + Tailscale) ──
+// Si el container corre tailscaled (setup-container.sh) y el teléfono está en la
+// misma tailnet, se descubre su SOCKS5 SOLO consultando `tailscale status --json`
+// — sin editar proxy.conf a mano. music-server.js lo llama al arranque.
+function runTailscaleStatusJson() {
+  return new Promise((resolve) => {
+    // Binarios candidatos: bin/tailscale (instalado por setup-container.sh), env,
+    // o PATH. Sockets candidatos: el del daemon userspace (~/.tailscale) y el
+    // por defecto. Se prueban hasta que uno responde.
+    const candidates = [
+      join(localBin, 'tailscale'),
+      process.env.TAILSCALE_BIN || '',
+      'tailscale',
+    ].filter((c) => c && (c === 'tailscale' || existsSync(c)));
+    const sockets = [
+      ['--socket', join(homedir(), '.tailscale', 'tailscaled.sock'), 'status', '--json'],
+      ['status', '--json'],
+    ];
+    let i = 0;
+    const total = candidates.length * sockets.length;
+    const attempt = () => {
+      if (i >= total) return resolve(null);
+      const bin = candidates[Math.floor(i / sockets.length)];
+      const args = sockets[i % sockets.length];
+      i += 1;
+      let out = '';
+      let settled = false;
+      const done = (v) => { if (settled) return; settled = true; clearTimeout(to); resolve(v); };
+      const to = setTimeout(() => { try { child.kill('SIGKILL'); } catch {} done(null); }, 6000);
+      const child = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+      child.stdout?.on('data', (d) => { out += d; });
+      child.on('close', (code) => { if (code === 0 && out.trim()) done(out.trim()); else attempt(); });
+      child.on('error', () => done(null));
+    };
+    attempt();
+  });
+}
+
+export async function discoverPhoneProxy() {
+  const raw = await runTailscaleStatusJson();
+  if (!raw) return null;
+  let data;
+  try { data = JSON.parse(raw); } catch { return null; }
+  const selfId = data?.Self?.ID;
+  const selfHost = String(data?.Self?.HostName || '').toLowerCase();
+  const peers = Object.values(data?.Peer || {}).filter((p) => p && Array.isArray(p.TailscaleIPs));
+  const pickIp = (p) => (p.TailscaleIPs || []).find((ip) => /^100\./.test(ip)) || null;
+  // 1) Peer cuyo hostname/DNSName contenga termux o phone (el teléfono).
+  for (const p of peers) {
+    const h = String(p.HostName || p.DNSName || '').toLowerCase();
+    if ((h.includes('termux') || h.includes('phone')) && pickIp(p)) return pickIp(p);
+  }
+  // 2) Cualquier peer que no sea self ni el propio container.
+  for (const p of peers) {
+    if (p.ID === selfId) continue;
+    const h = String(p.HostName || '').toLowerCase();
+    if (h === selfHost) continue;
+    if (pickIp(p)) return pickIp(p);
+  }
+  return null;
+}
+
+// Auto-configura el proxy si no hay YTDLP_PROXY/proxy.conf válido: detecta el
+// teléfono vía la tailnet local y escribe proxy.conf + aplica el agente. Lo
+// llama music-server.js al arranque (antes del diagnóstico del proxy) y el
+// watchdog. Con { force: true } se RE-DETECTA aunque ya haya proxy configurado
+// (IP vieja del teléfono tras dormirse/cambiar) — el watchdog lo usa.
+export async function autoConfigureProxy({ force = false } = {}) {
+  if (!force && YTDLP_PROXY && PROXY_AGENT) {
+    return { configured: true, source: 'configurado (YTDLP_PROXY/proxy.conf)', url: YTDLP_PROXY };
+  }
+  try {
+    const ip = await discoverPhoneProxy();
+    if (!ip) return { configured: false, error: 'teléfono no detectado en la tailnet (¿tailscale up en ambos lados?)' };
+    const url = `socks5://${ip}:1080`;
+    applyProxyUrl(url);
+    // Persistir en proxy.conf para futuros arranques (sin daemon tailscale).
+    try {
+      const existing = readFileSync(PROXY_CONF_FILE, 'utf8').split(/\r?\n/)[0].trim();
+      if (existing !== url) writeFileSync(PROXY_CONF_FILE, url + '\n', 'utf8');
+    } catch { try { writeFileSync(PROXY_CONF_FILE, url + '\n', 'utf8'); } catch {} }
+    console.info(`[music-stream] proxy auto-detectado vía Tailscale: ${url} → YouTube verá IP residencial`);
+    return { configured: true, source: 'auto-detectado (Tailscale)', url };
+  } catch (err) {
+    return { configured: false, error: String(err?.message || err).slice(0, 160) };
+  }
+}
+
 // Estado del proxy para /api/music/health: permite diagnosticar sin mirar logs
 // si el túnel del teléfono (Termux/Tailscale) está vivo y configurado.
 export function getProxyStatus() {

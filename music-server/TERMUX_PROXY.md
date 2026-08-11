@@ -46,29 +46,41 @@ tailscale ip -4
 
 ---
 
-## 2) Container de HidenCloud (una vez)
+## 2) Container de HidenCloud — 100% AUTOMÁTICO, SIN consola
 
-Sube los archivos del `music-server/` actualizado (incluye la integración de
-proxy y el health). Luego, **por la web console** (sin SSH):
+Solo sube los archivos del `music-server/` actualizado (incluye
+`api/_tailscaleSetup.js`). Al arrancar, `node music-server.js` hace **todo**
+solo — no necesitas lanzar ningún comando en la web console:
 
-```bash
-# 1. Descarga el binario de Tailscale (arm64) y súbelo a bin/
-#    (o descárgalo tú localmente y súbelo por FTP/panel):
-#    https://pkgs.tailscale.com/stable/#static → tailscale_*.tgz (linux arm64)
-#    Extrae tailscale + tailscaled y súbelos a /home/container/bin/
-#    chmod +x /home/container/bin/tailscale*
+1. Detecta que no hay proxy → descarga el binario estático de Tailscale
+   (auto-detecta la arquitectura; formato real del tarball
+   `tailscale_<ver>_<arch>.tgz`, sin "linux").
+2. Arranca `tailscaled` en userspace (`--tun=userspace-networking`, sin root).
+3. Lanza `tailscale up --hostname=hidencloud-music` y **imprime el link de
+   login EN LOS LOGS** (busca `AUTENTICA TAILSCALE DEL CONTAINER`):
+   ```
+   🔗 AUTENTICA TAILSCALE DEL CONTAINER (una vez):
+   Abre este link en tu navegador y acepta con la MISMA cuenta
+   con la que autenticaste el teléfono (termux-phone):
 
-# 2. Arranca tailscaled en userspace (sin TUN, sin root):
-cd /home/container/bin
-./tailscaled --state=/home/container/.tailscale.state --tun=userspace-networking &
-sleep 3
-./tailscale up --hostname=hidencloud-music
-# → mismo flujo: link de login → acepta en el navegador
+       https://login.tailscale.com/a/xxxxxxxxxxxx
+   ```
+   Abre ese link en el navegador de tu PC/teléfono y acepta (solo la primera
+   vez). El link se reimprime si expira.
+4. Detecta la autenticación por polling, encuentra el teléfono
+   (`tailscale status --json` → peer `termux-phone`) y escribe `proxy.conf`
+   solo: `socks5://<IP-del-teléfono>:1080`.
+5. Verifica el túnel y lo reporta: `proxy: ✅ alcanzable`.
+6. Watchdog: cada minuto re-verifica; si el teléfono se duerme o cambia de IP,
+   re-detecta solo. Nunca bloquea el arranque ni los streams.
 
-# 3. Crea el archivo de proxy del music-server:
-echo 'socks5://100.x.y.z:1080' > /home/container/proxy.conf
-#    (100.x.y.z = IP del TELÉFONO del paso 1)
-```
+> 💡 **¿Quieres hacerlo a mano igualmente?** El script `setup-container.sh`
+> sigue disponible (hace los pasos 1-5 en un comando), pero ya es opcional: el
+> propio server hace lo mismo al arrancar.
+
+> **Alternativas si prefieres no usar Tailscale:** puedes poner
+> `socks5://100.x.y.z:1080` en la variable `YTDLP_PROXY` del panel, o subir
+> `proxy.conf` a mano — el server lo respeta igual.
 
 > **¿No se puede ejecutar nada?** Los paneles tipo HidenCloud permiten subir
 > archivos y setear variables. Puedes:

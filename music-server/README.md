@@ -90,6 +90,20 @@ if [ -f /home/container/package.json ]; then /usr/local/bin/npm install; fi
 
 Los binarios se descargan con `setup.sh` en `/home/container/bin/`.
 
+## Proxy residencial AUTOMÁTICO (Termux + Tailscale) — SIN consola
+
+Si el container no tiene `YTDLP_PROXY` ni `proxy.conf`, el server hace **todo**
+solo al arrancar (vía `api/_tailscaleSetup.js`): descarga el binario estático
+de Tailscale, arranca el daemon en userspace (sin root), **imprime el link de
+login en los logs**, espera a que lo aceptes en el navegador (misma cuenta que
+teléfono), detecta el peer `termux-phone` en la tailnet y escribe `proxy.conf`
+solo. Incluye watchdog de reconexión. No se necesita la web console para nada.
+
+Detalles y pasos: `TERMUX_PROXY.md`.
+
+(El script `setup-container.sh` sigue disponible si algún día quieres hacerlo
+en un comando a mano, pero es opcional.)
+
 ## ⚠️ Permisos de ejecución al subir por panel
 
 Si subes la carpeta con el file manager/zip del panel, los binarios de `bin/`
@@ -105,7 +119,10 @@ la carpeta) y deja que el server lo re-descargue en el próximo arranque.
 music-server.js          → HTTP server (CORS, rate-limit, routing, túnel cloudflared)
 api/_music.js            → Búsqueda en Deezer API
 api/_musicStream.js      → Stream completo (yt-dlp + ffmpeg + proxy + cache)
+api/_tailscaleSetup.js   → Auto-setup de Tailscale del container (sin consola) + watchdog
 setup.sh                 → Descarga binarios para linux arm64
+setup-container.sh       → Tailscale del container + proxy.conf automático (opcional, manual)
 bin/                     → Binarios (yt-dlp, ffmpeg, cloudflared, bgutil-pot, plugins)
 cookies.txt              → Cookies de sesión de YouTube (NO commitear)
+proxy.conf               → Proxy residencial (socks5://IP-del-teléfono:1080) — auto-generado
 ```
