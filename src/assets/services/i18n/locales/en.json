@@ -32,6 +32,8 @@
   "auth.nickname": "Nickname",
   "auth.username_invalid_chars": "Username can only contain letters, numbers and underscores",
   "auth.username_length": "Username must be between 3 and 20 characters",
+  "comunidades.mature": "+18 Content",
+  "comunidades.mature_hint": "Mark the community as only suitable for adults 18+",
   "modal.displayname_length": "Display name can't exceed 50 characters",
   "modal.pronouns_length": "Pronouns can't exceed 30 characters",
   "auth.username": "Username",

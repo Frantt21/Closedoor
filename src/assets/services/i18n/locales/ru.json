@@ -125,6 +125,8 @@
   "common.you": "Вы",
   "comunidades.empty": "Сообществ пока нет",
   "comunidades.empty_sub": "Присоединяйтесь или создайте сообщество, чтобы начать.",
+  "comunidades.mature": "Контент 18+",
+  "comunidades.mature_hint": "Отметьте сообщество как предназначенное только для взрослых 18+",
   "comunidades.title": "Сообщества",
   "comunidades.avatar": "Аватар",
   "comunidades.banner": "Баннер",

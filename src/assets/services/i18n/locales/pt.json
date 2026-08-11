@@ -125,6 +125,8 @@
   "common.you": "Você",
   "comunidades.empty": "Nenhuma comunidade ainda",
   "comunidades.empty_sub": "Entre ou crie uma comunidade para começar.",
+  "comunidades.mature": "Conteúdo +18",
+  "comunidades.mature_hint": "Marque a comunidade como adequada apenas para maiores de 18 anos",
   "comunidades.title": "Comunidades",
   "comunidades.avatar": "Avatar",
   "comunidades.banner": "Banner",

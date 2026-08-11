@@ -17,7 +17,7 @@ export function isAdminRole(roles) {
 const COMMUNITY_SELECT = [
   'id', 'slug', 'name', 'description', 'rules', 'interests',
   'avatar_url', 'banner_url', 'accent_color', 'accent_color_secondary',
-  'is_private', 'owner_id', 'member_count', 'post_count', 'created_at', 'updated_at',
+  'is_private', 'is_mature', 'owner_id', 'member_count', 'post_count', 'created_at', 'updated_at',
   'profiles!communities_owner_id_fkey (id, username, displayname, avatar_url, roles)',
 ].join(',');
 
@@ -108,7 +108,7 @@ export async function canCreateCommunity(userId, { roles = [] } = {}) {
 }
 
 // ── Crear comunidad ──
-export async function createCommunity({ userId, name, description, rules, interests, avatarUrl, bannerUrl, accentColor, accentColorSecondary, isPrivate }) {
+export async function createCommunity({ userId, name, description, rules, interests, avatarUrl, bannerUrl, accentColor, accentColorSecondary, isPrivate, isMature }) {
   if (!userId) throw new Error('auth_required');
   const cleanName = String(name || '').trim();
   if (cleanName.length < 3 || cleanName.length > COMMUNITY_NAME_MAX) {
@@ -172,6 +172,7 @@ export async function createCommunity({ userId, name, description, rules, intere
       accent_color: accentColor || null,
       accent_color_secondary: accentColorSecondary || null,
       is_private: !!isPrivate,
+      is_mature: !!isMature,
       owner_id: userId,
     })
     .select(COMMUNITY_SELECT)

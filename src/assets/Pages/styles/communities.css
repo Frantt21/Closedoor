@@ -45,6 +45,19 @@
   font-size: 0.78rem;
   color: var(--color-text-muted, #6b7280);
 }
+/* Badge +18 en las cards del listado */
+.comunidades-card-mature {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 6px;
+}
 
 .comunidades-empty {
   text-align: center;
@@ -86,7 +99,6 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 16px;
   padding: 10px 14px;
   border-radius: 10px;
   background: rgba(245, 158, 11, 0.08);
@@ -267,6 +279,60 @@
 }
 .community-create-privacy-icon { font-size: 1.1rem; }
 
+/* ── Toggle +18 (contenido adulto) dentro de la card de privacidad ── */
+.community-create-mature-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border, #2a2a2a);
+}
+.community-create-mature-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.community-create-mature-info strong {
+  font-size: 0.85rem;
+  color: var(--color-text, #fff);
+}
+.community-create-mature-info small {
+  font-size: 0.72rem;
+  color: var(--color-text-muted, #6b7280);
+}
+.community-create-mature-switch {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
+  background: var(--overlay-bg);
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+}
+.community-create-mature-switch--on {
+  background: #ef4444;
+}
+.community-create-mature-switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s ease;
+}
+.community-create-mature-switch--on .community-create-mature-switch-knob {
+  transform: translateX(18px);
+}
+
 /* ── Página de comunidad ── */
 .community-page { max-width: 1100px; margin: 0 auto; padding-bottom: 40px; }
 .community-page-loading {
@@ -383,6 +449,19 @@
   gap: 4px;
   font-size: 0.75rem;
   color: #f59e0b;
+}
+/* Badge +18 en el header de la comunidad */
+.community-header-mature {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  border-radius: 6px;
 }
 .community-header-stats {
   display: flex;

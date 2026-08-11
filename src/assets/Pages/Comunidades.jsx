@@ -202,6 +202,11 @@ export default function Comunidades() {
                           <FaLock />
                         </span>
                       )}
+                      {c.is_mature && (
+                        <span className="comunidades-card-mature" title={t('comunidades.mature')}>
+                          +18
+                        </span>
+                      )}
                     </div>
 
                     <span className="explore-card-followers">

@@ -44,6 +44,7 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
   const [interestInput, setInterestInput] = useState('');
   const [showSuggested, setShowSuggested] = useState(false);
   const [isPrivate, setIsPrivate] = useState(false);
+  const [isMature, setIsMature] = useState(false);
   const [accentColor, setAccentColor] = useState('');
   const [accentSecondary, setAccentSecondary] = useState('');
   const [extractedColors, setExtractedColors] = useState([]);
@@ -71,6 +72,7 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
     setInterestInput('');
     setShowSuggested(false);
     setIsPrivate(false);
+    setIsMature(false);
     setAccentColor('');
     setAccentSecondary('');
     setExtractedColors([]);
@@ -218,6 +220,7 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
         accentColor: accentColor || null,
         accentColorSecondary: accentSecondary || null,
         isPrivate,
+        isMature,
       });
       toast.success(t('comunidades.created'));
       if (onSuccess) onSuccess(community);
@@ -595,43 +598,59 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
                   </span>
                 </button>
               </div>
+
+              {/* ── +18 (contenido adulto) ── */}
+              <div className="community-create-mature-row">
+                <div className="community-create-mature-info">
+                  <strong>{t('comunidades.mature')}</strong>
+                  <small>{t('comunidades.mature_hint')}</small>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isMature}
+                  className={`community-create-mature-switch${isMature ? ' community-create-mature-switch--on' : ''}`}
+                  onClick={() => setIsMature((prev) => !prev)}
+                >
+                  <span className="community-create-mature-knob" />
+                </button>
+              </div>
             </div>
+
+            {/* ── Aviso compacto del requisito de seguidores / límite (fallback).
+                Va justo DEBAJO de la card de privacidad. ── */}
+            {needsLimit ? (
+              <div className="community-create-gate">
+                <FaLock className="community-create-gate-icon" />
+                <div className="community-create-gate-texts">
+                  <p className="community-create-gate-text">
+                    {t('comunidades.limit_reached', { n: MAX_COMMUNITIES_PER_USER })}
+                  </p>
+                  <p className="community-create-gate-sub">{t('comunidades.limit_hint', { n: MAX_COMMUNITIES_PER_USER })}</p>
+                </div>
+              </div>
+            ) : needsFollowers ? (
+              <div className="community-create-gate">
+                <FaLock className="community-create-gate-icon" />
+                <div className="community-create-gate-texts">
+                  <p className="community-create-gate-text">
+                    {t('comunidades.followers_required', { n: MIN_FOLLOWERS_TO_CREATE })}
+                  </p>
+                  <p className="community-create-gate-sub">
+                    {t('comunidades.followers_current', { n: followers || 0 })}
+                  </p>
+                </div>
+              </div>
+            ) : isAdmin ? (
+              <div className="community-create-gate community-create-gate--admin">
+                <FaUsers className="community-create-gate-icon" />
+                <div className="community-create-gate-texts">
+                  <p className="community-create-gate-text">{t('comunidades.admin_unlimited')}</p>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
-
-        {/* ── Aviso compacto del requisito de seguidores / límite (fallback).
-            Va DESPUÉS del grid (bajo privacidad) para no crear espacio
-            innecesario entre el header y el contenido del modal. ── */}
-        {needsLimit ? (
-          <div className="community-create-gate">
-            <FaLock className="community-create-gate-icon" />
-            <div className="community-create-gate-texts">
-              <p className="community-create-gate-text">
-                {t('comunidades.limit_reached', { n: MAX_COMMUNITIES_PER_USER })}
-              </p>
-              <p className="community-create-gate-sub">{t('comunidades.limit_hint', { n: MAX_COMMUNITIES_PER_USER })}</p>
-            </div>
-          </div>
-        ) : needsFollowers ? (
-          <div className="community-create-gate">
-            <FaLock className="community-create-gate-icon" />
-            <div className="community-create-gate-texts">
-              <p className="community-create-gate-text">
-                {t('comunidades.followers_required', { n: MIN_FOLLOWERS_TO_CREATE })}
-              </p>
-              <p className="community-create-gate-sub">
-                {t('comunidades.followers_current', { n: followers || 0 })}
-              </p>
-            </div>
-          </div>
-        ) : isAdmin ? (
-          <div className="community-create-gate community-create-gate--admin">
-            <FaUsers className="community-create-gate-icon" />
-            <div className="community-create-gate-texts">
-              <p className="community-create-gate-text">{t('comunidades.admin_unlimited')}</p>
-            </div>
-          </div>
-        ) : null}
       </div>
     </ModalShell>
   );

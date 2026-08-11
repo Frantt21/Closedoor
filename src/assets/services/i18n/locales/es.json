@@ -32,6 +32,8 @@
   "auth.nickname": "Apodo",
   "auth.username_invalid_chars": "El usuario solo puede contener letras, números y guiones bajos",
   "auth.username_length": "El usuario debe tener entre 3 y 20 caracteres",
+  "comunidades.mature": "Contenido +18",
+  "comunidades.mature_hint": "Marca la comunidad como apta solo para mayores de 18 años",
   "modal.displayname_length": "El nombre mostrado no puede superar los 50 caracteres",
   "modal.pronouns_length": "Los pronombres no pueden superar los 30 caracteres",
   "auth.username": "Nombre de usuario",

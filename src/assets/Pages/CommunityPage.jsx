@@ -566,6 +566,7 @@ export default function CommunityPage() {
           <span className="community-header-slug" style={{ color: contrastColor }}>
             c/{community.slug}
             {community.is_private && <span className="community-header-private"><FaLock /> {t('comunidades.private')}</span>}
+            {community.is_mature && <span className="community-header-mature">+18</span>}
           </span>
 
           <div className="community-header-stats" style={{ color: contrastColor }}>
