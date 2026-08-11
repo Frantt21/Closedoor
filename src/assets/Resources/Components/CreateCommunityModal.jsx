@@ -3,7 +3,7 @@ import ModalShell from './ModalShell';
 import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../services/i18n/useI18n';
 import { toast } from 'react-toastify';
-import { FaCamera, FaSpinner, FaLock, FaGlobe, FaUsers } from 'react-icons/fa';
+import { FaCamera, FaSpinner, FaLock, FaGlobe, FaUsers, FaCheck, FaTimes } from 'react-icons/fa';
 import { uploadWithLocalPreview } from '../../services/cdnService';
 import { extractColors } from '../../services/colorExtractor';
 import {
@@ -264,9 +264,9 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
           <div className="fc-modal-grid-left">
             {/* ── Preview ── */}
             <div
-              className="community-create-preview"
+              className={`community-create-preview${accentColor || accentSecondary ? ' community-create-preview--accent' : ''}`}
               style={{
-                '--cc-accent': accentColor || 'transparent',
+                '--cc-accent': accentColor || accentSecondary || 'transparent',
                 '--cc-accent-2': accentSecondary || accentColor || 'transparent',
               }}
             >
@@ -336,18 +336,32 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
             <div className="fc-modal-card">
               <label className="fc-modal-label">
                 {t('comunidades.name')}
-                <input
-                  className="fc-modal-input"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder={t('comunidades.name_placeholder')}
-                  maxLength={COMMUNITY_NAME_MAX}
-                />
+                <div className="community-create-name-wrap">
+                  <input
+                    className="fc-modal-input community-create-name-input"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder={t('comunidades.name_placeholder')}
+                    maxLength={COMMUNITY_NAME_MAX}
+                  />
+                  {slugState === 'checking' && (
+                    <span className="community-create-name-check" title={t('common.loading')}>
+                      <FaSpinner className="fc-spin" />
+                    </span>
+                  )}
+                  {slugState === 'available' && (
+                    <span className="community-create-name-check community-create-name-check--ok" title={t('comunidades.name_available', { slug })}>
+                      <FaCheck />
+                    </span>
+                  )}
+                  {slugState === 'taken' && (
+                    <span className="community-create-name-check community-create-name-check--bad" title={t('comunidades.name_taken')}>
+                      <FaTimes />
+                    </span>
+                  )}
+                </div>
                 <span className="fc-modal-char-count">{name.length}/{COMMUNITY_NAME_MAX}</span>
               </label>
-              {slugState === 'checking' && <p className="community-create-slug-status">{t('common.loading')}</p>}
-              {slugState === 'taken' && <p className="community-create-slug-status community-create-slug-status--bad">{t('comunidades.name_taken')}</p>}
-              {slugState === 'available' && <p className="community-create-slug-status community-create-slug-status--ok">{t('comunidades.name_available', { slug })}</p>}
 
               <label className="fc-modal-label">
                 {t('comunidades.description')}
@@ -453,53 +467,104 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
                 </div>
               </div>
             </div>
-            {/* ── Color acento ── */}
+            {/* ── Color de acento: primario + secundario (patrón modal de perfil) ── */}
             <div className="fc-modal-card">
               <label className="fc-modal-label">{t('comunidades.accent_color')}</label>
               {banner.trim() && extracting && <p className="fc-modal-social-hint">{t('modal.extracting_colors')}</p>}
               {banner.trim() && !extracting && extractedColors.length < 4 && (
                 <p className="fc-modal-social-hint">{t('modal.add_banner_hint')}</p>
               )}
-              <div className="fc-modal-color-picker">
-                {banner.trim() && !extracting && extractedColors.length >= 4 && extractedColors.map((color) => (
-                  <button
-                    key={color}
-                    type="button"
-                    className={`fc-modal-color-swatch ${accentColor === color ? 'fc-modal-color-swatch--selected' : ''}`}
-                    style={{ '--swatch-color': color }}
-                    onClick={() => setAccentColor(color)}
-                    title={color}
+
+              {/* ── Color primario ── */}
+              <div className="fc-modal-color-section">
+                <span className="fc-modal-color-subtitle">{t('modal.color_primary')}</span>
+                <div className="fc-modal-color-picker">
+                  {banner.trim() && !extracting && extractedColors.length >= 4 && extractedColors.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      className={`fc-modal-color-swatch ${accentColor === color ? 'fc-modal-color-swatch--selected' : ''}`}
+                      style={{ '--swatch-color': color }}
+                      onClick={() => setAccentColor(color)}
+                      title={color}
+                    >
+                      {accentColor === color && (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </button>
+                  ))}
+                  <label
+                    htmlFor="community-accent-input"
+                    className="fc-modal-color-swatch"
+                    style={{
+                      width: 36, height: 36, borderRadius: '50%',
+                      background: accentColor || '#000000',
+                      border: '2px solid var(--color-border, #2a2a2a)',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                    title={`${t('modal.accent_color_custom')}: ${accentColor || '#000000'}`}
                   >
-                    {accentColor === color && (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    )}
-                  </button>
-                ))}
-                <label
-                  htmlFor="community-accent-input"
-                  className="fc-modal-color-swatch"
-                  style={{
-                    width: 36, height: 36, borderRadius: '50%',
-                    background: accentColor || '#000000',
-                    border: '2px solid var(--color-border, #2a2a2a)',
-                    cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}
-                  title={`${t('modal.accent_color_custom')}: ${accentColor || '#000000'}`}
-                >
-                  <input
-                    id="community-accent-input"
-                    type="color"
-                    value={accentColor || '#000000'}
-                    onChange={(e) => setAccentColor(e.target.value)}
-                    style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
-                  />
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="3" />
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                  </svg>
-                </label>
+                    <input
+                      id="community-accent-input"
+                      type="color"
+                      value={accentColor || '#000000'}
+                      onChange={(e) => setAccentColor(e.target.value)}
+                      style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
+                    />
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                    </svg>
+                  </label>
+                </div>
+              </div>
+
+              {/* ── Color secundario ── */}
+              <div className="fc-modal-color-section">
+                <span className="fc-modal-color-subtitle">{t('modal.accent_color_secondary')}</span>
+                <div className="fc-modal-color-picker">
+                  <label
+                    htmlFor="community-accent-secondary-input"
+                    className="fc-modal-color-swatch"
+                    style={{
+                      width: 36, height: 36, borderRadius: '50%',
+                      background: accentSecondary || '#000000',
+                      border: '2px solid var(--color-border, #2a2a2a)',
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                    title={`${t('modal.accent_color_secondary')}: ${accentSecondary || '#000000'}`}
+                  >
+                    <input
+                      id="community-accent-secondary-input"
+                      type="color"
+                      value={accentSecondary || '#000000'}
+                      onChange={(e) => setAccentSecondary(e.target.value)}
+                      style={{ position: 'absolute', opacity: 0, width: 0, height: 0, pointerEvents: 'none' }}
+                    />
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                    </svg>
+                  </label>
+                  {accentSecondary && (
+                    <button
+                      type="button"
+                      onClick={() => setAccentSecondary('')}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--color-text-muted, #6b7280)',
+                        fontSize: '0.75rem',
+                        cursor: 'pointer',
+                        padding: '2px 6px',
+                      }}
+                    >
+                      {t('common.clear')}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 

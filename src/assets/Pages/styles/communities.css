@@ -106,10 +106,47 @@
   border: 1px solid var(--color-border, #2a2a2a);
   background: var(--color-surface, #1c1c1e);
 }
+/* Con acento: mismo tratamiento que .explore-card--accent — el contenedor
+   pasa a fondo negro y solo la zona de info recibe el gradiente de los
+   acentos (primario→secundario al 18%, igual que .explore-card-body).
+   El banner NO usa el gradiente a saturación completa (eso oscurecía los
+   colores hasta casi negro): queda neutro con solo un tinte sutil del
+   acento, como el banner de explore (superficie + overlay). */
+.community-create-preview--accent {
+  background: var(--color-bg, #000000);
+}
+.community-create-preview--accent .community-create-preview-avatar {
+  border-color: color-mix(in srgb, var(--cc-accent, transparent) 40%, transparent);
+}
+.community-create-preview--accent .community-create-preview-info {
+  background: linear-gradient(180deg,
+      color-mix(in srgb, var(--cc-accent, transparent) 18%, transparent) 0%,
+      color-mix(in srgb, var(--cc-accent-2, var(--cc-accent, transparent)) 18%, transparent) 100%
+    ),
+    var(--color-bg, #000000);
+}
 .community-create-preview-banner {
   position: relative;
   height: 120px;
-  background: linear-gradient(135deg, var(--cc-accent, #333), var(--cc-accent-2, #222));
+  background: var(--color-surface, #1c1c1e);
+}
+.community-create-preview--accent .community-create-preview-banner {
+  background: linear-gradient(135deg,
+      color-mix(in srgb, var(--cc-accent, #333) 48%, transparent) 0%,
+      color-mix(in srgb, var(--cc-accent-2, var(--cc-accent, #222)) 48%, transparent) 100%
+    ),
+    var(--color-surface, #1c1c1e);
+}
+/* Overlay oscuro SOLO sobre la imagen del banner (igual que .explore-card-overlay).
+   Con :has(img) no se aplica al estado sin imagen (tinte de acento), así no se
+   vuelve a oscurecer el acento cuando aún no hay banner subido. */
+.community-create-preview-banner:has(img)::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 100%);
+  pointer-events: none;
+  z-index: 1;
 }
 .community-create-preview-banner img {
   position: absolute;
@@ -120,7 +157,13 @@
 }
 .community-create-preview-banner-empty { position: absolute; inset: 0; }
 /* Botón de cámara del banner: usa fc-preview-banner-edit (modal.css) */
-.community-create-preview-avatar-wrap { position: absolute; bottom: -30px; left: 16px; }
+.community-create-preview-avatar-wrap {
+  position: absolute;
+  bottom: -30px;
+  left: 16px;
+  /* Por encima del overlay oscuro (::after) para que el avatar no se oscurezca */
+  z-index: 2;
+}
 .community-create-preview-avatar {
   position: relative;
   width: 76px;
@@ -170,9 +213,27 @@
   font-size: 0.72rem;
   color: #f59e0b;
 }
-.community-create-slug-status { margin: 6px 0 0; font-size: 0.78rem; }
-.community-create-slug-status--ok { color: #22c55e; }
-.community-create-slug-status--bad { color: #ef4444; }
+/* ── Check de disponibilidad del nombre DENTRO del input ── */
+.community-create-name-wrap {
+  position: relative;
+}
+.community-create-name-input {
+  padding-right: 42px;
+}
+.community-create-name-check {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #6b7280);
+  pointer-events: none;
+}
+.community-create-name-check--ok { color: #22c55e; }
+.community-create-name-check--bad { color: #ef4444; }
 .fc-modal-input-hint { display: block; margin-top: 4px; font-size: 0.72rem; color: var(--color-text-muted, #6b7280); }
 
 .community-create-privacy-row {
