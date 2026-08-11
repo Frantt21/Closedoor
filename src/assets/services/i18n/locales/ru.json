@@ -716,5 +716,8 @@
   "comunidades.owner_cannot_leave": "Владелец не может покинуть сообщество. Сначала передайте право владения.",
   "comunidades.limit_reached": "Вы достигли лимита в {n} сообществ",
   "comunidades.limit_hint": "Максимум {n} сообществ на пользователя",
-  "comunidades.admin_unlimited": "Администратор может создавать сообщества без ограничений"
+  "comunidades.admin_unlimited": "Администратор может создавать сообщества без ограничений",
+  "comunidades.filter_popular": "Популярные",
+  "comunidades.filter_newest": "Новые",
+  "comunidades.filter_active": "Активные"
 }

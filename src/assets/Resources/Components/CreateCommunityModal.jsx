@@ -310,7 +310,7 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
                 )}
                 <button
                   type="button"
-                  className="community-create-preview-banner-btn"
+                  className="fc-preview-banner-edit"
                   onClick={(e) => { e.stopPropagation(); document.getElementById('cc-banner-input')?.click(); }}
                   title={t('comunidades.banner')}
                 >
@@ -332,22 +332,23 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
                         {(name.trim() || 'C').charAt(0).toUpperCase()}
                       </span>
                     )}
+                    {/* Overlay de edición (mismo patrón que el modal de perfil) */}
+                    <button
+                      type="button"
+                      className="fc-preview-avatar-edit"
+                      onClick={() => document.getElementById('cc-avatar-input')?.click()}
+                      title={t('comunidades.avatar')}
+                    >
+                      <FaCamera />
+                    </button>
+                    <input
+                      id="cc-avatar-input"
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      style={{ display: 'none' }}
+                      onChange={(e) => handleFileUpload(e, 'avatar')}
+                    />
                   </div>
-                  <button
-                    type="button"
-                    className="community-create-preview-avatar-btn"
-                    onClick={() => document.getElementById('cc-avatar-input')?.click()}
-                    title={t('comunidades.avatar')}
-                  >
-                    <FaCamera />
-                  </button>
-                  <input
-                    id="cc-avatar-input"
-                    type="file"
-                    accept="image/jpeg,image/png,image/gif,image/webp"
-                    style={{ display: 'none' }}
-                    onChange={(e) => handleFileUpload(e, 'avatar')}
-                  />
                 </div>
               </div>
               <div className="community-create-preview-info">

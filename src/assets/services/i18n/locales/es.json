@@ -716,5 +716,8 @@
   "comunidades.owner_cannot_leave": "El dueño no puede abandonar la comunidad. Transfiere la propiedad primero.",
   "comunidades.limit_reached": "Has alcanzado el límite de {n} comunidades",
   "comunidades.limit_hint": "Máximo {n} comunidades por usuario",
-  "comunidades.admin_unlimited": "Como administrador puedes crear comunidades sin límite"
+  "comunidades.admin_unlimited": "Como administrador puedes crear comunidades sin límite",
+  "comunidades.filter_popular": "Populares",
+  "comunidades.filter_newest": "Nuevas",
+  "comunidades.filter_active": "Activas"
 }

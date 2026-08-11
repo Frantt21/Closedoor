@@ -716,5 +716,8 @@
   "comunidades.owner_cannot_leave": "オーナーはコミュニティを離れられません。先に所有権を移譲してください。",
   "comunidades.limit_reached": "{n}件のコミュニティ作成上限に達しました",
   "comunidades.limit_hint": "ユーザーごとに最大{n}件のコミュニティ",
-  "comunidades.admin_unlimited": "管理者は制限なくコミュニティを作成できます"
+  "comunidades.admin_unlimited": "管理者は制限なくコミュニティを作成できます",
+  "comunidades.filter_popular": "人気",
+  "comunidades.filter_newest": "新しい",
+  "comunidades.filter_active": "アクティブ"
 }

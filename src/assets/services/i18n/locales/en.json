@@ -716,5 +716,8 @@
   "comunidades.owner_cannot_leave": "The owner cannot leave the community. Transfer ownership first.",
   "comunidades.limit_reached": "You've reached the limit of {n} communities",
   "comunidades.limit_hint": "Up to {n} communities per user",
-  "comunidades.admin_unlimited": "As an admin you can create communities without limits"
+  "comunidades.admin_unlimited": "As an admin you can create communities without limits",
+  "comunidades.filter_popular": "Popular",
+  "comunidades.filter_newest": "Newest",
+  "comunidades.filter_active": "Active"
 }

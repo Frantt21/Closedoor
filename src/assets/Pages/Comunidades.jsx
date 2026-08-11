@@ -20,14 +20,15 @@ export default function Comunidades() {
   const [communities, setCommunities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [activeFilter, setActiveFilter] = useState('popular');
   const [showCreate, setShowCreate] = useState(false);
   const [checkingPerms, setCheckingPerms] = useState(false);
   const searchTimerRef = useRef(null);
 
-  const load = useCallback(async (query = '') => {
+  const load = useCallback(async (query = '', sort = 'popular') => {
     setLoading(true);
     try {
-      const data = await getCommunities({ search: query, limit: 60 });
+      const data = await getCommunities({ search: query, sort, limit: 60 });
       setCommunities(data);
     } catch (err) {
       console.error('[Comunidades] Error loading:', err);
@@ -37,13 +38,13 @@ export default function Comunidades() {
     }
   }, []);
 
-  useEffect(() => { load(''); }, [load]);
+  useEffect(() => { load('', activeFilter); }, [load, activeFilter]);
 
-  // Búsqueda con debounce
+  // Búsqueda con debounce (mantiene el filtro activo)
   const handleSearch = (value) => {
     setSearch(value);
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
-    searchTimerRef.current = setTimeout(() => load(value), 350);
+    searchTimerRef.current = setTimeout(() => load(value, activeFilter), 350);
   };
 
   // Realtime: actualizar contadores de miembros/posts en el listado
@@ -92,21 +93,14 @@ export default function Comunidades() {
     }
   };
 
+  const filters = [
+    { key: 'popular', label: t('comunidades.filter_popular') },
+    { key: 'newest', label: t('comunidades.filter_newest') },
+    { key: 'active', label: t('comunidades.filter_active') },
+  ];
+
   return (
     <div className="comunidades-page">
-      <div className="comunidades-header">
-        <h2 className="comunidades-title">{t('comunidades.title')}</h2>
-        <button
-          type="button"
-          className="explore-filter-btn comunidades-create-btn"
-          onClick={handleCreateClick}
-          disabled={!user?.id || checkingPerms}
-          title={user?.id ? '' : t('auth.login_btn')}
-        >
-          {checkingPerms ? <FaSpinner className="fc-spin" /> : <FaPlus />} {t('comunidades.create_btn')}
-        </button>
-      </div>
-
       <div className="explore-search">
         <div className="explore-search-wrap">
           <FaSearch className="explore-search-icon" />
@@ -118,6 +112,23 @@ export default function Comunidades() {
             placeholder={t('comunidades.search_placeholder')}
           />
         </div>
+      </div>
+
+      {/* ── Fila de filtros (mismo patrón que Explore) ── */}
+      <div className="explore-filters">
+        {filters.map((f) => (
+          <button
+            key={f.key}
+            type="button"
+            className={`explore-filter-btn${activeFilter === f.key ? ' explore-filter-btn--active' : ''}`}
+            onClick={() => {
+              setActiveFilter(f.key);
+              load(search, f.key);
+            }}
+          >
+            {f.label}
+          </button>
+        ))}
       </div>
 
       {loading ? (
@@ -213,6 +224,19 @@ export default function Comunidades() {
           })}
         </div>
       )}
+
+      {/* ── Botón Crear al final (como acción principal de la página) ── */}
+      <div className="comunidades-create-bar">
+        <button
+          type="button"
+          className="explore-filter-btn explore-filter-btn--active comunidades-create-btn"
+          onClick={handleCreateClick}
+          disabled={!user?.id || checkingPerms}
+          title={user?.id ? '' : t('auth.login_btn')}
+        >
+          {checkingPerms ? <FaSpinner className="fc-spin" /> : <FaPlus />} {t('comunidades.create_btn')}
+        </button>
+      </div>
 
       <CreateCommunityModal
         isOpen={showCreate}

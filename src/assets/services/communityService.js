@@ -239,11 +239,19 @@ export async function isCommunitySlugAvailable(slug) {
 }
 
 // ── Listado / búsqueda ──
-export async function getCommunities({ search = '', limit = 30, offset = 0 } = {}) {
+// sort: 'popular' (member_count) | 'newest' (created_at) | 'active' (post_count)
+export async function getCommunities({ search = '', sort = 'popular', limit = 30, offset = 0 } = {}) {
+  const orderMap = {
+    popular: ['member_count', false],
+    newest: ['created_at', false],
+    active: ['post_count', false],
+  };
+  const [orderCol, orderAsc] = orderMap[sort] || orderMap.popular;
+
   let query = dbPublic
     .from('communities')
     .select(COMMUNITY_SELECT)
-    .order('member_count', { ascending: false })
+    .order(orderCol, { ascending: orderAsc })
     .range(offset, offset + limit - 1);
 
   if (search.trim()) {

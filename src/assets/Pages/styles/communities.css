@@ -10,23 +10,17 @@
   width: 100%;
   padding: 16px;
 }
-.comunidades-header {
+
+/* Botón Crear al final de la página (mismo estilo que los botones de Explore) */
+.comunidades-create-bar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-}
-.comunidades-title {
-  font-size: 1.3rem;
-  font-weight: 700;
-  margin: 0;
-  color: var(--color-text, #fff);
+  justify-content: center;
+  padding: 24px 0 8px;
 }
 .comunidades-create-btn {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  /* Mismo estilo que los botones de Explore (explore-filter-btn) */
 }
 .comunidades-create-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -71,7 +65,10 @@
 }
 
 /* ── Modal de creación ── */
-.community-create-modal .fc-modal-header { border-bottom: 1px solid var(--color-border, #2a2a2a); }
+/* Sin borde separador bajo el título: mismo header limpio que el modal de
+   edición de perfil (Modal.jsx). Los botones del header (fc-modal-save /
+   fc-modal-close) y los de cámara (fc-preview-banner-edit /
+   fc-preview-avatar-edit) vienen de modal.css. */
 .community-create-body {
   display: flex;
   flex-direction: column;
@@ -119,25 +116,10 @@
   object-fit: cover;
 }
 .community-create-preview-banner-empty { position: absolute; inset: 0; }
-.community-create-preview-banner-btn {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s ease;
-}
-.community-create-preview-banner-btn:hover { background: rgba(0, 0, 0, 0.8); }
+/* Botón de cámara del banner: usa fc-preview-banner-edit (modal.css) */
 .community-create-preview-avatar-wrap { position: absolute; bottom: -30px; left: 16px; }
 .community-create-preview-avatar {
+  position: relative;
   width: 76px;
   height: 76px;
   border-radius: 50%;
@@ -150,21 +132,15 @@
 }
 .community-create-preview-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .community-create-preview-avatar-letter { font-size: 1.8rem; font-weight: 800; color: #fff; }
-.community-create-preview-avatar-btn {
-  position: absolute;
-  bottom: -4px;
-  right: -4px;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  border: 2px solid var(--color-surface, #1c1c1e);
-  background: var(--color-accent, #6b7280);
-  color: #fff;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.65rem;
+
+/* Overlay de edición del avatar: visible al hover (patrón del modal de perfil) */
+.community-create-preview-avatar .fc-preview-avatar-edit {
+  background: rgba(0, 0, 0, 0.4);
+  color: rgba(255, 255, 255, 0.9);
+}
+.community-create-preview-avatar:hover .fc-preview-avatar-edit,
+.community-create-preview-avatar .fc-preview-avatar-edit:focus-visible {
+  opacity: 1;
 }
 .community-create-preview-info { padding: 40px 16px 14px; }
 .community-create-preview-name {
