@@ -46,3 +46,9 @@ music-server/bin/.bgutil-pot.pid
 docs/music/TERMUX_SETUP.md
 docs/music/TERMUX_DIAGNOSTICO.md
 scripts/diagnostico-stream.sh
+
+# Binarios descargados automaticamente por setup (yt-dlp, ffmpeg, cloudflared, bgutil-pot)
+music-server/bin/bgutil-pot
+music-server/bin/cloudflared
+music-server/bin/ffmpeg
+music-server/bin/yt-dlp
