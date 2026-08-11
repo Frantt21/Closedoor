@@ -141,11 +141,12 @@ body:has(.sidebar--collapsed) .app-layout {
 }
 
 /* ── Page container centering ── */
+/* comunidades-page NO está centrada: usa full-width tipo chat (App.jsx la
+   monta con app-content--full para el grid ancho estilo Explore). */
 .profile-page,
 .explore-page,
 .settings-page,
 .notifications-page,
-.comunidades-page,
 .post-detail-page,
 .auth-page {
     max-width: 800px;

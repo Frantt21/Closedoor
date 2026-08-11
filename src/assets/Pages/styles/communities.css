@@ -2,11 +2,13 @@
    Communities system
    ============================================== */
 
-/* ── Página de listado (Comunidades.jsx) ── */
+/* ── Página de listado (Comunidades.jsx) ──
+   Full-width tipo chat (App.jsx la monta con app-content--full). El grid
+   reusa las cards de Explore (explore-grid / explore-card) para un grid
+   ancho de hasta ~1300px. */
 .comunidades-page {
+  width: 100%;
   padding: 16px;
-  max-width: 700px;
-  margin: 0 auto;
 }
 .comunidades-header {
   display: flex;
@@ -24,114 +26,28 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 16px;
-  border: none;
-  border-radius: 999px;
-  background: var(--color-accent, #6b7280);
-  color: #fff;
-  font-size: 0.85rem;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  /* Mismo estilo que los botones de Explore (explore-filter-btn) */
 }
-.comunidades-create-btn:hover { opacity: 0.9; transform: translateY(-1px); }
 .comunidades-create-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.comunidades-search {
+/* Banner fallback (sin imagen) y avatar con letra dentro de la card */
+.comunidades-card-banner-fallback {
+  position: absolute;
+  inset: 0;
   width: 100%;
-  padding: 10px 14px;
-  margin-bottom: 16px;
-  border-radius: 10px;
-  border: 1px solid var(--color-border, #2a2a2a);
-  background: var(--color-surface, #1c1c1e);
-  color: var(--color-text, #fff);
-  font-family: inherit;
-  font-size: 0.9rem;
-  outline: none;
+  height: 100%;
 }
-.comunidades-search:focus { border-color: var(--color-accent, #6b7280); }
-
-.comunidades-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.comunidades-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px;
-  border-radius: 14px;
-  background: var(--color-surface, #1c1c1e);
-  border: 1px solid var(--color-border, #2a2a2a);
-  text-decoration: none;
-  color: inherit;
-  transition: transform 0.15s ease, border-color 0.15s ease;
-}
-.comunidades-card:hover {
-  transform: translateY(-2px);
-  border-color: var(--color-accent, #6b7280);
-}
-.comunidades-card-avatar {
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  overflow: hidden;
-  flex-shrink: 0;
-  background: var(--color-surface-hover, #252525);
-}
-.comunidades-card-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.comunidades-card-avatar span {
+.comunidades-card-avatar-letter {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  height: 100%;
-  font-size: 1.5rem;
+  font-size: 1.6rem;
   font-weight: 800;
   color: #fff;
-}
-.comunidades-card-info { flex: 1; min-width: 0; }
-.comunidades-card-name-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.comunidades-card-name {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--color-text, #fff);
 }
 .comunidades-card-slug {
   font-size: 0.78rem;
   color: var(--color-text-muted, #6b7280);
-}
-.comunidades-card-desc {
-  margin: 4px 0 0;
-  font-size: 0.82rem;
-  color: var(--color-text-secondary, #888);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-.comunidades-card-stats {
-  display: flex;
-  gap: 14px;
-  margin-top: 6px;
-  font-size: 0.75rem;
-  color: var(--color-text-muted, #6b7280);
-}
-.comunidades-card-stats strong { color: var(--color-text, #fff); }
-.comunidades-card-private {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.7rem;
-  color: #f59e0b;
 }
 
 .comunidades-empty {
@@ -177,6 +93,9 @@
   border: 1px solid rgba(245, 158, 11, 0.3);
 }
 .community-create-gate-icon { font-size: 1.1rem; color: #f59e0b; flex-shrink: 0; }
+.community-create-gate--admin { border-color: rgba(34, 197, 94, 0.3); background: rgba(34, 197, 94, 0.08); }
+.community-create-gate--admin .community-create-gate-icon { color: #22c55e; }
+.community-create-gate--admin .community-create-gate-text { color: #22c55e; }
 .community-create-gate-texts { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .community-create-gate-text { margin: 0; font-size: 0.82rem; font-weight: 600; color: #f59e0b; }
 .community-create-gate-sub { margin: 0; font-size: 0.72rem; color: var(--color-text-muted, #6b7280); }

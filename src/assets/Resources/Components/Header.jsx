@@ -156,12 +156,6 @@ function Header() {
                 <span>{t('nav.profile')}</span>
               </Link>
             </Tooltip>
-            <Tooltip text={tooltipText('nav.explore')} placement="right">
-              <Link to="/Explore" className={`sidebar-link${location.pathname.toLowerCase() === '/explore' ? ' active' : ''}`}>
-                <span className="sidebar-icon"><IconCompass /></span>
-                <span>{t('nav.explore')}</span>
-              </Link>
-            </Tooltip>
             <Tooltip text={tooltipText('nav.chat')} placement="right">
               <Link to="/Chat" className={`sidebar-link${location.pathname.toLowerCase() === '/chat' ? ' active' : ''}`}>
                 <span className="sidebar-icon"><IconComment /></span>
@@ -169,6 +163,12 @@ function Header() {
                   <span className="sidebar-notif-badge">{unreadChatCount > 99 ? '99+' : unreadChatCount}</span>
                 )}
                 <span>{t('nav.chat')}</span>
+              </Link>
+            </Tooltip>
+            <Tooltip text={tooltipText('nav.explore')} placement="right">
+              <Link to="/Explore" className={`sidebar-link${location.pathname.toLowerCase() === '/explore' ? ' active' : ''}`}>
+                <span className="sidebar-icon"><IconCompass /></span>
+                <span>{t('nav.explore')}</span>
               </Link>
             </Tooltip>
             <Tooltip text={tooltipText('nav.comunidades')} placement="right">

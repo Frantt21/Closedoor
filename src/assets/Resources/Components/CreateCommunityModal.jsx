@@ -3,13 +3,14 @@ import ModalShell from './ModalShell';
 import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../services/i18n/useI18n';
 import { toast } from 'react-toastify';
-import { FaCamera, FaSpinner, FaLock, FaGlobe } from 'react-icons/fa';
+import { FaCamera, FaSpinner, FaLock, FaGlobe, FaUsers } from 'react-icons/fa';
 import { uploadWithLocalPreview } from '../../services/cdnService';
 import { extractColors } from '../../services/colorExtractor';
 import {
   createCommunity,
   canCreateCommunity,
   MIN_FOLLOWERS_TO_CREATE,
+  MAX_COMMUNITIES_PER_USER,
   isCommunitySlugAvailable,
   COMMUNITY_NAME_MAX,
   COMMUNITY_DESC_MAX,
@@ -32,7 +33,7 @@ const SUGGESTED_INTERESTS = [
 
 export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
   const { t } = useI18n();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const [name, setName] = useState('');
   const [avatar, setAvatar] = useState('');
@@ -52,6 +53,8 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
   const [slugState, setSlugState] = useState('idle'); // idle | checking | available | taken
   const [followers, setFollowers] = useState(null);
   const [canCreate, setCanCreate] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [limitReached, setLimitReached] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const nameTimerRef = useRef(null);
@@ -74,23 +77,30 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
     setSlug('');
     setSlugState('idle');
     setSaving(false);
+    // Reset del estado de permisos para no mostrar el gate del cierre anterior
+    setFollowers(null);
+    setCanCreate(false);
+    setIsAdmin(false);
+    setLimitReached(false);
   }, [isOpen]);
 
-  // ── Chequear el mínimo de seguidores al abrir ──
-  // (fallback defensivo: el botón de Comunidades.jsx ya lo valida antes de abrir)
+  // ── Chequear permisos al abrir (fallback defensivo: el botón de
+  //    Comunidades.jsx ya valida antes de abrir) ──
   useEffect(() => {
     if (!isOpen || !user?.id) return;
     let cancelled = false;
-    canCreateCommunity(user.id).then((res) => {
+    canCreateCommunity(user.id, { roles: profile?.roles || [] }).then((res) => {
       if (!cancelled) {
         setFollowers(res.followers);
         setCanCreate(res.allowed);
+        setIsAdmin(res.isAdmin);
+        setLimitReached(!!res.limitReached);
       }
     }).catch(() => {
       if (!cancelled) setFollowers(0);
     });
     return () => { cancelled = true; };
-  }, [isOpen, user?.id]);
+  }, [isOpen, user?.id, profile?.roles]);
 
   // ── Validación de slug en vivo (debounce 400ms) ──
   useEffect(() => {
@@ -182,7 +192,11 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
       return;
     }
     if (!canCreate) {
-      toast.error(t('comunidades.followers_required', { n: MIN_FOLLOWERS_TO_CREATE }));
+      if (limitReached) {
+        toast.error(t('comunidades.limit_reached', { n: MAX_COMMUNITIES_PER_USER }));
+      } else {
+        toast.error(t('comunidades.followers_required', { n: MIN_FOLLOWERS_TO_CREATE }));
+      }
       return;
     }
 
@@ -217,8 +231,9 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
   };
 
   // Solo visible como fallback defensivo (el botón de la página ya bloquea
-  // la apertura si no se cumplen los 100 seguidores).
-  const needsFollowers = followers !== null && !canCreate;
+  // la apertura si no se cumplen los requisitos).
+  const needsFollowers = followers !== null && !canCreate && !limitReached;
+  const needsLimit = followers !== null && !canCreate && limitReached;
 
   return (
     <ModalShell isOpen={isOpen} onClose={onClose} className="community-create-modal">
@@ -243,8 +258,18 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
           aquí provocaba doble barra. padding-right reducido (4px) para dar
           respiro junto al scrollbar del dialog. */}
       <div className="community-create-body">
-        {/* ── Aviso compacto del requisito de seguidores (fallback) ── */}
-        {needsFollowers && (
+        {/* ── Aviso compacto del requisito de seguidores / límite (fallback) ── */}
+        {needsLimit ? (
+          <div className="community-create-gate">
+            <FaLock className="community-create-gate-icon" />
+            <div className="community-create-gate-texts">
+              <p className="community-create-gate-text">
+                {t('comunidades.limit_reached', { n: MAX_COMMUNITIES_PER_USER })}
+              </p>
+              <p className="community-create-gate-sub">{t('comunidades.limit_hint', { n: MAX_COMMUNITIES_PER_USER })}</p>
+            </div>
+          </div>
+        ) : needsFollowers ? (
           <div className="community-create-gate">
             <FaLock className="community-create-gate-icon" />
             <div className="community-create-gate-texts">
@@ -256,7 +281,14 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
               </p>
             </div>
           </div>
-        )}
+        ) : isAdmin ? (
+          <div className="community-create-gate community-create-gate--admin">
+            <FaUsers className="community-create-gate-icon" />
+            <div className="community-create-gate-texts">
+              <p className="community-create-gate-text">{t('comunidades.admin_unlimited')}</p>
+            </div>
+          </div>
+        ) : null}
 
         {/* ── Two-column grid (mismas clases que el modal de perfil Modal.jsx) ── */}
         <div className="fc-modal-grid">

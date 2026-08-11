@@ -713,5 +713,8 @@
   "post.undo_block_error": "Error al deshacer bloqueo",
   "comunidades.invite_invalid": "Invitación inválida o expirada",
   "comunidades.invite_prompt": "Te han invitado a esta comunidad. Únete con el enlace de invitación.",
-  "comunidades.owner_cannot_leave": "El dueño no puede abandonar la comunidad. Transfiere la propiedad primero."
+  "comunidades.owner_cannot_leave": "El dueño no puede abandonar la comunidad. Transfiere la propiedad primero.",
+  "comunidades.limit_reached": "Has alcanzado el límite de {n} comunidades",
+  "comunidades.limit_hint": "Máximo {n} comunidades por usuario",
+  "comunidades.admin_unlimited": "Como administrador puedes crear comunidades sin límite"
 }

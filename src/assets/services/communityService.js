@@ -5,8 +5,14 @@ import { createPost } from './postService';
 
 // ── Constantes ──
 export const MIN_FOLLOWERS_TO_CREATE = 100;
+export const MAX_COMMUNITIES_PER_USER = 3;
 export const COMMUNITY_NAME_MAX = 50;
 export const COMMUNITY_DESC_MAX = 300;
+
+// ¿El usuario tiene rol admin? (bypass de followers y de límite)
+export function isAdminRole(roles) {
+  return Array.isArray(roles) && roles.includes('admin');
+}
 
 const COMMUNITY_SELECT = [
   'id', 'slug', 'name', 'description', 'rules', 'interests',
@@ -72,9 +78,33 @@ export async function getFollowerCountFor(userId) {
   return count || 0;
 }
 
-export async function canCreateCommunity(userId) {
-  const followers = await getFollowerCountFor(userId);
-  return { allowed: followers >= MIN_FOLLOWERS_TO_CREATE, followers };
+// ¿Cuántas comunidades ha creado el usuario (como owner)?
+export async function countUserCommunities(userId) {
+  if (!userId) return 0;
+  const { count, error } = await dbPublic
+    .from('communities')
+    .select('id', { count: 'exact', head: true })
+    .eq('owner_id', userId);
+  if (error) {
+    console.warn('[Communities] Error counting owned communities:', error);
+    return 0;
+  }
+  return count || 0;
+}
+
+/**
+ * ¿Puede el usuario crear una comunidad?
+ * - Admin (roles incluye 'admin'): SIEMPRE puede (sin followers ni límite).
+ * - Usuarios normales: 100+ followers Y menos de MAX_COMMUNITIES_PER_USER
+ *   comunidades propias.
+ */
+export async function canCreateCommunity(userId, { roles = [] } = {}) {
+  const isAdmin = isAdminRole(roles);
+  const followers = isAdmin ? null : await getFollowerCountFor(userId);
+  const ownedCount = isAdmin ? null : await countUserCommunities(userId);
+  const limitReached = !isAdmin && ownedCount >= MAX_COMMUNITIES_PER_USER;
+  const allowed = isAdmin || (followers >= MIN_FOLLOWERS_TO_CREATE && !limitReached);
+  return { allowed, followers, isAdmin, ownedCount, limitReached, limit: MAX_COMMUNITIES_PER_USER };
 }
 
 // ── Crear comunidad ──
@@ -85,10 +115,25 @@ export async function createCommunity({ userId, name, description, rules, intere
     throw new Error(`El nombre debe tener entre 3 y ${COMMUNITY_NAME_MAX} caracteres`);
   }
 
-  // Validar mínimo de seguidores
-  const followers = await getFollowerCountFor(userId);
-  if (followers < MIN_FOLLOWERS_TO_CREATE) {
-    throw new Error(`Necesitas al menos ${MIN_FOLLOWERS_TO_CREATE} seguidores para crear una comunidad (tienes ${followers})`);
+  // Los roles se leen de la DB (no se confía en el cliente): un admin puede
+  // crear sin followers ni límite; los usuarios normales necesitan 100+
+  // followers Y < MAX_COMMUNITIES_PER_USER. La migración 059 exige lo mismo
+  // a nivel de policy INSERT — defensa en profundidad.
+  const { data: profile } = await dbPublic
+    .from('profiles')
+    .select('roles')
+    .eq('id', userId)
+    .maybeSingle();
+  const isAdmin = isAdminRole(profile?.roles);
+  if (!isAdmin) {
+    const followers = await getFollowerCountFor(userId);
+    if (followers < MIN_FOLLOWERS_TO_CREATE) {
+      throw new Error(`Necesitas al menos ${MIN_FOLLOWERS_TO_CREATE} seguidores para crear una comunidad (tienes ${followers})`);
+    }
+    const ownedCount = await countUserCommunities(userId);
+    if (ownedCount >= MAX_COMMUNITIES_PER_USER) {
+      throw new Error(`Has alcanzado el límite de ${MAX_COMMUNITIES_PER_USER} comunidades`);
+    }
   }
 
   const slug = slugifyName(cleanName);

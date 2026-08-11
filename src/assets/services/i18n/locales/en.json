@@ -713,5 +713,8 @@
   "trending.various": "Various",
   "comunidades.invite_invalid": "Invite invalid or expired",
   "comunidades.invite_prompt": "You've been invited to this community. Join with the invite link.",
-  "comunidades.owner_cannot_leave": "The owner cannot leave the community. Transfer ownership first."
+  "comunidades.owner_cannot_leave": "The owner cannot leave the community. Transfer ownership first.",
+  "comunidades.limit_reached": "You've reached the limit of {n} communities",
+  "comunidades.limit_hint": "Up to {n} communities per user",
+  "comunidades.admin_unlimited": "As an admin you can create communities without limits"
 }

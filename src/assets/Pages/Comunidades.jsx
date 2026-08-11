@@ -4,28 +4,30 @@ import { useI18n } from '../services/i18n/useI18n';
 import usePageTitle from '../../hooks/usePageTitle';
 import { FaUsers, FaPlus, FaSpinner, FaLock, FaSearch } from 'react-icons/fa';
 import { useAuth } from '../../hooks/useAuth';
-import { getCommunities, getCommunityById, canCreateCommunity, MIN_FOLLOWERS_TO_CREATE } from '../services/communityService';
+import { getCommunities, getCommunityById, canCreateCommunity, MIN_FOLLOWERS_TO_CREATE, MAX_COMMUNITIES_PER_USER } from '../services/communityService';
 import { supabase } from '../services/supabaseclient';
 import CreateCommunityModal from '../Resources/Components/CreateCommunityModal';
 import { toast } from 'react-toastify';
+import '../Resources/Styles/explore.css';
+import '../Resources/Styles/skeleton.css';
 import './styles/communities.css';
 
 export default function Comunidades() {
   const { t } = useI18n();
   usePageTitle(t('comunidades.title'));
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
 
   const [communities, setCommunities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showCreate, setShowCreate] = useState(false);
-  const [checkingFollowers, setCheckingFollowers] = useState(false);
+  const [checkingPerms, setCheckingPerms] = useState(false);
   const searchTimerRef = useRef(null);
 
   const load = useCallback(async (query = '') => {
     setLoading(true);
     try {
-      const data = await getCommunities({ search: query, limit: 50 });
+      const data = await getCommunities({ search: query, limit: 60 });
       setCommunities(data);
     } catch (err) {
       console.error('[Comunidades] Error loading:', err);
@@ -67,21 +69,26 @@ export default function Comunidades() {
     toast.success(t('comunidades.created'));
   };
 
-  // ── Aviso ANTES de abrir el modal: si no cumple los 100 seguidores, no abre ──
+  // ── Aviso ANTES de abrir el modal: si no cumple los requisitos (admin o
+  //    100+ followers y menos de 3 comunidades) no abre ──
   const handleCreateClick = async () => {
     if (!user?.id) return;
-    setCheckingFollowers(true);
+    setCheckingPerms(true);
     try {
-      const res = await canCreateCommunity(user.id);
+      const res = await canCreateCommunity(user.id, { roles: profile?.roles || [] });
       if (!res.allowed) {
-        toast.error(t('comunidades.followers_required', { n: MIN_FOLLOWERS_TO_CREATE }));
+        if (res.limitReached) {
+          toast.error(t('comunidades.limit_reached', { n: MAX_COMMUNITIES_PER_USER }));
+        } else {
+          toast.error(t('comunidades.followers_required', { n: MIN_FOLLOWERS_TO_CREATE }));
+        }
         return;
       }
       setShowCreate(true);
     } catch {
       setShowCreate(true);
     } finally {
-      setCheckingFollowers(false);
+      setCheckingPerms(false);
     }
   };
 
@@ -91,28 +98,44 @@ export default function Comunidades() {
         <h2 className="comunidades-title">{t('comunidades.title')}</h2>
         <button
           type="button"
-          className="comunidades-create-btn"
+          className="explore-filter-btn comunidades-create-btn"
           onClick={handleCreateClick}
-          disabled={!user?.id || checkingFollowers}
+          disabled={!user?.id || checkingPerms}
           title={user?.id ? '' : t('auth.login_btn')}
         >
-          {checkingFollowers ? <FaSpinner className="fc-spin" /> : <FaPlus />} {t('comunidades.create_btn')}
+          {checkingPerms ? <FaSpinner className="fc-spin" /> : <FaPlus />} {t('comunidades.create_btn')}
         </button>
       </div>
 
-      <div className="comunidades-search-wrap" style={{ position: 'relative' }}>
-        <FaSearch style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-muted, #6b7280)', fontSize: '0.85rem', pointerEvents: 'none' }} />
-        <input
-          className="comunidades-search"
-          style={{ paddingLeft: 36 }}
-          value={search}
-          onChange={(e) => handleSearch(e.target.value)}
-          placeholder={t('comunidades.search_placeholder')}
-        />
+      <div className="explore-search">
+        <div className="explore-search-wrap">
+          <FaSearch className="explore-search-icon" />
+          <input
+            className="explore-search-input"
+            type="text"
+            value={search}
+            onChange={(e) => handleSearch(e.target.value)}
+            placeholder={t('comunidades.search_placeholder')}
+          />
+        </div>
       </div>
 
       {loading ? (
-        <div className="comunidades-loading"><FaSpinner className="fc-spin" /></div>
+        <div className="explore-skeleton-grid">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="explore-skeleton-card">
+              <div className="skeleton explore-skeleton-banner" />
+              <div className="explore-skeleton-body">
+                <div className="skeleton skeleton--circle explore-skeleton-avatar" />
+                <div className="explore-skeleton-content">
+                  <div className="skeleton explore-skeleton-name" />
+                  <div className="skeleton explore-skeleton-count" />
+                  <div className="skeleton explore-skeleton-bio-line" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       ) : communities.length === 0 ? (
         <div className="comunidades-empty">
           <div className="comunidades-empty-icon"><FaUsers /></div>
@@ -120,34 +143,74 @@ export default function Comunidades() {
           <p className="comunidades-empty-sub">{t('comunidades.empty_sub')}</p>
         </div>
       ) : (
-        <div className="comunidades-grid">
-          {communities.map((c) => (
-            <Link key={c.id} to={`/c/${c.slug}`} className="comunidades-card">
-              <div className="comunidades-card-avatar" style={{ '--cc-accent': c.accent_color || 'transparent' }}>
-                {c.avatar_url ? (
-                  <img src={c.avatar_url} alt={c.name} />
-                ) : (
-                  <span style={{ background: `linear-gradient(135deg, ${c.accent_color || '#333'}, ${c.accent_color_secondary || c.accent_color || '#222'})` }}>
-                    {c.name.charAt(0).toUpperCase()}
-                  </span>
-                )}
-              </div>
-              <div className="comunidades-card-info">
-                <div className="comunidades-card-name-row">
-                  <span className="comunidades-card-name">{c.name}</span>
-                  <span className="comunidades-card-slug">c/{c.slug}</span>
-                  {c.is_private && (
-                    <span className="comunidades-card-private"><FaLock /> {t('comunidades.private')}</span>
+        <div className="explore-grid comunidades-grid">
+          {communities.map((c) => {
+            const accentStyle = c.accent_color
+              ? {
+                  '--accent-color': c.accent_color,
+                  '--accent-color-2': c.accent_color_secondary || c.accent_color,
+                }
+              : {};
+            return (
+              <Link
+                key={c.id}
+                to={`/c/${c.slug}`}
+                className={`explore-card${c.accent_color ? ' explore-card--accent' : ''}`}
+                style={accentStyle}
+              >
+                <div className="explore-card-banner">
+                  {c.banner_url ? (
+                    <img className="explore-card-banner-img" src={c.banner_url} alt="" />
+                  ) : (
+                    <div
+                      className="comunidades-card-banner-fallback"
+                      style={{ background: `linear-gradient(135deg, ${c.accent_color || '#333'}, ${c.accent_color_secondary || c.accent_color || '#222'})` }}
+                    />
                   )}
+                  <div className="explore-card-overlay" />
                 </div>
-                {c.description && <p className="comunidades-card-desc">{c.description}</p>}
-                <div className="comunidades-card-stats">
-                  <span><strong>{c.member_count || 0}</strong> {t('comunidades.members')}</span>
-                  <span><strong>{c.post_count || 0}</strong> {t('comunidades.posts')}</span>
+
+                <div className="explore-card-body">
+                  {c.avatar_url ? (
+                    <img className="explore-card-avatar" src={c.avatar_url} alt={c.name} />
+                  ) : (
+                    <div
+                      className="explore-card-avatar comunidades-card-avatar-letter"
+                      style={{ background: `linear-gradient(135deg, ${c.accent_color || '#333'}, ${c.accent_color_secondary || c.accent_color || '#222'})` }}
+                    >
+                      {c.name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+
+                  <div className="explore-card-info">
+                    <div className="explore-card-name-row">
+                      <span className="explore-card-name">{c.name}</span>
+                      <span className="comunidades-card-slug">c/{c.slug}</span>
+                      {c.is_private && (
+                        <span className="explore-card-private-icon" title={t('comunidades.private')}>
+                          <FaLock />
+                        </span>
+                      )}
+                    </div>
+
+                    <span className="explore-card-followers">
+                      {c.member_count || 0} {t('comunidades.members')} · {c.post_count || 0} {t('comunidades.posts')}
+                    </span>
+
+                    {c.description && <p className="explore-card-bio">{c.description}</p>}
+
+                    {c.interests?.length > 0 && (
+                      <div className="explore-card-interests">
+                        {c.interests.slice(0, 3).map((interest) => (
+                          <span key={interest} className="explore-card-interest">{interest}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </Link>
-          ))}
+              </Link>
+            );
+          })}
         </div>
       )}
 

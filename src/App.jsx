@@ -134,7 +134,11 @@ function ScrollToTop() {
 
 function App() {
   const location = useLocation();
-  const isChatRoute = location.pathname.toLowerCase() === '/chat';
+  const pathname = location.pathname.toLowerCase();
+  const isChatRoute = pathname === '/chat';
+  // Full-width tipo chat: las comunidades ocupan todo el ancho disponible
+  // (grid ancho estilo Explore, sin panel derecho).
+  const isFullWidthRoute = isChatRoute || pathname === '/communities' || pathname.startsWith('/c/');
 
   return (
     <I18nProvider>
@@ -155,7 +159,7 @@ function App() {
           {!isChatRoute && <BlockRealtimeWatcher />}
 
           {/* Pages (lazy-loaded) */}
-          <main className={isChatRoute ? "app-content app-content--full" : "app-content"}>
+          <main className={isFullWidthRoute ? "app-content app-content--full" : "app-content"}>
             <Suspense fallback={<PageFallback />}>
               <Routes>
                 <Route path="/" element={<Home />} />
@@ -179,7 +183,7 @@ function App() {
             </Suspense>
           </main>
 
-          {!isChatRoute && <RightPanel />}
+          {!isFullWidthRoute && <RightPanel />}
           <MobileNav />
           <ToastContainer
             position="top-right"

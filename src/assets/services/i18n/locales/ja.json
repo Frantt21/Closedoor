@@ -713,5 +713,8 @@
   "post.undo_block_error": "ブロック解除エラー",
   "comunidades.invite_invalid": "招待リンクが無効または期限切れです",
   "comunidades.invite_prompt": "このコミュニティに招待されました。招待リンクで参加してください。",
-  "comunidades.owner_cannot_leave": "オーナーはコミュニティを離れられません。先に所有権を移譲してください。"
+  "comunidades.owner_cannot_leave": "オーナーはコミュニティを離れられません。先に所有権を移譲してください。",
+  "comunidades.limit_reached": "{n}件のコミュニティ作成上限に達しました",
+  "comunidades.limit_hint": "ユーザーごとに最大{n}件のコミュニティ",
+  "comunidades.admin_unlimited": "管理者は制限なくコミュニティを作成できます"
 }
