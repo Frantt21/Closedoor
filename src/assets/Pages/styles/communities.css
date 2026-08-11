@@ -113,7 +113,7 @@
 .community-create-gate-sub { margin: 0; font-size: 0.72rem; color: var(--color-text-muted, #6b7280); }
 
 .community-create-preview {
-  border-radius: 14px;
+  border-radius: var(--radius, 10px);
   overflow: hidden;
   border: 1px solid var(--color-border, #2a2a2a);
   background: var(--color-surface, #1c1c1e);
@@ -364,9 +364,11 @@
 /* Header */
 .community-header {
   position: relative;
-  border-radius: 0 0 16px 16px;
+  /* Mismo arranque que el resto de páginas full-width (ej. chat): pegado al
+     top. Márgenes horizontales compartidos con el body (20px). */
+  margin: 0 20px;
+  border-radius: var(--radius, 10px);
   overflow: hidden;
-  border-bottom: 1px solid var(--color-border, #2a2a2a);
   background: var(--color-surface, #1c1c1e);
 }
 .community-header-banner { position: relative; height: 200px; }
@@ -402,25 +404,86 @@
 }
 .community-header-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .community-header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding-bottom: 8px; }
+/* Botones del header: mismo estilo que el botón de edición de perfil
+   (profile-edit-button): translúcido con blur, sin borde, radio del app. */
 .community-header-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 18px;
-  border-radius: 999px;
+  padding: 8px 16px;
+  border-radius: var(--radius, 10px);
   border: none;
-  background: var(--color-accent, #6b7280);
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   color: #fff;
   font-size: 0.85rem;
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
-  transition: opacity 0.15s ease;
+  transition: background 0.2s ease;
 }
-.community-header-btn:hover { opacity: 0.9; }
-.community-header-btn--leave { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4); }
-.community-header-btn--invite { background: rgba(99, 102, 241, 0.2); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.4); }
-.community-header-btn--pending { background: rgba(245, 158, 11, 0.15); color: #f59e0b; cursor: default; }
+.community-header-btn:hover { background: rgba(255, 255, 255, 0.14); }
+/* Botón Join (CTA principal): tinte del acento para que destaque */
+.community-header-btn--join {
+  background: color-mix(in srgb, var(--cc-accent, #6b7280) 45%, rgba(255, 255, 255, 0.08));
+}
+.community-header-btn--join:hover { background: color-mix(in srgb, var(--cc-accent, #6b7280) 60%, rgba(255, 255, 255, 0.08)); }
+.community-header-btn--leave { background: rgba(239, 68, 68, 0.18); color: #fca5a5; }
+.community-header-btn--leave:hover { background: rgba(239, 68, 68, 0.28); }
+.community-header-btn--pending { background: rgba(245, 158, 11, 0.2); color: #fcd34d; cursor: default; }
+/* Botón de 3 puntos (owner): mismo estilo que el de 3 puntos del banner de
+   perfil (profile-actions-menu-btn) — rectángulo redondeado translúcido. */
+.community-header-btn--dots {
+  padding: 8px 16px;
+  border-radius: var(--radius, 10px);
+  font-size: 0.85rem;
+  line-height: 1;
+}
+.community-header-btn--dots-active { background: rgba(255, 255, 255, 0.14); }
+
+/* Menú desplegable del botón de 3 puntos (mismo patrón que chat-context-menu) */
+.community-header-menu-wrap {
+  position: relative;
+  display: flex;
+}
+.community-header-dropdown {
+  /* Posición fija (top/right en línea desde el botón): escapa del
+     overflow:hidden del header para que el menú nunca quede recortado. */
+  position: fixed;
+  min-width: 170px;
+  z-index: 1100;
+  background: var(--color-surface, #1a1a1a);
+  border: 1px solid var(--color-border, #2a2a2a);
+  border-radius: var(--radius-sm, 6px);
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  animation: fcFadeIn 0.1s ease;
+}
+.community-header-dropdown-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--color-text, #ffffff);
+  font-size: 0.82rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.community-header-dropdown-btn:hover { background: var(--color-surface-hover, #252525); }
+.community-header-dropdown-btn svg { opacity: 0.7; font-size: 0.85rem; }
+
+/* fcFadeIn (solo definido en chat.css; lo declaramos aquí por si la página
+   de comunidad no carga chat.css) */
+@keyframes fcFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
 .community-header-role-badge {
   padding: 5px 12px;
   border-radius: 999px;
@@ -491,22 +554,30 @@
   backdrop-filter: blur(6px);
 }
 
-/* Body layout */
+/* Body layout: mismo patrón que el perfil (profile-layout): flex con la
+   columna principal al lado del sidebar de reglas/miembros. Alineado con el
+   header (mismo margen horizontal 20px) y con separación top mínima. */
 .community-body {
-  display: grid;
-  grid-template-columns: 1fr 300px;
-  gap: 18px;
-  padding: 18px 20px;
-  align-items: start;
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  padding: 14px 20px 18px;
 }
-.community-main { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.community-sidebar { display: flex; flex-direction: column; gap: 12px; position: sticky; top: 70px; }
+.community-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.community-sidebar {
+  width: 260px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: sticky;
+  top: 70px;
+}
 
-/* Solicitudes */
+/* Solicitudes (sin borde, como el resto de cards del app) */
 .community-requests {
-  border-radius: 14px;
-  border: 1px solid rgba(245, 158, 11, 0.25);
-  background: rgba(245, 158, 11, 0.05);
+  border-radius: var(--radius, 10px);
+  background: rgba(245, 158, 11, 0.06);
   padding: 12px;
 }
 .community-section-title {
@@ -553,10 +624,9 @@
 .community-request-btn--ok { background: rgba(34, 197, 94, 0.2); color: #22c55e; }
 .community-request-btn--no { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
 
-/* Composer */
+/* Composer (sin borde) */
 .community-composer {
-  border-radius: 14px;
-  border: 1px solid var(--color-border, #2a2a2a);
+  border-radius: var(--radius, 10px);
   background: var(--color-surface, #1c1c1e);
   padding: 12px;
 }
@@ -640,8 +710,8 @@
   gap: 10px;
   text-align: center;
   padding: 40px 20px;
-  border-radius: 14px;
-  border: 1px dashed var(--color-border, #2a2a2a);
+  border-radius: var(--radius, 10px);
+  background: var(--color-surface, #1c1c1e);
   color: var(--color-text-muted, #6b7280);
 }
 .community-join-prompt p { margin: 0; font-size: 0.9rem; }
@@ -656,14 +726,13 @@
   cursor: pointer;
 }
 
-/* Feed controls */
+/* Feed controls (sin borde) */
 .community-feed-controls {
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 12px;
-  border-radius: 14px;
-  border: 1px solid var(--color-border, #2a2a2a);
+  border-radius: var(--radius, 10px);
   background: var(--color-surface, #1c1c1e);
 }
 .community-feed-sorts, .community-feed-times {
@@ -701,22 +770,10 @@
 }
 .community-feed-empty p { margin: 0; font-size: 0.9rem; }
 
-/* Sidebar */
-.community-sidebar-card {
-  border-radius: 14px;
-  border: 1px solid var(--color-border, #2a2a2a);
-  background: var(--color-surface, #1c1c1e);
-  padding: 14px;
-}
-.community-sidebar-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--color-text, #fff);
-  margin-bottom: 10px;
-}
+/* Sidebar: las cards reusan los estilos del sidebar de perfil
+   (profile-sidebar-card / profile-sidebar-title de profileSidebar.css), por
+   eso aquí solo quedan los estilos propios del contenido (ranking, reglas,
+   preview de miembros). */
 .community-ranking { display: flex; flex-direction: column; gap: 4px; }
 .community-ranking-item {
   display: flex;
@@ -787,25 +844,14 @@
   padding: 0;
 }
 
-/* Roles bar (owner) */
-.community-roles-bar {
-  margin: 0 20px 14px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 10px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--color-border, #2a2a2a);
-  background: var(--color-surface, #1c1c1e);
-}
+/* Roles management (dentro del modal de ajustes del owner) */
 .community-roles-bar-title {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 0.8rem;
   font-weight: 700;
-  color: var(--color-text-muted, #6b7280);
+  color: var(--color-text, #fff);
 }
 .community-roles-bar-list { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .community-role-chip {
@@ -861,7 +907,7 @@
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  border-radius: 16px;
+  border-radius: var(--radius, 10px);
   background: var(--color-surface, #1c1c1e);
   border: 1px solid var(--color-border, #2a2a2a);
   overflow: hidden;
@@ -1008,9 +1054,9 @@
 .community-role-save:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* Responsive */
-@media (max-width: 900px) {
-  .community-body { grid-template-columns: 1fr; }
-  .community-sidebar { position: static; order: 2; }
+@media (max-width: 1024px) {
+  .community-body { flex-direction: column; }
+  .community-sidebar { position: static; order: 2; width: 100%; }
   .community-main { order: 1; }
   .community-header-banner { height: 150px; }
 }

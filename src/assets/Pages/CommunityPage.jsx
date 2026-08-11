@@ -6,7 +6,7 @@ import usePageTitle from '../../hooks/usePageTitle';
 import useBgContrast from '../../hooks/useBgContrast';
 import { supabase, dbPublic } from '../services/supabaseclient';
 import { toast } from 'react-toastify';
-import { FaUsers, FaLock, FaPlus, FaCheck, FaTimes, FaSpinner, FaCamera, FaLink, FaTrophy, FaTrash, FaShieldAlt, FaRegComments } from 'react-icons/fa';
+import { FaUsers, FaLock, FaPlus, FaCheck, FaTimes, FaSpinner, FaCamera, FaLink, FaTrophy, FaTrash, FaShieldAlt, FaRegComments, FaEllipsisH, FaCog } from 'react-icons/fa';
 import {
   getCommunity,
   getMyMembership,
@@ -38,6 +38,7 @@ import { uploadWithLocalPreview } from '../services/cdnService';
 import VirtualPostList from '../Resources/Components/VirtualPostList';
 import Avatar from '../Resources/Components/Avatar';
 import ConfirmModal from '../Resources/Components/ConfirmModal';
+import '../Resources/Components/css/profileSidebar.css';
 import './styles/communities.css';
 
 const BUILTIN_MODERATOR_ROLES = ['owner', 'admin', 'moderator'];
@@ -78,7 +79,11 @@ export default function CommunityPage() {
   const [composerError, setComposerError] = useState(null);
 
   // UI
+  const [showSettings, setShowSettings] = useState(false);
   const [showCreateRole, setShowCreateRole] = useState(false);
+  const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
+  const [headerMenuPos, setHeaderMenuPos] = useState(null); // { top, right } fixed
+  const headerMenuRef = useRef(null);
   const [newRoleName, setNewRoleName] = useState('');
   const [newRoleColor, setNewRoleColor] = useState('#6366f1');
   const [newRolePerms, setNewRolePerms] = useState([]);
@@ -91,6 +96,23 @@ export default function CommunityPage() {
 
   const membershipRef = useRef(null);
   useEffect(() => { membershipRef.current = membership; }, [membership]);
+
+  // ── Cerrar menú de 3 puntos al hacer clic fuera o scrollear ──
+  useEffect(() => {
+    if (!headerMenuOpen) return;
+    const handleClick = (e) => {
+      if (headerMenuRef.current && !headerMenuRef.current.contains(e.target)) {
+        setHeaderMenuOpen(false);
+      }
+    };
+    const closeOnScroll = () => setHeaderMenuOpen(false);
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('scroll', closeOnScroll, { passive: true, capture: true });
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('scroll', closeOnScroll, { capture: true });
+    };
+  }, [headerMenuOpen]);
 
   const bannerUrl = community?.banner_url || '';
   const contrastColor = useBgContrast(bannerUrl);
@@ -528,7 +550,7 @@ export default function CommunityPage() {
             </div>
             <div className="community-header-actions">
               {!user?.id ? (
-                <button className="community-header-btn" onClick={() => navigate('/Login')}>
+                <button className="community-header-btn community-header-btn--join" onClick={() => navigate('/Login')}>
                   {t('comunidades.join')}
                 </button>
               ) : isPending ? (
@@ -539,9 +561,41 @@ export default function CommunityPage() {
                 <>
                   <span className="community-header-role-badge">{t(`comunidades.role_${membership.role}`)}</span>
                   {isOwner && (
-                    <button className="community-header-btn community-header-btn--invite" onClick={() => setShowInvites(true)}>
-                      <FaLink /> {t('comunidades.invites')}
-                    </button>
+                    <div className="community-header-menu-wrap" ref={headerMenuRef}>
+                      <button
+                        className={`community-header-btn community-header-btn--dots ${headerMenuOpen ? 'community-header-btn--dots-active' : ''}`}
+                        onClick={(e) => {
+                          // Posición fija para que el menú no quede recortado por
+                          // el overflow:hidden del header (mismo patrón que Chat.jsx)
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setHeaderMenuPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+                          setHeaderMenuOpen((s) => !s);
+                        }}
+                        title={t('comunidades.more')}
+                      >
+                        <FaEllipsisH />
+                      </button>
+                      {headerMenuOpen && headerMenuPos && (
+                        <div className="community-header-dropdown" style={{ top: headerMenuPos.top, right: headerMenuPos.right }}>
+                          <button
+                            type="button"
+                            className="community-header-dropdown-btn"
+                            onClick={() => { setHeaderMenuOpen(false); setShowSettings(true); }}
+                          >
+                            <FaCog />
+                            <span>{t('comunidades.settings')}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="community-header-dropdown-btn"
+                            onClick={() => { setHeaderMenuOpen(false); setShowInvites(true); }}
+                          >
+                            <FaLink />
+                            <span>{t('comunidades.invites')}</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
                   {!isOwner && (
                     <button
@@ -553,7 +607,7 @@ export default function CommunityPage() {
                   )}
                 </>
               ) : (
-                <button className="community-header-btn" onClick={handleJoin}>
+                <button className="community-header-btn community-header-btn--join" onClick={handleJoin}>
                   {community.is_private && <FaLock />} {t('comunidades.join')}
                 </button>
               )}
@@ -566,7 +620,7 @@ export default function CommunityPage() {
           <span className="community-header-slug" style={{ color: contrastColor }}>
             c/{community.slug}
             {community.is_private && <span className="community-header-private"><FaLock /> {t('comunidades.private')}</span>}
-            {community.is_mature && <span className="community-header-mature">+18</span>}
+            {community.is_mature && <span className="community-header-mature" title={t('comunidades.mature')}>+18</span>}
           </span>
 
           <div className="community-header-stats" style={{ color: contrastColor }}>
@@ -759,12 +813,12 @@ export default function CommunityPage() {
           )}
         </div>
 
-        {/* ── Sidebar ── */}
+        {/* ── Sidebar (estilos del sidebar de perfil reutilizados) ── */}
         <div className="community-sidebar">
           {/* ── Ranking de activos ── */}
           {ranking.length > 0 && (
-            <div className="community-sidebar-card">
-              <div className="community-sidebar-title"><FaTrophy /> {t('comunidades.most_active')}</div>
+            <div className="profile-sidebar-card">
+              <div className="profile-sidebar-title"><FaTrophy className="profile-sidebar-title-icon" /> {t('comunidades.most_active')}</div>
               <div className="community-ranking">
                 {ranking.map((r, idx) => (
                   <Link
@@ -784,8 +838,8 @@ export default function CommunityPage() {
 
           {/* ── Reglas ── */}
           {community.rules?.length > 0 && (
-            <div className="community-sidebar-card">
-              <div className="community-sidebar-title"><FaShieldAlt /> {t('comunidades.rules')}</div>
+            <div className="profile-sidebar-card">
+              <div className="profile-sidebar-title"><FaShieldAlt className="profile-sidebar-title-icon" /> {t('comunidades.rules')}</div>
               <ol className="community-rules-list">
                 {community.rules.map((rule, i) => (
                   <li key={i} className="community-rule-item">{rule}</li>
@@ -796,8 +850,8 @@ export default function CommunityPage() {
 
           {/* ── Miembros ── */}
           {members.length > 0 && (
-            <div className="community-sidebar-card">
-              <div className="community-sidebar-title"><FaUsers /> {t('comunidades.members')}</div>
+            <div className="profile-sidebar-card">
+              <div className="profile-sidebar-title"><FaUsers className="profile-sidebar-title-icon" /> {t('comunidades.members')}</div>
               <div className="community-members-preview">
                 {members.slice(0, 12).map((m) => (
                   <Link key={m.user_id} to={`/profile/${m.profiles?.username}`} title={`@${m.profiles?.username || ''}`}>
@@ -888,20 +942,36 @@ export default function CommunityPage() {
         </div>
       )}
 
-      {/* ── Modal de roles (owner) ── */}
-      {isOwner && (
-        <div className="community-roles-bar">
-          <div className="community-roles-bar-title"><FaShieldAlt /> {t('comunidades.roles')}</div>
-          <div className="community-roles-bar-list">
-            {roles.map((r) => (
-              <span key={r.id} className="community-role-chip" style={{ '--cc-role': r.color || '#6366f1' }}>
-                {r.name}
-                <button type="button" onClick={() => handleDeleteRole(r)}><FaTimes /></button>
-              </span>
-            ))}
-            <button type="button" className="community-roles-bar-add" onClick={() => setShowCreateRole(true)}>
-              <FaPlus /> {t('comunidades.role_create')}
-            </button>
+      {/* ── Modal de ajustes (owner): roles + accesos rápidos ── */}
+      {showSettings && isOwner && (
+        <div className="community-modal-backdrop" onClick={() => setShowSettings(false)}>
+          <div className="community-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="community-modal-header">
+              <span className="community-modal-title">{t('comunidades.settings')}</span>
+              <button type="button" className="community-modal-close" onClick={() => setShowSettings(false)}><FaTimes /></button>
+            </div>
+            <div className="community-modal-body">
+              <div className="community-roles-bar-title"><FaShieldAlt /> {t('comunidades.roles')}</div>
+              <div className="community-roles-bar-list">
+                {roles.map((r) => (
+                  <span key={r.id} className="community-role-chip" style={{ '--cc-role': r.color || '#6366f1' }}>
+                    {r.name}
+                    <button type="button" onClick={() => handleDeleteRole(r)}><FaTimes /></button>
+                  </span>
+                ))}
+                <button type="button" className="community-roles-bar-add" onClick={() => setShowCreateRole(true)}>
+                  <FaPlus /> {t('comunidades.role_create')}
+                </button>
+              </div>
+              <button
+                type="button"
+                className="community-sidebar-link"
+                style={{ marginTop: 14 }}
+                onClick={() => { setShowSettings(false); setShowInvites(true); }}
+              >
+                <FaLink style={{ marginRight: 4 }} /> {t('comunidades.invites')}
+              </button>
+            </div>
           </div>
         </div>
       )}
