@@ -26,6 +26,7 @@ const Settings = lazy(() => import('./assets/Pages/Settings.jsx'));
 const HashtagPage = lazy(() => import('./assets/Pages/HashtagPage.jsx'));
 const Chat = lazy(() => import('./assets/Pages/Chat.jsx'));
 const Comunidades = lazy(() => import('./assets/Pages/Comunidades.jsx'));
+const CommunityPage = lazy(() => import('./assets/Pages/CommunityPage.jsx'));
 const Trending = lazy(() => import('./assets/Pages/Trending.jsx'));
 
 // ── Minimal route-level loading fallback ──
@@ -171,6 +172,7 @@ function App() {
                 <Route path="/hashtag/:tag" element={<HashtagPage />} />
                 <Route path="/Chat" element={<Chat />} />
                 <Route path="/Communities" element={<Comunidades />} />
+                <Route path="/c/:slug" element={<CommunityPage />} />
                 <Route path="/Trending" element={<Trending />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>

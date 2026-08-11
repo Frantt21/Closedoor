@@ -40,7 +40,7 @@ export async function resolveMentions(content) {
   return mentions;
 }
 
-export async function createPost({ userId, content, imageUrl, imageUrls, videoUrl, encryptedContent, encryptedIv, allowedUsers, obfuscatedDisplay, pollData, scheduledAt, commentsAllowed, isSensitive }) {
+export async function createPost({ userId, content, imageUrl, imageUrls, videoUrl, encryptedContent, encryptedIv, allowedUsers, obfuscatedDisplay, pollData, scheduledAt, commentsAllowed, isSensitive, communityId }) {
   content = content ? sanitizeContent(content) : content;
   let mentions = {};
   if (content) {
@@ -63,6 +63,7 @@ export async function createPost({ userId, content, imageUrl, imageUrls, videoUr
     encrypted_iv: encryptedIv || null,
     allowed_users: allowedUsers && allowedUsers.length > 0 ? allowedUsers : null,
     obfuscated_display: obfuscatedDisplay || null,
+    community_id: communityId || null,
   };
 
   if (pollData) {

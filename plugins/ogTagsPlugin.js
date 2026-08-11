@@ -50,6 +50,9 @@ export default function ogTagsPlugin() {
     } else if (path.startsWith('/Comunidades')) {
       title = 'Comunidades | Closedoor';
       description = 'Join communities and connect with people who share your interests on Closedoor.';
+    } else if (path.startsWith('/c/')) {
+      title = 'Community | Closedoor';
+      description = 'Check out this community on Closedoor.';
     } else if (path.startsWith('/Hashtag/')) {
       const tag = path.replace('/Hashtag/', '');
       title = `#${tag} | Closedoor`;
@@ -91,12 +94,51 @@ export default function ogTagsPlugin() {
         const path = (req.url || '').split('?')[0];
         const profileMatch = path.match(/^\/profile\/([a-zA-Z0-9_]+)/);
         const postMatch = path.match(/^\/Post\/([a-zA-Z0-9-]+)/);
+        const communityMatch = path.match(/^\/c\/([a-zA-Z0-9-]+)/);
         const username = profileMatch ? profileMatch[1] : null;
 
         // ── Resolve OG data ──
         let og;
 
-        if (username) {
+        if (communityMatch) {
+          // Community route — fetch community from Supabase with cache
+          const slug = communityMatch[1];
+          og = cache.get('community_' + slug);
+          if (!og) {
+            og = {
+              title: `c/${slug} | Closedoor`,
+              description: `Join the c/${slug} community on Closedoor!`,
+              image: 'https://placehold.co/1200x630/1a1a2e/6b7280?text=Closedoor',
+              type: 'website',
+              username: null,
+            };
+
+            if (supabase) {
+              try {
+                const { data } = await supabase
+                  .from('communities')
+                  .select('name, slug, description, avatar_url, banner_url, member_count')
+                  .eq('slug', slug)
+                  .maybeSingle();
+
+                if (data) {
+                  og = {
+                    title: `c/${data.slug} · ${data.name} | Closedoor`,
+                    description: data.description
+                      ? (data.description.length > 200 ? data.description.slice(0, 200) + '...' : data.description)
+                      : `Join c/${data.slug} on Closedoor — ${data.member_count || 0} members.`,
+                    image: data.banner_url || data.avatar_url || 'https://placehold.co/1200x630/1a1a2e/6b7280?text=Closedoor',
+                    type: 'website',
+                    username: null,
+                  };
+                  cache.set('community_' + slug, og);
+                }
+              } catch (err) {
+                console.warn('[og-tags] Community fetch error:', err.message);
+              }
+            }
+          }
+        } else if (username) {
           // Profile route — fetch from Supabase with cache
           og = cache.get('profile_' + username);
           if (!og) {
