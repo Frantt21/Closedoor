@@ -1105,6 +1105,97 @@
 }
 .community-role-save:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* ── Editar avatar/banner de la comunidad (modal de ajustes) ── */
+.community-settings-media {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--color-border, #2a2a2a);
+}
+
+.community-settings-media-row {
+  display: flex;
+  gap: 10px;
+}
+
+.community-settings-media-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.community-settings-media-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.community-settings-media-preview {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--color-surface-hover, #252525);
+  border: 2px solid var(--color-border, #2a2a2a);
+  flex-shrink: 0;
+}
+
+.community-settings-media-preview--banner {
+  width: 100%;
+  max-width: 200px;
+  height: 64px;
+  border-radius: var(--radius, 10px);
+}
+
+.community-settings-media-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.community-settings-media-letter {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--color-text, #fff);
+}
+
+.community-settings-media-btn {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.7rem;
+  transition: background 0.15s ease;
+}
+
+.community-settings-media-btn:hover { background: rgba(0, 0, 0, 0.8); }
+
+.community-settings-media-save {
+  margin-top: 6px;
+  align-self: flex-start;
+  padding: 7px 18px;
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
   .community-body { flex-direction: column; }

@@ -57,6 +57,9 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [limitReached, setLimitReached] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Subida en vuelo: bloquea crear mientras la URL real del CDN no llega
+  // (evita persistir un blob: URL que solo vería el creador).
+  const [uploading, setUploading] = useState(false);
 
   const nameTimerRef = useRef(null);
 
@@ -79,6 +82,7 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
     setSlug('');
     setSlugState('idle');
     setSaving(false);
+    setUploading(false);
     // Reset del estado de permisos para no mostrar el gate del cierre anterior
     setFollowers(null);
     setCanCreate(false);
@@ -167,6 +171,7 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
       toast.error(t('modal.invalid_image_type') || 'Invalid image type');
       return;
     }
+    setUploading(true);
     try {
       const { localUrl, realUrlPromise } = uploadWithLocalPreview(file, user.id, type === 'avatar' ? 'avatar' : 'banner');
       if (type === 'avatar') setAvatar(localUrl);
@@ -179,6 +184,7 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
       console.error('CDN upload error:', err);
       toast.error(err.message || 'Upload failed', { autoClose: 3000 });
     } finally {
+      setUploading(false);
       e.target.value = '';
     }
   };
@@ -199,6 +205,12 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
       } else {
         toast.error(t('comunidades.followers_required', { n: MIN_FOLLOWERS_TO_CREATE }));
       }
+      return;
+    }
+    // Guarda contra blob: URLs (subida en vuelo o fallida): un blob solo lo
+    // puede ver la sesión que lo creó → jamás debe persistirse en la DB.
+    if (avatar.trim().startsWith('blob:') || banner.trim().startsWith('blob:')) {
+      toast.error(t('comunidades.media_uploading'));
       return;
     }
 
@@ -244,7 +256,7 @@ export default function CreateCommunityModal({ isOpen, onClose, onSuccess }) {
       <div className="fc-modal-header">
         <h3 className="fc-modal-title">{t('comunidades.create_community')}</h3>
         <div className="fc-modal-header-actions">
-          <button className="fc-modal-save" onClick={handleSubmit} disabled={saving}>
+          <button className="fc-modal-save" onClick={handleSubmit} disabled={saving || uploading}>
             {saving ? <FaSpinner className="fc-spin" /> : t('comunidades.create_btn')}
           </button>
           <button type="button" className="fc-modal-close" onClick={onClose} aria-label={t('common.close')}>

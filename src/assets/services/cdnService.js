@@ -15,9 +15,28 @@
  */
 
 import { getItem, setItem, removeItem } from './secureStorage';
+import { supabase } from './supabaseclient';
 
 const CDN_BASE = import.meta.env.VITE_CDN_URL || '';
 const CACHE_PREFIX = 'cdn_upload_';
+
+/**
+ * Access token de Supabase para autenticar uploads/borrados contra el CDN.
+ * El CDN verifica el JWT (SUPABASE_JWT_SECRET) y exige que el sub coincida
+ * con el user_id del form → sin sesión válida no se puede llamar al API.
+ */
+async function getAccessToken() {
+  try {
+    const { data } = await supabase.auth.getSession();
+    return data?.session?.access_token || '';
+  } catch {
+    return '';
+  }
+}
+// TTL de la caché de uploads: si la copia del CDN se pierde (borrado manual,
+// limpieza de storage del server…), la entrada caduca sola y no se reutiliza
+// una URL muerta para siempre (la caché era permanente antes de esto).
+const UPLOAD_CACHE_TTL = 30 * 24 * 60 * 60 * 1000; // 30 días
 
 /**
  * Genera un hash SHA-256 del contenido del archivo.
@@ -51,15 +70,53 @@ async function getUploadCacheKey(userId, type, file) {
 /**
  * Try to get a cached upload result for the given file.
  * Returns the cached result or null if not found/expired.
+ * Ahora con TTL: una entrada antigua (>30 días) se descarta y se re-suben
+ * los bytes de verdad, en vez de reutilizar una URL posiblemente muerta.
  */
 async function getCachedUpload(userId, type, file) {
   try {
     const key = await getUploadCacheKey(userId, type, file);
     const parsed = await getItem(key);
     if (!parsed) return null;
+    if (Date.now() - (parsed.timestamp || 0) > UPLOAD_CACHE_TTL) {
+      await removeItem(key);
+      return null;
+    }
     return parsed.result;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Drop a cached upload result (e.g. after validating it is a dead URL).
+ */
+async function removeCachedUpload(userId, type, file) {
+  try {
+    const key = await getUploadCacheKey(userId, type, file);
+    await removeItem(key);
+  } catch {
+    // Ignorar
+  }
+}
+
+/**
+ * Verify that a CDN file still exists on the server (HEAD request).
+ * Devuelve true si el archivo responde OK, o si la URL NO es del CDN
+ * (no se puede/puede que no deba validarse una URL externa).
+ *
+ * Esto permite sanear URLs muertas: si la copia del CDN se perdió, la caché
+ * de uploads dejará de reutilizarla y la re-subida creará un archivo nuevo.
+ */
+export async function verifyCdnFile(url) {
+  if (!url) return false;
+  const path = getCdnUrl(url);
+  if (!path.startsWith('/cdn/files/')) return true; // No es CDN → no validar
+  try {
+    const res = await fetch(path, { method: 'HEAD' });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 
@@ -117,6 +174,65 @@ export function uploadWithLocalPreview(file, userId, type) {
 }
 
 /**
+ * Fetch autenticado contra el CDN con reintento automático ante 401: refresca
+ * la sesión de Supabase (sana sesiones viejas o expiradas — p. ej. creadas con
+ * una signing key anterior a una rotación ECC) y reintenta una vez con el
+ * token nuevo. Si el refresh falla, la sesión está muerta → lanza
+ * session_expired (el usuario debe volver a iniciar sesión).
+ *
+ * NOTA: el retry solo ocurre en 401, y el CDN rechaza ANTES de procesar la
+ * petición (verifica el token antes de leer el body), así que no hay riesgo
+ * de duplicar una subida.
+ */
+async function authedCdnFetch(url, init, token) {
+  const doFetch = (tok) =>
+    fetch(url, {
+      ...init,
+      headers: { ...(init.headers || {}), Authorization: `Bearer ${tok}` },
+    });
+
+  // Lee el motivo del rechazo del body (token expirado, firma inválida, kid
+  // rotado, rol no permitido…). Se captura ANTES del reintento para no perderlo
+  // si el reintento falla por infraestructura (502).
+  const readReason = async (res) => {
+    try {
+      const body = await res.clone().json();
+      return body.reason || body.error || '';
+    } catch {
+      return '';
+    }
+  };
+
+  let response = await doFetch(token);
+  let firstReason = '';
+
+  if (response.status === 401) {
+    firstReason = await readReason(response);
+    try {
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      const freshToken = refreshData?.session?.access_token;
+      if (!refreshError && freshToken) {
+        response = await doFetch(freshToken);
+      }
+    } catch {
+      // Ignorar: se propaga el 401 original
+    }
+  }
+
+  if (response.status === 401) {
+    const reason = (await readReason(response)) || firstReason;
+    throw new Error(`session_expired${reason ? ` (${reason})` : ''}: vuelve a iniciar sesión para subir o borrar imágenes`);
+  }
+
+  // El reintento falló por infraestructura pero el 401 original era de auth:
+  // preservar la razón para no perder el diagnóstico.
+  if ((response.status === 502 || response.status === 503 || response.status === 504) && firstReason) {
+    throw new Error(`cdn_unavailable (auth rechazó: ${firstReason}) — reintenta en unos segundos`);
+  }
+  return response;
+}
+
+/**
  * Upload an image to the CDN server.
  * Results are cached by file fingerprint — re-uploading the same file returns
  * the cached URL immediately without a network request.
@@ -147,8 +263,23 @@ export async function uploadImage(file, userId, type) {
   // ── Check local cache first (instant return for re-uploads) ──
   const cached = await getCachedUpload(userId, type, file);
   if (cached) {
-    // Normalizar URLs cacheadas de sesiones anteriores (forceHttps → relativa)
-    return { ...cached, url: normalizeCdnUrl(cached.url) };
+    const url = normalizeCdnUrl(cached.url);
+    // Validar que el archivo SIGUE existiendo en el CDN: si la copia del CDN
+    // se perdió (borrado manual, limpieza de storage…), el URL cacheado está
+    // muerto y reutilizarlo guardaría una imagen rota para todos los usuarios
+    // (solo visible para quien la subió, por la caché del navegador).
+    // En ese caso se descarta la entrada y se re-suben los bytes de verdad
+    // (nuevo id en el CDN) — así la re-subida sana el banner/avatar roto.
+    if (await verifyCdnFile(url)) {
+      return { ...cached, url };
+    }
+    await removeCachedUpload(userId, type, file);
+  }
+
+  // El CDN exige autenticación JWT en upload (ratelimit + verificación incluidos)
+  const token = await getAccessToken();
+  if (!token) {
+    throw new Error('auth_required: inicia sesión para subir imágenes');
   }
 
   const formData = new FormData();
@@ -156,16 +287,28 @@ export async function uploadImage(file, userId, type) {
   formData.append('user_id', userId);
   formData.append('type', type);
 
-  const response = await fetch(`${CDN_BASE}/cdn/upload`, {
+  const response = await authedCdnFetch(`${CDN_BASE}/cdn/upload`, {
     method: 'POST',
     body: formData,
     // No Content-Type header - browser sets it with boundary for FormData
-  });
+  }, token);
 
-  const data = await response.json();
+  // El CDN responde JSON siempre, pero un 502/504 del proxy (server reiniciando
+  // o caído) llega con body vacío → no asumir que el body es parseable.
+  let data;
+  try {
+    data = await response.json();
+  } catch {
+    throw new Error(
+      response.status === 502 || response.status === 503 || response.status === 504
+        ? 'cdn_unavailable: el servidor de imágenes no está disponible, intenta de nuevo'
+        : `upload_failed: el servidor respondió ${response.status}`
+    );
+  }
 
   if (!data.success) {
-    throw new Error(data.error || 'Upload failed');
+    // reason llega del CDN (token expirado, kid rotado, firma inválida…)
+    throw new Error(data.reason || data.error || 'Upload failed');
   }
 
   // Si el CDN devolvió url (nueva subida) la normalizamos a ruta relativa.
@@ -194,10 +337,18 @@ export async function deleteImage(imageId) {
   if (!imageId) return false;
 
   try {
-    const response = await fetch(`${CDN_BASE}/cdn/files/${imageId}`, {
+    // El CDN exige autenticación JWT en DELETE + ser el dueño del archivo
+    const token = await getAccessToken();
+    if (!token) return false;
+    const response = await authedCdnFetch(`${CDN_BASE}/cdn/files/${imageId}`, {
       method: 'DELETE',
-    });
-    const data = await response.json();
+    }, token);
+    let data = {};
+    try {
+      data = await response.json();
+    } catch {
+      // 502/504 con body vacío → considerar fallo silencioso
+    }
     return data.success === true;
   } catch (err) {
     console.warn('Error deleting image from CDN:', err);

@@ -32,6 +32,9 @@ import {
   deleteInvite,
   getActiveMembersRanking,
   redeemInvite,
+  updateCommunity,
+  clearCommunityCache,
+  clearCommunitiesListCache,
 } from '../services/communityService';
 import {
   getLikedPostIds,
@@ -102,6 +105,15 @@ export default function CommunityPage() {
 
   // UI
   const [showSettings, setShowSettings] = useState(false);
+  const [editAvatar, setEditAvatar] = useState('');
+  const [editBanner, setEditBanner] = useState('');
+  const [savingMedia, setSavingMedia] = useState(false);
+  // Subida en vuelo: bloquea el guardado mientras la URL real del CDN no
+  // llega (evita persistir un blob: URL que solo vería el creador).
+  const [mediaUploading, setMediaUploading] = useState(false);
+  // Banner roto (el archivo del CDN ya no existe → 404 para todos). Se oculta
+  // con elegancia y se limpia la cache del detalle para que el refetch sane.
+  const [bannerBroken, setBannerBroken] = useState(false);
   const [showCreateRole, setShowCreateRole] = useState(false);
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const [headerMenuPos, setHeaderMenuPos] = useState(null); // { top, right } fixed
@@ -118,6 +130,27 @@ export default function CommunityPage() {
 
   const membershipRef = useRef(null);
   useEffect(() => { membershipRef.current = membership; }, [membership]);
+
+  // Al navegar a otra comunidad se resetea el estado de banner roto y los
+  // borradores de edición de imagen pendientes (evita guardar en la comunidad
+  // B una imagen elegida para la A).
+  useEffect(() => {
+    setBannerBroken(false);
+    setEditAvatar('');
+    setEditBanner('');
+    setSavingMedia(false);
+    setMediaUploading(false);
+  }, [slug]);
+
+  // Al cerrar el modal de ajustes se descartan los borradores de imagen
+  useEffect(() => {
+    if (!showSettings) {
+      setEditAvatar('');
+      setEditBanner('');
+      setSavingMedia(false);
+      setMediaUploading(false);
+    }
+  }, [showSettings]);
 
   // ── Cerrar menú de 3 puntos al hacer clic fuera o scrollear ──
   useEffect(() => {
@@ -441,6 +474,66 @@ export default function CommunityPage() {
     }
   };
 
+  // ── Editar avatar/banner (owner) ──
+  // Re-subir la imagen también sana archivos rotos del CDN: si el archivo
+  // cacheado devolvió 404, uploadImage descarta la entrada y crea uno nuevo.
+  const handleMediaUpload = async (e, type) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.id) return;
+    if (!file.type.startsWith('image/')) {
+      toast.error(t('modal.invalid_image_type'));
+      return;
+    }
+    setMediaUploading(true);
+    try {
+      const { localUrl, realUrlPromise } = uploadWithLocalPreview(file, user.id, type);
+      if (type === 'avatar') setEditAvatar(localUrl);
+      else setEditBanner(localUrl);
+      const realUrl = await realUrlPromise;
+      if (type === 'avatar') setEditAvatar(realUrl);
+      else setEditBanner(realUrl);
+      toast.success(t('upload.uploaded'), { autoClose: 2000 });
+    } catch (err) {
+      console.error('CDN upload error:', err);
+      toast.error(err.message || t('comunidades.error'));
+    } finally {
+      setMediaUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleSaveMedia = async () => {
+    if (!editAvatar && !editBanner) return;
+    // Guarda contra blob: URLs (subida en vuelo o fallida): un blob solo lo
+    // puede ver la sesión que lo creó → jamás debe persistirse en la DB.
+    if ((editAvatar && editAvatar.startsWith('blob:')) || (editBanner && editBanner.startsWith('blob:'))) {
+      toast.error(t('comunidades.media_uploading'));
+      return;
+    }
+    setSavingMedia(true);
+    try {
+      const updates = {};
+      if (editAvatar) updates.avatar_url = editAvatar;
+      if (editBanner) updates.banner_url = editBanner;
+      const updated = await updateCommunity(community.id, updates);
+      if (updated) {
+        setCommunity(updated);
+        setEditAvatar('');
+        setEditBanner('');
+        setBannerBroken(false);
+        // El listado cachea la comunidad → invalidarlo para que la nueva
+        // imagen (y el updated_at) aparezcan sin esperar el TTL.
+        clearCommunitiesListCache(user.id);
+        toast.success(t('comunidades.media_saved'));
+      }
+    } catch (err) {
+      console.error('[Community] Error saving media:', err);
+      toast.error(err.message || t('comunidades.error'));
+    } finally {
+      setSavingMedia(false);
+    }
+  };
+
   // ── Invitaciones ──
   const handleCreateInvite = async () => {
     try {
@@ -626,10 +719,22 @@ export default function CommunityPage() {
         }}
       >
         <div className="community-header-banner">
-          {community.banner_url ? (
-            <img src={community.banner_url} alt="" />
+          {community.banner_url && !bannerBroken ? (
+            <img
+              src={community.banner_url}
+              alt=""
+              onError={() => {
+                // El archivo del CDN no existe (404) → ocultarlo con elegancia
+                // y limpiar la cache del detalle para que el refetch sane.
+                setBannerBroken(true);
+                clearCommunityCache(slug);
+              }}
+            />
           ) : (
-            <div className="community-header-banner-empty" />
+            <div
+              className="community-header-banner-empty"
+              style={community.accent_color ? { background: `linear-gradient(135deg, ${community.accent_color}, ${community.accent_color_secondary || community.accent_color})` } : undefined}
+            />
           )}
           <div className="community-header-overlay" />
         </div>
@@ -1046,6 +1151,71 @@ export default function CommunityPage() {
               <button type="button" className="community-modal-close" onClick={() => setShowSettings(false)}><FaTimes /></button>
             </div>
             <div className="community-modal-body">
+              {/* ── Editar avatar / banner (owner). La re-subida también sana
+                  archivos rotos del CDN (ver cdnService.uploadImage) ── */}
+              <div className="community-settings-media">
+                <div className="community-roles-bar-title"><FaCamera /> {t('comunidades.edit_media')}</div>
+                <div className="community-settings-media-row">
+                  <div className="community-settings-media-item">
+                    <span className="community-settings-media-label">{t('comunidades.avatar')}</span>
+                    <div className="community-settings-media-preview">
+                      {editAvatar || community.avatar_url ? (
+                        <img src={editAvatar || community.avatar_url} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                      ) : (
+                        <span className="community-settings-media-letter">{community.name.charAt(0).toUpperCase()}</span>
+                      )}
+                      <button
+                        type="button"
+                        className="community-settings-media-btn"
+                        onClick={() => document.getElementById('cc-settings-avatar-input')?.click()}
+                        title={t('comunidades.avatar')}
+                      >
+                        <FaCamera />
+                      </button>
+                      <input
+                        id="cc-settings-avatar-input"
+                        type="file"
+                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        style={{ display: 'none' }}
+                        onChange={(e) => handleMediaUpload(e, 'avatar')}
+                      />
+                    </div>
+                  </div>
+                  <div className="community-settings-media-item">
+                    <span className="community-settings-media-label">{t('comunidades.banner')}</span>
+                    <div className="community-settings-media-preview community-settings-media-preview--banner">
+                      {editBanner || community.banner_url ? (
+                        <img src={editBanner || community.banner_url} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+                      ) : (
+                        <span className="community-settings-media-letter">{t('comunidades.banner')}</span>
+                      )}
+                      <button
+                        type="button"
+                        className="community-settings-media-btn"
+                        onClick={() => document.getElementById('cc-settings-banner-input')?.click()}
+                        title={t('comunidades.banner')}
+                      >
+                        <FaCamera />
+                      </button>
+                      <input
+                        id="cc-settings-banner-input"
+                        type="file"
+                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        style={{ display: 'none' }}
+                        onChange={(e) => handleMediaUpload(e, 'banner')}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="community-role-save community-settings-media-save"
+                  onClick={handleSaveMedia}
+                  disabled={savingMedia || mediaUploading || (!editAvatar && !editBanner)}
+                >
+                  {savingMedia ? <FaSpinner className="fc-spin" /> : t('comunidades.save_changes')}
+                </button>
+              </div>
               <div className="community-roles-bar-title"><FaShieldAlt /> {t('comunidades.roles')}</div>
               <div className="community-roles-bar-list">
                 {roles.map((r) => (

@@ -26,6 +26,9 @@ export default function Comunidades() {
   const [showCreate, setShowCreate] = useState(false);
   const [checkingPerms, setCheckingPerms] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // Banners cuyo archivo ya no existe en el CDN (404) → mostrar el fallback
+  // de gradiente en vez de la imagen rota (el refetch puede sanearlos).
+  const [brokenBanners, setBrokenBanners] = useState(() => new Set());
   const searchTimerRef = useRef(null);
 
   const load = useCallback(async (query = '', sort = 'popular') => {
@@ -210,8 +213,13 @@ export default function Comunidades() {
                 style={accentStyle}
               >
                 <div className="explore-card-banner">
-                  {c.banner_url ? (
-                    <img className="explore-card-banner-img" src={c.banner_url} alt="" />
+                  {c.banner_url && !brokenBanners.has(c.id) ? (
+                    <img
+                      className="explore-card-banner-img"
+                      src={c.banner_url}
+                      alt=""
+                      onError={() => setBrokenBanners((prev) => new Set(prev).add(c.id))}
+                    />
                   ) : (
                     <div
                       className="comunidades-card-banner-fallback"
