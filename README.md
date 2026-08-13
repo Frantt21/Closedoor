@@ -4,6 +4,8 @@ Plataforma de red social desarrollada con React y Supabase: perfiles, publicacio
 
 ---
 
+12 de agosto
+
 ## Indice
 
 1. [Descripcion](#descripcion)
