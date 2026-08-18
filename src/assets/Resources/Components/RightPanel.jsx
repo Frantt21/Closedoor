@@ -6,6 +6,7 @@ import { getUserProfile, getUserProfileByUsername, getCachedProfileByUsername, g
 import { getTrendingHashtags, getTrendingWords, getCachedTrendingWords, getCachedTrendingHashtags, deduplicateTrending } from '../../services/hashtagService';
 import { getTrendingCategory } from '../../services/trendingDictionary';
 import ProfileSidebar from './ProfileSidebar';
+import CommunitySidebar from './CommunitySidebar';
 import { getContrastText, isUUID } from '../../services/helpers';
 import useBgContrast from '../../../hooks/useBgContrast';
 import { IconFire, IconHashtag, IconArrowRight } from './ShellIcons';
@@ -23,9 +24,16 @@ export default function RightPanel() {
   // ── Sin sesión o auth pages: hidden ──
   if (!user || path === '/login' || path === '/register') return null;
 
+  // ── Community page: render community sidebar ──
+  const isCommunityPage = path.startsWith('/c/');
+
   return (
     <aside className="right-panel">
-      <ProfileContent path={path} ownProfile={ownProfile} user={user} t={t} />
+      {isCommunityPage ? (
+        <CommunitySidebar />
+      ) : (
+        <ProfileContent path={path} ownProfile={ownProfile} user={user} t={t} />
+      )}
     </aside>
   );
 }

@@ -367,7 +367,9 @@
 }
 
 /* ── Página de comunidad ── */
-.community-page { max-width: 1100px; margin: 0 auto; padding-bottom: 40px; }
+/* El sidebar ahora vive en RightPanel (como /profile). La página se mantiene
+   dentro de app-content (max-width 800px) y no necesita layout flex propio. */
+.community-page { max-width: 100%; margin: 0 auto; padding-bottom: 40px; }
 /* ── Skeleton de la página de comunidad (mismo patrón que el resto del app) ── */
 .community-skeleton-page { display: flex; flex-direction: column; gap: 14px; }
 .community-skeleton-header {
@@ -392,9 +394,7 @@
 .community-skeleton-card { height: 110px; border-radius: var(--radius, 10px); }
 .community-skeleton-sidebar-card { height: 140px; border-radius: var(--radius, 10px); }
 
-@media (max-width: 1024px) {
-  .community-skeleton-page .community-sidebar { order: 0; }
-}
+
 .community-page--empty {
   text-align: center;
   padding: 80px 20px;
@@ -416,9 +416,6 @@
 /* Header */
 .community-header {
   position: relative;
-  /* Mismo arranque que el resto de páginas full-width (ej. chat): pegado al
-     top. Márgenes horizontales compartidos con el body (20px). */
-  margin: 0 20px;
   border-radius: var(--radius, 10px);
   overflow: hidden;
   background: var(--color-surface, #1c1c1e);
@@ -529,6 +526,8 @@
 }
 .community-header-dropdown-btn:hover { background: var(--color-surface-hover, #252525); }
 .community-header-dropdown-btn svg { opacity: 0.7; font-size: 0.85rem; }
+.community-header-dropdown-btn--leave { color: #ef4444; }
+.community-header-dropdown-btn--leave:hover { background: rgba(239, 68, 68, 0.12); }
 
 /* fcFadeIn (solo definido en chat.css; lo declaramos aquí por si la página
    de comunidad no carga chat.css) */
@@ -540,7 +539,7 @@
   padding: 5px 12px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--cc-accent, #6b7280) 22%, transparent);
-  border: 1px solid color-mix(in srgb, var(--cc-accent, #6b7280) 45%, transparent);
+  border: none;
   color: var(--color-text, #fff);
   font-size: 0.78rem;
   font-weight: 600;
@@ -606,25 +605,15 @@
   backdrop-filter: blur(6px);
 }
 
-/* Body layout: mismo patrón que el perfil (profile-layout): flex con la
-   columna principal al lado del sidebar de reglas/miembros. Alineado con el
-   header (mismo margen horizontal 20px) y con separación top mínima. */
+/* Body layout: solo columna principal (el sidebar de ranking/reglas/miembros
+   ahora vive en RightPanel, igual que el sidebar de perfil). */
 .community-body {
   display: flex;
-  gap: 20px;
-  align-items: flex-start;
-  padding: 14px 20px 18px;
-}
-.community-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
-.community-sidebar {
-  width: 260px;
-  flex-shrink: 0;
-  display: flex;
   flex-direction: column;
-  gap: 12px;
-  position: sticky;
-  top: 70px;
+  gap: 14px;
+  padding: 14px 0 18px;
 }
+.community-main { min-width: 0; display: flex; flex-direction: column; gap: 14px; }
 
 /* Solicitudes (sin borde, como el resto de cards del app) */
 .community-requests {
@@ -822,10 +811,14 @@
 }
 .community-feed-empty p { margin: 0; font-size: 0.9rem; }
 
-/* Sidebar: las cards reusan los estilos del sidebar de perfil
-   (profile-sidebar-card / profile-sidebar-title de profileSidebar.css), por
-   eso aquí solo quedan los estilos propios del contenido (ranking, reglas,
-   preview de miembros). */
+/* Sidebar cards: las cards reusan los estilos del sidebar de perfil
+   (profile-sidebar-card / profile-sidebar-title de profileSidebar.css).
+   El sidebar ahora vive en RightPanel (CommunitySidebar.jsx). */
+.community-sidebar-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 .community-ranking { display: flex; flex-direction: column; gap: 4px; }
 .community-ranking-item {
   display: flex;
@@ -1198,8 +1191,6 @@
 
 /* Responsive */
 @media (max-width: 1024px) {
-  .community-body { flex-direction: column; }
-  .community-sidebar { position: static; order: 2; width: 100%; }
-  .community-main { order: 1; }
   .community-header-banner { height: 150px; }
+  .community-body { padding: 14px 0 18px; }
 }

@@ -136,9 +136,9 @@ function App() {
   const location = useLocation();
   const pathname = location.pathname.toLowerCase();
   const isChatRoute = pathname === '/chat';
-  // Full-width tipo chat: las comunidades ocupan todo el ancho disponible
-  // (grid ancho estilo Explore, sin panel derecho).
-  const isFullWidthRoute = isChatRoute || pathname === '/communities' || pathname.startsWith('/c/');
+  // Full-width tipo chat: solo chat y comunidades listado.
+  // /c/:slug usa el layout normal con RightPanel (sidebar de comunidad).
+  const isFullWidthRoute = isChatRoute || pathname === '/communities';
 
   return (
     <I18nProvider>

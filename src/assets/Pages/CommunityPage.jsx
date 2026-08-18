@@ -6,7 +6,7 @@ import usePageTitle from '../../hooks/usePageTitle';
 import useBgContrast from '../../hooks/useBgContrast';
 import { supabase, dbPublic } from '../services/supabaseclient';
 import { toast } from 'react-toastify';
-import { FaUsers, FaLock, FaPlus, FaCheck, FaTimes, FaSpinner, FaCamera, FaLink, FaTrophy, FaTrash, FaShieldAlt, FaRegComments, FaEllipsisH, FaCog } from 'react-icons/fa';
+import { FaUsers, FaLock, FaPlus, FaCheck, FaTimes, FaSpinner, FaCamera, FaLink, FaTrash, FaShieldAlt, FaRegComments, FaEllipsisH, FaCog } from 'react-icons/fa';
 import {
   getCommunity,
   getCachedCommunity,
@@ -684,10 +684,6 @@ export default function CommunityPage() {
             <div className="skeleton community-skeleton-card" />
             <div className="skeleton community-skeleton-card" />
           </div>
-          <div className="community-sidebar">
-            <div className="skeleton community-skeleton-sidebar-card" />
-            <div className="skeleton community-skeleton-sidebar-card" />
-          </div>
         </div>
       </div>
     );
@@ -760,23 +756,21 @@ export default function CommunityPage() {
               ) : isMember ? (
                 <>
                   <span className="community-header-role-badge">{t(`comunidades.role_${membership.role}`)}</span>
-                  {isOwner && (
-                    <div className="community-header-menu-wrap" ref={headerMenuRef}>
-                      <button
-                        className={`community-header-btn community-header-btn--dots ${headerMenuOpen ? 'community-header-btn--dots-active' : ''}`}
-                        onClick={(e) => {
-                          // Posición fija para que el menú no quede recortado por
-                          // el overflow:hidden del header (mismo patrón que Chat.jsx)
-                          const rect = e.currentTarget.getBoundingClientRect();
-                          setHeaderMenuPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
-                          setHeaderMenuOpen((s) => !s);
-                        }}
-                        title={t('comunidades.more')}
-                      >
-                        <FaEllipsisH />
-                      </button>
-                      {headerMenuOpen && headerMenuPos && (
-                        <div className="community-header-dropdown" style={{ top: headerMenuPos.top, right: headerMenuPos.right }}>
+                  <div className="community-header-menu-wrap" ref={headerMenuRef}>
+                    <button
+                      className={`community-header-btn community-header-btn--dots ${headerMenuOpen ? 'community-header-btn--dots-active' : ''}`}
+                      onClick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        setHeaderMenuPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+                        setHeaderMenuOpen((s) => !s);
+                      }}
+                      title={t('comunidades.more')}
+                    >
+                      <FaEllipsisH />
+                    </button>
+                    {headerMenuOpen && headerMenuPos && (
+                      <div className="community-header-dropdown" style={{ top: headerMenuPos.top, right: headerMenuPos.right }}>
+                        {isOwner && (
                           <button
                             type="button"
                             className="community-header-dropdown-btn"
@@ -785,26 +779,28 @@ export default function CommunityPage() {
                             <FaCog />
                             <span>{t('comunidades.settings')}</span>
                           </button>
+                        )}
+                        <button
+                          type="button"
+                          className="community-header-dropdown-btn"
+                          onClick={() => { setHeaderMenuOpen(false); setShowInvites(true); }}
+                        >
+                          <FaLink />
+                          <span>{t('comunidades.invites')}</span>
+                        </button>
+                        {!isOwner && (
                           <button
                             type="button"
-                            className="community-header-dropdown-btn"
-                            onClick={() => { setHeaderMenuOpen(false); setShowInvites(true); }}
+                            className="community-header-dropdown-btn community-header-dropdown-btn--leave"
+                            onClick={() => { setHeaderMenuOpen(false); setLeavePending(true); }}
                           >
-                            <FaLink />
-                            <span>{t('comunidades.invites')}</span>
+                            <FaTimes />
+                            <span>{t('comunidades.leave')}</span>
                           </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {!isOwner && (
-                    <button
-                      className="community-header-btn community-header-btn--leave"
-                      onClick={() => setLeavePending(true)}
-                    >
-                      {t('comunidades.leave')}
-                    </button>
-                  )}
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </>
               ) : (
                 <button className="community-header-btn community-header-btn--join" onClick={handleJoin}>
@@ -1013,63 +1009,7 @@ export default function CommunityPage() {
           )}
         </div>
 
-        {/* ── Sidebar (estilos del sidebar de perfil reutilizados) ── */}
-        <div className="community-sidebar">
-          {/* ── Ranking de activos ── */}
-          {ranking.length > 0 && (
-            <div className="profile-sidebar-card">
-              <div className="profile-sidebar-title"><FaTrophy className="profile-sidebar-title-icon" /> {t('comunidades.most_active')}</div>
-              <div className="community-ranking">
-                {ranking.map((r, idx) => (
-                  <Link
-                    key={r.user_id}
-                    to={`/profile/${r.profile?.username}`}
-                    className="community-ranking-item"
-                  >
-                    <span className={`community-ranking-pos ${idx < 3 ? `community-ranking-pos--${idx + 1}` : ''}`}>{idx + 1}</span>
-                    <Avatar className="community-ranking-avatar" src={r.profile?.avatar_url} alt={r.profile?.username} />
-                    <span className="community-ranking-name">@{r.profile?.username || '…'}</span>
-                    <span className="community-ranking-score">{r.score}</span>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
 
-          {/* ── Reglas ── */}
-          {community.rules?.length > 0 && (
-            <div className="profile-sidebar-card">
-              <div className="profile-sidebar-title"><FaShieldAlt className="profile-sidebar-title-icon" /> {t('comunidades.rules')}</div>
-              <ol className="community-rules-list">
-                {community.rules.map((rule, i) => (
-                  <li key={i} className="community-rule-item">{rule}</li>
-                ))}
-              </ol>
-            </div>
-          )}
-
-          {/* ── Miembros ── */}
-          {members.length > 0 && (
-            <div className="profile-sidebar-card">
-              <div className="profile-sidebar-title"><FaUsers className="profile-sidebar-title-icon" /> {t('comunidades.members')}</div>
-              <div className="community-members-preview">
-                {members.slice(0, 12).map((m) => (
-                  <Link key={m.user_id} to={`/profile/${m.profiles?.username}`} title={`@${m.profiles?.username || ''}`}>
-                    <Avatar className="community-members-preview-avatar" src={m.profiles?.avatar_url} alt={m.profiles?.username} />
-                  </Link>
-                ))}
-                {members.length > 12 && (
-                  <button type="button" className="community-members-more" onClick={() => setShowMembersModal(true)}>
-                    +{members.length - 12}
-                  </button>
-                )}
-              </div>
-              <button type="button" className="community-sidebar-link" onClick={() => setShowMembersModal(true)}>
-                {t('comunidades.view_all_members')}
-              </button>
-            </div>
-          )}
-        </div>
       </div>
 
       {/* ── Modal de miembros ── */}
