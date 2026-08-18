@@ -1267,6 +1267,124 @@
     display: block;
 }
 
+/* ── Community invite card in chat ── */
+.chat-message-shared-community {
+    margin-bottom: 6px;
+    border-radius: var(--radius, 10px);
+    background: var(--color-surface, #1a1a1a);
+    border: 1px solid var(--color-border, #2a2a2a);
+    overflow: hidden;
+    max-width: 280px;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+}
+.chat-message-shared-community:hover {
+    border-color: var(--color-text-muted, #6b7280);
+}
+.chat-message-shared-community--loading {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    margin-bottom: 6px;
+    font-size: 0.78rem;
+    color: var(--color-text-muted, #6b7280);
+    border-radius: var(--radius, 10px);
+    background: var(--color-surface, #1a1a1a);
+    border: 1px solid var(--color-border, #2a2a2a);
+}
+.chat-community-card-banner {
+    position: relative;
+    height: 70px;
+    overflow: hidden;
+}
+.chat-community-card-banner img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.chat-community-card-banner-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,0.4), transparent);
+}
+.chat-community-card-body {
+    padding: 10px 12px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.chat-community-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.chat-community-card-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--color-surface, #1a1a1a);
+    margin-top: -18px;
+    flex-shrink: 0;
+    background: var(--color-surface-hover, #252525);
+}
+.chat-community-card-avatar--letter {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    font-weight: 800;
+    color: #fff;
+}
+.chat-community-card-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.chat-community-card-name {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--color-text, #ffffff);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.chat-community-card-slug {
+    font-size: 0.7rem;
+    color: var(--color-text-muted, #6b7280);
+}
+.chat-community-card-desc {
+    margin: 0;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    color: var(--color-text-secondary, #9ca3af);
+}
+.chat-community-card-stats {
+    display: flex;
+    gap: 12px;
+    font-size: 0.7rem;
+    color: var(--color-text-muted, #6b7280);
+}
+.chat-community-card-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 0;
+    border-radius: 999px;
+    background: var(--color-accent, #6b7280);
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-decoration: none;
+    text-align: center;
+    transition: opacity 0.15s ease;
+}
+.chat-community-card-btn:hover {
+    opacity: 0.85;
+}
+
 /* ── Infinite scroll loading spinner (visual bottom = oldest messages) ── */
 .chat-load-more-spinner {
     display: flex;

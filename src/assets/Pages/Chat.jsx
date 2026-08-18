@@ -369,6 +369,8 @@ export default function Chat() {
   const [otherUserTyping, setOtherUserTyping] = useState(false);
   // ── Shared post data cache (state to trigger re-render) ──
   const [sharedPosts, setSharedPosts] = useState({});
+  // ── Shared community data cache ──
+  const [sharedCommunities, setSharedCommunities] = useState({});
 
   // ── SessionStorage cache helpers (survives page reload, cleared on tab close) ──
   const getSessionCacheKey = () => `chatMessagesCache_${user?.id || 'anon'}`;
@@ -836,6 +838,12 @@ export default function Chat() {
             setSharedPosts(prev => ({ ...prev, [newMsg.shared_post_id]: postData }));
           } catch {}
         }
+        if (newMsg.shared_community_id && !sharedCommunities[newMsg.shared_community_id]) {
+          try {
+            const { data } = await supabase.from('communities').select('*').eq('id', newMsg.shared_community_id).single();
+            if (data) setSharedCommunities(prev => ({ ...prev, [newMsg.shared_community_id]: data }));
+          } catch {}
+        }
         if (eventType === 'UPDATE') {
           setMessages((prev) => prev.map((msg) => msg.id === newMsg.id ? { ...msg, ...newMsg, decryptedContent: content } : msg));
         } else {
@@ -946,6 +954,28 @@ export default function Chat() {
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages]);
+
+  // ── Pre-fetch shared communities for visible messages ──
+  useEffect(() => {
+    const sharedCommunityIds = [...new Set(
+      messages.filter((m) => m.shared_community_id).map((m) => m.shared_community_id)
+    )];
+    if (sharedCommunityIds.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      for (const cid of sharedCommunityIds) {
+        if (cancelled) break;
+        if (sharedCommunities[cid]) continue;
+        try {
+          const { data } = await supabase.from('communities').select('*').eq('id', cid).single();
+          if (!cancelled && data) {
+            setSharedCommunities((prev) => (prev[cid] ? prev : { ...prev, [cid]: data }));
+          }
+        } catch { /* ignore */ }
+      }
+    })();
+    return () => { cancelled = true; };
   }, [messages]);
 
   // Sync messages cache on every update (realtime, delete, edit, etc.)
@@ -2837,6 +2867,56 @@ export default function Chat() {
                               />
                             </div>
                           )}
+                        </div>
+                      );
+                    })()}
+                    {msg.shared_community_id && (() => {
+                      const community = sharedCommunities[msg.shared_community_id];
+                      if (!community) {
+                        return (
+                          <div className="chat-message-shared-community chat-message-shared-community--loading">
+                            <div className="chat-message-shared-post-spinner" />
+                            <span>{t('common.loading')}</span>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="chat-message-shared-community">
+                          {community.banner_url && (
+                            <div className="chat-community-card-banner">
+                              <img src={community.banner_url} alt="" />
+                              <div className="chat-community-card-banner-overlay" />
+                            </div>
+                          )}
+                          <div className="chat-community-card-body">
+                            <div className="chat-community-card-header">
+                              {community.avatar_url ? (
+                                <img className="chat-community-card-avatar" src={community.avatar_url} alt={community.name} />
+                              ) : (
+                                <div className="chat-community-card-avatar chat-community-card-avatar--letter">
+                                  {community.name?.charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                              <div className="chat-community-card-info">
+                                <span className="chat-community-card-name">{community.name}</span>
+                                <span className="chat-community-card-slug">c/{community.slug}</span>
+                              </div>
+                            </div>
+                            {community.description && (
+                              <p className="chat-community-card-desc">{community.description.length > 80 ? community.description.slice(0, 80) + '...' : community.description}</p>
+                            )}
+                            <div className="chat-community-card-stats">
+                              <span>{community.member_count || 0} {t('comunidades.members')}</span>
+                              <span>{community.post_count || 0} {t('comunidades.posts')}</span>
+                            </div>
+                            <a
+                              href={`/c/${community.slug}`}
+                              className="chat-community-card-btn"
+                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.location.href = `/c/${community.slug}`; }}
+                            >
+                              {t('comunidades.join_btn')}
+                            </a>
+                          </div>
                         </div>
                       );
                     })()}

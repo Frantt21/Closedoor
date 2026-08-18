@@ -6,7 +6,7 @@ import usePageTitle from '../../hooks/usePageTitle';
 import useBgContrast from '../../hooks/useBgContrast';
 import { supabase, dbPublic } from '../services/supabaseclient';
 import { toast } from 'react-toastify';
-import { FaUsers, FaLock, FaPlus, FaCheck, FaTimes, FaSpinner, FaCamera, FaLink, FaTrash, FaShieldAlt, FaRegComments, FaEllipsisH, FaCog } from 'react-icons/fa';
+import { FaUsers, FaLock, FaPlus, FaCheck, FaTimes, FaSpinner, FaCamera, FaLink, FaTrash, FaShieldAlt, FaRegComments, FaEllipsisH, FaCog, FaComment } from 'react-icons/fa';
 import {
   getCommunity,
   getCachedCommunity,
@@ -46,6 +46,9 @@ import {
   clearFeedCache,
 } from '../services/postService';
 import { uploadWithLocalPreview } from '../services/cdnService';
+import { getFollowing } from '../services/followService';
+import { getOrCreateConversation, sendMessage } from '../services/chatService';
+import { getCachedBlockStatus } from '../services/blockService';
 import VirtualPostList from '../Resources/Components/VirtualPostList';
 import Avatar from '../Resources/Components/Avatar';
 import ConfirmModal from '../Resources/Components/ConfirmModal';
@@ -127,6 +130,12 @@ export default function CommunityPage() {
   const [leavePending, setLeavePending] = useState(false);
   const [inviteToken, setInviteToken] = useState(() => new URLSearchParams(window.location.search).get('invite') || null);
   const [inviteRedeeming, setInviteRedeeming] = useState(false);
+  // Share community invite to chat
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareFollowing, setShareFollowing] = useState([]);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState(new Set());
+  const [shareSendingTo, setShareSendingTo] = useState(new Set());
 
   const membershipRef = useRef(null);
   useEffect(() => { membershipRef.current = membership; }, [membership]);
@@ -662,27 +671,139 @@ export default function CommunityPage() {
     setPosts((prev) => prev.map((p) => (p.id === updatedPost.id ? { ...p, ...updatedPost } : p)));
   }, []);
 
+  // ── Share community invite to chat ──
+  const openShareModal = useCallback(async () => {
+    setShowInvites(false);
+    if (!user?.id) return;
+    setShowShareModal(true);
+    setSelectedUsers(new Set());
+    setShareSendingTo(new Set());
+    setShareLoading(true);
+    try {
+      const data = await getFollowing(user.id);
+      const filtered = (data || []).filter(u => {
+        const blockedByMe = getCachedBlockStatus(user.id, u.id);
+        const blockedByThem = getCachedBlockStatus(u.id, user.id);
+        return blockedByMe !== true && blockedByThem !== true;
+      });
+      setShareFollowing(filtered);
+    } catch (err) {
+      console.warn('Error loading following for share:', err);
+      setShareFollowing([]);
+    } finally {
+      setShareLoading(false);
+    }
+  }, [user?.id]);
+
+  const toggleUserSelection = useCallback((userId) => {
+    setSelectedUsers((prev) => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  }, []);
+
+  const handleSendInviteToChat = useCallback(async () => {
+    if (selectedUsers.size === 0 || !user?.id || !community?.id) return;
+    const targets = shareFollowing.filter(u => selectedUsers.has(u.id));
+    setShareSendingTo(new Set(selectedUsers));
+    let errors = 0;
+    for (const targetUser of targets) {
+      const cachedBlocked = getCachedBlockStatus(user.id, targetUser.id);
+      if (cachedBlocked === true) { errors++; continue; }
+      const cachedBlockedByThem = getCachedBlockStatus(targetUser.id, user.id);
+      if (cachedBlockedByThem === true) { errors++; continue; }
+      try {
+        const convId = await getOrCreateConversation(user.id, targetUser.id);
+        const { data: participants } = await supabase
+          .from('chat_participants')
+          .select('user_id')
+          .eq('conversation_id', convId);
+        const participantIds = (participants || []).map(p => p.user_id).filter(id => id !== user.id);
+        await sendMessage(convId, user.id, '', participantIds, null, null, community.id);
+      } catch (err) {
+        console.error('Error sharing community invite to', targetUser.username, ':', err);
+        errors++;
+      }
+    }
+    setShareSendingTo(new Set());
+    if (errors === 0) {
+      setShowShareModal(false);
+      setSelectedUsers(new Set());
+      setShareFollowing([]);
+      toast.success(t('comunidades.share_chat_sent'));
+    } else {
+      toast.error(t('comunidades.error'));
+    }
+  }, [selectedUsers, shareFollowing, user?.id, community?.id, t]);
+
   // ── Render ──
   if (loading) {
     return (
       <div className="community-page community-skeleton-page">
-        {/* Skeleton del header (mismo patrón de skeleton que el resto del app) */}
+        {/* Skeleton del header */}
         <div className="community-skeleton-header">
           <div className="skeleton community-skeleton-banner" />
           <div className="community-skeleton-header-main">
-            <div className="skeleton skeleton--circle community-skeleton-avatar" />
+            <div className="community-skeleton-avatar-row">
+              <div className="skeleton skeleton--circle community-skeleton-avatar" />
+              <div className="community-skeleton-header-actions">
+                <div className="skeleton community-skeleton-btn" />
+                <div className="skeleton community-skeleton-btn" style={{ width: 34 }} />
+              </div>
+            </div>
             <div className="community-skeleton-header-lines">
               <div className="skeleton community-skeleton-line community-skeleton-line--title" />
               <div className="skeleton community-skeleton-line community-skeleton-line--slug" />
+              <div className="community-skeleton-line--stats">
+                <div className="skeleton community-skeleton-line--stat" />
+                <div className="skeleton community-skeleton-line--stat" style={{ width: 70 }} />
+              </div>
               <div className="skeleton community-skeleton-line community-skeleton-line--desc" />
+              <div className="community-skeleton-line--interests">
+                <div className="skeleton community-skeleton-interest" />
+                <div className="skeleton community-skeleton-interest" style={{ width: 50 }} />
+                <div className="skeleton community-skeleton-interest" style={{ width: 70 }} />
+                <div className="skeleton community-skeleton-interest" style={{ width: 55 }} />
+              </div>
             </div>
           </div>
         </div>
         <div className="community-body">
           <div className="community-main">
-            <div className="skeleton community-skeleton-card" />
-            <div className="skeleton community-skeleton-card" />
-            <div className="skeleton community-skeleton-card" />
+            {/* Skeleton composer */}
+            <div className="community-skeleton-composer">
+              <div className="skeleton community-skeleton-composer-textarea" />
+              <div className="community-skeleton-composer-footer">
+                <div className="skeleton community-skeleton-composer-btn" />
+                <div className="skeleton community-skeleton-composer-submit" />
+              </div>
+            </div>
+            {/* Skeleton feed controls */}
+            <div className="community-skeleton-feed-controls">
+              <div className="community-skeleton-feed-sorts">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="skeleton community-skeleton-pill" />
+                ))}
+              </div>
+              <div className="community-skeleton-feed-sorts">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="skeleton community-skeleton-pill" style={{ width: 50 }} />
+                ))}
+              </div>
+            </div>
+            {/* Skeleton posts */}
+            {[1, 2].map((i) => (
+              <div key={i} className="community-skeleton-post">
+                <div className="skeleton community-skeleton-post-avatar" />
+                <div className="community-skeleton-post-lines">
+                  <div className="skeleton community-skeleton-line" style={{ width: '40%' }} />
+                  <div className="skeleton community-skeleton-line" style={{ width: '90%' }} />
+                  <div className="skeleton community-skeleton-line" style={{ width: '65%' }} />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -1071,6 +1192,14 @@ export default function CommunityPage() {
                   <button type="button" className="community-invite-copy" onClick={() => copyInvite(inv)}>
                     {t('comunidades.invite_copy')}
                   </button>
+                  <button
+                    type="button"
+                    className="community-invite-chat"
+                    title={t('comunidades.invite_send_chat')}
+                    onClick={() => openShareModal()}
+                  >
+                    <FaComment />
+                  </button>
                   <button type="button" className="community-invite-del" onClick={() => handleDeleteInvite(inv.id)}>
                     <FaTrash />
                   </button>
@@ -1078,6 +1207,70 @@ export default function CommunityPage() {
               ))}
               {invites.length === 0 && <p className="community-modal-empty">{t('comunidades.no_invites')}</p>}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de compartir invitación por chat ── */}
+      {showShareModal && (
+        <div className="post-card-share-modal-overlay" onClick={() => setShowShareModal(false)}>
+          <div className="post-card-share-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="post-card-share-modal-header">
+              <h3 className="post-card-share-modal-title">{t('comunidades.share_chat_title')}</h3>
+              <button className="post-card-share-modal-close" onClick={() => setShowShareModal(false)}>
+                <FaTimes />
+              </button>
+            </div>
+            {shareLoading ? (
+              <div className="post-card-share-modal-status">{t('common.loading')}</div>
+            ) : shareFollowing.length === 0 ? (
+              <div className="post-card-share-modal-status">
+                <FaUsers className="post-card-share-modal-empty-icon" />
+                <p>{t('comunidades.share_chat_empty')}</p>
+              </div>
+            ) : (
+              <>
+                <div className="post-card-share-modal-grid">
+                  {shareFollowing.map((u) => {
+                    const isSelected = selectedUsers.has(u.id);
+                    const isSending = shareSendingTo.has(u.id);
+                    return (
+                      <button
+                        key={u.id}
+                        className={`post-card-share-modal-user ${isSelected ? 'post-card-share-modal-user--selected' : ''}`}
+                        onClick={() => toggleUserSelection(u.id)}
+                        disabled={shareSendingTo.size > 0}
+                      >
+                        <Avatar
+                          src={u.avatar_url}
+                          alt={u.username}
+                          className="post-card-share-modal-avatar"
+                        />
+                        <span className="post-card-share-modal-username">{u.username}</span>
+                        {isSending ? (
+                          <span className="post-card-share-modal-spinner" />
+                        ) : isSelected ? (
+                          <FaCheck className="post-card-share-modal-sent" />
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedUsers.size > 0 && (
+                  <div className="post-card-share-modal-footer">
+                    <button
+                      className="post-card-share-modal-send-btn"
+                      onClick={handleSendInviteToChat}
+                      disabled={shareSendingTo.size > 0}
+                    >
+                      {shareSendingTo.size > 0
+                        ? (t('common.sending') || 'Sending...')
+                        : t('comunidades.share_chat_send', { n: selectedUsers.size })}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}

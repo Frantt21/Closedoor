@@ -276,7 +276,7 @@ export async function markAsRead(conversationId, userId) {
 /**
  * Send an encrypted message
  */
-export async function sendMessage(conversationId, senderId, content, participantIds, replyTo = null, sharedPostId = null) {
+export async function sendMessage(conversationId, senderId, content, participantIds, replyTo = null, sharedPostId = null, sharedCommunityId = null) {
   const allIds = [...new Set([senderId, ...participantIds])];
 
   // Sanitizar contenido antes de cifrarlo (anti-XSS: no guardar scripts)
@@ -297,6 +297,9 @@ export async function sendMessage(conversationId, senderId, content, participant
   }
   if (sharedPostId) {
     insertPayload.shared_post_id = sharedPostId;
+  }
+  if (sharedCommunityId) {
+    insertPayload.shared_community_id = sharedCommunityId;
   }
 
   // Insert message with sender_id, then fetch profile separately
@@ -320,6 +323,8 @@ export async function sendMessage(conversationId, senderId, content, participant
   // Update conversation last_message_text with obfuscated preview
   const obfuscatedPreview = sharedPostId
     ? '📌 Shared a post'
+    : sharedCommunityId
+    ? '🏘️ Community invite'
     : (cleanContent.length > 80 ? cleanContent.slice(0, 80) + '...' : cleanContent);
   await supabase
     .from('conversations')

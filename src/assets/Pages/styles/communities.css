@@ -373,7 +373,6 @@
 /* ── Skeleton de la página de comunidad (mismo patrón que el resto del app) ── */
 .community-skeleton-page { display: flex; flex-direction: column; gap: 14px; }
 .community-skeleton-header {
-  margin: 0 20px;
   border-radius: var(--radius, 10px);
   overflow: hidden;
   background: var(--color-surface, #1a1a1a);
@@ -385,14 +384,109 @@
   gap: 14px;
   padding: 12px 16px 16px;
 }
-.community-skeleton-avatar { width: 84px; height: 84px; flex-shrink: 0; margin-top: -40px; border: 4px solid var(--color-surface, #1a1a1a); }
+.community-skeleton-avatar-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-top: -40px;
+  gap: 12px;
+}
+.community-skeleton-avatar { width: 84px; height: 84px; flex-shrink: 0; border: 4px solid var(--color-surface, #1a1a1a); }
+.community-skeleton-header-actions {
+  display: flex;
+  gap: 8px;
+  padding-bottom: 8px;
+}
+.community-skeleton-btn {
+  width: 80px;
+  height: 34px;
+  border-radius: var(--radius, 10px);
+}
 .community-skeleton-header-lines { flex: 1; display: flex; flex-direction: column; gap: 8px; padding-top: 8px; }
 .community-skeleton-line { height: 12px; border-radius: 4px; }
-.community-skeleton-line--title { width: 40%; height: 20px; }
-.community-skeleton-line--slug { width: 25%; }
-.community-skeleton-line--desc { width: 70%; }
-.community-skeleton-card { height: 110px; border-radius: var(--radius, 10px); }
-.community-skeleton-sidebar-card { height: 140px; border-radius: var(--radius, 10px); }
+.community-skeleton-line--title { width: 45%; height: 22px; }
+.community-skeleton-line--slug { width: 28%; }
+.community-skeleton-line--stats { display: flex; gap: 16px; margin-top: 4px; }
+.community-skeleton-line--stat { width: 90px; height: 14px; }
+.community-skeleton-line--desc { width: 75%; }
+.community-skeleton-line--interests {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+.community-skeleton-interest {
+  width: 60px;
+  height: 22px;
+  border-radius: 999px;
+}
+/* ── Cards del body ── */
+.community-skeleton-composer {
+  border-radius: var(--radius, 10px);
+  background: var(--color-surface, #1a1a1a);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.community-skeleton-composer-textarea {
+  width: 100%;
+  height: 64px;
+  border-radius: 6px;
+}
+.community-skeleton-composer-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border, #2a2a2a);
+}
+.community-skeleton-composer-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+}
+.community-skeleton-composer-submit {
+  margin-left: auto;
+  width: 80px;
+  height: 34px;
+  border-radius: 999px;
+}
+.community-skeleton-feed-controls {
+  border-radius: var(--radius, 10px);
+  background: var(--color-surface, #1a1a1a);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.community-skeleton-feed-sorts {
+  display: flex;
+  gap: 6px;
+}
+.community-skeleton-pill {
+  width: 64px;
+  height: 26px;
+  border-radius: 999px;
+}
+.community-skeleton-post {
+  border-radius: var(--radius, 10px);
+  background: var(--color-surface, #1a1a1a);
+  padding: 16px;
+  display: flex;
+  gap: 12px;
+}
+.community-skeleton-post-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.community-skeleton-post-lines {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 
 
 .community-page--empty {
@@ -766,7 +860,6 @@
   font-family: inherit;
   cursor: pointer;
 }
-
 /* Feed controls (sin borde) */
 .community-feed-controls {
   display: flex;
@@ -1046,6 +1139,23 @@
   font-size: 0.75rem;
   font-family: inherit;
   cursor: pointer;
+}
+.community-invite-chat {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(96, 165, 250, 0.15);
+  color: #60a5fa;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  transition: background 0.15s ease;
+}
+.community-invite-chat:hover {
+  background: rgba(96, 165, 250, 0.28);
 }
 .community-invite-del {
   width: 30px;
