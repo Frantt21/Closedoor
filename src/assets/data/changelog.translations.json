@@ -1,0 +1,40 @@
+{
+  "2026-08-24+2:170ovzz": {
+    "es": {
+      "title": "Imágenes, invitaciones y estados mejorados",
+      "items": [
+        "Las imágenes publicadas ahora se muestran con su relación de aspecto real, sin recortar.",
+        "Las fotos del feed cargan una versión optimizada: menos datos, pero la misma calidad al abrirlas.",
+        "Correcciones en invitaciones comunitarias desde el chat.",
+        "Estados de actividad más estables y precisos (en línea/ocupado/ausente)."
+      ]
+    },
+    "pt": {
+      "title": "Imagens, convites e status aprimorados",
+      "items": [
+        "As imagens postadas agora são exibidas com sua proporção real, sem cortes.",
+        "As fotos do feed carregam uma versão otimizada: menos dados, mas a mesma qualidade quando abertas.",
+        "Correções nos convites da comunidade do chat.",
+        "Status de atividade mais estáveis ​​e precisos (on-line/ocupado/ausente)."
+      ]
+    },
+    "ru": {
+      "title": "Улучшенные изображения, приглашения и статусы",
+      "items": [
+        "Изображения сообщений теперь отображаются с их фактическим соотношением сторон, без обрезки.",
+        "Фотографии в ленте загружаются в оптимизированном варианте: меньше данных, но то же качество при открытии.",
+        "Исправления в приглашениях сообщества из чата.",
+        "Более стабильные и точные статусы активности (онлайн/занят/отсутствует)."
+      ]
+    },
+    "ja": {
+      "title": "強化された画像、招待状、ステータス",
+      "items": [
+        "投稿画像は切り取られることなく、実際のアスペクト比で表示されるようになりました。",
+        "フィード内の写真は最適化されたバージョンで読み込まれます。データ量は少なくなりますが、開いたときの品質は同じです。",
+        "チャットからのコミュニティへの招待を修正しました。",
+        "より安定して正確なアクティビティ ステータス (オンライン / ビジー / 外出中)。"
+      ]
+    }
+  }
+}

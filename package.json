@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "prebuild": "node scripts/translate-changelog.mjs",
+    "translate-changelog": "node scripts/translate-changelog.mjs",
     "start": "node server.js",
     "lint": "eslint .",
     "preview": "vite preview",

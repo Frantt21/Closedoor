@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import ModalShell from './ModalShell';
 import './css/changelogModal.css';
 import { useI18n } from '../../services/i18n/useI18n';
@@ -8,6 +8,7 @@ import {
   hasSeenRelease,
   markReleaseSeen,
 } from '../../data/changelog';
+import TRANSLATIONS from '../../data/changelog.translations.json';
 
 /**
  * ChangelogModal — novedades del último deploy.
@@ -20,71 +21,13 @@ import {
  *   Entrada nueva O entrada editada → vuelve a aparecer.
  * - La ✗ cierra SIN marcar como visto (reaparece al recargar).
  * - "Got it" marca como visto → no vuelve a mostrarse.
- * - Los entries se escriben SIEMPRE en inglés; si el locale del usuario es
- *   otro se traducen vía endpoint nativo de Google Translate (dict-chrome-ex,
- *   sin API key), cacheando por locale+fingerprint en localStorage. Al cambiar
- *   el release, las traducciones de releases anteriores se limpian solas.
+ * - Los entries se escriben SIEMPRE en inglés. Las traducciones se generan
+ *   EN BUILD TIME (npm run translate-changelog, integrado al build) vía
+ *   endpoint nativo de Google Translate y viajan dentro del bundle — la CSP
+ *   de producción no permite conectarse a terceros desde el navegador.
+ *   Si un idioma no está traducido aún, se muestra inglés (fallback).
  * - En desarrollo solo se abre con ?changelog en la URL.
  */
-
-/**
- * Traducción vía endpoint nativo de Google Translate (el que usa la
- * extensión de Chrome; sin API key, con CORS habilitado). Probado para
- * es/pt/ru/ja. Si falla (sin red, bloqueo de Google) → fallback inglés.
- */
-const GT_ENDPOINT = 'https://clients5.google.com/translate_a/t';
-
-async function googleTranslate(text, targetLocale) {
-  const url =
-    `${GT_ENDPOINT}?client=dict-chrome-ex&sl=en&tl=${encodeURIComponent(targetLocale)}` +
-    `&q=${encodeURIComponent(text)}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`translate_failed_${res.status}`);
-  const data = await res.json();
-  // Respuesta normal: ["texto traducido"]. Con segmentación: [["t1","o1"],...]
-  if (!Array.isArray(data)) throw new Error('translate_bad_shape');
-  return data.map((seg) => (Array.isArray(seg) ? seg[0] : seg) ?? '').join('');
-}
-
-function trCacheKey(locale, fingerprint) {
-  return `fc_changelog_tr_${locale}_${fingerprint}`;
-}
-
-function readTrCache(locale, fingerprint) {
-  try {
-    const raw = localStorage.getItem(trCacheKey(locale, fingerprint));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed?.title && Array.isArray(parsed.items)) return parsed;
-  } catch {
-    // caché corrupta/bloqueada → ignorar
-  }
-  return null;
-}
-
-function writeTrCache(locale, fingerprint, value) {
-  try {
-    localStorage.setItem(trCacheKey(locale, fingerprint), JSON.stringify(value));
-  } catch {
-    // localStorage lleno/bloqueado → sin caché, se traducirá de nuevo
-  }
-}
-
-/** Borra traducciones cacheadas de releases anteriores (ya no sirven). */
-function pruneStaleTrCaches(currentFingerprint) {
-  try {
-    const stale = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key?.startsWith('fc_changelog_tr_') && !key.endsWith(`_${currentFingerprint}`)) {
-        stale.push(key);
-      }
-    }
-    stale.forEach((key) => localStorage.removeItem(key));
-  } catch {
-    // localStorage bloqueado → las cachés viejas se quedan, no pasa nada
-  }
-}
 
 export default function ChangelogModal() {
   const { t, locale } = useI18n();
@@ -105,54 +48,17 @@ export default function ChangelogModal() {
     return !hasSeenRelease();
   });
 
-  // Contenido mostrado: inglés (hardcodeado) o traducción cacheada/recién traída
-  const [display, setDisplay] = useState(() =>
-    latest ? { title: latest.title, items: [...latest.items] } : null
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-    // Limpieza barata: traducciones de releases anteriores fuera
-    if (fingerprint) pruneStaleTrCaches(fingerprint);
-    const english = latest ? { title: latest.title, items: [...latest.items] } : null;
-
-    (async () => {
-      // Microtask boundary: el setState NO debe correr síncrono dentro del
-      // efecto (regla react-compiler / cascading renders)
-      await Promise.resolve();
-      if (cancelled || !english) return;
-
-      // Inglés = fuente; sin fetch
-      if (locale === 'en') {
-        setDisplay(english);
-        return;
-      }
-
-      const cached = readTrCache(locale, fingerprint);
-      if (cached) {
-        setDisplay(cached);
-        return;
-      }
-      try {
-        // Traducir título e items por separado (payloads chicos y confiables)
-        const [titleTr, ...itemsTr] = await Promise.all([
-          googleTranslate(latest.title, locale),
-          ...latest.items.map((item) => googleTranslate(item, locale)),
-        ]);
-        if (cancelled) return;
-        if (!titleTr || itemsTr.some((it) => !it)) return; // fallback inglés
-        const translated = { title: titleTr, items: itemsTr };
-        writeTrCache(locale, fingerprint, translated);
-        setDisplay(translated);
-      } catch {
-        // Sin red / endpoint bloqueado → quedarse con inglés
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [open, locale]); // eslint-disable-line react-hooks/exhaustive-deps -- latest/fingerprint son datos estáticos del módulo
+  // Contenido mostrado: traducción de build-time si existe, si no inglés.
+  // Derivación pura en render (sin estado ni efectos): el JSON viaja en el
+  // bundle, no hay red involucrada.
+  let display = null;
+  if (latest) {
+    const tr = locale !== 'en' ? TRANSLATIONS[fingerprint]?.[locale] : null;
+    display =
+      tr?.title && Array.isArray(tr.items)
+        ? tr
+        : { title: latest.title, items: [...latest.items] };
+  }
 
   if (!open || !display) return null;
 
