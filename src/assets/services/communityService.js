@@ -688,7 +688,24 @@ export async function deleteCommunityRole(communityId, roleId, roleName) {
 }
 
 // ── Invitaciones ──
+/**
+ * Crear (u obtener) la invitación personal del usuario en una comunidad.
+ * Regla: 1 invitación activa por usuario y comunidad, sin importar el rol
+ * (índice único idx_community_invites_one_per_user). Si ya tiene una se
+ * devuelve la existente; borrarla permite regenerarla.
+ */
 export async function createInvite(communityId, userId, { expiresAt = null, maxUses = null } = {}) {
+  const INVITE_COLS = 'id, community_id, token, created_by, created_at, expires_at, max_uses, uses';
+
+  // ¿Ya tiene invitación? → devolverla en lugar de fallar por unique violation
+  const { data: existing } = await supabase
+    .from('community_invites')
+    .select(INVITE_COLS)
+    .eq('community_id', communityId)
+    .eq('created_by', userId)
+    .maybeSingle();
+  if (existing) return existing;
+
   const token = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
   const { data, error } = await supabase
     .from('community_invites')
@@ -701,7 +718,16 @@ export async function createInvite(communityId, userId, { expiresAt = null, maxU
     })
     .select()
     .single();
+
   if (error) {
+    // Carrera entre pestañas/dispositivos: otra petición la creó primero
+    const { data: race } = await supabase
+      .from('community_invites')
+      .select(INVITE_COLS)
+      .eq('community_id', communityId)
+      .eq('created_by', userId)
+      .maybeSingle();
+    if (race) return race;
     console.error('[Communities] Error creating invite:', error);
     throw error;
   }

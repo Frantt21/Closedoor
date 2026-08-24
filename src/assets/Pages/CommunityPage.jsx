@@ -544,6 +544,9 @@ export default function CommunityPage() {
   };
 
   // ── Invitaciones ──
+  // Regla: 1 invitación activa por usuario y comunidad (índice único en DB).
+  const myInvite = invites.find((inv) => inv.created_by === user?.id);
+
   const handleCreateInvite = async () => {
     try {
       await createInvite(community.id, user.id);
@@ -709,23 +712,32 @@ export default function CommunityPage() {
     const targets = shareFollowing.filter(u => selectedUsers.has(u.id));
     setShareSendingTo(new Set(selectedUsers));
     let errors = 0;
-    for (const targetUser of targets) {
-      const cachedBlocked = getCachedBlockStatus(user.id, targetUser.id);
-      if (cachedBlocked === true) { errors++; continue; }
-      const cachedBlockedByThem = getCachedBlockStatus(targetUser.id, user.id);
-      if (cachedBlockedByThem === true) { errors++; continue; }
-      try {
-        const convId = await getOrCreateConversation(user.id, targetUser.id);
-        const { data: participants } = await supabase
-          .from('chat_participants')
-          .select('user_id')
-          .eq('conversation_id', convId);
-        const participantIds = (participants || []).map(p => p.user_id).filter(id => id !== user.id);
-        await sendMessage(convId, user.id, '', participantIds, null, null, community.id);
-      } catch (err) {
-        console.error('Error sharing community invite to', targetUser.username, ':', err);
-        errors++;
+    try {
+      // Get-or-create: mi invitación personal única (su token viaja en el mensaje)
+      const invite = await createInvite(community.id, user.id);
+      for (const targetUser of targets) {
+        const cachedBlocked = getCachedBlockStatus(user.id, targetUser.id);
+        if (cachedBlocked === true) { errors++; continue; }
+        const cachedBlockedByThem = getCachedBlockStatus(targetUser.id, user.id);
+        if (cachedBlockedByThem === true) { errors++; continue; }
+        try {
+          const convId = await getOrCreateConversation(user.id, targetUser.id);
+          const { data: participants } = await supabase
+            .from('chat_participants')
+            .select('user_id')
+            .eq('conversation_id', convId);
+          const participantIds = (participants || []).map(p => p.user_id).filter(id => id !== user.id);
+          await sendMessage(convId, user.id, '', participantIds, null, null, community.id, invite.token);
+        } catch (err) {
+          console.error('Error sharing community invite to', targetUser.username, ':', err);
+          errors++;
+        }
       }
+    } catch (err) {
+      console.error('Error resolving own invite:', err);
+      toast.error(t('comunidades.error'));
+      setShareSendingTo(new Set());
+      return;
     }
     setShareSendingTo(new Set());
     if (errors === 0) {
@@ -1183,13 +1195,21 @@ export default function CommunityPage() {
               <button type="button" className="community-modal-close" onClick={() => setShowInvites(false)}><FaTimes /></button>
             </div>
             <div className="community-modal-body">
-              <button type="button" className="community-invite-create" onClick={handleCreateInvite}>
+              <button
+                type="button"
+                className="community-invite-create"
+                onClick={handleCreateInvite}
+                disabled={!!myInvite}
+              >
                 <FaPlus /> {t('comunidades.invite_create')}
               </button>
-              {invites.map((inv) => (
-                <div key={inv.id} className="community-invite-row">
-                  <code className="community-invite-token">{inviteUrl(inv)}</code>
-                  <button type="button" className="community-invite-copy" onClick={() => copyInvite(inv)}>
+              {myInvite && (
+                <p className="community-invite-limit">{t('comunidades.invite_limit')}</p>
+              )}
+              {myInvite ? (
+                <div key={myInvite.id} className="community-invite-row">
+                  <code className="community-invite-token">{inviteUrl(myInvite)}</code>
+                  <button type="button" className="community-invite-copy" onClick={() => copyInvite(myInvite)}>
                     {t('comunidades.invite_copy')}
                   </button>
                   <button
@@ -1200,12 +1220,13 @@ export default function CommunityPage() {
                   >
                     <FaComment />
                   </button>
-                  <button type="button" className="community-invite-del" onClick={() => handleDeleteInvite(inv.id)}>
+                  <button type="button" className="community-invite-del" onClick={() => handleDeleteInvite(myInvite.id)}>
                     <FaTrash />
                   </button>
                 </div>
-              ))}
-              {invites.length === 0 && <p className="community-modal-empty">{t('comunidades.no_invites')}</p>}
+              ) : (
+                <p className="community-modal-empty">{t('comunidades.no_invites')}</p>
+              )}
             </div>
           </div>
         </div>

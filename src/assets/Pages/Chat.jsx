@@ -2880,14 +2880,22 @@ export default function Chat() {
                           </div>
                         );
                       }
+                      // El token viaja en el mensaje → el receptor canjea al unirse
+                      const inviteQs = msg.shared_invite_token ? `?invite=${msg.shared_invite_token}` : '';
                       return (
                         <div className="chat-message-shared-community">
-                          {community.banner_url && (
-                            <div className="chat-community-card-banner">
+                          {/* Banner: imagen real o gradiente con el acento de la comunidad (igual que CommunityPage) */}
+                          <div className="chat-community-card-banner">
+                            {community.banner_url ? (
                               <img src={community.banner_url} alt="" />
-                              <div className="chat-community-card-banner-overlay" />
-                            </div>
-                          )}
+                            ) : (
+                              <div
+                                className="chat-community-card-banner-fallback"
+                                style={community.accent_color ? { background: `linear-gradient(135deg, ${community.accent_color}, ${community.accent_color_secondary || community.accent_color})` } : undefined}
+                              />
+                            )}
+                            <div className="chat-community-card-banner-overlay" />
+                          </div>
                           <div className="chat-community-card-body">
                             <div className="chat-community-card-header">
                               {community.avatar_url ? (
@@ -2902,20 +2910,25 @@ export default function Chat() {
                                 <span className="chat-community-card-slug">c/{community.slug}</span>
                               </div>
                             </div>
-                            {community.description && (
-                              <p className="chat-community-card-desc">{community.description.length > 80 ? community.description.slice(0, 80) + '...' : community.description}</p>
-                            )}
+                            {/* Bloque de 2 líneas fijo (clamp en CSS) para que todas las tarjetas midan igual */}
+                            <p className="chat-community-card-desc">{community.description || ''}</p>
                             <div className="chat-community-card-stats">
                               <span>{community.member_count || 0} {t('comunidades.members')}</span>
                               <span>{community.post_count || 0} {t('comunidades.posts')}</span>
                             </div>
-                            <a
-                              href={`/c/${community.slug}`}
-                              className="chat-community-card-btn"
-                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.location.href = `/c/${community.slug}`; }}
-                            >
-                              {t('comunidades.join_btn')}
-                            </a>
+                            {isOwn ? (
+                              <span className="chat-community-card-btn chat-community-card-btn--disabled" aria-disabled="true">
+                                {t('comunidades.join_btn')}
+                              </span>
+                            ) : (
+                              <a
+                                href={`/c/${community.slug}${inviteQs}`}
+                                className="chat-community-card-btn"
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.location.href = `/c/${community.slug}${inviteQs}`; }}
+                              >
+                                {t('comunidades.join_btn')}
+                              </a>
+                            )}
                           </div>
                         </div>
                       );

@@ -276,7 +276,7 @@ export async function markAsRead(conversationId, userId) {
 /**
  * Send an encrypted message
  */
-export async function sendMessage(conversationId, senderId, content, participantIds, replyTo = null, sharedPostId = null, sharedCommunityId = null) {
+export async function sendMessage(conversationId, senderId, content, participantIds, replyTo = null, sharedPostId = null, sharedCommunityId = null, sharedInviteToken = null) {
   const allIds = [...new Set([senderId, ...participantIds])];
 
   // Sanitizar contenido antes de cifrarlo (anti-XSS: no guardar scripts)
@@ -300,6 +300,9 @@ export async function sendMessage(conversationId, senderId, content, participant
   }
   if (sharedCommunityId) {
     insertPayload.shared_community_id = sharedCommunityId;
+  }
+  if (sharedInviteToken) {
+    insertPayload.shared_invite_token = sharedInviteToken;
   }
 
   // Insert message with sender_id, then fetch profile separately

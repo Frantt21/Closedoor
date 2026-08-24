@@ -168,6 +168,8 @@
   "comunidades.invite_copied": "Invite link copied",
   "comunidades.invite_copy": "Copy",
   "comunidades.invite_create": "Create invite",
+  "comunidades.invite_limit": "You can only have one active invite. Delete it to create a new one.",
+
   "comunidades.invite_created": "Invite created",
   "comunidades.invite_invalid": "Invite invalid or expired",
   "comunidades.invite_prompt": "You've been invited to this community. Join with the invite link.",
