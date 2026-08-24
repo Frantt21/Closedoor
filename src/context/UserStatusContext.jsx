@@ -16,8 +16,13 @@ import { dbPublic } from '../assets/services/supabaseclient';
 const UserStatusActionsContext = createContext();
 export const UserStatusContext = createContext();
 
-// 1 minuto sin actualización → considerar disconnected
-const STALE_STATUS_MS = 60 * 1000;
+// Sin actualización → considerar disconnected.
+// El heartbeat nominal es 30s, pero los navegadores clampan los timers de
+// pestañas en fondo a ~60s+ (y más con throttling intensivo). Con corte de
+// 60s los usuarios con la app en segunda pestaña flappeaban a disconnected
+// y al volver se veían "reseteos". 3 min tolera el clamp normal; los cierres
+// limpios igual marcan disconnected al instante vía beforeunload/pagehide.
+const STALE_STATUS_MS = 3 * 60 * 1000;
 const POLL_INTERVAL_MS = 3000;
 
 function computeEffectiveStatus(user) {

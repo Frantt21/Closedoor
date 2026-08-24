@@ -87,7 +87,7 @@ export function useUserStatus(userId, otherUserId) {
       try {
         const { getItem } = await import('./secureStorage');
         const saved = getItem('fc_user_status');
-        if (saved === 'dnd' || saved === 'idle') {
+        if (saved === 'online' || saved === 'dnd' || saved === 'idle') {
           initialStatus = saved;
         }
       } catch {}
@@ -110,11 +110,28 @@ export function useUserStatus(userId, otherUserId) {
       }
 
       // ── Heartbeat cada 30s ──
+      // ⚠️ Lee SIEMPRE secureStorage en cada tick (igual que el tracker
+      // global de AuthContext). Usar solo myStatusRef congelaba el valor del
+      // montaje: si el estado cambió por otra pestaña/vía, este heartbeat
+      // sobreescribía la DB con un estado viejo ("resetea a online").
       const heartbeatRef = { current: null };
       const startHeartbeat = () => {
         if (heartbeatRef.current) clearInterval(heartbeatRef.current);
-        heartbeatRef.current = setInterval(() => {
-          const s = myStatusRef.current;
+        heartbeatRef.current = setInterval(async () => {
+          let s = myStatusRef.current;
+          try {
+            const { getItem } = await import('./secureStorage');
+            const saved = getItem('fc_user_status');
+            if (saved === 'online' || saved === 'dnd' || saved === 'idle') {
+              s = saved;
+              if (myStatusRef.current !== s) {
+                myStatusRef.current = s;
+                setMyStatusState(s); // sincronizar UI propia entre pestañas
+              }
+            }
+          } catch {
+            // secureStorage no disponible → mantener ref actual
+          }
           if (s === 'online' || s === 'idle' || s === 'dnd') {
             persistPresence(s).catch(() => {});
           }
