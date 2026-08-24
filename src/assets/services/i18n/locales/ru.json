@@ -166,14 +166,14 @@
   "comunidades.interests_placeholder": "Добавить интерес...",
   "comunidades.invite_copied": "Ссылка-приглашение скопирована",
   "comunidades.invite_copy": "Копировать",
-  "comunidades.invite_create": "Создать приглашение",  "comunidades.invite_send_chat": "Отправить в чат",
+  "comunidades.invite_create": "Создать приглашение",
+  "comunidades.invite_send_chat": "Отправить в чат",
   "comunidades.share_chat_title": "Отправить",
   "comunidades.share_chat_send": "Отправить {n}",
   "comunidades.share_chat_sent": "Приглашение отправлено!",
   "comunidades.share_chat_empty": "Подпишитесь на пользователей, чтобы отправлять приглашения",
   "comunidades.join_btn": "Присоединиться",
   "comunidades.invite_limit": "Может быть только одно активное приглашение. Удалите его, чтобы создать новое.",
-
   "comunidades.invite_created": "Приглашение создано",
   "comunidades.invite_invalid": "Приглашение недействительно или истекло",
   "comunidades.invite_prompt": "Вас пригласили в это сообщество. Вступите по ссылке-приглашению.",
@@ -735,5 +735,7 @@
   "trending.title": "Тренды",
   "trending.various": "Разное",
   "upload.uploaded": "Изображение загружено",
-  "upload.uploading": "Загрузка изображения..."
+  "upload.uploading": "Загрузка изображения...",
+  "changelog.badge": "Новости",
+  "changelog.accept": "Понятно!"
 }

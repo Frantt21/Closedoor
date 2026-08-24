@@ -169,7 +169,6 @@
   "comunidades.invite_copy": "Copiar",
   "comunidades.invite_create": "Crear invitación",
   "comunidades.invite_limit": "Solo puedes tener una invitación activa. Elimínala para crear una nueva.",
-
   "comunidades.invite_created": "Invitación creada",
   "comunidades.invite_invalid": "Invitación inválida o expirada",
   "comunidades.invite_prompt": "Te han invitado a esta comunidad. Únete con el enlace de invitación.",
@@ -738,5 +737,7 @@
   "trending.title": "Tendencias",
   "trending.various": "Varios",
   "upload.uploaded": "Imagen subida",
-  "upload.uploading": "Subiendo imagen..."
+  "upload.uploading": "Subiendo imagen...",
+  "changelog.badge": "Novedades",
+  "changelog.accept": "¡Entendido!"
 }

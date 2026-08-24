@@ -10,6 +10,7 @@ import GlobalProfileBg from './assets/Resources/Components/GlobalProfileBg';
 import AppSurfaceTheme from './assets/Resources/Components/AppSurfaceTheme';
 import AppLoader from './assets/Resources/Components/AppLoader';
 import MobileNav from './assets/Resources/Components/MobileNav';
+import ChangelogModal from './assets/Resources/Components/ChangelogModal';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -225,6 +226,7 @@ function App() {
 
           {!isFullWidthRoute && <RightPanel />}
           <MobileNav />
+          <ChangelogModal />
           <ToastContainer
             position="top-right"
             autoClose={3000}

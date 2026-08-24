@@ -166,14 +166,14 @@
   "comunidades.interests_placeholder": "興味を追加...",
   "comunidades.invite_copied": "招待リンクをコピーしました",
   "comunidades.invite_copy": "コピー",
-  "comunidades.invite_create": "招待を作成",  "comunidades.invite_send_chat": "チャットで送信",
+  "comunidades.invite_create": "招待を作成",
+  "comunidades.invite_send_chat": "チャットで送信",
   "comunidades.share_chat_title": "送信先",
   "comunidades.share_chat_send": "{n} 人に送信",
   "comunidades.share_chat_sent": "招待を送信しました！",
   "comunidades.share_chat_empty": "招待を送るにはユーザーをフォローしてください",
   "comunidades.join_btn": "参加",
   "comunidades.invite_limit": "アクティブな招待は1つだけです。新しく作るには削除してください。",
-
   "comunidades.invite_created": "招待を作成しました",
   "comunidades.invite_invalid": "招待リンクが無効または期限切れです",
   "comunidades.invite_prompt": "このコミュニティに招待されました。招待リンクで参加してください。",
@@ -735,5 +735,7 @@
   "trending.title": "トレンド",
   "trending.various": "その他",
   "upload.uploaded": "画像をアップロードしました",
-  "upload.uploading": "画像をアップロード中..."
+  "upload.uploading": "画像をアップロード中...",
+  "changelog.badge": "新機能",
+  "changelog.accept": "了解しました！"
 }
