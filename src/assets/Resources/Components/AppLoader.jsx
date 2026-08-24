@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
 import './css/appLoader.css';
 
@@ -9,12 +9,16 @@ export default function AppLoader({ children }) {
   const { loading } = useAuth();
   const [showLoader, setShowLoader] = useState(true);
   const [fadeOut, setFadeOut] = useState(false);
-  const startTime = useRef(Date.now());
+  const startTimeRef = useRef(0);
   const readyRef = useRef(false);
   const forceTimerRef = useRef(null);
 
-  // ── Safety timeout: force-hide loader if auth stays loading too long ──
+  // ── Boot: timestamp de inicio + safety timeout ──
+  // (Date.now() vive aquí DENTRO del efecto: llamarlo en render es impuro)
   useEffect(() => {
+    startTimeRef.current = Date.now();
+
+    // Safety timeout: force-hide loader if auth stays loading too long
     forceTimerRef.current = setTimeout(() => {
       if (!readyRef.current) {
         console.warn('[AppLoader] Auth loading timed out — force-hiding loader');
@@ -32,7 +36,7 @@ export default function AppLoader({ children }) {
     if (!loading && !readyRef.current) {
       readyRef.current = true;
       clearTimeout(forceTimerRef.current);
-      const elapsed = Date.now() - startTime.current;
+      const elapsed = Date.now() - startTimeRef.current;
       const remaining = Math.max(0, MIN_DISPLAY_MS - elapsed);
 
       const timer = setTimeout(() => {
@@ -50,20 +54,27 @@ export default function AppLoader({ children }) {
   useEffect(() => {
     const onShow = () => {
       readyRef.current = false;
-      startTime.current = Date.now();
+      startTimeRef.current = Date.now();
     };
     window.addEventListener('pageshow', onShow);
     return () => window.removeEventListener('pageshow', onShow);
   }, []);
 
-  // ── Loader completamente oculto: renderizar solo la app ──
-  if (!showLoader) return children;
-
+  // ── Árbol SIEMPRE con la misma forma: fragment [overlay, children] ──
+  // Antes se hacía `if (!showLoader) return children;`: al pasar de
+  // <Fragment>[overlay, children]</Fragment> a solo children, React considera
+  // que la raíz cambió y DESMONTA Y REMONTA toda la app (los modales nativos
+  // abiertos parpadean/cierran-y-abren, y el estado ya cargado de las páginas
+  // se descarta y refetchea). Ahora el overlay permanece en el DOM oculto con
+  // display:none y los children nunca se desmontan.
   return (
     <>
       {/* Overlay siempre PRIMERO en el fragment — React preserva el DOM element,
           así la transición CSS (opacity 1→0) funciona correctamente */}
-      <div className={`app-loader-overlay ${fadeOut ? 'app-loader-overlay--hidden' : ''}`}>
+      <div
+        className={`app-loader-overlay ${fadeOut ? 'app-loader-overlay--hidden' : ''}`}
+        style={showLoader ? undefined : { display: 'none' }}
+      >
         <div className="app-loader-container">
           <img
             src="/logo.svg"
@@ -72,8 +83,9 @@ export default function AppLoader({ children }) {
           />
         </div>
       </div>
-      {/* Children solo se montan cuando auth ya está resuelto (fadeOut activo) */}
-      {fadeOut && children}
+      {/* Children solo se montan cuando auth ya está resuelto (fadeOut activo),
+          y una vez montados JAMÁS se desmontan */}
+      {(fadeOut || !showLoader) && children}
     </>
   );
 }
