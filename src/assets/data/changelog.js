@@ -22,7 +22,7 @@ export const CHANGELOG_SEEN_KEY = 'fc_changelog_seen';
 
 export const RELEASES = [
   {
-    id: '2026-08-24',
+    id: '2026-08-24+1',
     date: '2026-08-24',
     title: 'Enhanced images, invitations, and statuses',
     items: [

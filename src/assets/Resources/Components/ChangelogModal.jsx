@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import ModalShell from './ModalShell';
+import './css/changelogModal.css';
 import { useI18n } from '../../services/i18n/useI18n';
 import {
   RELEASES,
@@ -184,7 +185,10 @@ export default function ChangelogModal() {
     >
       {/* ── Header bar: igual al modal de editar perfil ── */}
       <div className="fc-modal-header">
-        <h3 className="fc-modal-title">{t('changelog.badge')}</h3>
+        <h3 className="fc-modal-title">
+          {t('changelog.badge')}
+          <span className="changelog-modal-date">{dateStr}</span>
+        </h3>
         <div className="fc-modal-header-actions">
           <button className="fc-modal-save" onClick={handleAccept}>
             {t('changelog.accept')}
@@ -200,7 +204,6 @@ export default function ChangelogModal() {
 
       <div className="changelog-modal-inner">
         <h2 className="changelog-modal-title">{display.title}</h2>
-        <span className="changelog-modal-date">{dateStr}</span>
         <ul className="changelog-modal-list">
           {display.items.map((item, i) => (
             <li key={i} className="changelog-modal-item">
