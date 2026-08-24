@@ -143,7 +143,7 @@ async function setCachedUpload(userId, type, file, result) {
  * @param {File} file - The image file to upload
  * @param {string} userId - The user's UUID
  * @param {'avatar'|'banner'|'post'|'chat'} type - Image type for sizing
- * @returns {Promise<{localUrl: string, realUrlPromise: Promise<string>}>}
+ * @returns {{localUrl: string, realUrlPromise: Promise<string>, realResultPromise: Promise<{url: string, id: string, width?: number, height?: number}>}}
  *
  * Usage:
  *   const { localUrl, realUrlPromise } = uploadWithLocalPreview(file, userId, type);
@@ -155,8 +155,14 @@ export function uploadWithLocalPreview(file, userId, type) {
   // Create local object URL instantly for preview
   const localUrl = URL.createObjectURL(file);
 
+  // Una sola promesa de subida compartida (evita uploads duplicados)
+  const resultPromise = uploadImage(file, userId, type);
+
+  // Resultado completo ({url,id,width,height,...}) para quien necesite dims
+  const realResultPromise = resultPromise;
+
   // Start CDN upload in background
-  const realUrlPromise = uploadImage(file, userId, type)
+  const realUrlPromise = resultPromise
     .then(result => {
       // ⚠️ Delayed cleanup: esperar a que React commitée la URL real
       // antes de revocar el blob URL, para evitar ERR_FILE_NOT_FOUND
@@ -170,7 +176,7 @@ export function uploadWithLocalPreview(file, userId, type) {
       throw err;
     });
 
-  return { localUrl, realUrlPromise };
+  return { localUrl, realUrlPromise, realResultPromise };
 }
 
 /**
@@ -445,4 +451,22 @@ export function getFileIdFromUrl(url) {
   if (!url) return null;
   const match = url.match(/\/cdn\/files\/([^/?#]+)/);
   return match ? match[1] : null;
+}
+
+/**
+ * Build the feed-thumbnail URL for a CDN image.
+ * Devuelve `/cdn/files/<id>/thumb` (variante ~480w generada por el CDN).
+ * Si la imagen no es del CDN (Pinterest, GIPHY…) o no se puede extraer el
+ * ID, devuelve la URL original. El endpoint de thumb hace fallback al
+ * archivo completo cuando la variante no existe (uploads legacy), así que
+ * esta URL es siempre segura de usar.
+ * @param {string} url
+ * @returns {string}
+ */
+export function getCdnThumbUrl(url) {
+  if (!url) return '';
+  const normalized = getCdnUrl(url);
+  const fileId = getFileIdFromUrl(normalized);
+  if (!fileId || !isCdnUrl(normalized)) return normalized;
+  return `/cdn/files/${fileId}/thumb`;
 }

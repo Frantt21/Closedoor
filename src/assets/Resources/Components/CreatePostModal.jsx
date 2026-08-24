@@ -42,6 +42,9 @@ export default function CreatePostModal({
   const [showImageSection, setShowImageSection] = useState(false);
   const [uploadingPostIndex, setUploadingPostIndex] = useState(-1);
   const [mediaLimitWarning, setMediaLimitWarning] = useState(null);
+  // Dimensiones reales de las imágenes subidas (url → {u,w,h}) para
+  // posts.image_meta: permite aspect-ratio sin recorte en las PostCards
+  const imageMetaRef = useRef(new Map());
 
   // ── @ Mention autocomplete (shared hook) ──
   const {
@@ -323,7 +326,7 @@ export default function CreatePostModal({
 
     try {
       // Mostrar preview local instantáneo mientras se sube en background
-      const { localUrl, realUrlPromise } = uploadWithLocalPreview(file, userId, 'post');
+      const { localUrl, realUrlPromise, realResultPromise } = uploadWithLocalPreview(file, userId, 'post');
       setImageUrls((prev) => {
         const updated = [...prev];
         updated[index] = localUrl;
@@ -338,6 +341,13 @@ export default function CreatePostModal({
         updated[index] = realUrl;
         return updated;
       });
+
+      // Guardar dimensiones reales para image_meta (no bloquea el submit)
+      realResultPromise.then((result) => {
+        if (result?.width > 0 && result?.height > 0) {
+          imageMetaRef.current.set(result.url, { u: result.url, w: result.width, h: result.height });
+        }
+      }).catch(() => {});
 
       toast.update(toastId, {
         render: t('upload.uploaded') || 'Imagen subida',
@@ -381,6 +391,11 @@ export default function CreatePostModal({
     const finalImageUrls = validImageUrls.length > 0
       ? validImageUrls
       : (imageUrl ? [imageUrl] : []);
+
+    // Dimensiones reales alineadas con las URLs finales (para image_meta)
+    const finalImageMeta = finalImageUrls
+      .map((u) => imageMetaRef.current.get(u))
+      .filter(Boolean);
 
     // ── Validate poll ──
     let finalPollData = null;
@@ -464,6 +479,7 @@ export default function CreatePostModal({
           content: trimmed,
           image_url: finalImageUrls[0] || imageUrl,
           image_urls: finalImageUrls.length > 0 ? finalImageUrls : null,
+          image_meta: finalImageMeta.length > 0 ? finalImageMeta : null,
           video_url: videoUrl,
           comments_allowed: commentsAllowed,
           is_sensitive: isSensitive,
@@ -544,6 +560,7 @@ export default function CreatePostModal({
           content: isEncrypted ? obfuscatedDisplay : trimmed,
           imageUrl: finalImageUrls[0] || imageUrl,
           imageUrls: finalImageUrls.length > 0 ? finalImageUrls : null,
+          imageMeta: finalImageMeta.length > 0 ? finalImageMeta : null,
           videoUrl,
           encryptedContent: encryptedResult?.ciphertext || null,
           encryptedIv: encryptedResult?.iv || null,

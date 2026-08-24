@@ -17,6 +17,11 @@ function normalizePostUrls(post) {
   if (Array.isArray(post.image_urls)) {
     post.image_urls = post.image_urls.map(u => getCdnUrl(u));
   }
+  if (Array.isArray(post.image_meta)) {
+    post.image_meta = post.image_meta
+      .filter((m) => m && m.u)
+      .map((m) => ({ ...m, u: getCdnUrl(m.u) }));
+  }
   if (post.profiles) {
     if (post.profiles.avatar_url) post.profiles.avatar_url = getCdnUrl(post.profiles.avatar_url);
   }
@@ -40,7 +45,7 @@ export async function resolveMentions(content) {
   return mentions;
 }
 
-export async function createPost({ userId, content, imageUrl, imageUrls, videoUrl, encryptedContent, encryptedIv, allowedUsers, obfuscatedDisplay, pollData, scheduledAt, commentsAllowed, isSensitive, communityId }) {
+export async function createPost({ userId, content, imageUrl, imageUrls, imageMeta, videoUrl, encryptedContent, encryptedIv, allowedUsers, obfuscatedDisplay, pollData, scheduledAt, commentsAllowed, isSensitive, communityId }) {
   content = content ? sanitizeContent(content) : content;
   let mentions = {};
   if (content) {
@@ -56,6 +61,7 @@ export async function createPost({ userId, content, imageUrl, imageUrls, videoUr
     content,
     image_url: imageUrl || null,
     image_urls: imageUrls && imageUrls.length > 0 ? imageUrls : null,
+    image_meta: imageMeta && imageMeta.length > 0 ? imageMeta : null,
     video_url: videoUrl || null,
     mentions,
     is_encrypted: !!encryptedContent,
@@ -108,7 +114,7 @@ export async function createPost({ userId, content, imageUrl, imageUrls, videoUr
 export async function getPosts({ userId, profileUserId, limit = 20, offset = 0 } = {}) {
   // Seleccionar solo las columnas necesarias para el feed (evitar SELECT *)
   const feedSelect = [
-    'id', 'user_id', 'content', 'image_url', 'image_urls', 'video_url',
+    'id', 'user_id', 'content', 'image_url', 'image_urls', 'image_meta', 'video_url',
     'is_pinned', 'pinned_at', 'is_encrypted', 'is_sensitive',
     'likes_count', 'dislikes_count', 'comments_count', 'reposts_count', 'views_count',
     'created_at', 'updated_at', 'mentions',
@@ -146,7 +152,7 @@ export async function getPosts({ userId, profileUserId, limit = 20, offset = 0 }
 
 export async function getPost(postId) {
   const explicitSelect = [
-    'id', 'user_id', 'content', 'image_url', 'image_urls', 'video_url',
+    'id', 'user_id', 'content', 'image_url', 'image_urls', 'image_meta', 'video_url',
     'is_pinned', 'pinned_at', 'is_encrypted', 'is_sensitive',
     'likes_count', 'dislikes_count', 'comments_count', 'reposts_count', 'views_count',
     'created_at', 'updated_at', 'mentions',
@@ -246,7 +252,7 @@ export async function getProfileContent(profileUserId, currentUserId, { offset =
       .select(`
         id, created_at, user_id,
         posts!reposts_post_id_fkey (
-          id, user_id, content, image_url, image_urls, video_url, is_pinned, pinned_at, mentions,
+          id, user_id, content, image_url, image_urls, image_meta, video_url, is_pinned, pinned_at, mentions,
           is_encrypted, encrypted_content, encrypted_iv, allowed_users, obfuscated_display,
           likes_count, dislikes_count, comments_count, reposts_count, views_count, created_at, updated_at,
           profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)
@@ -1301,7 +1307,7 @@ export async function getScheduledPosts(userId, { limit = 50, offset = 0 } = {})
   if (!userId) return [];
   const now = new Date().toISOString();
   const explicitSelect = [
-    'id', 'user_id', 'content', 'image_url', 'image_urls', 'video_url',
+    'id', 'user_id', 'content', 'image_url', 'image_urls', 'image_meta', 'video_url',
     'is_pinned', 'pinned_at', 'is_encrypted', 'is_sensitive',
     'likes_count', 'dislikes_count', 'comments_count', 'reposts_count', 'views_count',
     'created_at', 'updated_at', 'mentions',
@@ -1336,7 +1342,7 @@ export async function getLikedPosts(userId, { limit = 50, offset = 0 } = {}) {
     .select(`
       id, created_at,
       posts!likes_post_id_fkey (
-        id, user_id, content, image_url, image_urls, video_url, mentions,
+        id, user_id, content, image_url, image_urls, image_meta, video_url, mentions,
         is_encrypted, encrypted_content, encrypted_iv, allowed_users, obfuscated_display,
         likes_count, dislikes_count, comments_count, reposts_count, views_count, created_at, updated_at,
         profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)
@@ -1481,7 +1487,7 @@ export async function getSavedPosts(userId, { limit = 50, offset = 0 } = {}) {
     .select(`
       id, created_at,
       posts!saved_posts_post_id_fkey (
-        id, user_id, content, image_url, image_urls, video_url, mentions,
+        id, user_id, content, image_url, image_urls, image_meta, video_url, mentions,
         is_encrypted, encrypted_content, encrypted_iv, allowed_users, obfuscated_display,
         likes_count, dislikes_count, comments_count, reposts_count, views_count, created_at, updated_at,
         profiles!posts_user_id_fkey (id, username, avatar_url, roles, is_private, avatar_position)

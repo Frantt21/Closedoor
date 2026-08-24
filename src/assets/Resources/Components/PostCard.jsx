@@ -27,6 +27,7 @@ import { FaHeart, FaRegHeart, FaHeartBroken, FaComment, FaRetweet, FaThumbtack, 
 import { toast } from 'react-toastify';
 import Badge from './Badge';
 import SafeImage from './SafeImage';
+import { getCdnThumbUrl } from '../../services/cdnService';
 import Avatar from './Avatar';
 import RichText from './RichText';
 import LinkPreview from './LinkPreview';
@@ -1173,7 +1174,7 @@ const PostCard = React.memo(function PostCard({
           {post.image_url && !post.image_urls?.length && !post.video_url && (
             <div className="post-card-media">
               <SafeImage
-                src={post.image_url}
+                src={getCdnThumbUrl(post.image_url)}
                 alt={t('post.media_alt', { n: 1 })}
                 className="post-card-image"
                 onClick={(e) => openGallery(e, 0)}
@@ -1185,7 +1186,7 @@ const PostCard = React.memo(function PostCard({
           {post.video_url && !isVideo(post.video_url) && !post.image_url && (
             <div className="post-card-media">
               <SafeImage
-                src={post.video_url}
+                src={getCdnThumbUrl(post.video_url)}
                 alt={t('post.media_alt', { n: 1 })}
                 className="post-card-image"
                 onClick={(e) => openGallery(e, 0)}
@@ -1198,7 +1199,7 @@ const PostCard = React.memo(function PostCard({
             <div className="post-card-media">
               {inlineMedia.type === 'image' ? (
                 <SafeImage
-                  src={inlineMedia.url}
+                  src={getCdnThumbUrl(inlineMedia.url)}
                   alt={t('post.media_alt', { n: 1 })}
                   className="post-card-image"
                   onClick={(e) => openGallery(e, 0)}
@@ -1550,7 +1551,7 @@ const PostCard = React.memo(function PostCard({
                     aria-label={`Go to image ${i + 1}`}
                   >
                     <div className="post-card-gallery-thumb-inner">
-                      <SafeImage src={url} alt={`Thumbnail ${i + 1}`} />
+                      <SafeImage src={getCdnThumbUrl(url)} alt={`Thumbnail ${i + 1}`} />
                     </div>
                   </button>
                 ))}
@@ -1592,6 +1593,49 @@ function getSkipUrls(post) {
   return result;
 }
 
+// ── Imagen de feed con thumbnail + ratio real ──
+// Cache de módulo: dims naturales medidas en carga para imágenes sin
+// image_meta (posts legacy) — compartida entre todas las PostCards.
+const naturalDimsCache = new Map();
+
+/**
+ * Celda de imagen del feed.
+ * - fixed=true (mosaicos de 2-4): celda 16/10 + cover, src=thumbnail.
+ * - fixed=false (imagen única): aspect-ratio con el ratio REAL (image_meta
+ *   o medición onLoad para posts legacy) → sin recorte y sin salto de layout.
+ */
+function FeedImage({ url, alt, onClick, meta, fixed }) {
+  const [measured, setMeasured] = useState(() => naturalDimsCache.get(url) || null);
+
+  const dims = (meta?.w > 0 && meta?.h > 0)
+    ? meta
+    : measured;
+
+  const handleLoad = (e) => {
+    if (fixed || naturalDimsCache.has(url)) return;
+    const img = e.currentTarget;
+    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+      const d = { w: img.naturalWidth, h: img.naturalHeight };
+      naturalDimsCache.set(url, d);
+      setMeasured(d);
+    }
+  };
+
+  return (
+    <div
+      className="post-card-image-grid-item"
+      style={!fixed && dims ? { aspectRatio: `${dims.w} / ${dims.h}`, maxHeight: '80vh' } : undefined}
+    >
+      <SafeImage
+        src={getCdnThumbUrl(url)}
+        alt={alt}
+        onClick={onClick}
+        onLoad={handleLoad}
+      />
+    </div>
+  );
+}
+
 // ── Render image grid (up to 4 images) ──
 function renderImageGrid(post, onImageClick, t) {
   const urls = (post.image_urls || (post.image_url ? [post.image_url] : []))
@@ -1603,18 +1647,27 @@ function renderImageGrid(post, onImageClick, t) {
 
   const handleClick = onImageClick || ((e) => e.stopPropagation());
 
+  // Mapa url → dimensiones reales (posts nuevos con image_meta)
+  const dimsMap = new Map(
+    (Array.isArray(post.image_meta) ? post.image_meta : [])
+      .filter((m) => m && m.u && m.w > 0 && m.h > 0)
+      .map((m) => [m.u, m])
+  );
+
   const gridClass = `post-card-image-grid post-card-image-grid--${Math.min(urls.length, 4)}`;
+  const isSingle = urls.length === 1;
 
   return (
     <div className={gridClass}>
       {urls.slice(0, 4).map((url, i) => (
-        <div key={url} className="post-card-image-grid-item">
-          <SafeImage
-            src={url}
-            alt={t('post.media_alt', { n: i + 1 })}
-            onClick={(e) => handleClick(e, i)}
-          />
-        </div>
+        <FeedImage
+          key={url}
+          url={url}
+          alt={t('post.media_alt', { n: i + 1 })}
+          meta={dimsMap.get(url)}
+          fixed={!isSingle}
+          onClick={(e) => handleClick(e, i)}
+        />
       ))}
     </div>
   );

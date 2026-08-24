@@ -922,13 +922,14 @@ export async function getCommunityPosts(communityId, { sort = 'recent', timeRang
  * Crear un post dentro de la comunidad.
  * Reusa createPost() y añade community_id.
  */
-export async function createCommunityPost({ userId, communityId, content, imageUrl, imageUrls, videoUrl, pollData, isSensitive }) {
+export async function createCommunityPost({ userId, communityId, content, imageUrl, imageUrls, imageMeta, videoUrl, pollData, isSensitive }) {
   if (!communityId || !userId) throw new Error('auth_required');
   return createPost({
     userId,
     content,
     imageUrl,
     imageUrls,
+    imageMeta,
     videoUrl,
     pollData,
     isSensitive,

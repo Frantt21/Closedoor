@@ -580,6 +580,8 @@ export default function CommunityPage() {
   };
 
   // ── Composer ──
+  const composerImageMetaRef = useRef({});
+
   const handleComposerImage = async (e) => {
     const file = e.target.files?.[0];
     if (!file || !user?.id) return;
@@ -589,10 +591,15 @@ export default function CommunityPage() {
     }
     setComposerUploading(true);
     try {
-      const { localUrl, realUrlPromise } = uploadWithLocalPreview(file, user.id, 'post');
+      const { localUrl, realUrlPromise, realResultPromise } = uploadWithLocalPreview(file, user.id, 'post');
       setComposerImage(localUrl);
       const realUrl = await realUrlPromise;
       setComposerImage(realUrl);
+      realResultPromise.then((result) => {
+        if (result?.width > 0 && result?.height > 0) {
+          composerImageMetaRef.current[realUrl] = { u: realUrl, w: result.width, h: result.height };
+        }
+      }).catch(() => {});
     } catch (err) {
       console.error(err);
       toast.error(err.message || t('comunidades.error'));
@@ -608,6 +615,10 @@ export default function CommunityPage() {
       setComposerError(t('create_post.empty_error'));
       return;
     }
+    const finalImageUrls = composerImage ? [composerImage] : [];
+    const finalImageMeta = finalImageUrls
+      .map((u) => composerImageMetaRef.current[u])
+      .filter(Boolean);
     setPosting(true);
     setComposerError(null);
     try {
@@ -615,7 +626,8 @@ export default function CommunityPage() {
         userId: user.id,
         communityId: community.id,
         content: text || undefined,
-        imageUrls: composerImage ? [composerImage] : undefined,
+        imageUrls: finalImageUrls.length > 0 ? finalImageUrls : undefined,
+        imageMeta: finalImageMeta.length > 0 ? finalImageMeta : undefined,
       });
       // Insertar al inicio del feed
       const { data } = await dbPublic
