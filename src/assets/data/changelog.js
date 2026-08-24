@@ -22,12 +22,12 @@ export const RELEASES = [
   {
     id: '2026-08-24',
     date: '2026-08-24',
-    title: 'Imágenes, invitaciones y estados mejorados',
+    title: 'Enhanced images, invitations, and statuses',
     items: [
-      'Las imágenes de los posts ahora se muestran con su proporción real, sin recortes.',
-      'Las fotos del feed cargan una versión optimizada: menos datos, misma calidad al abrirlas.',
-      'Arreglos en las invitaciones a comunidades desde el chat.',
-      'Estados de actividad (online / ocupado / ausente) más estables y precisos.',
+      'Post images are now displayed with their actual aspect ratio, without cropping.',
+      'The photos in the feed load an optimized version: less data, but the same quality when opened.',
+      'Fixes in community invitations from the chat.',
+      'More stable and accurate activity statuses (online / busy / away).',
     ],
   },
 ];
