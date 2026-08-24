@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
 import ModalShell from './ModalShell';
 import { useI18n } from '../../services/i18n/useI18n';
-import { RELEASES, CHANGELOG_SEEN_KEY } from '../../data/changelog';
+import {
+  RELEASES,
+  getReleaseFingerprint,
+  hasSeenRelease,
+  markReleaseSeen,
+} from '../../data/changelog';
 
 /**
  * ChangelogModal — novedades del último deploy.
@@ -9,13 +14,15 @@ import { RELEASES, CHANGELOG_SEEN_KEY } from '../../data/changelog';
  * Formato idéntico al modal de editar perfil (fc-modal-header +
  * fc-modal-save / fc-modal-close).
  *
- * - SOLO producción: se abre si el id del último release difiere de
- *   'fc_changelog_seen' (localStorage).
+ * - SOLO producción: se abre si el fingerprint del último release
+ *   ('id:hash-contenido') difiere del guardado en 'fc_changelog_seen'.
+ *   Entrada nueva O entrada editada → vuelve a aparecer.
  * - La ✗ cierra SIN marcar como visto (reaparece al recargar).
  * - "Got it" marca como visto → no vuelve a mostrarse.
  * - Los entries se escriben SIEMPRE en inglés; si el locale del usuario es
  *   otro se traducen vía endpoint nativo de Google Translate (dict-chrome-ex,
- *   sin API key), cacheando el resultado por locale+release en localStorage.
+ *   sin API key), cacheando por locale+fingerprint en localStorage. Al cambiar
+ *   el release, las traducciones de releases anteriores se limpian solas.
  * - En desarrollo solo se abre con ?changelog en la URL.
  */
 
@@ -38,13 +45,13 @@ async function googleTranslate(text, targetLocale) {
   return data.map((seg) => (Array.isArray(seg) ? seg[0] : seg) ?? '').join('');
 }
 
-function trCacheKey(locale, releaseId) {
-  return `fc_changelog_tr_${locale}_${releaseId}`;
+function trCacheKey(locale, fingerprint) {
+  return `fc_changelog_tr_${locale}_${fingerprint}`;
 }
 
-function readTrCache(locale, releaseId) {
+function readTrCache(locale, fingerprint) {
   try {
-    const raw = localStorage.getItem(trCacheKey(locale, releaseId));
+    const raw = localStorage.getItem(trCacheKey(locale, fingerprint));
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed?.title && Array.isArray(parsed.items)) return parsed;
@@ -54,17 +61,34 @@ function readTrCache(locale, releaseId) {
   return null;
 }
 
-function writeTrCache(locale, releaseId, value) {
+function writeTrCache(locale, fingerprint, value) {
   try {
-    localStorage.setItem(trCacheKey(locale, releaseId), JSON.stringify(value));
+    localStorage.setItem(trCacheKey(locale, fingerprint), JSON.stringify(value));
   } catch {
     // localStorage lleno/bloqueado → sin caché, se traducirá de nuevo
+  }
+}
+
+/** Borra traducciones cacheadas de releases anteriores (ya no sirven). */
+function pruneStaleTrCaches(currentFingerprint) {
+  try {
+    const stale = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith('fc_changelog_tr_') && !key.endsWith(`_${currentFingerprint}`)) {
+        stale.push(key);
+      }
+    }
+    stale.forEach((key) => localStorage.removeItem(key));
+  } catch {
+    // localStorage bloqueado → las cachés viejas se quedan, no pasa nada
   }
 }
 
 export default function ChangelogModal() {
   const { t, locale } = useI18n();
   const latest = RELEASES[0] || null;
+  const fingerprint = getReleaseFingerprint();
 
   const [open, setOpen] = useState(() => {
     if (!latest) return false;
@@ -75,13 +99,9 @@ export default function ChangelogModal() {
         return false;
       }
     }
-    let seenId = null;
-    try {
-      seenId = localStorage.getItem(CHANGELOG_SEEN_KEY);
-    } catch {
-      // localStorage bloqueado → mostrar siempre (mejor 1 popup de más)
-    }
-    return seenId !== latest.id;
+    // Helper valida id+contenido contra lo guardado: si difiere,
+    // hasSeenRelease() devuelve false aunque haya un "visto" almacenado
+    return !hasSeenRelease();
   });
 
   // Contenido mostrado: inglés (hardcodeado) o traducción cacheada/recién traída
@@ -91,6 +111,8 @@ export default function ChangelogModal() {
 
   useEffect(() => {
     let cancelled = false;
+    // Limpieza barata: traducciones de releases anteriores fuera
+    if (fingerprint) pruneStaleTrCaches(fingerprint);
     const english = latest ? { title: latest.title, items: [...latest.items] } : null;
 
     (async () => {
@@ -105,7 +127,7 @@ export default function ChangelogModal() {
         return;
       }
 
-      const cached = readTrCache(locale, latest.id);
+      const cached = readTrCache(locale, fingerprint);
       if (cached) {
         setDisplay(cached);
         return;
@@ -119,7 +141,7 @@ export default function ChangelogModal() {
         if (cancelled) return;
         if (!titleTr || itemsTr.some((it) => !it)) return; // fallback inglés
         const translated = { title: titleTr, items: itemsTr };
-        writeTrCache(locale, latest.id, translated);
+        writeTrCache(locale, fingerprint, translated);
         setDisplay(translated);
       } catch {
         // Sin red / endpoint bloqueado → quedarse con inglés
@@ -129,16 +151,12 @@ export default function ChangelogModal() {
     return () => {
       cancelled = true;
     };
-  }, [open, locale]); // eslint-disable-line react-hooks/exhaustive-deps -- latest es dato estático del módulo
+  }, [open, locale]); // eslint-disable-line react-hooks/exhaustive-deps -- latest/fingerprint son datos estáticos del módulo
 
   if (!open || !display) return null;
 
   const handleAccept = () => {
-    try {
-      localStorage.setItem(CHANGELOG_SEEN_KEY, latest.id);
-    } catch {
-      // localStorage bloqueado → solo cerrar, reaparecerá al recargar
-    }
+    markReleaseSeen();
     setOpen(false);
   };
 
