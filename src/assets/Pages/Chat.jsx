@@ -2746,6 +2746,9 @@ export default function Chat() {
               if (uid === user.id) groupedReactions[em].isOwn = true;
             });
             const ownReaction = reactions[user.id];
+            // Invitación "pura" (sin texto): la burbuja se vuelve transparente
+            // para que la card se vea suelta, fuera de la burbuja visualmente
+            const isPureInvite = !!(msg.shared_community_id && !(msg.decryptedContent || '').trim());
 
             return (
               <React.Fragment key={msg.id}>
@@ -2767,7 +2770,7 @@ export default function Chat() {
                     />
                   )}
                   {!isOwn && !showAvatar && <div className="chat-message-avatar-spacer" />}
-                  <div className={`chat-message-bubble ${groupClass} ${msg.is_pinned ? 'chat-message-bubble--pinned' : ''}`}>
+                  <div className={`chat-message-bubble ${groupClass} ${msg.is_pinned ? 'chat-message-bubble--pinned' : ''}${isPureInvite ? ' chat-message-bubble--bare' : ''}`}>
                     {msg.is_pinned && (
                       <div className="chat-message-pin-badge">
                         <FaThumbtack />

@@ -792,6 +792,17 @@
     color: var(--chat-bubble-other-text, var(--color-text, #ffffff));
 }
 
+/* ── Burbuja transparente: mensajes de solo-invitación ──
+   La card de comunidad se ve suelta (como los previews de links en
+   Telegram), sin el rectángulo de la burbuja alrededor */
+.chat-message-bubble--bare,
+.chat-message--own .chat-message-bubble--bare,
+.chat-message--other .chat-message-bubble--bare {
+    background: transparent;
+    padding: 0;
+    box-shadow: none;
+}
+
 /* ── Bubble corner variants ── */
 /* ── In column-reverse, visual order is inverted from DOM order ── */
 /* isFirstInGroup = chronologically first = visual TOP of group (has avatar) */
@@ -1274,8 +1285,10 @@
     background: var(--color-surface, #1a1a1a);
     border: 1px solid var(--color-border, #2a2a2a);
     overflow: hidden;
-    /* Ancho fijo: todas las invitaciones miden igual sin importar el contenido */
-    width: min(280px, 100%);
+    /* Ancho fijo en px (no %): dentro de la burbuja shrink-to-fit los
+       porcentajes se resuelven inconsistente y las cards variaban */
+    width: 280px;
+    max-width: 100%;
     transition: border-color 0.15s ease;
 }
 .chat-message-shared-community:hover {
