@@ -295,15 +295,22 @@ export default function Settings() {
   };
 
   // ── Sincronizar preferencias con Supabase ──
-  // Flag per-key para permitir saves concurrentes de diferentes settings
+  // Flag per-key + cola del último valor: los clics rápidos sobre el mismo
+  // setting no se pierden (gana siempre el último); keys distintas van en paralelo
   const savingRef = useRef({});
+  const pendingRef = useRef({});
 
   const syncProfilePref = async (key, value) => {
     if (!user?.id) return;
-    if (savingRef.current[key]) return; // Solo bloquear la misma key
+    pendingRef.current[key] = value;
+    if (savingRef.current[key]) return; // Ya hay un save en vuelo → solo encolar
     savingRef.current[key] = true;
     try {
-      await updateUserProfile(user.id, { [key]: value });
+      while (pendingRef.current[key] !== undefined) {
+        const latest = pendingRef.current[key];
+        delete pendingRef.current[key];
+        await updateUserProfile(user.id, { [key]: latest });
+      }
       await refreshProfile(user.id);
     } catch (err) {
       console.error('Error syncing profile pref:', err);
@@ -334,13 +341,14 @@ export default function Settings() {
       { col: 'time_format_24h', setter: setHour24 },
       { col: 'theme', setter: setTheme },
       { col: 'locale', setter: setLocale },
+      { col: 'show_global_bg', setter: setShowGlobalBg },
     ];
     for (const { col, setter } of mappings) {
       if (profile[col] !== undefined && profile[col] !== null) {
         setter(profile[col]);
       }
     }
-  }, [profile, profileSynced, setShowAccentProfile, setShowAccentExplore, setAccentVisibility, setShowProfileStats, setShowLikes, setAllowMention, setAllowEncryptedAdd, setFilterEncrypted]);
+  }, [profile, profileSynced, setShowAccentProfile, setShowAccentExplore, setAccentVisibility, setShowProfileStats, setShowLikes, setAllowMention, setAllowEncryptedAdd, setFilterEncrypted, setShowGlobalBg]);
 
   const handlePrivacyChange = async (value) => {
     if (!user?.id || privacyUpdating || value === isPrivate) return;
@@ -578,7 +586,11 @@ export default function Settings() {
                 <button
                   type="button"
                   className={`settings-toggle ${showGlobalBg ? 'settings-toggle--active' : ''}`}
-                  onClick={() => setShowGlobalBg(!showGlobalBg)}
+                  onClick={() => {
+                    const next = !showGlobalBg;
+                    setShowGlobalBg(next);
+                    syncProfilePref('show_global_bg', next);
+                  }}
                   aria-pressed={showGlobalBg}
                 >
                   <span className="settings-toggle-track">

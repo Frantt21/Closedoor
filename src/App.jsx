@@ -13,21 +13,61 @@ import MobileNav from './assets/Resources/Components/MobileNav';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
-// ── Lazy-loaded page chunks (code-split per route) ──
-const Home = lazy(() => import('./assets/Pages/Home.jsx'));
-const Login = lazy(() => import('./assets/Pages/Sing/Login.jsx'));
-const Register = lazy(() => import('./assets/Pages/Sing/Register.jsx'));
-const Profile = lazy(() => import('./assets/Pages/profile.jsx'));
-const AuthCallback = lazy(() => import('./assets/Pages/AuthCallback.jsx'));
-const Notifications = lazy(() => import('./assets/Pages/Notifications.jsx'));
-const Explore = lazy(() => import('./assets/Pages/Explore.jsx'));
-const PostDetail = lazy(() => import('./assets/Pages/PostDetail.jsx'));
-const Settings = lazy(() => import('./assets/Pages/Settings.jsx'));
-const HashtagPage = lazy(() => import('./assets/Pages/HashtagPage.jsx'));
-const Chat = lazy(() => import('./assets/Pages/Chat.jsx'));
-const Comunidades = lazy(() => import('./assets/Pages/Comunidades.jsx'));
-const CommunityPage = lazy(() => import('./assets/Pages/CommunityPage.jsx'));
-const Trending = lazy(() => import('./assets/Pages/Trending.jsx'));
+// ── Lazy con reintentos (anti "cargando infinito") ──
+// React.lazy cachea la promesa: si el import de un chunk falla UNA vez
+// (deploy nuevo con la pestaña abierta → chunk viejo 404, o pestaña
+// restaurada sin red), el fallback queda infinito hasta reload manual.
+// Esta envoltura reintenta y se auto-recupera:
+//   1. 3 reintentos con backoff (blips de red / SW sirviendo HTML viejo)
+//   2. Si sigue fallando y hay conexión → UN solo location.reload() para
+//      tomar el build nuevo (sessionStorage evita bucles de recarga)
+//   3. Si estamos offline → espera al evento 'online' y recarga entonces
+const CHUNK_RELOAD_FLAG = 'fc_chunk_reload';
+function lazyPage(importer) {
+  return lazy(async () => {
+    let lastError;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await importer();
+      } catch (err) {
+        lastError = err;
+        await new Promise((r) => setTimeout(r, 300 * (attempt + 1)));
+      }
+    }
+    let alreadyReloaded = false;
+    try { alreadyReloaded = !!sessionStorage.getItem(CHUNK_RELOAD_FLAG); } catch { /* storage bloqueado */ }
+    if (!alreadyReloaded) {
+      const reloadOnce = () => {
+        try { sessionStorage.setItem(CHUNK_RELOAD_FLAG, '1'); } catch { /* storage bloqueado */ }
+        window.location.reload();
+      };
+      // Sin conexión ahora: recargar en cuanto vuelva (el fallback sigue visible)
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        return new Promise(() => {
+          window.addEventListener('online', reloadOnce, { once: true });
+        });
+      }
+      reloadOnce();
+    }
+    throw lastError;
+  });
+}
+
+// Lazy-loaded page chunks (code-split per route)
+const Home = lazyPage(() => import('./assets/Pages/Home.jsx'));
+const Login = lazyPage(() => import('./assets/Pages/Sing/Login.jsx'));
+const Register = lazyPage(() => import('./assets/Pages/Sing/Register.jsx'));
+const Profile = lazyPage(() => import('./assets/Pages/profile.jsx'));
+const AuthCallback = lazyPage(() => import('./assets/Pages/AuthCallback.jsx'));
+const Notifications = lazyPage(() => import('./assets/Pages/Notifications.jsx'));
+const Explore = lazyPage(() => import('./assets/Pages/Explore.jsx'));
+const PostDetail = lazyPage(() => import('./assets/Pages/PostDetail.jsx'));
+const Settings = lazyPage(() => import('./assets/Pages/Settings.jsx'));
+const HashtagPage = lazyPage(() => import('./assets/Pages/HashtagPage.jsx'));
+const Chat = lazyPage(() => import('./assets/Pages/Chat.jsx'));
+const Comunidades = lazyPage(() => import('./assets/Pages/Comunidades.jsx'));
+const CommunityPage = lazyPage(() => import('./assets/Pages/CommunityPage.jsx'));
+const Trending = lazyPage(() => import('./assets/Pages/Trending.jsx'));
 
 // ── Minimal route-level loading fallback ──
 function PageFallback() {
