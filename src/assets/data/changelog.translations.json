@@ -1,5 +1,5 @@
 {
-  "2026-08-24+2:1gjt0r4": {
+  "2026-08-24+2:jozhxh": {
     "es": {
       "title": "Imágenes, invitaciones y estados mejorados",
       "items": [
@@ -7,7 +7,8 @@
         "Las fotos del feed cargan una versión optimizada: menos datos, pero la misma calidad al abrirlas.",
         "Correcciones en invitaciones comunitarias desde el chat.",
         "Estados de actividad más estables y precisos (en línea/ocupado/ausente).",
-        "Se mejoraron los estilos para Explorar, comunidades, chats y notificaciones."
+        "Se mejoraron los estilos para Explorar, comunidades, chats y notificaciones.",
+        "El encabezado de la barra lateral adopta un estilo específico al navegar por los chats."
       ]
     },
     "pt": {
@@ -17,7 +18,8 @@
         "As fotos do feed carregam uma versão otimizada: menos dados, mas a mesma qualidade quando abertas.",
         "Correções nos convites da comunidade do chat.",
         "Status de atividade mais estáveis ​​e precisos (on-line/ocupado/ausente).",
-        "Os estilos de Explorar, comunidades, bate-papos e notificações foram aprimorados."
+        "Os estilos de Explorar, comunidades, bate-papos e notificações foram aprimorados.",
+        "O cabeçalho da barra lateral adota um estilo específico ao navegar pelos chats."
       ]
     },
     "ru": {
@@ -27,7 +29,8 @@
         "Фотографии в ленте загружаются в оптимизированном варианте: меньше данных, но то же качество при открытии.",
         "Исправления в приглашениях сообщества из чата.",
         "Более стабильные и точные статусы активности (онлайн/занят/отсутствует).",
-        "Были улучшены стили для Explore, сообществ, чатов и уведомлений."
+        "Были улучшены стили для Explore, сообществ, чатов и уведомлений.",
+        "Заголовок боковой панели имеет особый стиль при навигации по чатам."
       ]
     },
     "ja": {
@@ -37,7 +40,8 @@
         "フィード内の写真は最適化されたバージョンで読み込まれます。データ量は少なくなりますが、開いたときの品質は同じです。",
         "チャットからのコミュニティへの招待を修正しました。",
         "より安定して正確なアクティビティ ステータス (オンライン / ビジー / 外出中)。",
-        "Explore、コミュニティ、チャット、通知のスタイルが改善されました。"
+        "Explore、コミュニティ、チャット、通知のスタイルが改善されました。",
+        "サイドバーのヘッダーは、チャット内を移動するときに特定のスタイルを採用します。"
       ]
     }
   }

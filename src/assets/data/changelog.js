@@ -31,6 +31,7 @@ export const RELEASES = [
       'Fixes in community invitations from the chat.',
       'More stable and accurate activity statuses (online / busy / away).',
       'The styles for Explore, communities, chats, and notifications were improved.',
+      'The sidebar header adopts a specific style when navigating through chats.',
     ],
   },
 ];

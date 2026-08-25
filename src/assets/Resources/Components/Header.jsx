@@ -121,7 +121,7 @@ function Header() {
   return (
     <aside
       ref={asideRef}
-      className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}${!showGlobalBg ? ' sidebar--solid' : ''}`}
+      className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}${!showGlobalBg ? ' sidebar--solid' : ''}${location.pathname.toLowerCase() === '/chat' ? ' sidebar--chat' : ''}`}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       onFocus={onFocus}
