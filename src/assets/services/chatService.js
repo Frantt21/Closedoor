@@ -355,13 +355,6 @@ export async function getMessages(conversationId, limit = 50, before = null) {
   const { data, error } = await query;
   if (error) throw error;
 
-  // Filter out messages where current user is in deleted_for
-  // (we don't know the user here, so this is a pass-through;
-  //  Chat.jsx does the actual filter after fetch)
-  // Note: the caller should filter .filter(m => !m.deleted_for?.includes(userId))
-  if (error) throw error;
-
-  // Fetch sender profiles separately
   let msgs = (data || []).reverse();
   if (msgs.length === 0) return [];
 

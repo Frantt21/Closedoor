@@ -2319,12 +2319,13 @@ dialog.fc-modal.chat-followers-modal {
     padding: 12px 8px;
     border: none;
     border-radius: var(--radius, 10px);
-    background: var(--overlay-bg-subtle);
+    background: var(--overlay-bg-subtle, rgba(255, 255, 255, 0.03));
     color: var(--color-text, #ffffff);
     cursor: pointer;
     transition: background 0.12s ease, transform 0.12s ease;
     font-family: inherit;
     text-align: center;
+    position: relative;
 }
 
 .chat-followers-modal-card:hover {
@@ -2333,8 +2334,8 @@ dialog.fc-modal.chat-followers-modal {
 }
 
 .chat-followers-modal-card-avatar {
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
     border-radius: 50%;
     object-fit: cover;
     flex-shrink: 0;
@@ -2342,7 +2343,7 @@ dialog.fc-modal.chat-followers-modal {
 }
 
 .chat-followers-modal-card-name {
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     font-weight: 600;
     color: var(--color-text, #ffffff);
     overflow: hidden;
@@ -2351,43 +2352,10 @@ dialog.fc-modal.chat-followers-modal {
     max-width: 100%;
 }
 
-.chat-followers-modal-card-badges {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-}
-
-.chat-followers-modal-card-wrapper {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    align-items: center;
-}
-
-.chat-followers-modal-nickname-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border: none;
-    border-radius: 50%;
-    background: var(--overlay-bg-subtle);
-    color: var(--color-text-muted, #6b7280);
-    cursor: pointer;
-    font-size: 0.6rem;
-    transition: background 0.12s ease, color 0.12s ease;
+.chat-followers-modal-card-verified {
+    width: 14px;
+    height: 14px;
     flex-shrink: 0;
-    opacity: 0.7;
-}
-
-.chat-followers-modal-card-wrapper:hover .chat-followers-modal-nickname-btn {
-    opacity: 1;
-}
-
-.chat-followers-modal-nickname-btn:hover {
-    background: var(--color-surface-hover, #252525);
-    color: var(--color-text, #ffffff);
 }
 
 /* ── Responsive ── */

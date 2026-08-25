@@ -344,6 +344,11 @@ export default function Chat() {
   const staleBackgroundFetchRef = useRef(false); // true cuando se muestran datos stale mientras se fetchea en bg
   const messagesRef = useRef(messages); // ref sincronizada para evitar race conditions con Realtime
   useEffect(() => { messagesRef.current = messages; }, [messages]);
+
+  // ══ DEBUG: track every messages state change ══
+  useEffect(() => {
+    console.log(`[CHAT MSGS] state changed: conv=${activeConvId} owner=${messagesOwnerRef.current} count=${messages.length} firstId=${messages[0]?.id ?? 'none'} lastId=${messages[messages.length - 1]?.id ?? 'none'}`);
+  }, [messages]);
   // ── Overrides locales para preview de conversaciones (persisten a loadConvs) ──
   const localConvOverridesRef = useRef({});
   const overridesRestoredRef = useRef(false);
@@ -531,6 +536,7 @@ export default function Chat() {
     if (prevConvIdRef.current === activeConvId) {
       return;
     }
+    console.log(`[CHAT LAYOUT] activeConvId=${activeConvId} prev=${prevConvIdRef.current}`);
 
     // Save current messages to the OLD conversation's cache before switching
     if (prevConvIdRef.current && messagesOwnerRef.current === prevConvIdRef.current) {
@@ -559,6 +565,7 @@ export default function Chat() {
       const isStale = lastMsgAt && fetchedAt && new Date(lastMsgAt) > new Date(fetchedAt);
       if (isStale) {
         // Mostrar mensajes cacheados inmediatamente SIN skeleton
+        console.log(`[CHAT LAYOUT] ${activeConvId}: STALE cache, showing ${cached.length} msgs, bg fetch`);
         setMessages(cached);
         setMsgsLoading(false); // false para NO mostrar el skeleton
         staleBackgroundFetchRef.current = true; // evita que sync effect guarde datos stale
@@ -566,6 +573,7 @@ export default function Chat() {
         setOldestMessageDate(null);
         // skipMsgLoadRef se deja en false para que msgEffect haga el fetch
       } else {
+        console.log(`[CHAT LAYOUT] ${activeConvId}: FRESH cache, ${cached.length} msgs, skipFetch`);
         setMessages(cached);
         setMsgsLoading(false);
         if (cached.length > 0 && cachedMeta?.hasMoreMessages === false) {
@@ -579,6 +587,7 @@ export default function Chat() {
         skipMsgLoadRef.current = true;
       }
     } else {
+      console.log(`[CHAT LAYOUT] ${activeConvId}: NO cache, clearing messages`);
       setMessages([]);
       setMsgsLoading(true);
       setHasMoreMessages(true);
@@ -731,6 +740,7 @@ export default function Chat() {
   // ── Load messages when active conversation changes ──
   useEffect(() => {
     if (!activeConvId) return;
+    console.log(`[CHAT EFFECT] RUN conv=${activeConvId} skipFetch=${skipMsgLoadRef.current} owner=${messagesOwnerRef.current}`);
     // Skip DB ops for pending conversations (temp IDs like "pending_xxx" are not real UUIDs)
     if (activeConvId.startsWith('pending_')) {
       setMsgsLoading(false);
@@ -756,6 +766,7 @@ export default function Chat() {
           let hasMore = false;
           let cursor = null;
           const fetchLimit = INITIAL_BATCH_LIMIT + 1; // request one extra to detect 'more'
+          console.log(`[CHAT FETCH] START conv=${convForThisEffect}`);
 
           do {
             attempts += 1;
@@ -803,6 +814,21 @@ export default function Chat() {
             // Orden ascendente defensivo (el realtime puede intercalar mensajes)
             finalMessages.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
           }
+          // ══ Guard: if the user switched conversations during the async fetch,
+          // writing to state/cache would corrupt the new conversation's data.
+          // Only cache the result; don't overwrite the live state.
+          if (messagesOwnerRef.current !== convForThisEffect || aborted) {
+            console.log(`[CHAT FETCH] GUARD HIT conv=${convForThisEffect} owner=${messagesOwnerRef.current} aborted=${aborted} → caching only`);
+            messagesCacheRef.current[convForThisEffect] = finalMessages;
+            if (!messagesCacheRef.current._meta) messagesCacheRef.current._meta = {};
+            messagesCacheRef.current._meta[convForThisEffect] = {
+              fetchedAt: new Date().toISOString(),
+              hasMore: hasMore,
+              oldestMessageDate: finalMessages.length > 0 ? finalMessages[0].created_at : null,
+            };
+            return;
+          }
+          console.log(`[CHAT FETCH] OK conv=${convForThisEffect} msgs=${finalMessages.length} → setMessages`);
           messagesCacheRef.current[convForThisEffect] = finalMessages;
           messagesOwnerRef.current = convForThisEffect;
           setMessages(finalMessages);
@@ -815,7 +841,8 @@ export default function Chat() {
         } catch {
         } finally {
           staleBackgroundFetchRef.current = false;
-          if (!aborted) {
+          // Only clear loading if this conversation is still the active one
+          if (!aborted && messagesOwnerRef.current === convForThisEffect) {
             setMsgsLoading(false);
           }
         }
@@ -830,8 +857,15 @@ export default function Chat() {
       convForThisEffect,
       async (newMsg, eventType) => {
         if (aborted) return;
+        // Guard: messages state may already belong to a different conversation
+        // (useLayoutEffect sets the new state before useEffect cleanup runs)
+        if (messagesOwnerRef.current !== convForThisEffect) {
+          console.log(`[CHAT RT] BLOCKED owner=${messagesOwnerRef.current} !== conv=${convForThisEffect} msg_id=${newMsg.id}`);
+          return;
+        }
         const content = await decryptMessage(newMsg, user.id);
         if (aborted) return;
+        if (messagesOwnerRef.current !== convForThisEffect) return;
         if (newMsg.shared_post_id && !sharedPosts[newMsg.shared_post_id]) {
           try {
             const postData = await getPost(newMsg.shared_post_id);
@@ -878,6 +912,7 @@ export default function Chat() {
       // onDelete: called when a message is deleted by the other user
       (deletedId) => {
         if (aborted) return;
+        if (messagesOwnerRef.current !== convForThisEffect) return;
         setMessages((prev) => {
           const filtered = prev.filter(m => m.id !== deletedId);
           // If deleted message was the last one, update the conversation preview
@@ -987,6 +1022,13 @@ export default function Chat() {
   useEffect(() => {
     if (!activeConvId || messagesOwnerRef.current !== activeConvId) return;
     if (msgsLoading || staleBackgroundFetchRef.current) return;
+    // ABSOLUTE GUARD: verify messages actually belong to this conversation.
+    // Prevents a stale async fetch from writing wrong data to the active cache.
+    if (messages.length > 0 && messages[0].conversation_id && messages[0].conversation_id !== activeConvId) {
+      console.log(`[CHAT SYNC] BLOCKED conv_id mismatch: active=${activeConvId} msg_conv_id=${messages[0].conversation_id}`);
+      return;
+    }
+    console.log(`[CHAT SYNC] WRITE activeConv=${activeConvId} msgs=${messages.length} owner=${messagesOwnerRef.current}`);
     messagesCacheRef.current[activeConvId] = messages;
     // Update fetchedAt + pagination state for staleness check on next conversation switch
     if (!messagesCacheRef.current._meta) messagesCacheRef.current._meta = {};
@@ -1004,6 +1046,12 @@ export default function Chat() {
   }, [messages, activeConvId, msgsLoading]);
 
   // ── Flush messages cache on pagehide & unmount (navegación entre rutas) ──
+  // NOTE: This effect must NOT write to the in-memory cache. The cleanup
+  // closure captures stale values from the previous render (e.g. old
+  // messages with a new activeConvId during conversation switches), which
+  // would corrupt the cache for the new conversation. The SYNC effect
+  // (line 1024) already keeps messagesCacheRef up-to-date in real time;
+  // this effect only needs to persist the current cache to sessionStorage.
   useEffect(() => {
     const flushCache = () => {
       // Cancelar el save pendiente: aquí se persiste de inmediato
@@ -1011,15 +1059,6 @@ export default function Chat() {
         clearTimeout(cacheSaveTimerRef.current);
         cacheSaveTimerRef.current = null;
       }
-      if (!activeConvId) return;
-      if (messagesOwnerRef.current !== activeConvId) return;
-      messagesCacheRef.current[activeConvId] = messages;
-      if (!messagesCacheRef.current._meta) messagesCacheRef.current._meta = {};
-      messagesCacheRef.current._meta[activeConvId] = {
-        fetchedAt: new Date().toISOString(),
-        hasMoreMessages,
-        oldestMessageDate,
-      };
       saveCacheToSession(messagesCacheRef.current);
     };
     const handlePageHide = () => flushCache();
@@ -2394,7 +2433,7 @@ export default function Chat() {
   const renderFollowersModal = () => (
     <ModalShell isOpen={showFollowersModal} onClose={() => setShowFollowersModal(false)} onEscape={() => setShowFollowersModal(false)} className="chat-followers-modal">
       <div className="chat-followers-modal-header">
-        <h3 className="fc-modal-title">{t('following.title')}</h3>
+        <h3 className="fc-modal-title">{t('chat.new')}</h3>
         <button type="button" className="chat-followers-modal-close" onClick={() => setShowFollowersModal(false)}>
           <FaTimes />
         </button>
@@ -2408,25 +2447,13 @@ export default function Chat() {
       ) : (
         <div className="chat-followers-modal-grid">
           {followers.map((u) => (
-            <div key={u.id} className="chat-followers-modal-card-wrapper">
-              <button className="chat-followers-modal-card" onClick={() => { setShowFollowersModal(false); startConversation(u); }}>
-                <Avatar src={u.avatar_url} alt={u.username} className="chat-followers-modal-card-avatar" />
-                <span className="chat-followers-modal-card-name">{getDisplayName(u)}</span>
-                <span style={{ fontSize: '0.68rem', fontWeight: 400, opacity: 0.5 }}>@{u.username}</span>
-                {Array.isArray(u.roles) && u.roles.some(r => r !== 'user') && (
-                  <span className="chat-followers-modal-card-badges">
-                    <Badge roles={u.roles} />
-                  </span>
-                )}
-              </button>
-              <button
-                className="chat-followers-modal-nickname-btn"
-                title={nicknames[u.id] ? (t('chat.edit_nickname') || 'Edit nickname') : (t('chat.set_nickname') || 'Set nickname')}
-                onClick={(e) => { e.stopPropagation(); openNicknameModal(u.id, u); }}
-              >
-                <FaEdit />
-              </button>
-            </div>
+            <button key={u.id} className="chat-followers-modal-card" onClick={() => { setShowFollowersModal(false); startConversation(u); }}>
+              <Avatar src={u.avatar_url} alt={u.username} className="chat-followers-modal-card-avatar" />
+              <span className="chat-followers-modal-card-name">{getDisplayName(u)}</span>
+              {Array.isArray(u.roles) && u.roles.includes('verified') && (
+                <img src="/verified_badge2.png" alt="Verified" className="chat-followers-modal-card-verified" draggable={false} loading="lazy" />
+              )}
+            </button>
           ))}
         </div>
       )}
