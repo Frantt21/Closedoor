@@ -4,8 +4,8 @@
    ========================================== */
 
 .explore-page {
-    max-width: 800px;
-    margin: 0 auto;
+    /* Full-width como comunidades (App.jsx monta /explore con
+       app-content--full): SIN max-width — el grid auto-fill decide columnas */
     padding: 0;
 }
 
@@ -103,7 +103,11 @@
 /* ---- Grid ---- */
 .explore-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    /* Mínimo 392px por card (medida original) estirando para llenar el ancho:
+       el grid queda borde a borde y queda SIMÉTRICO con la barra de búsqueda
+       y los tabs de filtro (mismos bordes inicio/fin). Nunca baja de 392px,
+       así el texto envuelve igual y la altura es estable. */
+    grid-template-columns: repeat(auto-fill, minmax(min(392px, 100%), 1fr));
     gap: 16px;
 }
 

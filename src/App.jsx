@@ -177,9 +177,10 @@ function App() {
   const location = useLocation();
   const pathname = location.pathname.toLowerCase();
   const isChatRoute = pathname === '/chat';
-  // Full-width tipo chat: solo chat y comunidades listado.
+  // Full-width tipo chat: chat, comunidades listado y explore.
   // /c/:slug usa el layout normal con RightPanel (sidebar de comunidad).
-  const isFullWidthRoute = isChatRoute || pathname === '/communities';
+  const isFullWidthRoute =
+    isChatRoute || pathname === '/communities' || pathname === '/explore';
 
   return (
     <I18nProvider>

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useI18n } from '../services/i18n/useI18n';
 import usePageTitle from '../../hooks/usePageTitle';
-import { FaUsers, FaPlus, FaSpinner, FaLock, FaSearch, FaSyncAlt } from 'react-icons/fa';
+import { FaUsers, FaPlus, FaSpinner, FaLock, FaSyncAlt } from 'react-icons/fa';
 import { useAuth } from '../../hooks/useAuth';
 import { getCommunities, getCommunityById, canCreateCommunity, getCachedCommunities, MIN_FOLLOWERS_TO_CREATE, MAX_COMMUNITIES_PER_USER } from '../services/communityService';
 import { supabase } from '../services/supabaseclient';
@@ -127,7 +127,9 @@ export default function Comunidades() {
   };
 
   const filters = [
-    { key: 'popular', label: t('comunidades.filter_popular') },
+    // 'popular' es el parámetro del backend; el TEXTO se unifica con Explore
+    // (Relevance) para que ambas páginas se vean iguales.
+    { key: 'popular', label: t('explore.filter_relevance') },
     { key: 'newest', label: t('comunidades.filter_newest') },
     { key: 'active', label: t('comunidades.filter_active') },
   ];
@@ -136,7 +138,10 @@ export default function Comunidades() {
     <div className="comunidades-page">
       <div className="explore-search comunidades-search-row">
         <div className="explore-search-wrap">
-          <FaSearch className="explore-search-icon" />
+          <svg className="explore-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
           <input
             className="explore-search-input"
             type="text"

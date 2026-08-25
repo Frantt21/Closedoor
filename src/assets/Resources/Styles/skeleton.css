@@ -32,7 +32,8 @@
 /* ── Explore skeleton cards (mismas dimensiones que .explore-card real) ── */
 .explore-skeleton-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  /* Mismo criterio que .explore-grid: mínimo 392px, llena borde a borde */
+  grid-template-columns: repeat(auto-fill, minmax(min(392px, 100%), 1fr));
   gap: 16px;
 }
 
