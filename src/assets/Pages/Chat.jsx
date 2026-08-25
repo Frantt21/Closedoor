@@ -2436,8 +2436,11 @@ export default function Chat() {
   if (!user) return null;
 
   // ── Render conversation list content ──
+  // NOTA: devuelve un FRAGMENT — el <div className="chat-list"> lo pone el
+  // caller (ver return principal). Anidar otra .chat-list aquí duplicaba la
+  // card flotante (card dentro de card desplazando búsqueda e items).
   const renderConversationListContent = () => (
-    <div className="chat-list">
+    <>
       <div className="chat-list-header">
         <h2 className="chat-list-title">{t('chat.title')}</h2>
         <Tooltip text={t('chat.new')} placement="bottom">
@@ -2543,12 +2546,14 @@ export default function Chat() {
           ))
         )}
       </div>
-    </div>
+    </>
   );
 
   // ── Render message area content ──
+  // NOTA: FRAGMENT — el <div className="chat-messages"> lo pone el caller
+  // (mismo patrón que renderConversationListContent / la card flotante).
   const renderMessageAreaContent = () => (
-    <div className="chat-messages">
+    <>
       {/* Header */}
       <div className="chat-messages-header">
         <div className="chat-messages-header-left">
@@ -2705,7 +2710,7 @@ export default function Chat() {
       <div className="chat-messages-body" ref={messagesContainerRef} style={{
         '--chat-bubble-own': bubbleColors[activeConvId]?.own || '#111111',
         '--chat-bubble-own-text': getContrastFromHex(bubbleColors[activeConvId]?.own),
-        '--chat-bubble-other': bubbleColors[activeConvId]?.other || 'var(--color-surface, #1a1a1a)',
+        '--chat-bubble-other': bubbleColors[activeConvId]?.other || 'var(--color-surface-hover, #252525)',
         '--chat-bubble-other-text': getContrastFromHex(bubbleColors[activeConvId]?.other),
       }}>
         {msgsLoading ? (
@@ -3261,7 +3266,7 @@ export default function Chat() {
           </>
         )}
       </div>
-    </div>
+    </>
   );
 
   return (

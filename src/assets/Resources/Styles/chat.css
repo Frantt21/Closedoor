@@ -12,14 +12,20 @@
     border-radius: 0;
 }
 
-/* ── Conversation list (left sidebar) ── */
+/* ── Conversation list (left sidebar) ──
+   CARD FLOTANTE: superficie elevada (--color-surface) con radius y sombra,
+   separada del borde por margen que deja ver el fondo de la página.
+   Los items internos son transparentes y heredan la superficie. */
 .chat-list {
     width: 340px;
     min-width: 340px;
     display: flex;
     flex-direction: column;
-    border-right: 1px solid var(--color-border, #2a2a2a);
-    background: var(--color-bg, #000000);
+    /* Flexbox stretch respeta los margins → la card flota sin hacks de altura */
+    margin: 12px 6px 12px 6px;
+    border-radius: var(--radius, 10px);
+    background: var(--color-surface, #1a1a1a);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
     overflow: hidden;
 }
 
@@ -29,7 +35,8 @@
     gap: 10px;
     padding: 16px 16px 12px;
     border-bottom: 1px solid var(--color-border, #2a2a2a);
-    background: var(--color-bg, #000000);
+    /* transparente → hereda la superficie de la card flotante */
+    background: transparent;
 }
 
 .chat-list-title {
@@ -374,7 +381,9 @@
     min-height: 69px;
 }
 
-/* ── Message area (right side) ── */
+/* ── Message area (right side) ──
+   CARD FLOTANTE espejo de .chat-list: margen izq 6px (empareja con el
+   derecho de la lista → 12px entre cards), der 12px hacia el borde. */
 .chat-messages {
     flex: 1;
     display: flex;
@@ -382,6 +391,10 @@
     min-width: 0;
     overflow: hidden;
     position: relative;
+    margin: 12px 12px 12px 6px;
+    border-radius: var(--radius, 10px);
+    background: var(--color-surface, #1a1a1a);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 
 /* ── Welcome placeholder when no conversation selected ── */
@@ -409,7 +422,8 @@
     justify-content: space-between;
     padding: 16px 16px 12px;
     border-bottom: 1px solid var(--color-border, #2a2a2a);
-    background: var(--color-bg, #000000);
+    /* transparente → hereda la superficie de la card flotante */
+    background: transparent;
 }
 
 .chat-messages-header-left {
@@ -540,7 +554,8 @@
     display: flex;
     flex-direction: column-reverse;
     gap: 4px;
-    background: var(--color-bg, #000000);
+    /* transparente → hereda la superficie de la card flotante */
+    background: transparent;
     /* No scrollbar-gutter: stable — overlay scrollbar, no real space */
     scrollbar-width: thin;
     scrollbar-color: var(--color-border, #2a2a2a) transparent;
@@ -788,7 +803,9 @@
 }
 
 .chat-message--other .chat-message-bubble {
-    background: var(--chat-bubble-other, var(--color-surface, #1a1a1a));
+    /* surface-hover: sobre la card flotante (surface) necesita un tono más
+       claro para no desaparecer */
+    background: var(--chat-bubble-other, var(--color-surface-hover, #252525));
     color: var(--chat-bubble-other-text, var(--color-text, #ffffff));
 }
 
@@ -1456,7 +1473,8 @@
     gap: 8px;
     padding: 12px 16px;
     border-top: 1px solid var(--color-border, #2a2a2a);
-    background: var(--color-bg, #000000);
+    /* transparente → hereda la superficie de la card flotante */
+    background: transparent;
     position: relative;
 }
 
@@ -2597,6 +2615,10 @@ dialog.fc-modal.chat-followers-modal {
         width: 100%;
         min-width: 0;
         height: 100%;
+        /* Móvil: lista full-bleed, sin look de card flotante */
+        margin: 0;
+        border-radius: 0;
+        box-shadow: none;
         border-right: none;
     }
 
@@ -2607,6 +2629,10 @@ dialog.fc-modal.chat-followers-modal {
     .chat-messages {
         height: 100%;
         overflow: hidden;
+        /* Móvil: full-bleed, sin look de card flotante */
+        margin: 0;
+        border-radius: 0;
+        box-shadow: none;
     }
 
     .chat-message {

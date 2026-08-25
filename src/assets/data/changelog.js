@@ -30,7 +30,7 @@ export const RELEASES = [
       'The photos in the feed load an optimized version: less data, but the same quality when opened.',
       'Fixes in community invitations from the chat.',
       'More stable and accurate activity statuses (online / busy / away).',
-      'The styles for Explore, communities, and notifications were improved.',
+      'The styles for Explore, communities, chats, and notifications were improved.',
     ],
   },
 ];
