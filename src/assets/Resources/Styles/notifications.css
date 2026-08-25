@@ -118,15 +118,12 @@
   margin: 0;
 }
 
-/* List */
+/* List — cada notificación es una CARD independiente (gap 16px igual que
+   las explore-cards). El contenedor ya no pinta fondo ni borde. */
 .notifications-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  background: var(--color-surface, #1a1a1a);
-  border-radius: var(--radius, 10px);
-  overflow: hidden;
-  border: 1px solid var(--color-border, #2a2a2a);
+  gap: 12px;
 }
 
 /* ---- Checkbox ---- */
@@ -184,38 +181,33 @@
   transition: background 0.15s ease;
   position: relative;
   cursor: pointer;
+  /* Card individual */
+  background: var(--color-surface, #1a1a1a);
+  border-radius: var(--radius, 10px);
+  overflow: hidden;
 }
 
 .notification-item:hover {
   background: var(--color-surface-hover, #252525);
 }
 
-.notification-item + .notification-item {
-  border-top: 1px solid var(--color-border, #2a2a2a);
-}
-
 /* ── Notificaciones virtualizadas (VirtualPostList) ──
-   Cada item vive en su propio .virtual-post-row absoluto, así que el
-   selector de hermanos anterior no aplica. data-index="0" = primer item
-   real (no el primero montado, que cambia al scrollear). El row global
-   trae padding-bottom: 12px (pensado para PostCards); aquí lo devolvemos
-   al gap original de 2px de la lista. */
+   Cada item vive en su propio .virtual-post-row absoluto, así que el gap
+   del contenedor no aplica: el ESPACIADO es el padding-bottom del row.
+   16px = mismo gap que las cards del resto de la app. Ya no hay bordes
+   separadores: cada item es una card completa. */
 .notifications-list .virtual-post-row {
-  padding-bottom: 2px;
-}
-.notifications-list .virtual-post-row[data-index="0"] .notification-item {
-  border-top: none;
-}
-.notifications-list .virtual-post-row .notification-item {
-  border-top: 1px solid var(--color-border, #2a2a2a);
+  padding-bottom: 12px;
 }
 
+/* Estados como TINTA sobre la superficie de la card (background-image en
+   vez de background: así no se pierde el fondo surface del card) */
 .notification-item--unread {
-  background: var(--overlay-bg-subtle);
+  background-image: linear-gradient(var(--overlay-bg-subtle), var(--overlay-bg-subtle));
 }
 
 .notification-item--unread:hover {
-  background: var(--overlay-bg);
+  background-image: linear-gradient(var(--overlay-bg), var(--overlay-bg));
 }
 
 .notification-item--unread .notifications-checkbox {
@@ -227,11 +219,11 @@
 }
 
 .notification-item--selected {
-  background: var(--overlay-bg);
+  background-image: linear-gradient(var(--overlay-bg), var(--overlay-bg));
 }
 
 .notification-item--selected:hover {
-  background: var(--overlay-bg-hover);
+  background-image: linear-gradient(var(--overlay-bg-hover), var(--overlay-bg-hover));
 }
 
 .notification-item--deleting {
@@ -281,7 +273,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 8px 14px 8px;
+  padding: 14px 8px;
   text-decoration: none;
   color: inherit;
   flex: 1;

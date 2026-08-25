@@ -94,10 +94,7 @@
 .notif-skeleton-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  background: var(--color-surface, #1a1a1a);
-  border-radius: var(--radius, 10px);
-  overflow: hidden;
+  gap: 12px;
 }
 
 .notif-skeleton-item {
@@ -105,10 +102,9 @@
   align-items: center;
   gap: 12px;
   padding: 14px 16px;
-}
-
-.notif-skeleton-item + .notif-skeleton-item {
-  border-top: none;
+  /* Card individual (igual que .notification-item) */
+  background: var(--color-surface, #1a1a1a);
+  border-radius: var(--radius, 10px);
 }
 
 .notif-skeleton-avatar {
