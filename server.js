@@ -22,7 +22,14 @@ import { Readable } from 'stream';
 import { buildSitemapUrls, wrapSitemapXml } from './api/_sitemap.js';
 import { issueLiveKitToken } from './api/_livekit.js';
 import { searchMusicServer, resolveTrackPreview } from './api/_music.js';
-import { resolveTrackAudio, getInnertubeInfo, upstreamRangeHeader } from './api/_innertube.js';
+import {
+  resolveTrackAudio,
+  getInnertubeInfo,
+  upstreamRangeHeader,
+  urlMayBeExpired,
+  markStreamFallback,
+  activeStreamSource,
+} from './api/_innertube.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIST = join(__dirname, 'dist');
@@ -554,27 +561,43 @@ async function proxyInnertubeAudio(req, res, track, { fresh = false } = {}) {
     return;
   }
 
-  // ⚠️ El rango del cliente NO se reenvía tal cual: googlevideo (rqh=1) responde
-  // 403 a los rangos abiertos (`bytes=0-`, lo que manda el navegador al
-  // arrancar) y a los que pasan de ~1 MiB. Se pide siempre un bloque acotado.
-  const upstreamRange = upstreamRangeHeader(req.headers.range, resolved.contentLength);
+  // ⚠️ El rango del cliente NO se reenvía tal cual: googlevideo responde 403 a
+  // los rangos abiertos (`bytes=0-`, lo que manda el navegador al arrancar) y a
+  // los que pasan de ~1 MiB. Se pide siempre un bloque acotado (para el muxed,
+  // que sí sirve cualquier offset, esto además trocea la descarga).
+  const source = { ...activeStreamSource(resolved) };
+  let upstreamRange = upstreamRangeHeader(req.headers.range, source.contentLength);
   if (upstreamRange === null) {
     res.status(416).json({ success: false, error: 'Rango fuera del archivo' });
     return;
   }
-  const headers = { Range: upstreamRange };
   const isFirstChunk = upstreamRange.startsWith('bytes=0-');
 
   let upstream;
   try {
-    upstream = await fetch(resolved.url, { headers });
-    if ((upstream.status === 403 || upstream.status === 410) && isFirstChunk) {
-      // Sólo en el primer bloque un 403 significa "URL vencida" → resolver de
-      // nuevo y reintentar una vez. Más adelante, un 403 es el tope de YouTube
-      // (no entrega más audio de esta canción desde esta IP) y reintentar sólo
-      // gastaría otra resolución.
+    upstream = await fetch(source.url, { headers: { Range: upstreamRange } });
+
+    // Reintento 1: la URL pudo caducar (tiene horas) → resolver otra vez.
+    if ((upstream.status === 403 || upstream.status === 410) && isFirstChunk && urlMayBeExpired(resolved)) {
       resolved = await resolveTrackAudio(track, { fresh: true });
-      upstream = await fetch(resolved.url, { headers });
+      const retry = activeStreamSource(resolved);
+      upstreamRange = upstreamRangeHeader(req.headers.range, retry.contentLength) ?? upstreamRange;
+      upstream = await fetch(retry.url, { headers: { Range: upstreamRange } });
+    }
+
+    // Reintento 2: el CDN no da más de esa URL y hay MUXED → servir desde el
+    // muxed (sin tope de rango). Queda marcado en la caché del proceso.
+    if (
+      (upstream.status === 403 || upstream.status === 410) &&
+      isFirstChunk &&
+      resolved.fallbackUrl &&
+      !resolved.useFallback &&
+      markStreamFallback(track)
+    ) {
+      resolved = { ...resolved, useFallback: true };
+      const fallback = activeStreamSource(resolved);
+      upstreamRange = upstreamRangeHeader(req.headers.range, fallback.contentLength) ?? upstreamRange;
+      upstream = await fetch(fallback.url, { headers: { Range: upstreamRange } });
     }
   } catch (err) {
     res.status(502).json({ success: false, error: `Audio no disponible: ${err.message}` });
@@ -640,6 +663,8 @@ app.get('/api/music/resolve', async (req, res) => {
       itag: resolved.itag,
       mimeType: resolved.mimeType,
       contentLength: resolved.contentLength,
+      playable: resolved.playable !== false,
+      degraded: !!resolved.degraded,
       cached: !!resolved.cached,
     });
   } catch (err) {

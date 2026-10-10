@@ -7,6 +7,10 @@
  * No devuelve la URL de googlevideo a propósito: está firmada para la IP del
  * server y no le sirve al navegador.
  *
+ * Devuelve `playable`: false cuando la pista no cabe entera en el tramo que
+ * entrega el CDN (~1 MiB por URL) → el cliente usa el preview de 30 s en vez de
+ * arrancar un stream que moriría a los ~1,5 s con 502.
+ *
  * Uso: GET /api/music/resolve?artist=...&title=...&duration=...
  */
 
@@ -55,6 +59,8 @@ export default async function handler(req) {
         itag: resolved.itag,
         mimeType: resolved.mimeType,
         contentLength: resolved.contentLength,
+        playable: resolved.playable !== false,
+        degraded: !!resolved.degraded,
         cached: !!resolved.cached,
       }),
       { status: 200, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } }

@@ -5,6 +5,7 @@ import ogTagsPlugin from './plugins/ogTagsPlugin'
 import livekitTokenPlugin from './plugins/livekitTokenPlugin'
 import preloadRouteChunks from './plugins/preloadRouteChunks'
 import inlineCssPlugin from './plugins/inlineCssPlugin'
+import musicDevApiPlugin from './plugins/musicDevApiPlugin'
 import { cspPlugin } from './plugins/cspPlugin'
 
 // https://vite.dev/config/
@@ -15,18 +16,11 @@ export default defineConfig({
         target: 'http://api.foranly.space:24587',
         changeOrigin: true,
       },
-      // API de música en dev: la sirve server.js (npm start) con el resolver
-      // innertube local. Si no está corriendo, la petición falla rápido y el
-      // frontend cae al preview de 30 s (iTunes directo sigue funcionando).
-      // `/api/music-search` DEBE ir antes que `/api/music` (prefijo).
-      '/api/music-search': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-      },
-      '/api/music': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-      },
+      // ⚠️ /api/music* y /api/music-search NO se proxian: los sirve
+      // musicDevApiPlugin (abajo) con la misma lógica que producción
+      // (api/music/*.js + api/_music.js). Antes se proxiavan a server.js
+      // (:3000) y, sin `npm start`, devolvían 502 → la card caía siempre al
+      // preview de 30 s.
       // Proxy de imágenes CORS (wallhaven, etc. bloquean el fetch del navegador):
       // el server baja la imagen y la devuelve con CORS *, igual que en Vercel.
       '/api/image-proxy': {
@@ -68,6 +62,7 @@ export default defineConfig({
     livekitTokenPlugin(),
     preloadRouteChunks(),
     inlineCssPlugin(),
+    musicDevApiPlugin(),
     cspPlugin(),
     react(),
     babel({ presets: [reactCompilerPreset()] })

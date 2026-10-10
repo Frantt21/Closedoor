@@ -19,6 +19,10 @@ import {
   getInnertubeInfo,
   clearInnertubeCaches,
   upstreamRangeHeader,
+  urlMayBeExpired,
+  pickMuxedFormat,
+  markStreamFallback,
+  activeStreamSource,
   MAX_UPSTREAM_RANGE_BYTES,
 } from '../api/_innertube.js';
 
@@ -88,6 +92,18 @@ check('pickAudioFormat cae a opus 251 si no hay 140', pickAudioFormat(AUDIO_FORM
 check('pickAudioFormat ignora video y elige el mejor m4a', pickAudioFormat(AUDIO_FORMATS.filter((f) => f.itag !== 140 && f.itag !== 251))?.itag === 139);
 check('pickAudioFormat sin audio → null', pickAudioFormat([AUDIO_FORMATS[4]]) === null);
 
+// Con tope de tamaño (el CDN sólo entrega ~1 MiB por URL) se prefiere una pista
+// ENTERA de menor calidad antes que una que no se puede terminar.
+const AUDIO_WITH_LOW = [
+  ...AUDIO_FORMATS,
+  { itag: 599, mimeType: 'audio/mp4; codecs="mp4a.40.5"', bitrate: 32000, contentLength: '811937', url: 'https://gv/599' },
+];
+check('con tope: elige el m4a que cabe entero (599)', pickAudioFormat(AUDIO_WITH_LOW, { maxBytes: MAX_UPSTREAM_RANGE_BYTES })?.itag === 599);
+check('con tope amplio: prefiere el mejor m4a que quepa (139 sobre 599)', pickAudioFormat(AUDIO_WITH_LOW, { maxBytes: 1400000 })?.itag === 139);
+check('sin m4a que quepa: cae a opus que sí quepa (249)', pickAudioFormat([AUDIO_FORMATS[2], AUDIO_FORMATS[3]], { maxBytes: 1300000 })?.itag === 249);
+check('sin tope: sigue prefiriendo 140 (no degrada gratis)', pickAudioFormat(AUDIO_WITH_LOW)?.itag === 140);
+check('si nada cabe: devuelve la preferida (el caller marca playable:false)', pickAudioFormat(AUDIO_FORMATS, { maxBytes: MAX_UPSTREAM_RANGE_BYTES })?.itag === 140);
+
 // ── 2. Matching por duración (el señuelo de 45 s no debe ganar) ──
 {
   const best = pickBestCandidate(
@@ -110,6 +126,8 @@ check('mimeType normalizado', resolved.mimeType === 'audio/mp4', resolved.mimeTy
 check('contentLength numérico', resolved.contentLength === 3449447, String(resolved.contentLength));
 check('cliente usado: ANDROID_VR', resolved.client === 'ANDROID_VR', resolved.client);
 check('el search se deduplicó (3 videos, no 4)', (await searchTracks('x', { limit: 10 })).length === 3);
+check('pista > 1 MiB → playable:false', resolved.playable === false);
+check('sin degradación cuando nada cabe', resolved.degraded === false);
 
 // ── 4. Caché: la segunda resolución no vuelve a llamar ──
 const callsAfterFirst = calls.length;
@@ -125,12 +143,38 @@ playerResponder = (sent) =>
   sent.context.client.clientName === 'ANDROID_VR'
     ? { playabilityStatus: { status: 'LOGIN_REQUIRED', reason: "Sign in to confirm you're not a bot" } }
     : { playabilityStatus: { status: 'OK' }, streamingData: { adaptiveFormats: AUDIO_FORMATS } };
+const beforeFallback = playerCalls().length;
 const viaFallback = await resolveVideoAudio('LQ4w9xiHkrY');
+const fallbackChain = playerCalls().slice(beforeFallback).map((c) => JSON.parse(c.body).context.client.clientName);
 check('cae al siguiente cliente (IOS)', viaFallback.client === 'IOS', viaFallback.client);
 check('el fallback devuelve audio igual', viaFallback.url === 'https://gv/140');
-check('probó ANDROID_VR antes que IOS', playerCalls().at(-2) && JSON.parse(playerCalls().at(-2).body).context.client.clientName === 'ANDROID_VR');
+check('probó ANDROID_VR antes que IOS', fallbackChain.slice(0, 2).join(',') === 'ANDROID_VR,IOS', fallbackChain.join(','));
 
-// ── 6. Todos los clientes bloqueados → error explicativo ──
+// ── 6. Canción larga: se consultan los clientes hasta encontrar un formato que
+//       quepa ENTERO (el itag 599 de baja calidad sólo lo expone ANDROID) ──
+clearInnertubeCaches();
+playerResponder = (sent) =>
+  sent.context.client.clientName === 'ANDROID'
+    ? { playabilityStatus: { status: 'OK' }, streamingData: { adaptiveFormats: AUDIO_WITH_LOW } }
+    : { playabilityStatus: { status: 'OK' }, streamingData: { adaptiveFormats: AUDIO_FORMATS } };
+const beforeDegraded = playerCalls().length;
+const degraded = await resolveVideoAudio('dQw4w9WgXcQ');
+const triedClients = playerCalls().slice(beforeDegraded).map((c) => JSON.parse(c.body).context.client.clientName);
+check('elige el itag 599 (cabe entero)', degraded.itag === 599, String(degraded.itag));
+check('lo sirve el cliente que lo expone (ANDROID)', degraded.client === 'ANDROID', degraded.client);
+check('probó los 3 clientes en orden VR→IOS→ANDROID', triedClients.join(',') === 'ANDROID_VR,IOS,ANDROID', triedClients.join(','));
+check('marca playable:true', degraded.playable === true);
+check('marca degraded:true', degraded.degraded === true);
+check('contentLength del formato elegido', degraded.contentLength === 811937, String(degraded.contentLength));
+
+// Si NINGÚN cliente ofrece un formato que quepa → playable:false (preview en la card)
+clearInnertubeCaches();
+playerResponder = () => ({ playabilityStatus: { status: 'OK' }, streamingData: { adaptiveFormats: AUDIO_FORMATS } });
+const noFit = await resolveVideoAudio('dQw4w9WgXcQ');
+check('sin formato que quepa → playable:false', noFit.playable === false);
+check('y devuelve el mejor disponible (140)', noFit.itag === 140, String(noFit.itag));
+
+// ── 7. Todos los clientes bloqueados → error explicativo ──
 clearInnertubeCaches();
 playerResponder = () => ({ playabilityStatus: { status: 'LOGIN_REQUIRED', reason: "Sign in to confirm you're not a bot" } });
 let thrown = null;
@@ -141,7 +185,7 @@ try {
 }
 check('error si todos los clientes fallan', !!thrown && /ANDROID_VR/.test(thrown) && /IOS/.test(thrown), thrown);
 
-// ── 7. Búsqueda sin coincidencia razonable → error (no reproducir algo random) ──
+// ── 8. Búsqueda sin coincidencia razonable → error (no reproducir algo random) ──
 clearInnertubeCaches();
 const noMatch = await (async () => {
   try {
@@ -153,10 +197,10 @@ const noMatch = await (async () => {
 })();
 check('sin coincidencia → error claro', /coincidencia razonable/.test(noMatch || ''), noMatch);
 
-// ── 8. El search NO usa innertube/search (evita el envenenamiento) ──
+// ── 9. El search NO usa innertube/search (evita el envenenamiento) ──
 check('ninguna llamada a innertube/search', !calls.some((c) => c.target.includes('/youtubei/v1/search')));
 
-// ── 9. Rango acotado hacia googlevideo (el navegador manda `bytes=0-`: con ese
+// ── 10. Rango acotado hacia googlevideo (el navegador manda `bytes=0-`: con ese
 //       rango abierto el CDN responde 403, así que nunca se reenvía tal cual) ──
 {
   const CHUNK = MAX_UPSTREAM_RANGE_BYTES;
@@ -174,9 +218,68 @@ check('ninguna llamada a innertube/search', !calls.some((c) => c.target.includes
   check('sin contentLength no se recorta al archivo', upstreamRangeHeader('bytes=0-4095', 0) === 'bytes=0-4095');
 }
 
-// ── 10. Health info ──
+// ── 11. 403 en el primer bloque: ¿caducó la URL o es el allowance del CDN? ──
+// (Re-resolver una URL recién resuelta sólo gasta una llamada al player.)
+{
+  const AT = 1_700_000_000_000;
+  check('URL recién resuelta → no se re-resuelve', urlMayBeExpired({ resolvedAt: AT }, AT + 60_000) === false);
+  check('URL con horas → sí se re-resuelve', urlMayBeExpired({ resolvedAt: AT }, AT + 6 * 60 * 60 * 1000) === true);
+  check('sin marca de tiempo → conservador (sí re-resuelve)', urlMayBeExpired({}) === true);
+  check('la resolución guarda su marca de tiempo', typeof resolved.resolvedAt === 'number' && resolved.resolvedAt > 0);
+}
+
+// ── 12. MUXED: la vía para servir una canción larga ENTERA ──
+// Sus URLs sirven cualquier offset (verificado contra el CDN real), así que es
+// la red de seguridad del audio-only.
+{
+  const MUXED = [
+    { itag: 22, mimeType: 'video/mp4; codecs="avc1.64001F, mp4a.40.2"', bitrate: 1200000, contentLength: '30000000', url: 'https://gv/22' },
+    { itag: 18, mimeType: 'video/mp4; codecs="avc1.42001E, mp4a.40.2"', bitrate: 496000, contentLength: '13067708', url: 'https://gv/18' },
+    { itag: 137, mimeType: 'video/mp4; codecs="avc1.640028"', bitrate: 4081000, contentLength: '99000000' }, // sin url → se descarta
+  ];
+  check('pickMuxedFormat prefiere itag 18 (el más ligero)', pickMuxedFormat(MUXED)?.itag === 18);
+  check('pickMuxedFormat cae a 22 si no hay 18', pickMuxedFormat(MUXED.filter((f) => f.itag !== 18))?.itag === 22);
+  check('pickMuxedFormat ignora los que no traen url', pickMuxedFormat([MUXED[2]]) === null);
+  check('pickMuxedFormat sin muxed → null', pickMuxedFormat([AUDIO_FORMATS[1]]) === null);
+
+  // Canción larga sin audio-only que quepa → se sirve el muxed (pista completa)
+  clearInnertubeCaches();
+  playerResponder = () => ({ playabilityStatus: { status: 'OK' }, streamingData: { adaptiveFormats: AUDIO_FORMATS, formats: MUXED } });
+  const viaMuxed = await resolveVideoAudio('dQw4w9WgXcQ');
+  check('sin audio-only que quepa → usa el muxed (18)', viaMuxed.itag === 18, String(viaMuxed.itag));
+  check('el muxed es playable (no limitado por rango)', viaMuxed.playable === true);
+  check('el muxed no necesita fallback', viaMuxed.fallbackUrl === null, String(viaMuxed.fallbackUrl));
+  check('contentLength del muxed', viaMuxed.contentLength === 13067708, String(viaMuxed.contentLength));
+
+  // Canción que SÍ cabe como audio-only → se sigue prefiriendo el archivo pequeño,
+  // pero con el muxed apuntado como red de seguridad
+  clearInnertubeCaches();
+  playerResponder = () => ({ playabilityStatus: { status: 'OK' }, streamingData: { adaptiveFormats: AUDIO_WITH_LOW, formats: MUXED } });
+  const conFallback = await resolveTrackAudio({ artist: 'Rick Astley', title: 'Never Gonna Give You Up', duration: 213 });
+  check('si el audio-only cabe, se usa (599)', conFallback.itag === 599, String(conFallback.itag));
+  check('y queda apuntado el muxed como fallback', conFallback.fallbackUrl === 'https://gv/18', String(conFallback.fallbackUrl));
+  check('con su tamaño para recalcular offsets', conFallback.fallbackLength === 13067708);
+}
+
+// ── 13. Fuente activa y marca sticky del fallback ──
+{
+  check('activeStreamSource: sin fallback usa el elegido', activeStreamSource({ url: 'https://gv/599', contentLength: 811937 })?.url === 'https://gv/599');
+  const switched = activeStreamSource({ url: 'https://gv/599', contentLength: 811937, useFallback: true, fallbackUrl: 'https://gv/18', fallbackLength: 13067708 });
+  check('activeStreamSource: con fallback usa el muxed', switched.url === 'https://gv/18' && switched.contentLength === 13067708);
+  check('activeStreamSource: useFallback sin url → el elegido', activeStreamSource({ url: 'https://gv/599', useFallback: true })?.url === 'https://gv/599');
+
+  // La marca se guarda en la caché del proceso (sobrevive a la siguiente petición)
+  const track = { artist: 'Rick Astley', title: 'Never Gonna Give You Up', duration: 213 };
+  check('markStreamFallback sobre pista con fallback → true', markStreamFallback(track) === true);
+  const again2 = await resolveTrackAudio(track);
+  check('la siguiente lectura de caché ya viene con useFallback', again2.useFallback === true);
+  check('y su fuente activa es el muxed', activeStreamSource(again2).url === 'https://gv/18');
+  check('markStreamFallback sobre una desconocida → false', markStreamFallback({ artist: 'x', title: 'y', duration: 1 }) === false);
+}
+
+// ── 14. Health info ──
 const info = getInnertubeInfo();
-check('health informa provider y clientes', info.provider === 'innertube' && info.clients.length === 2, JSON.stringify(info.clients));
+check('health informa provider y clientes', info.provider === 'innertube' && info.clients.length === 3, JSON.stringify(info.clients));
 
 globalThis.fetch = realFetch;
 console.log(failures === 0 ? '\nTODO OK' : `\nFALLARON ${failures}`);

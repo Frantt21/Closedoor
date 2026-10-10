@@ -15,16 +15,14 @@
  *   3. match   → se elige el mejor candidato por similitud de título/artista y
  *                por DURACIÓN (evita covers, remixes y versiones en vivo).
  *
- * ⚠️ Cliente: ANDROID_VR. Verificado contra la API real desde IP de datacenter
- * (2026-10): es el único de los sondeados que devuelve playabilityStatus OK con
- * URLs directas. Referencia del sondeo:
- *   ANDROID_VR ......... OK, formatos con `url` directa
- *   WEB ................ UNPLAYABLE (requiere PO token desde datacenter)
- *   ANDROID / IOS ...... HTTP 400 (clientes retirados)
- *   TVHTML5_SIMPLY_EMBEDDED_PLAYER ... "no longer supported"
- * Por eso NO se usa WEB ni los clientes móviles: si algún día ANDROID_VR deja
- * de funcionar, hay que re-sondear clientes (el fallback natural es WEB + PO
- * token, que necesita un servicio extra).
+ * ⚠️ Clientes: cadena ANDROID_VR → IOS → ANDROID (ver CLIENTS). Sobre el
+ * sondeo real (2026-10-10): los tres devuelven playabilityStatus OK con URLs
+ * directas (ANDROID_VR a veces LOGIN_REQUIRED según el momento), WEB y los
+ * clientes de música quedan UNPLAYABLE / LOGIN_REQUIRED. ANDROID va último
+ * porque es el único que expone los itags de baja calidad (599 = 32 kbps) con
+ * los que una canción larga cabe entera en el tramo que entrega el CDN. Si
+ * algún día todos dejan de funcionar, hay que re-sondear clientes (el fallback
+ * natural es WEB + PO token, que necesita un servicio extra).
  *
  * ⚠️ Las URLs de googlevideo están atadas a la IP que las resolvió y expiran
  * (~6 h). Por eso el frontend nunca las recibe: se proxian desde el server
@@ -37,11 +35,18 @@
 // Clientes innertube soportados, en orden de preferencia. Las claves son las
 // públicas que llevan las apps en el APK/IPA (no son secretos).
 //
-// Verificado contra la API real (2026-10): ANDROID_VR e IOS devuelven
-// playabilityStatus OK con URLs de audio directas. WEB queda UNPLAYABLE desde
-// IP de datacenter (exige PO token), ANDROID/IOS clásicos dan HTTP 400 y
-// TVHTML5_SIMPLY_EMBEDDED_PLAYER responde "no longer supported". Por eso la
-// cadena es VR → IOS: si uno queda bloqueado, el otro suele pasar.
+// Sondeo contra la API real (2026-10-10, mismo vídeo y misma IP):
+//   ANDROID_VR ......... OK o LOGIN_REQUIRED según el momento · sólo 139/140
+//   IOS ................ OK · sólo 139/140
+//   ANDROID ............ OK · expone además los itags de BAJA calidad
+//                        (599 = 32 kbps m4a, 600 = opus), que son los únicos
+//                        que permiten que una canción larga quepa ENTERA en el
+//                        tramo servible (MAX_UPSTREAM_RANGE_BYTES)
+//   ANDROID_MUSIC / IOS_MUSIC ... LOGIN_REQUIRED ("Please sign in")
+//   WEB_REMIX / MWEB ... UNPLAYABLE · WEB ... UNPLAYABLE (PO token)
+//   TVHTML5_SIMPLY_EMBEDDED_PLAYER ... "no longer supported"
+// Orden VR → IOS → ANDROID: los dos primeros dan mejor audio y ANDROID se
+// consulta sólo si ninguno ofrece un formato que quepa entero.
 const CLIENTS = [
   {
     name: 'ANDROID_VR',
@@ -64,6 +69,20 @@ const CLIENTS = [
       clientName: 'IOS',
       clientVersion: '20.10.4',
       deviceModel: 'iPhone16,2',
+      hl: 'en',
+      gl: 'US',
+    },
+  },
+  // Último recurso: es el único cliente que expone los itags de baja calidad
+  // (599/600) con los que una canción larga entra entera en el tramo servible.
+  {
+    name: 'ANDROID',
+    key: 'AIzaSyA8eiZmM1FaDVjRy-df2KTyQ_vz_yYM39w',
+    userAgent: 'com.google.android.youtube/20.10.38 (Linux; U; Android 14) gzip',
+    client: {
+      clientName: 'ANDROID',
+      clientVersion: '20.10.38',
+      androidSdkVersion: 34,
       hl: 'en',
       gl: 'US',
     },
@@ -127,15 +146,60 @@ function cacheSet(cache, key, value) {
 // `bytes=0-1048575` y `bytes=1000000-1048575` dan 206, pero `bytes=1048576-…`
 // da 403 — incluso en la PRIMERA petición de una URL recién resuelta desde una
 // IP residencial. La URL tampoco lleva un param `range` que reescribir:
-// añadirlo da 400 y quitarlo o poner `rqh=0` da 403.
+// añadirlo con un rango fuera del MiB firmado da 416 (`&range=1048576-2097151`),
+// con rango abierto da 403, y quitarlo o poner `rqh=0` da 403 (re-verificado
+// 2026-10-10 con una URL recién resuelta: el CDN acepta sólo 0-1048575).
 //
-// Consecuencia práctica: una canción de más de ~1 MiB (~65 s a 128 kbps) suena
-// hasta ahí y el <audio> dispara onError → SongCard cae al preview de 30 s de
-// iTunes; las canciones cortas suenan completas (verificado byte a byte).
+// Consecuencia práctica (medida con un navegador real, 2026-10-10): el <audio>
+// de Chrome NO espera a consumir el buffer — pide la continuación
+// (`Range: bytes=1048576-`) en paralelo al arrancar, y el 502 de esa petición
+// mata el pipeline entero (PIPELINE_ERROR_READ a los ~1,5 s, con 64 s ya en
+// buffer). Por eso:
+//   1. el resolver elige, si existe, un formato cuya pista ENTERA quepa en el
+//      tramo servible (itag 599 = 32 kbps m4a suele caber incluso en canciones
+//      de 3-4 min) → la canción suena completa, con menos calidad;
+//   2. si ninguno cabe, se sirve el formato MUXED (itag 18), cuyas URLs NO
+//      están limitadas por rango (ver pickMuxedFormat) → la canción suena
+//      entera. Si la pista no tiene muxed con URL, marca `playable: false` y la
+//      card reproduce directo el preview de 30 s en vez de un stream condenado.
+//
+// 📌 Idea tomada del proyecto Scrup (ytdownloader): el audio-only va "gated"
+// (su URL caduca/limita), el muxed no. Scrup además lo pide con el cliente
+// ANDROID; aquí se usa ANDROID como ÚLTIMO cliente de la cadena porque es el
+// único de los sondeados que devuelve a la vez audio-only (139/140/249/251/599/
+// 600) y muxed (18) con URL directa: IOS no expone muxed y ANDROID 21.x sirve el
+// audio cifrado (sin URL), que es lo que obliga a Scrup a usar sólo el muxed.
+// ⚠️ El presupuesto por URL no es constante: medido (2026-10-10) que tras mucho
+// sondeo desde la misma IP una URL fresca entregaba sólo ~300 KB en trozos de
+// 100 KB y devolvía 403 a peticiones mayores, sin recuperarse al esperar
+// (token-bucket por IP). Si el CDN rechaza el bloque, el proxy responde 502 en
+// la primera petición y la card cae al preview sin dejar audio a medias.
 // Levantar el tope exige PO token (un servicio extra, p. ej.
 // bgutil-ytdlp-pot-provider: era lo que hacía el music server yt-dlp borrado).
 // Ver README.
 export const MAX_UPSTREAM_RANGE_BYTES = 1024 * 1024;
+
+// Margen para distinguir "URL caducada" de "el CDN no da más": las URLs de
+// googlevideo viven ~6 h, así que un 403 a los pocos minutos de resolverla no es
+// caducidad (ver urlMayBeExpired).
+export const STREAM_URL_FRESH_MS = 5 * 60 * 1000;
+
+/**
+ * ¿Merece la pena re-resolver porque la URL pudo caducar?
+ *
+ * Un 403/410 en el primer bloque de una URL recién resuelta NO es caducidad:
+ * es el allowance del CDN por URL (ver MAX_UPSTREAM_RANGE_BYTES). En ese caso
+ * re-resolver gasta una llamada al player y ~1-2 s antes de dar el mismo 502.
+ *
+ * @param {{resolvedAt?: number}} resolved Resolución (`resolvedAt` en ms).
+ * @param {number} [nowMs] Instante actual (inyectable para tests).
+ * @returns {boolean} true si puede estar caducada (o si no se sabe: conservador).
+ */
+export function urlMayBeExpired(resolved, nowMs = Date.now()) {
+  const at = Number(resolved?.resolvedAt) || 0;
+  if (!at) return true; // sin marca de tiempo no se puede descartar la caducidad
+  return nowMs - at > STREAM_URL_FRESH_MS;
+}
 
 /**
  * Convierte el `Range` del cliente en el rango acotado que se le pide a
@@ -250,21 +314,40 @@ export function pickBestCandidate(candidates, track) {
  * Elige el formato de audio con mejor relación compatibilidad/tamaño.
  * Orden: m4a 140 (131 kbps, lo reproduce todo) > opus 251 (mejor calidad pero
  * Safari no lo decodifica) > el m4a disponible con más bitrate > el primero.
+ *
+ * @param {Array} adaptiveFormats Formatos del player (streamingData).
+ * @param {{ maxBytes?: number }} [options] Con `maxBytes` sólo se eligen
+ *   formatos cuya pista ENTERA quepa en ese tamaño (el CDN con `rqh=1` sólo
+ *   entrega el primer MiB de cada URL: ver MAX_UPSTREAM_RANGE_BYTES). Se
+ *   prefiere perder calidad antes que no poder oír la canción completa:
+ *   140 → el mejor m4a que quepa → el mejor opus que quepa (Safari no lo
+ *   decodifica, así que va último). Si NINGUNO cabe, devuelve la elección
+ *   normal y es el llamador quien marca `playable: false`.
  */
-export function pickAudioFormat(adaptiveFormats = []) {
+export function pickAudioFormat(adaptiveFormats = [], { maxBytes = 0 } = {}) {
   const audio = adaptiveFormats.filter(
     (f) => String(f.mimeType || '').startsWith('audio/') && typeof f.url === 'string'
   );
   if (audio.length === 0) return null;
 
   const byItag = (itag) => audio.find((f) => String(f.itag) === String(itag));
-  const preferred = byItag(140) || byItag(251);
-  if (preferred) return preferred;
+  const byBitrate = (list) =>
+    [...list].sort((a, b) => Number(b.bitrate || 0) - Number(a.bitrate || 0));
+  // Sin tamaño declarado no se puede garantizar que quepa: se descarta.
+  const fits = (f) => Number(f.contentLength) > 0 && Number(f.contentLength) <= maxBytes;
+  const m4a = byBitrate(audio.filter((f) => f.mimeType.includes('mp4')));
 
-  const m4a = audio
-    .filter((f) => f.mimeType.includes('mp4'))
-    .sort((a, b) => Number(b.bitrate || 0) - Number(a.bitrate || 0));
-  return m4a[0] || audio[0];
+  const preferred = byItag(140) || byItag(251);
+  if (preferred && (maxBytes <= 0 || fits(preferred))) return preferred;
+
+  if (maxBytes > 0) {
+    const m4aFits = m4a.find(fits);
+    if (m4aFits) return m4aFits;
+    const anyFits = byBitrate(audio).find(fits);
+    if (anyFits) return anyFits;
+  }
+
+  return preferred || m4a[0] || audio[0];
 }
 
 // ── Llamadas a innertube ──
@@ -400,12 +483,23 @@ export async function searchTracks(query, { limit = 10, fresh = false } = {}) {
 /**
  * Resuelve un videoId a un stream de audio reproducible, probando los clientes
  * de la cadena hasta que uno responda con formatos utilizables.
- * Devuelve { url, mimeType, itag, contentLength, videoId, title, client }.
+ *
+ * Elige el formato que quepa ENTERO en el tramo que entrega el CDN
+ * (MAX_UPSTREAM_RANGE_BYTES). Devuelve:
+ *   { url, mimeType, codecs, itag, contentLength, videoId, title, client,
+ *     playable, degraded }
+ * donde `playable: false` significa que la pista es más grande que el tramo
+ * servible → la card debe usar el preview de 30 s, y `degraded: true` que se
+ * bajó de calidad para que la canción sí quepa completa.
  */
 export async function resolveVideoAudio(videoId) {
   if (!videoId) throw new Error('resolveVideoAudio: falta videoId');
 
   const failures = [];
+  // Primera resolución utilizable aunque la pista NO quepa entera: se devuelve
+  // sólo si ningún cliente ofrece un formato que sí quepa (playable:false → la
+  // card reproduce el preview de 30 s en vez de un stream condenado).
+  let tooBig = null;
 
   for (const apiClient of CLIENTS) {
     let json;
@@ -429,25 +523,110 @@ export async function resolveVideoAudio(videoId) {
       continue;
     }
 
-    const format = pickAudioFormat(json?.streamingData?.adaptiveFormats);
+    const formats = json?.streamingData?.adaptiveFormats;
+    const best = pickAudioFormat(formats);
+    const muxed = pickMuxedFormat(json?.streamingData?.formats);
+    // 1º) el mejor audio-only cuya pista ENTERA quepa en el tramo servible (el
+    //     archivo más pequeño). 2º) si no cabe, el muxed, que no está limitado
+    //     por rango → la canción suena entera (ver pickMuxedFormat).
+    const audioOnly = pickAudioFormat(formats, { maxBytes: MAX_UPSTREAM_RANGE_BYTES });
+    const audioOnlyLength = Number(audioOnly?.contentLength) || 0;
+    const audioOnlyFits = audioOnlyLength > 0 && audioOnlyLength <= MAX_UPSTREAM_RANGE_BYTES;
+    const format = audioOnlyFits || !muxed ? audioOnly : muxed;
     if (!format) {
       failures.push(`${apiClient.name}: sin formatos de audio con URL directa`);
       continue;
     }
+    const isMuxed = format === muxed;
 
-    return {
+    const contentLength = Number(format.contentLength) || 0;
+    const entry = {
       url: format.url,
       mimeType: String(format.mimeType || 'audio/mp4').split(';')[0],
       codecs: /codecs="([^"]+)"/.exec(format.mimeType || '')?.[1] || null,
       itag: format.itag,
-      contentLength: Number(format.contentLength) || 0,
+      contentLength,
       videoId,
       title: json?.videoDetails?.title || '',
       client: apiClient.name,
+      // El muxed siempre es servible entero; el audio-only sólo si cabe en el
+      // tramo que el CDN entrega de una URL.
+      playable: isMuxed || (contentLength > 0 && contentLength <= MAX_UPSTREAM_RANGE_BYTES),
+      // true si hubo que bajar de calidad (itag distinto al mejor disponible)
+      degraded: !!best && String(best.itag) !== String(format.itag),
+      // Red de seguridad del audio-only: si el CDN rechaza su primer bloque
+      // (403 = allowance de la URL agotado) el stream se sirve desde el muxed.
+      fallbackUrl: isMuxed ? null : muxed?.url || null,
+      fallbackLength: isMuxed ? 0 : Number(muxed?.contentLength) || 0,
     };
+
+    // Si cabe ENTERA es la buena y no se consulta a los demás clientes.
+    if (entry.playable) return entry;
+    // Si no cabe se prueba el siguiente cliente (ANDROID expone los itags de
+    // baja calidad, VR/IOS no) antes de rendirse con esta.
+    if (!tooBig) tooBig = entry;
   }
 
+  if (tooBig) return tooBig;
   throw new Error(`no se pudo resolver el audio (${failures.join(' | ')})`);
+}
+
+/**
+ * Formato MUXED (vídeo+áudio en un MP4 progresivo): itag 18 = 360p con AAC
+ * ~128 kbps. No es ideal en ancho de banda, pero es la ÚNICA vía fiable de
+ * servir una canción larga entera: verificado (2026-10-10, IP residencial y de
+ * datacenter con el cliente ANDROID) que sus URLs sirven CUALQUIER offset —
+ * incluidas posiciones de 3, 5 y 12 MB de un archivo de 13 MB — mientras las
+ * URLs audio-only (adaptive) devuelven 403 en cuanto el CDN agota el allowance
+ * de esa URL. Es la idea que usa el proyecto Scrup (ytdownloader): el audio-only
+ * va "gated", el muxed no.
+ *
+ * Orden: itag 18 (el más ligero: ~496 kbps totales) → itag 22 (720p) → el de
+ * menor bitrate. Los formatos sin `url` directa (firmados/cipher) se descartan.
+ */
+export function pickMuxedFormat(streamingFormats = []) {
+  const muxed = streamingFormats.filter(
+    (f) => typeof f.url === 'string' && String(f.mimeType || '').startsWith('video/')
+  );
+  if (muxed.length === 0) return null;
+
+  const byItag = (itag) => muxed.find((f) => String(f.itag) === String(itag));
+  return (
+    byItag(18) ||
+    byItag(22) ||
+    [...muxed].sort((a, b) => Number(a.bitrate || 0) - Number(b.bitrate || 0))[0]
+  );
+}
+
+/**
+ * Marca la resolución cacheada de una pista para que el stream use el muxed
+ * (`fallbackUrl`) en vez del audio-only. Queda *sticky* en la caché del proceso:
+ * el CDN ya dijo que no da más de esa URL, así que los siguientes bloques y los
+ * seek deben leer el MISMO archivo (y el mismo espacio de offsets).
+ *
+ * @param {{artist?: string, title: string, duration?: number}} track
+ * @returns {boolean} true si la pista tenía fallback y quedó marcada.
+ */
+/**
+ * Fuente activa de una resolución: el MUXED (`fallbackUrl`) si ya se cayó a él,
+ * si no el formato elegido. El muxed es OTRO archivo (más grande), así que
+ * devuelve también su tamaño: los offsets que pida el cliente pasan a ser los
+ * suyos y el `Content-Range` que se le reenvía es el del archivo servido.
+ *
+ * @param {{url: string, contentLength?: number, fallbackUrl?: string|null, fallbackLength?: number, useFallback?: boolean}} resolved
+ */
+export function activeStreamSource(resolved) {
+  if (resolved?.useFallback && resolved?.fallbackUrl) {
+    return { url: resolved.fallbackUrl, contentLength: resolved.fallbackLength || 0 };
+  }
+  return { url: resolved?.url, contentLength: resolved?.contentLength || 0 };
+}
+
+export function markStreamFallback(track) {
+  const hit = streamCache.get(trackKey(track));
+  if (!hit?.value?.fallbackUrl) return false;
+  hit.value.useFallback = true;
+  return true;
 }
 
 function trackKey({ artist = '', title = '', duration = 0 }) {
@@ -481,7 +660,14 @@ export async function resolveTrackAudio(track, { fresh = false } = {}) {
   }
 
   const resolved = await resolveVideoAudio(videoId);
-  const value = { ...resolved, track: { artist: track.artist || '', title, duration: track.duration || 0 } };
+  const value = {
+    ...resolved,
+    // Cuándo se resolvió: permite distinguir "URL caducada" de "el CDN no da
+    // más audio de esta IP" cuando el primer bloque responde 403 (ver
+    // urlMayBeExpired).
+    resolvedAt: Date.now(),
+    track: { artist: track.artist || '', title, duration: track.duration || 0 },
+  };
   cacheSet(streamCache, key, value);
   return value;
 }

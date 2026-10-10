@@ -23,7 +23,13 @@
  * 502 fallo al resolver o al traer el audio.
  */
 
-import { resolveTrackAudio, upstreamRangeHeader } from '../_innertube.js';
+import {
+  resolveTrackAudio,
+  upstreamRangeHeader,
+  urlMayBeExpired,
+  markStreamFallback,
+  activeStreamSource as activeSource,
+} from '../_innertube.js';
 
 export const config = {
   runtime: 'nodejs',
@@ -99,8 +105,9 @@ export default async function handler(req) {
     );
   }
 
-  // ── Traer el audio (y reintentar UNA vez re-resolviendo si la URL venció) ──
-  const upstreamRange = upstreamRangeHeader(req.headers.get('range'), resolved.contentLength);
+  // ── Traer el audio ──
+  const source = { ...activeSource(resolved) };
+  let upstreamRange = upstreamRangeHeader(req.headers.get('range'), source.contentLength);
   if (upstreamRange === null) {
     return jsonResponse({ success: false, error: 'Rango fuera del archivo' }, 416);
   }
@@ -109,13 +116,32 @@ export default async function handler(req) {
 
   let upstream;
   try {
-    upstream = await fetchAudio(resolved.url, upstreamRange, userAgent);
-    if ((upstream.status === 403 || upstream.status === 410) && isFirstChunk) {
-      // Sólo en el primer bloque un 403 significa "URL vencida" → resolver de
-      // nuevo y reintentar. Más adelante es el tope de YouTube (no entrega más
-      // audio de esta canción desde esta IP) y reintentar no ayudaría.
+    upstream = await fetchAudio(source.url, upstreamRange, userAgent);
+
+    // Reintento 1: la URL pudo caducar (tiene horas) → resolver de nuevo y
+    // repetir. Un 403 en el primer bloque de una URL recién resuelta NO es
+    // caducidad (es el allowance del CDN por URL: ver _innertube.js).
+    if ((upstream.status === 403 || upstream.status === 410) && isFirstChunk && urlMayBeExpired(resolved)) {
       resolved = await resolveTrackAudio({ artist, title, duration, videoId }, { fresh: true });
-      upstream = await fetchAudio(resolved.url, upstreamRange, userAgent);
+      const retrySource = activeSource(resolved);
+      upstreamRange = upstreamRangeHeader(req.headers.get('range'), retrySource.contentLength) ?? upstreamRange;
+      upstream = await fetchAudio(retrySource.url, upstreamRange, userAgent);
+    }
+
+    // Reintento 2: el CDN no da más de esa URL y hay MUXED disponible → se sirve
+    // desde el muxed, que no está limitado por rango. Queda marcado en la caché
+    // para que los siguientes bloques y los seek lean el mismo archivo.
+    if (
+      (upstream.status === 403 || upstream.status === 410) &&
+      isFirstChunk &&
+      resolved.fallbackUrl &&
+      !resolved.useFallback &&
+      markStreamFallback({ artist, title, duration })
+    ) {
+      resolved = { ...resolved, useFallback: true };
+      const fallbackSource = activeSource(resolved);
+      upstreamRange = upstreamRangeHeader(req.headers.get('range'), fallbackSource.contentLength) ?? upstreamRange;
+      upstream = await fetchAudio(fallbackSource.url, upstreamRange, userAgent);
     }
   } catch (err) {
     return jsonResponse({ success: false, error: `Audio no disponible: ${err.message}` }, 502);

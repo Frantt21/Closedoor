@@ -20,8 +20,11 @@ function formatTime(s) {
  *   resuelve con innertube y la sirve por HTTPS desde el mismo origen, con
  *   soporte de Range → el <audio> hace streaming progresivo y permite seek.
  *   Ya no hay blob local ni túneles: el navegador consume el stream directo.
- * - Si el stream no está disponible (p. ej. `vite dev` sin server.js, o YouTube
- *   pidió verificación), cae al preview de 30 s (iTunes / Deezer).
+ * - El resolver elige el formato de audio que quepa ENTERO en el tramo que
+ *   entrega YouTube (~1 MiB por URL): canciones cortas en 131 kbps y canciones
+ *   largas en el mejor bitrate que quepa (p. ej. 32 kbps) para que suenen
+ *   completas. Si ninguna cabría, o el stream falla, cae al preview de 30 s
+ *   (iTunes / Deezer).
  * - En el perfil propio permite buscar, elegir, cambiar y quitar la canción
  *   inline (sin abrir el modal de edición).
  */
@@ -47,6 +50,12 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
   const [duration, setDuration] = useState(songObj?.duration || 0);
   // true cuando el stream completo falló y hay que caer al preview de 30s
   const [usePreview, setUsePreview] = useState(false);
+  // Resultado de /api/music/resolve para la canción actual. `playable: false`
+  // significa que la pista NO cabe entera en el tramo que entrega YouTube
+  // (~1 MiB por URL): el navegador pide la continuación en paralelo al arrancar
+  // y ese 502 tumba el pipeline a los ~1,5 s, así que en ese caso se reproduce
+  // directo el preview de 30 s en vez de intentarlo.
+  const [streamInfo, setStreamInfo] = useState({ sig: '', playable: true });
   // ¿El backend de stream (innertube) está disponible? Se usa solo como gate del
   // pre-warm: si el endpoint no responde (p. ej. `vite dev` sin server.js), no se
   // pide una resolución que va a fallar. El src del <audio> NO depende de esto:
@@ -129,7 +138,15 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
   // sí lo descarga progresivo el <audio> y queda cacheado en el server.
   useEffect(() => {
     if (!selected || !streamHealth) return;
-    prewarmStream(selected);
+    let cancelled = false;
+    const sig = `${selected.provider}:${selected.trackId}`;
+    prewarmStream(selected).then((info) => {
+      if (cancelled || !info) return;
+      setStreamInfo({ sig, playable: info.playable !== false });
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [selected, streamHealth]);
 
   // Pausar al desmontar (el <audio> siempre está montado → el ref es estable).
@@ -143,11 +160,15 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
   // ── Fuente de reproducción ──
   // Stream completo same-origin servido por /api/music/stream (innertube). El
   // <audio> hace streaming progresivo y puede hacer seek (el backend reenvía el
-  // header Range). Si el backend no está o el stream falla → preview de 30 s.
+  // header Range). Si el backend no está, la canción no cabe entera en el tramo
+  // servible (`playable: false`) o el stream falla → preview de 30 s.
   // No se espera al health para fijar el src: si el endpoint no responde, el
-  // propio <audio> dispara onError y cae al preview (sin cambiar de URL a
-  // mitad de la reproducción).
-  const streamUrl = usePreview ? null : getStreamUrl(selected);
+  // propio <audio> dispara onError y cae al preview. Si el resolve confirma que
+  // la canción no cabe entera, el src cambia a mitad de la reproducción y
+  // resumeIfWanted lo reanuda.
+  const streamUnplayable =
+    !!selected && streamInfo.sig === selSig && streamInfo.playable === false;
+  const streamUrl = usePreview || streamUnplayable ? null : getStreamUrl(selected);
   const playbackSrc = streamUrl || effectivePreviewSrc;
 
   const ignorePlaybackError = (err) => {
@@ -155,6 +176,20 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
     // Es benigno (el preview nuevo se encargará) → no loguear.
     if (err?.name === 'AbortError') return;
     console.warn('[song] playback error:', err?.message || err);
+  };
+
+  // El src cambia solo (p. ej. el resolve confirma que la canción no cabe
+  // entera → pasamos de stream a preview): el <audio> se recarga, así que hay
+  // que reanudar si el usuario ya había pulsado play (event-driven, sin estado
+  // en efectos).
+  const resumeIfWanted = () => {
+    if (!wantsPlayRef.current) return;
+    requestAnimationFrame(() => {
+      const a = audioRef.current;
+      if (a && wantsPlayRef.current && a.paused) {
+        a.play().then(() => setPlaying(true)).catch(ignorePlaybackError);
+      }
+    });
   };
 
   // Perfil ajeno sin canción → no mostrar la card (después de los hooks)
@@ -433,6 +468,7 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
         ref={audioRef}
         src={playbackSrc || undefined}
         preload="none"
+        onLoadStart={resumeIfWanted}
         onTimeUpdate={(e) => {
           setCurrentTime(e.currentTarget.currentTime);
         }}

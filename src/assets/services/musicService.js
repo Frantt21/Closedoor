@@ -11,8 +11,9 @@
  *
  * Stream de la canción completa: lo resuelve el backend con la API innertube
  * (YouTube) y se sirve proxyado desde el mismo origen (/api/music/stream, ver
- * api/_innertube.js). Ya no depende de ningún server externo con yt-dlp: en dev
- * lo sirve server.js y en producción la función serverless de Vercel.
+ * api/_innertube.js). Ya no depende de ningún server externo con yt-dlp: en
+ * `npm run dev` lo sirve plugins/musicDevApiPlugin.js (misma lógica que
+ * producción), y en producción la función serverless de Vercel.
  *
  * Si la resolución falla (p. ej. YouTube pidió verificación), la card cae al
  * preview de 30 s.
@@ -99,20 +100,26 @@ export function getStreamUrl(song) {
  *
  * NO se pre-descarga el audio: descargas simultáneas desde la misma IP
  * disparan el rate-limit de googlevideo (throttling) y rompen los streams.
- * Fire-and-forget: nunca lanza errores al llamador.
+ *
+ * Devuelve el payload de /resolve (`{ contentLength, playable, degraded, … }`) o
+ * null si no se pudo resolver. `playable: false` = la pista no cabe entera en el
+ * tramo que entrega el CDN → la card reproduce directo el preview de 30 s. Nunca
+ * rechaza: el pre-warm no debe romper nada.
  */
 export function prewarmStream(song) {
-  if (!song?.title || !song?.artist) return;
+  if (!song?.title || !song?.artist) return Promise.resolve(null);
   const params = new URLSearchParams({ artist: song.artist, title: song.title });
   if (song.duration) params.set('duration', String(song.duration));
 
-  fetch(`${MUSIC_API}/resolve?${params.toString()}`, { signal: AbortSignal.timeout(20000) }).catch(() => {});
+  return fetch(`${MUSIC_API}/resolve?${params.toString()}`, { signal: AbortSignal.timeout(20000) })
+    .then((res) => (res.ok ? res.json() : null))
+    .catch(() => null);
 }
 
 // ── Health del stream (cache en memoria, TTL 5 min) ──
 // Sirve para saber si el backend de innertube está disponible: si no lo está
-// (p. ej. `vite dev` sin server.js), la card reproduce directo el preview de
-// 30 s en vez de intentar un stream que va a fallar.
+// (p. ej. un entorno sin las rutas de música), la card reproduce directo el
+// preview de 30 s en vez de intentar un stream que va a fallar.
 let streamHealthCache = { at: 0, data: null };
 const STREAM_HEALTH_TTL = 5 * 60 * 1000;
 
