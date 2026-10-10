@@ -8,6 +8,9 @@
  *
  * Uso: node scripts/test-innertube-resolver.mjs
  * Sale con código 1 si falla algún check.
+ *
+ * Los bloques 15-16 simulan una red donde YouTube NO responde (fetch colgado) y
+ * tardan ~15 s en total; el resto es instantáneo.
  */
 import {
   resolveTrackAudio,
@@ -23,6 +26,7 @@ import {
   pickMuxedFormat,
   markStreamFallback,
   activeStreamSource,
+  isResolveTimeout,
   MAX_UPSTREAM_RANGE_BYTES,
 } from '../api/_innertube.js';
 
@@ -280,6 +284,107 @@ check('ninguna llamada a innertube/search', !calls.some((c) => c.target.includes
 // ── 14. Health info ──
 const info = getInnertubeInfo();
 check('health informa provider y clientes', info.provider === 'innertube' && info.clients.length === 3, JSON.stringify(info.clients));
+
+// ── 15. Presupuesto de tiempo ──
+// En serverless la resolución corre dentro del reloj de la función: sin
+// presupuesto, una IP donde YouTube no responde acaba en el 504 opaco de la
+// plataforma tras ~60 s (y el usuario sólo ve el preview al final). Con
+// presupuesto se corta antes y el error es legible (los handlers lo mapean a 504).
+{
+  clearInnertubeCaches();
+  // Los timers de AbortSignal.timeout están "unref" en Node: sin trabajo pendiente
+  // el proceso saldría antes de que el presupuesto aborte. Este intervalo mantiene
+  // vivo el bucle mientras duran las dos subpruebas.
+  const keepAlive = setInterval(() => {}, 250);
+  const hangingFetch = (url, options = {}) =>
+    new Promise((_, reject) => {
+      const signal = options.signal;
+      if (!signal) return; // cuelga indefinidamente (para el test basta)
+      if (signal.aborted) return reject(signal.reason);
+      signal.addEventListener('abort', () => reject(signal.reason));
+    });
+
+  // (a) Todo cuelga (búsqueda incluida)
+  globalThis.fetch = hangingFetch;
+  const startedAll = Date.now();
+  let errAll = null;
+  try {
+    await resolveTrackAudio(
+      { artist: 'Nadie', title: 'Colgada Presupuesto Test', duration: 180 },
+      { budgetMs: 1500 }
+    );
+  } catch (err) {
+    errAll = err.message;
+  }
+  const elapsedAll = Date.now() - startedAll;
+  check('presupuesto: todo colgado → error de timeout legible', /a tiempo \(timeout\)/.test(errAll || ''), errAll);
+  check('presupuesto: reconocible como timeout (504 en el handler)', isResolveTimeout({ message: errAll }) === true);
+  check('presupuesto: se rinde con el presupuesto, no a los 60 s', elapsedAll < 4_000, `${elapsedAll} ms`);
+
+  // (b) La búsqueda responde y el player cuelga: la cadena de clientes se corta
+  let playerTries = 0;
+  globalThis.fetch = (url, options = {}) => {
+    const target = String(url);
+    if (target.includes('/player')) playerTries++;
+    return target.includes('/results?')
+      ? Promise.resolve({ ok: true, status: 200, text: async () => SEARCH_HTML })
+      : hangingFetch(url, options);
+  };
+  const startedPlayer = Date.now();
+  let errPlayer = null;
+  try {
+    // Presupuesto suficiente para ARRANCAR el primer cliente (el mínimo son
+    // 2,5 s) y ver que el propio paso se aborta al agotarse, en vez de esperar
+    // los 7 s del timeout por paso.
+    await resolveTrackAudio(
+      { artist: 'Rick Astley', title: 'Never Gonna Give You Up', duration: 213 },
+      { budgetMs: 4000, fresh: true }
+    );
+  } catch (err) {
+    errPlayer = err.message;
+  }
+  const elapsedPlayer = Date.now() - startedPlayer;
+  check('presupuesto: player colgado → mismo error de timeout', /a tiempo \(timeout\)/.test(errPlayer || ''), errPlayer);
+  check('presupuesto: se intenta UN cliente y NO los 3', playerTries === 1, `${playerTries} intentos`);
+  check('presupuesto: el paso se aborta al agotarse, no a los 7 s', elapsedPlayer >= 3_000 && elapsedPlayer < 6_000, `${elapsedPlayer} ms`);
+
+  clearInterval(keepAlive);
+}
+
+// ── 16. Los HANDLERS responden su propio 504 (no el de la plataforma) ──
+// En producción el fallo se veía como un 504 "de Vercel" tras ~60 s (y el usuario
+// sólo recibía el preview al final). Con presupuesto, el handler contesta él mismo
+// un 504 legible en segundos: mismo fallback en el cliente, pero rápido y con
+// motivo. Se llaman los handlers REALES (no un mock) con un fetch colgado.
+{
+  const keepAlive = setInterval(() => {}, 250);
+  globalThis.fetch = (url, options = {}) =>
+    new Promise((_, reject) => {
+      const signal = options.signal;
+      if (signal?.aborted) return reject(signal.reason);
+      signal?.addEventListener('abort', () => reject(signal.reason));
+    });
+
+  const { default: streamHandler } = await import('../api/music/stream.js');
+  const { default: resolveHandler } = await import('../api/music/resolve.js');
+  const query = 'artist=Nadie&title=Colgada%20Handlers%20Test&duration=180';
+
+  for (const [name, handler] of [['stream', streamHandler], ['resolve', resolveHandler]]) {
+    const started = Date.now();
+    const res = await handler(
+      new Request(`https://app.foranly.space/api/music/${name}?${query}`, {
+        headers: { range: 'bytes=0-' },
+      })
+    );
+    const body = await res.text();
+    const elapsed = Date.now() - started;
+    check(`${name}: 504 propio (no el opaco de la plataforma)`, res.status === 504, `status=${res.status}`);
+    check(`${name}: responde en segundos, no en ~60 s`, elapsed < 15_000, `${elapsed} ms`);
+    check(`${name}: explica el motivo`, /a tiempo \(timeout\)/.test(body), body.slice(0, 90));
+  }
+
+  clearInterval(keepAlive);
+}
 
 globalThis.fetch = realFetch;
 console.log(failures === 0 ? '\nTODO OK' : `\nFALLARON ${failures}`);

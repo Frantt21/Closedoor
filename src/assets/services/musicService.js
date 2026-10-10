@@ -105,6 +105,12 @@ export function getStreamUrl(song) {
  * null si no se pudo resolver. `playable: false` = la pista no cabe entera en el
  * tramo que entrega el CDN → la card reproduce directo el preview de 30 s. Nunca
  * rechaza: el pre-warm no debe romper nada.
+ *
+ * NO se puerta detrás de /health: en producción la primera llamada a una función
+ * serverless puede tardar (instancia fría) y con el gate el pre-warm se saltaba
+ * justo cuando más falta hace (la primera reproducción), dejando que el stream
+ * pagara la resolución completa dentro de su propio tiempo de función. El
+ * endpoint /api/music/health sigue existiendo para diagnóstico.
  */
 export function prewarmStream(song) {
   if (!song?.title || !song?.artist) return Promise.resolve(null);
@@ -114,29 +120,6 @@ export function prewarmStream(song) {
   return fetch(`${MUSIC_API}/resolve?${params.toString()}`, { signal: AbortSignal.timeout(20000) })
     .then((res) => (res.ok ? res.json() : null))
     .catch(() => null);
-}
-
-// ── Health del stream (cache en memoria, TTL 5 min) ──
-// Sirve para saber si el backend de innertube está disponible: si no lo está
-// (p. ej. un entorno sin las rutas de música), la card reproduce directo el
-// preview de 30 s en vez de intentar un stream que va a fallar.
-let streamHealthCache = { at: 0, data: null };
-const STREAM_HEALTH_TTL = 5 * 60 * 1000;
-
-export async function getStreamHealth() {
-  if (streamHealthCache.data && Date.now() - streamHealthCache.at < STREAM_HEALTH_TTL) {
-    return streamHealthCache.data;
-  }
-  try {
-    const res = await fetch(`${MUSIC_API}/health`, { signal: AbortSignal.timeout(4000) });
-    const data = await res.json().catch(() => null);
-    streamHealthCache = { at: Date.now(), data: data?.ok ? data : null };
-    return streamHealthCache.data;
-  } catch (err) {
-    console.warn('[music] stream health check failed:', err?.message || err);
-    streamHealthCache = { at: Date.now(), data: null };
-    return null;
-  }
 }
 
 /**

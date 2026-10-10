@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { FaMusic, FaPlay, FaPause, FaPencilAlt, FaTrash, FaSearch, FaSpinner } from 'react-icons/fa';
 import { useI18n } from '../../services/i18n/useI18n';
 import { useAuth } from '../../../hooks/useAuth';
-import { searchMusic, resolvePreviewUrl, getStreamUrl, getStreamHealth, prewarmStream } from '../../services/musicService';
+import { searchMusic, resolvePreviewUrl, getStreamUrl, prewarmStream } from '../../services/musicService';
 import { updateUserProfile } from '../../services/userService';
 import { toast } from 'react-toastify';
 import './css/songCard.css';
@@ -56,11 +56,13 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
   // y ese 502 tumba el pipeline a los ~1,5 s, así que en ese caso se reproduce
   // directo el preview de 30 s en vez de intentarlo.
   const [streamInfo, setStreamInfo] = useState({ sig: '', playable: true });
-  // ¿El backend de stream (innertube) está disponible? Se usa solo como gate del
-  // pre-warm: si el endpoint no responde (p. ej. `vite dev` sin server.js), no se
-  // pide una resolución que va a fallar. El src del <audio> NO depende de esto:
-  // si el stream falla, el propio <audio> dispara onError y cae al preview.
-  const [streamHealth, setStreamHealth] = useState(null);
+  // Intento de stream en curso (0 = primero). Al fallar se reintenta UNA vez con
+  // otro valor: el backend ignora el parámetro, solo sirve para forzar al <audio>
+  // a recargar la misma URL (en serverless el primer intento puede expirar en una
+  // instancia fría y el segundo encontrar la instancia caliente y la resolución
+  // ya cacheada).
+  const [streamAttempt, setStreamAttempt] = useState(0);
+  const streamRetriedRef = useRef(false);
   // true mientras el <audio> está resolviendo el stream (spinner en la portada)
   const [loadingStream, setLoadingStream] = useState(false);
   const wantsPlayRef = useRef(false); // el usuario pulsó play → autoplay al estar listo
@@ -82,6 +84,8 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
     setDuration(songObj?.duration || 0);
     setUsePreview(false);
     setLoadingStream(false);
+    setStreamAttempt(0);
+    streamRetriedRef.current = false;
     const audio = audioRef.current;
     if (audio) {
       audio.pause();
@@ -120,24 +124,13 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected]);
 
-  // Health del server de stream (una vez; getStreamHealth cachea 5 min)
+  // Pre-warm: cuando la card monta con una canción se anticipa la resolución en
+  // background (buscar el videoId en YouTube + traer el formato de audio, ~1-2 s)
+  // SIN esperar a ningún health check: en producción esa espera (instancia fría)
+  // dejaba la resolución para dentro del propio stream. El audio en sí lo
+  // descarga progresivo el <audio> y queda cacheado en el server.
   useEffect(() => {
-    let cancelled = false;
-    getStreamHealth().then((h) => {
-      if (cancelled) return;
-      setStreamHealth(h);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  // Pre-warm: cuando la card monta con una canción y el backend responde, se
-  // anticipa la resolución en background (buscar el videoId en YouTube + traer
-  // el formato de audio, ~1-2 s). Así el play arranca al instante: el audio en
-  // sí lo descarga progresivo el <audio> y queda cacheado en el server.
-  useEffect(() => {
-    if (!selected || !streamHealth) return;
+    if (!selected) return;
     let cancelled = false;
     const sig = `${selected.provider}:${selected.trackId}`;
     prewarmStream(selected).then((info) => {
@@ -147,7 +140,7 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
     return () => {
       cancelled = true;
     };
-  }, [selected, streamHealth]);
+  }, [selected]);
 
   // Pausar al desmontar (el <audio> siempre está montado → el ref es estable).
   useEffect(() => {
@@ -168,7 +161,11 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
   // resumeIfWanted lo reanuda.
   const streamUnplayable =
     !!selected && streamInfo.sig === selSig && streamInfo.playable === false;
-  const streamUrl = usePreview || streamUnplayable ? null : getStreamUrl(selected);
+  const baseStreamUrl = usePreview || streamUnplayable ? null : getStreamUrl(selected);
+  // `&r=N` solo en los reintentos: fuerza al <audio> a recargar la MISMA url (el
+  // backend ignora el parámetro).
+  const streamUrl =
+    baseStreamUrl && streamAttempt > 0 ? `${baseStreamUrl}&r=${streamAttempt}` : baseStreamUrl;
   const playbackSrc = streamUrl || effectivePreviewSrc;
 
   const ignorePlaybackError = (err) => {
@@ -482,10 +479,18 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
         onError={() => {
           // Si ya está en preview, no hay más fallbacks
           if (usePreview) return;
+          setLoadingStream(false);
+          // Reintento único antes de rendirse: un 504/502 de la primera petición
+          // (instancia fría o resolución lenta) no significa que la canción no
+          // se pueda servir; el segundo intento suele entrar.
+          if (streamUrl && !streamRetriedRef.current) {
+            streamRetriedRef.current = true;
+            setStreamAttempt((n) => n + 1);
+            return;
+          }
           // El stream completo no cargó (sin backend, rate limit de YouTube o
           // red) → caer al preview de 30 s y seguir reproduciendo si el usuario
           // ya había pulsado play.
-          setLoadingStream(false);
           if (streamUrl) {
             setUsePreview(true);
             requestAnimationFrame(() => {

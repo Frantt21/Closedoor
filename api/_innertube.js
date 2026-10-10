@@ -95,7 +95,35 @@ const SEARCH_RESULTS_URL = 'https://www.youtube.com/results';
 // devuelve un HTML recortado donde no siempre está ytInitialData).
 const BROWSER_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
-const REQUEST_TIMEOUT_MS = 12_000;
+// Timeout por paso contra YouTube. En serverless (Vercel) esto lo paga el reloj
+// de la función: un paso que no contesta razonablemente rápido está muerto, y
+// esperar 12 s sólo sirve para reventar el límite de la plataforma (504).
+const REQUEST_TIMEOUT_MS = 7_000;
+
+// Presupuesto TOTAL de una resolución (búsqueda + cadena de clientes). Con esto
+// el handler decide él mismo cuándo rendirse (y responde un error legible) en
+// lugar de que la plataforma lo mate con un 504 a los 60 s.
+const RESOLVE_BUDGET_MS = 25_000;
+// Mensaje único del timeout: los handlers lo usan para responder 504 en vez de
+// 502 (ver isResolveTimeout).
+const RESOLVE_TIMEOUT_MESSAGE = 'no se pudo resolver el audio a tiempo (timeout)';
+// Margen mínimo para intentar otro cliente: por debajo de esto no se arranca uno
+// nuevo (es mejor devolver lo que ya se tenga).
+const MIN_CLIENT_BUDGET_MS = 2_500;
+
+/**
+ * Control de tiempo para una operación con presupuesto.
+ * @param {number} budgetMs Milisegundos disponibles.
+ */
+function deadlineGuard(budgetMs) {
+  const deadline = Date.now() + Math.max(1_000, budgetMs);
+  return {
+    remaining: () => deadline - Date.now(),
+    expired: () => Date.now() >= deadline,
+    // Timeout para el siguiente paso: nunca más que lo que queda de presupuesto.
+    timeoutFor: (max) => Math.max(1_000, Math.min(max, deadline - Date.now())),
+  };
+}
 
 // TTL de la caché de resolución. Las URLs de googlevideo viven ~6 h; se guarda
 // 2 h para no servir nunca una URL vencida en una sesión larga.
@@ -371,7 +399,7 @@ function serialize(fn) {
   return run;
 }
 
-async function innertubeRequest(endpoint, body, apiClient) {
+async function innertubeRequest(endpoint, body, apiClient, timeoutMs = REQUEST_TIMEOUT_MS) {
   const url = `${INNERTUBE_BASE}/${endpoint}?key=${apiClient.key}&prettyPrint=false`;
 
   const res = await serialize(() =>
@@ -384,7 +412,7 @@ async function innertubeRequest(endpoint, body, apiClient) {
         'X-Goog-Api-Format-Version': '2',
       },
       body: JSON.stringify({ context: { client: apiClient.client }, ...body }),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     })
   );
   if (!res.ok) throw new Error(`${apiClient.name} HTTP ${res.status}`);
@@ -437,7 +465,7 @@ function collectVideoRenderers(node, out, seen) {
  * Búsqueda por la página de resultados (ytInitialData).
  * Devuelve candidatos normalizados { videoId, title, channel, durationSec }.
  */
-async function searchViaResultsPage(query, limit) {
+async function searchViaResultsPage(query, limit, timeoutMs = REQUEST_TIMEOUT_MS) {
   const url =
     `${SEARCH_RESULTS_URL}?search_query=${encodeURIComponent(query)}&hl=en&gl=US`;
   const res = await serialize(() =>
@@ -446,7 +474,7 @@ async function searchViaResultsPage(query, limit) {
         'User-Agent': BROWSER_UA,
         'Accept-Language': 'en-US,en;q=0.9',
       },
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     })
   );
   if (!res.ok) throw new Error(`search HTTP ${res.status}`);
@@ -465,7 +493,7 @@ async function searchViaResultsPage(query, limit) {
  * ⚠️ Usa la página /results y NO youtubei/v1/search: el search de innertube
  * deja marcada la sesión y el player siguiente responde LOGIN_REQUIRED.
  */
-export async function searchTracks(query, { limit = 10, fresh = false } = {}) {
+export async function searchTracks(query, { limit = 10, fresh = false, timeoutMs = REQUEST_TIMEOUT_MS } = {}) {
   const q = String(query || '').trim();
   if (!q) return [];
 
@@ -475,7 +503,7 @@ export async function searchTracks(query, { limit = 10, fresh = false } = {}) {
     if (cached) return cached;
   }
 
-  const results = await searchViaResultsPage(q, limit);
+  const results = await searchViaResultsPage(q, limit, timeoutMs);
   if (results.length > 0) cacheSet(searchCache, cacheKey, results);
   return results;
 }
@@ -492,22 +520,36 @@ export async function searchTracks(query, { limit = 10, fresh = false } = {}) {
  * servible → la card debe usar el preview de 30 s, y `degraded: true` que se
  * bajó de calidad para que la canción sí quepa completa.
  */
-export async function resolveVideoAudio(videoId) {
+export async function resolveVideoAudio(videoId, { budgetMs = 0 } = {}) {
   if (!videoId) throw new Error('resolveVideoAudio: falta videoId');
 
+  // Presupuesto opcional: sin él se comporta como antes (un intento por
+  // cliente); con él, la cadena se corta cuando se agota para no reventar el
+  // reloj de la función serverless que la llamó.
+  const guard = budgetMs > 0 ? deadlineGuard(budgetMs) : null;
   const failures = [];
+  // true si la cadena se cortó por presupuesto (no por fallos de YouTube).
+  let budgetCut = false;
   // Primera resolución utilizable aunque la pista NO quepa entera: se devuelve
   // sólo si ningún cliente ofrece un formato que sí quepa (playable:false → la
   // card reproduce el preview de 30 s en vez de un stream condenado).
   let tooBig = null;
 
   for (const apiClient of CLIENTS) {
+    // Sin presupuesto suficiente no se arranca otro cliente: es preferible
+    // devolver lo que ya se tenga (tooBig) o fallar rápido.
+    if (guard && (guard.expired() || guard.remaining() < MIN_CLIENT_BUDGET_MS)) {
+      budgetCut = true;
+      break;
+    }
+
     let json;
     try {
       json = await innertubeRequest(
         'player',
         { videoId, contentCheckOk: true, racyCheckOk: true },
-        apiClient
+        apiClient,
+        guard ? guard.timeoutFor(REQUEST_TIMEOUT_MS) : REQUEST_TIMEOUT_MS
       );
     } catch (err) {
       failures.push(`${apiClient.name}: ${err.message}`);
@@ -568,6 +610,10 @@ export async function resolveVideoAudio(videoId) {
   }
 
   if (tooBig) return tooBig;
+  // Se agotó el presupuesto (o no quedaba margen para otro cliente) y no hay
+  // nada utilizable: el error honesto es el timeout, no "todos los clientes
+  // fallaron".
+  if (guard?.expired() || budgetCut) throw new Error(RESOLVE_TIMEOUT_MESSAGE);
   throw new Error(`no se pudo resolver el audio (${failures.join(' | ')})`);
 }
 
@@ -622,6 +668,14 @@ export function activeStreamSource(resolved) {
   return { url: resolved?.url, contentLength: resolved?.contentLength || 0 };
 }
 
+/**
+ * ¿El error de una resolución es un agotamiento del presupuesto de tiempo?
+ * (para que los handlers respondan 504 en vez de 502).
+ */
+export function isResolveTimeout(err) {
+  return /a tiempo \(timeout\)/.test(err?.message || '');
+}
+
 export function markStreamFallback(track) {
   const hit = streamCache.get(trackKey(track));
   if (!hit?.value?.fallbackUrl) return false;
@@ -638,9 +692,9 @@ function trackKey({ artist = '', title = '', duration = 0 }) {
  * Cachea el resultado (la resolución es lo caro y las URLs duran horas).
  *
  * @param {{ artist?: string, title: string, duration?: number, videoId?: string }} track
- * @param {{ fresh?: boolean }} [options]
+ * @param {{ fresh?: boolean, budgetMs?: number }} [options]
  */
-export async function resolveTrackAudio(track, { fresh = false } = {}) {
+export async function resolveTrackAudio(track, { fresh = false, budgetMs = RESOLVE_BUDGET_MS } = {}) {
   const title = String(track?.title || '').trim();
   if (!title) throw new Error('resolveTrackAudio: falta title');
 
@@ -650,16 +704,36 @@ export async function resolveTrackAudio(track, { fresh = false } = {}) {
     if (cached) return { ...cached, cached: true };
   }
 
+  // Todo el trabajo (búsqueda + cadena de clientes) comparte un presupuesto: el
+  // handler serverless prefiere responder un 504 suyo y legible antes que morir
+  // con el 504 de la plataforma tras 60 s de espera (el usuario ve el preview
+  // en ambos casos, pero aquí en segundos y con un motivo en el cuerpo).
+  const guard = deadlineGuard(budgetMs);
+
   let videoId = track?.videoId || null;
   if (!videoId) {
     const query = [track.artist, title].filter(Boolean).join(' ');
-    const candidates = await searchTracks(query, { limit: 10, fresh });
+    let candidates;
+    try {
+      candidates = await searchTracks(query, {
+        limit: 10,
+        fresh,
+        timeoutMs: guard.timeoutFor(REQUEST_TIMEOUT_MS),
+      });
+    } catch (err) {
+      // Un paso abortado por el presupuesto sale como timeout legible (504 en el
+      // handler) en lugar del error crudo de undici ("operation was aborted").
+      const aborted = err?.name === 'TimeoutError' || err?.name === 'AbortError';
+      if (aborted || guard.expired()) throw new Error(RESOLVE_TIMEOUT_MESSAGE, { cause: err });
+      throw err;
+    }
+    if (guard.expired()) throw new Error(RESOLVE_TIMEOUT_MESSAGE);
     const best = pickBestCandidate(candidates, track);
     if (!best) throw new Error('no se encontró una coincidencia razonable en YouTube');
     videoId = best.videoId;
   }
 
-  const resolved = await resolveVideoAudio(videoId);
+  const resolved = await resolveVideoAudio(videoId, { budgetMs: guard.remaining() });
   const value = {
     ...resolved,
     // Cuándo se resolvió: permite distinguir "URL caducada" de "el CDN no da

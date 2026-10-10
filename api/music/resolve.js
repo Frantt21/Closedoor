@@ -14,7 +14,7 @@
  * Uso: GET /api/music/resolve?artist=...&title=...&duration=...
  */
 
-import { resolveTrackAudio } from '../_innertube.js';
+import { resolveTrackAudio, isResolveTimeout } from '../_innertube.js';
 
 export const config = {
   runtime: 'nodejs',
@@ -68,7 +68,7 @@ export default async function handler(req) {
   } catch (err) {
     const notFound = /coincidencia razonable/.test(err.message || '');
     return new Response(JSON.stringify({ success: false, error: err.message }), {
-      status: notFound ? 404 : 502,
+      status: notFound ? 404 : isResolveTimeout(err) ? 504 : 502,
       headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
     });
   }

@@ -28,6 +28,7 @@ import {
   upstreamRangeHeader,
   urlMayBeExpired,
   markStreamFallback,
+  isResolveTimeout,
   activeStreamSource,
 } from './api/_innertube.js';
 
@@ -557,7 +558,8 @@ async function proxyInnertubeAudio(req, res, track, { fresh = false } = {}) {
     resolved = await resolveTrackAudio(track, { fresh });
   } catch (err) {
     const notFound = /coincidencia razonable/.test(err.message || '');
-    res.status(notFound ? 404 : 502).json({ success: false, error: err.message });
+    // Mismo mapeo que la función serverless: presupuesto agotado → 504.
+    res.status(notFound ? 404 : isResolveTimeout(err) ? 504 : 502).json({ success: false, error: err.message });
     return;
   }
 
@@ -600,7 +602,7 @@ async function proxyInnertubeAudio(req, res, track, { fresh = false } = {}) {
       upstream = await fetch(fallback.url, { headers: { Range: upstreamRange } });
     }
   } catch (err) {
-    res.status(502).json({ success: false, error: `Audio no disponible: ${err.message}` });
+    res.status(isResolveTimeout(err) ? 504 : 502).json({ success: false, error: `Audio no disponible: ${err.message}` });
     return;
   }
 
@@ -669,7 +671,7 @@ app.get('/api/music/resolve', async (req, res) => {
     });
   } catch (err) {
     const notFound = /coincidencia razonable/.test(err.message || '');
-    res.status(notFound ? 404 : 502).json({ success: false, error: err.message });
+    res.status(notFound ? 404 : isResolveTimeout(err) ? 504 : 502).json({ success: false, error: err.message });
   }
 });
 

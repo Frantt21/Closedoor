@@ -28,6 +28,7 @@ import {
   upstreamRangeHeader,
   urlMayBeExpired,
   markStreamFallback,
+  isResolveTimeout,
   activeStreamSource as activeSource,
 } from '../_innertube.js';
 
@@ -48,7 +49,17 @@ const CORS_HEADERS = {
   'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges',
 };
 
-const AUDIO_TIMEOUT_MS = 20_000;
+// Cada bloque es ≤1 MiB: en 12 s o llega o esa URL no sirve. Con dos intentos
+// posibles, un CDN colgado consume 24 s como máximo (y el total sigue por
+// debajo del tope de la función: ver maxDuration).
+const AUDIO_TIMEOUT_MS = 12_000;
+
+// Presupuestos de resolución DENTRO de esta función. La suma del peor caso tiene
+// que caber en maxDuration (60 s): primera resolución + intento de audio +
+// re-resolución (URL caducada) + intento = 20 + 12 + 12 + 12 = 56 s. El default
+// del resolver (25 s) se reserva para /resolve (pre-warm, cuyo tope son 30 s).
+const RESOLVE_BUDGET_FIRST_MS = 20_000;
+const RESOLVE_BUDGET_RETRY_MS = 12_000;
 
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -96,12 +107,18 @@ export default async function handler(req) {
   // ── Resolver (con caché en memoria del proceso) ──
   let resolved;
   try {
-    resolved = await resolveTrackAudio({ artist, title, duration, videoId });
+    resolved = await resolveTrackAudio(
+      { artist, title, duration, videoId },
+      { budgetMs: RESOLVE_BUDGET_FIRST_MS }
+    );
   } catch (err) {
     const notFound = /coincidencia razonable/.test(err.message || '');
+    // 504 propio y rápido en vez de esperar a que la plataforma corte la
+    // función (que devolvía el 504 opaco tras 60 s).
+    const status = notFound ? 404 : isResolveTimeout(err) ? 504 : 502;
     return jsonResponse(
       { success: false, error: err.message || 'No se pudo resolver el stream' },
-      notFound ? 404 : 502
+      status
     );
   }
 
@@ -122,7 +139,10 @@ export default async function handler(req) {
     // repetir. Un 403 en el primer bloque de una URL recién resuelta NO es
     // caducidad (es el allowance del CDN por URL: ver _innertube.js).
     if ((upstream.status === 403 || upstream.status === 410) && isFirstChunk && urlMayBeExpired(resolved)) {
-      resolved = await resolveTrackAudio({ artist, title, duration, videoId }, { fresh: true });
+      resolved = await resolveTrackAudio(
+        { artist, title, duration, videoId },
+        { fresh: true, budgetMs: RESOLVE_BUDGET_RETRY_MS }
+      );
       const retrySource = activeSource(resolved);
       upstreamRange = upstreamRangeHeader(req.headers.get('range'), retrySource.contentLength) ?? upstreamRange;
       upstream = await fetchAudio(retrySource.url, upstreamRange, userAgent);
@@ -144,7 +164,10 @@ export default async function handler(req) {
       upstream = await fetchAudio(fallbackSource.url, upstreamRange, userAgent);
     }
   } catch (err) {
-    return jsonResponse({ success: false, error: `Audio no disponible: ${err.message}` }, 502);
+    return jsonResponse(
+      { success: false, error: `Audio no disponible: ${err.message}` },
+      isResolveTimeout(err) ? 504 : 502
+    );
   }
 
   if (!upstream.ok && upstream.status !== 206) {
