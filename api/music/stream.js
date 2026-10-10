@@ -40,15 +40,11 @@ import {
   activeStreamSource as activeSource,
 } from '../_innertube.js';
 
-export const config = {
-  runtime: 'nodejs',
-  supportsResponseStreaming: true,
-  // Tope del reloj de la función. Cada petición sirve como máximo un bloque de
-  // 1 MiB (ver upstreamRangeHeader), así que el tiempo de la función no depende
-  // de la duración de la canción: el <audio> pide el resto en peticiones
-  // sucesivas y cada una arranca su propio reloj.
-  maxDuration: 60,
-};
+// SIN `export const config` (ver api/music/health.js): era la única familia de
+// funciones que lo declaraba y las tres colgaban en producción. El tope del
+// reloj —cada petición sirve como máximo un bloque de 1 MiB (ver
+// upstreamRangeHeader), así que no depende de la duración de la canción— vive en
+// vercel.json (`functions["api/music/stream.js"].maxDuration = 60`).
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',

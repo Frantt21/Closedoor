@@ -437,6 +437,22 @@ check('health informa provider y clientes', info.provider === 'innertube' && inf
   check('health: sigue informando el resolver', body.ok === true && body.stream === 'innertube' && Array.isArray(body.clients));
 }
 
+// ── 19. Sondas de despliegue (temporales) ──
+// Aislan por qué api/music/* colgaba en produccion: subcarpeta vs `config`.
+// Se invocan aquí para que un cambio que las rompa se vea antes de desplegar.
+{
+  const probes = [
+    ['anidada sin config', '../api/music/diag-nested.js', 'nested-no-config'],
+    ['plana con config', '../api/diag-flat.js', 'flat-with-config'],
+  ];
+  for (const [name, path, expected] of probes) {
+    const { default: handler } = await import(path);
+    const res = await handler(new Request('https://app.foranly.space/api/diag'));
+    const body = await res.json();
+    check(`sonda ${name}: responde JSON 200`, res.status === 200 && body.probe === expected, `status=${res.status} probe=${body.probe}`);
+  }
+}
+
 globalThis.fetch = realFetch;
 console.log(failures === 0 ? '\nTODO OK' : `\nFALLARON ${failures}`);
 process.exit(failures === 0 ? 0 : 1);

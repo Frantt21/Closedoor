@@ -12,14 +12,16 @@
  * arrancar un stream que moriría a los ~1,5 s con 502.
  *
  * Uso: GET /api/music/resolve?artist=...&title=...&duration=...
+ *
+ * El pre-warm de la card va a /api/music/stream?prewarm=1 (misma instancia que el
+ * audio); este endpoint se mantiene para diagnóstico y compatibilidad.
  */
 
 import { resolveTrackAudio, isResolveTimeout } from '../_innertube.js';
 
-export const config = {
-  runtime: 'nodejs',
-  maxDuration: 30,
-};
+// SIN `export const config` (ver api/music/health.js): era la única familia de
+// funciones que lo declaraba y las tres colgaban en producción. El tope de 30 s
+// vive en vercel.json (`functions["api/music/resolve.js"].maxDuration`).
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
