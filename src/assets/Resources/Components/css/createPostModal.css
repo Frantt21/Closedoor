@@ -672,6 +672,19 @@
     font-style: italic;
 }
 
+/* Markdown en la vista previa: compensa el pre-wrap del contenedor */
+.create-post-live-preview-markdown {
+    word-break: break-word;
+}
+
+/* ── Separador del grupo de formato markdown en la toolbar ── */
+.create-post-toolbar-divider {
+    align-self: stretch;
+    width: 1px;
+    margin: 4px 2px;
+    background: var(--color-border, #2a2a2a);
+}
+
 .create-post-live-preview-actions {
     display: flex;
     gap: 6px;

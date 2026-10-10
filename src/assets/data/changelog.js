@@ -22,6 +22,16 @@ export const CHANGELOG_SEEN_KEY = 'fc_changelog_seen';
 
 export const RELEASES = [
   {
+    id: '2026-10-10',
+    date: '2026-10-10',
+    title: 'Markdown in posts',
+    items: [
+      'Posts now support markdown: bold, italic, strikethrough, inline code, lists, quotes, headings, tables and code blocks.',
+      'A new formatting group in the composer toolbar inserts the syntax for you.',
+      'Mentions and hashtags keep working inside formatted text.',
+    ],
+  },
+  {
     id: '2026-08-24+2',
     date: '2026-08-24',
     title: 'Enhanced images, invitations, and statuses',

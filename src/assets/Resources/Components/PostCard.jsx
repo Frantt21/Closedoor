@@ -29,7 +29,8 @@ import Badge from './Badge';
 import SafeImage from './SafeImage';
 import { getCdnThumbUrl } from '../../services/cdnService';
 import Avatar from './Avatar';
-import RichText from './RichText';
+import PostMarkdown from './PostMarkdown';
+import { closeUnbalancedMarkers } from '../../services/postMarkdown';
 import LinkPreview from './LinkPreview';
 import { useI18n } from '../../services/i18n/useI18n';
 import { DEFAULT_AVATAR, getTimeAgo, getEmbedUrl as getEmbedUrlHelper, isVideoUrl as isVideoUrlHelper, IMG_RE, VID_RE, VID_RE_EXTENDED, getImageStyle, sanitizeUrl } from '../../services/helpers';import { decode as encryptDecode,
@@ -962,8 +963,8 @@ const PostCard = React.memo(function PostCard({
 
           {/* (badge moved inside header above) */}
 
-          {/* Text content with @mention highlighting (truncated to TRUNCATE_LENGTH at word boundary) */}
-          <p className="post-card-text">
+          {/* Text content: markdown GFM + @menciones/#hashtags (truncado a TRUNCATE_LENGTH en borde de palabra) */}
+          <div className="post-card-text">
             {showEncryptedLoading ? (
               <span className="post-card-encrypted-loading">{t('common.loading') || 'Descifrando...'}</span>
             ) : showEncryptedLabel ? (
@@ -976,13 +977,14 @@ const PostCard = React.memo(function PostCard({
               const truncateAt = shouldTruncate
                 ? text.lastIndexOf(' ', TRUNCATE_LENGTH) || TRUNCATE_LENGTH
                 : text.length;
-              const displayed = shouldTruncate ? text.slice(0, truncateAt) + '...' : text;
+              const displayed = shouldTruncate
+                ? closeUnbalancedMarkers(`${text.slice(0, truncateAt)}...`)
+                : text;
               return (
                 <>
-                  <RichText
+                  <PostMarkdown
                     text={displayed}
                     skipUrls={getSkipUrls(post)}
-                    mentions={post.mentions}
                     onExternalLink={handleExternalLink}
                   />
                   {shouldTruncate && (
@@ -999,7 +1001,7 @@ const PostCard = React.memo(function PostCard({
                 </>
               );
             })()}
-          </p>
+          </div>
 
           {/* ── Link preview (OG card) para URLs no-media visibles en el contenido ── */}
           {!showEncryptedLoading && !showEncryptedLabel && (() => {

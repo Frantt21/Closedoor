@@ -5,13 +5,15 @@ import { createPost, updatePost, notifyMentions, notifyEncryptedAdd, extractMent
 import { searchProfiles } from '../../services/userService';
 import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../services/i18n/useI18n';
-import { FaImage, FaTimes, FaPlus, FaMinus, FaLink, FaLock, FaUnlock, FaUserPlus, FaCheck, FaSearch, FaRegHeart, FaHeartBroken, FaComment, FaRetweet, FaEye, FaPoll, FaCalendarAlt, FaClock, FaGlobe, FaUserFriends, FaBan, FaExclamationTriangle, FaBookmark, FaRegBookmark, FaUpload, FaSpinner } from 'react-icons/fa';
+import { FaImage, FaTimes, FaPlus, FaMinus, FaLink, FaLock, FaUnlock, FaUserPlus, FaCheck, FaSearch, FaRegHeart, FaHeartBroken, FaComment, FaRetweet, FaEye, FaPoll, FaCalendarAlt, FaClock, FaGlobe, FaUserFriends, FaBan, FaExclamationTriangle, FaBookmark, FaRegBookmark, FaUpload, FaSpinner, FaBold, FaItalic, FaStrikethrough, FaCode, FaListUl, FaQuoteRight } from 'react-icons/fa';
 import SafeImage from './SafeImage';
 import Avatar from './Avatar';
 import Badge from './Badge';
 import GifPicker from './GifPicker';
 import { IMG_RE, VID_RE, YOUTUBE_PATTERN, VIMEO_PATTERN, extractUrls, detectMediaFromContent, getEmbedUrl as getEmbedUrlHelper } from '../../services/helpers';
 import ConfirmModal from './ConfirmModal';
+import PostMarkdown from './PostMarkdown';
+import { applyMarkdownEdit } from '../../services/postMarkdown';
 import { toast } from 'react-toastify';
 import { uploadImage, uploadWithLocalPreview } from '../../services/cdnService';
 import Tooltip from './Tooltip';
@@ -292,6 +294,24 @@ export default function CreatePostModal({
     mentionHandleChange(e);
     updatePreview(text);
   };
+
+  // ── Markdown: envuelve la selección con la sintaxis (o deja el cursor
+  //    dentro para empezar a escribir, sin insertar texto de relleno) ──
+  const applyMarkdown = useCallback((opts) => {
+    const el = textareaRef.current;
+    const value = content;
+    const start = el?.selectionStart ?? value.length;
+    const end = el?.selectionEnd ?? value.length;
+    const { next, selectionStart, selectionEnd } = applyMarkdownEdit({ value, start, end, ...opts });
+
+    setContent(next);
+
+    requestAnimationFrame(() => {
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(selectionStart, selectionEnd);
+    });
+  }, [content, textareaRef]);
 
   // ── Image URL management ──
   const handleImageUrlChange = (index, value) => {
@@ -866,6 +886,75 @@ export default function CreatePostModal({
                 <FaExclamationTriangle />
               </button>
               </Tooltip>
+
+              {/* ── Formato markdown ── */}
+              <span className="create-post-toolbar-divider" aria-hidden="true" />
+
+              <Tooltip text={t('create_post.md_bold')} placement="bottom">
+              <button
+                type="button"
+                className="create-post-toolbar-btn"
+                aria-label={t('create_post.md_bold')}
+                onClick={() => applyMarkdown({ prefix: '**', suffix: '**' })}
+              >
+                <FaBold />
+              </button>
+              </Tooltip>
+
+              <Tooltip text={t('create_post.md_italic')} placement="bottom">
+              <button
+                type="button"
+                className="create-post-toolbar-btn"
+                aria-label={t('create_post.md_italic')}
+                onClick={() => applyMarkdown({ prefix: '*', suffix: '*' })}
+              >
+                <FaItalic />
+              </button>
+              </Tooltip>
+
+              <Tooltip text={t('create_post.md_strike')} placement="bottom">
+              <button
+                type="button"
+                className="create-post-toolbar-btn"
+                aria-label={t('create_post.md_strike')}
+                onClick={() => applyMarkdown({ prefix: '~~', suffix: '~~' })}
+              >
+                <FaStrikethrough />
+              </button>
+              </Tooltip>
+
+              <Tooltip text={t('create_post.md_code')} placement="bottom">
+              <button
+                type="button"
+                className="create-post-toolbar-btn"
+                aria-label={t('create_post.md_code')}
+                onClick={() => applyMarkdown({ prefix: '`', suffix: '`' })}
+              >
+                <FaCode />
+              </button>
+              </Tooltip>
+
+              <Tooltip text={t('create_post.md_list')} placement="bottom">
+              <button
+                type="button"
+                className="create-post-toolbar-btn"
+                aria-label={t('create_post.md_list')}
+                onClick={() => applyMarkdown({ prefix: '- ', block: true })}
+              >
+                <FaListUl />
+              </button>
+              </Tooltip>
+
+              <Tooltip text={t('create_post.md_quote')} placement="bottom">
+              <button
+                type="button"
+                className="create-post-toolbar-btn"
+                aria-label={t('create_post.md_quote')}
+                onClick={() => applyMarkdown({ prefix: '> ', block: true })}
+              >
+                <FaQuoteRight />
+              </button>
+              </Tooltip>
             </div>
 
             {/* ── GIF picker panel ── */}
@@ -1161,9 +1250,11 @@ export default function CreatePostModal({
                     <span className="create-post-live-preview-username">{displayName}</span>
                     <Badge roles={profile?.roles || []} />
                   </div>
-                  <p className="create-post-live-preview-text">
-                    {cleanPreviewText || <span className="create-post-live-preview-placeholder">{t('create_post.placeholder')}</span>}
-                  </p>
+                  <div className="create-post-live-preview-text">
+                    {cleanPreviewText
+                      ? <PostMarkdown text={cleanPreviewText} className="post-markdown create-post-live-preview-markdown" />
+                      : <span className="create-post-live-preview-placeholder">{t('create_post.placeholder')}</span>}
+                  </div>
                   {/* Preview images from image_urls */}
                   {showImageSection && getValidImageUrls().length > 0 && (
                     <div className={`post-card-image-grid post-card-image-grid--${Math.min(getValidImageUrls().length, 4)}`}>

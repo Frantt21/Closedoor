@@ -44,5 +44,39 @@
         "サイドバーのヘッダーは、チャット内を移動するときに特定のスタイルを採用します。"
       ]
     }
+  },
+  "2026-10-10:is2cuf": {
+    "es": {
+      "title": "Rebaja en publicaciones",
+      "items": [
+        "Las publicaciones ahora admiten rebajas: negrita, cursiva, tachado, código en línea, listas, citas, encabezados, tablas y bloques de código.",
+        "Un nuevo grupo de formato en la barra de herramientas del compositor inserta la sintaxis por usted.",
+        "Las menciones y los hashtags siguen funcionando dentro del texto formateado."
+      ]
+    },
+    "pt": {
+      "title": "Markdown em postagens",
+      "items": [
+        "As postagens agora suportam marcação: negrito, itálico, tachado, código embutido, listas, aspas, títulos, tabelas e blocos de código.",
+        "Um novo grupo de formatação na barra de ferramentas do compositor insere a sintaxe para você.",
+        "Menções e hashtags continuam funcionando dentro do texto formatado."
+      ]
+    },
+    "ru": {
+      "title": "Уценка в постах",
+      "items": [
+        "Сообщения теперь поддерживают уценку: жирный шрифт, курсив, зачеркивание, встроенный код, списки, кавычки, заголовки, таблицы и блоки кода.",
+        "Новая группа форматирования на панели инструментов композитора вставляет синтаксис за вас.",
+        "Упоминания и хэштеги продолжают работать внутри форматированного текста."
+      ]
+    },
+    "ja": {
+      "title": "投稿のマークダウン",
+      "items": [
+        "投稿では、マークダウン (太字、斜体、取り消し線、インライン コード、リスト、引用符、見出し、表、コード ブロック) がサポートされるようになりました。",
+        "Composer ツールバーの新しい書式設定グループにより、構文が挿入されます。",
+        "メンションとハッシュタグは、書式設定されたテキスト内で引き続き機能します。"
+      ]
+    }
   }
 }
