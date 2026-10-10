@@ -444,7 +444,9 @@ check('health informa provider y clientes', info.provider === 'innertube' && inf
   const probes = [
     ['anidada sin config', '../api/music/diag-nested.js', 'nested-no-config'],
     ['plana con config', '../api/diag-flat.js', 'flat-with-config'],
+    ['plana nueva sin config', '../api/diag-plain.js', 'flat-new-no-config'],
   ];
+
   for (const [name, path, expected] of probes) {
     const { default: handler } = await import(path);
     const res = await handler(new Request('https://app.foranly.space/api/diag'));

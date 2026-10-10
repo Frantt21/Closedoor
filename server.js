@@ -633,11 +633,39 @@ async function proxyInnertubeAudio(req, res, track, { fresh = false } = {}) {
 }
 
 app.get('/api/music/stream', async (req, res) => {
-  const { artist = '', title = '', videoId = '', duration = 0, fresh } = req.query || {};
+  const { artist = '', title = '', videoId = '', duration = 0, fresh, prewarm } = req.query || {};
   if (!title && !videoId) {
     res.status(400).json({ success: false, error: 'Missing ?title parameter' });
     return;
   }
+
+  // Pre-warm: mismo contrato que la función de Vercel (api/music/stream.js con
+  // prewarm=1) para que este servidor sea un sustituto 1:1 si la música se sirve
+  // desde el host propio (rewrite de Vercel) en vez de la función serverless.
+  if (prewarm === '1') {
+    try {
+      const resolved = await resolveTrackAudio(
+        { artist, title, videoId, duration: Number(duration) || 0 },
+        { budgetMs: 20_000 }
+      );
+      res.status(200).json({
+        success: true,
+        prewarm: true,
+        videoId: resolved.videoId,
+        itag: resolved.itag,
+        mimeType: resolved.mimeType,
+        contentLength: resolved.contentLength,
+        playable: resolved.playable !== false,
+        degraded: !!resolved.degraded,
+        cached: !!resolved.cached,
+      });
+    } catch (err) {
+      const notFound = /coincidencia razonable/.test(err.message || '');
+      res.status(notFound ? 404 : isResolveTimeout(err) ? 504 : 502).json({ success: false, error: err.message });
+    }
+    return;
+  }
+
   if (!rateLimitStream(req)) {
     res.status(429).json({ success: false, error: 'Too many stream requests, try again in a minute' });
     return;
