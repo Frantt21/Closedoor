@@ -427,6 +427,16 @@ check('health informa provider y clientes', info.provider === 'innertube' && inf
   check('prewarm: la resolución posterior es caché', cachedResolve.cached === true);
 }
 
+// ── 18. Marcador de build en health ──
+// Un solo request debe bastar para saber qué código corre en produccion.
+{
+  const { default: healthHandler } = await import('../api/music/health.js');
+  const res = await healthHandler(new Request('https://app.foranly.space/api/music/health'));
+  const body = await res.json();
+  check('health: responde con marcador de build', res.status === 200 && /^music-\d+$/.test(body.build || ''), String(body.build));
+  check('health: sigue informando el resolver', body.ok === true && body.stream === 'innertube' && Array.isArray(body.clients));
+}
+
 globalThis.fetch = realFetch;
 console.log(failures === 0 ? '\nTODO OK' : `\nFALLARON ${failures}`);
 process.exit(failures === 0 ? 0 : 1);

@@ -14,6 +14,12 @@ export const config = {
   runtime: 'nodejs',
 };
 
+// Marcador de build de la FUNCIÓN: permite saber en un solo request qué código
+// está vivo en producción. Si /api/music/health no responde (o no trae `build`),
+// lo desplegado no es esta versión: en el último incidente el dominio servía un
+// cliente nuevo con funciones antiguas y costó distinguirlo.
+const BUILD = 'music-3';
+
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
@@ -27,6 +33,7 @@ export default async function handler(req) {
   return new Response(
     JSON.stringify({
       ok: true,
+      build: BUILD,
       stream: 'innertube',
       ...getInnertubeInfo(),
     }),
