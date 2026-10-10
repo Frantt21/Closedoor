@@ -11,8 +11,9 @@
  *   no usa eval/new Function, así que la protección contra XSS es real.
  * - style-src 'unsafe-inline' es OBLIGATORIO: inlineCssPlugin mete el CSS
  *   inline en el HTML y React usa style={{}} (no hay nonce viable aquí).
- * - Los túneles de música (ngrok/cloudflared) usan subdominios dinámicos →
- *   wildcards de subdominio. LiveKit Cloud → *.livekit.cloud.
+ * - La canción del perfil se sirve same-origin (/api/music/stream), así que 'self'
+ *   ya la cubre: no hace falta ningún host de música ni túnel en connect-src.
+ *   LiveKit Cloud → *.livekit.cloud.
  *
  * ⚠️ MANTENER CONSISTENTE con la cabecera HTTP de vercel.json (la versión
  * HTTP añade frame-ancestors 'none', que la meta tag no soporta).
@@ -40,16 +41,11 @@ function buildCSP() {
     "'self'",
     supabaseOrigin, supabaseWss,
     cdnOrigin,
+    // Búsqueda de música: iTunes directo desde el navegador (los previews de
+    // Deezer van por el proxy same-origin /api/music-search).
     'https://itunes.apple.com',
     'https://api.klipy.com',
     'https://challenges.cloudflare.com',
-    // Music server (migrado de Termux a servidor con más ancho de banda)
-    'http://mapi.foranly.space:24633',
-    // Túneles dinámicos del music-server (subdominio aleatorio)
-    'https://*.ngrok-free.app', 'wss://*.ngrok-free.app',
-    'https://*.ngrok.io', 'wss://*.ngrok.io',
-    'https://*.ngrok.app', 'wss://*.ngrok.app',
-    'https://*.trycloudflare.com', 'wss://*.trycloudflare.com',
     // LiveKit Cloud (el server devuelve la URL real en /api/livekit-token)
     'https://*.livekit.cloud', 'wss://*.livekit.cloud',
   ].filter(Boolean);

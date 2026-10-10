@@ -51,22 +51,6 @@
       "destination": "/api/og-post"
     },
     {
-      "source": "/api/music/health",
-      "destination": "http://mapi.foranly.space:24633/api/music/health"
-    },
-    {
-      "source": "/api/music/search",
-      "destination": "http://mapi.foranly.space:24633/api/music/search"
-    },
-    {
-      "source": "/api/music/stream",
-      "destination": "http://mapi.foranly.space:24633/api/music/stream"
-    },
-    {
-      "source": "/api/music/download",
-      "destination": "http://mapi.foranly.space:24633/api/music/download"
-    },
-    {
       "source": "/api/image-proxy",
       "destination": "http://mapi.foranly.space:24633/api/image-proxy"
     },

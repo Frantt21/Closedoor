@@ -5,8 +5,7 @@ import { supabase, dbPublic } from '../../services/supabaseclient';
 import { useAuth } from '../../../hooks/useAuth';
 import { getCachedBlockStatus, subscribeBlockChanges } from '../../services/blockService';
 import { getItem, setItem, removeItem } from '../../services/secureStorage';
-// ⏸️ PAUSA: canción del perfil deshabilitada temporalmente
-// import SongCard from './SongCard';
+import SongCard from './SongCard';
 import './css/profileSidebar.css';
 
 // ── Stats cache ──
@@ -197,14 +196,14 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
 
   return (
     <aside className="profile-sidebar">
-      {/* ⏸️ PAUSA: canción del perfil deshabilitada temporalmente */}
-      {/* {!isBlocked && (isOwnProfile || canViewContent) && (
+      {/* ── Mi canción (arriba de intereses) ── */}
+      {!isBlocked && (isOwnProfile || canViewContent) && (
         <SongCard
           song={profile?.song || null}
           isOwnProfile={isOwnProfile}
           surfaceStyle={surfaceStyle}
         />
-      )} */}
+      )}
 
       {/* ── Interests (siempre visible) ── */}
       <div className="profile-sidebar-card" style={surfaceStyle}>

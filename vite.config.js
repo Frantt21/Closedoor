@@ -15,19 +15,16 @@ export default defineConfig({
         target: 'http://api.foranly.space:24587',
         changeOrigin: true,
       },
-      // Legacy fallback: /api/music-search → /api/music/search en el music server.
-      // DEBE ir ANTES de /api/music para que no matchee por prefijo.
+      // API de música en dev: la sirve server.js (npm start) con el resolver
+      // innertube local. Si no está corriendo, la petición falla rápido y el
+      // frontend cae al preview de 30 s (iTunes directo sigue funcionando).
+      // `/api/music-search` DEBE ir antes que `/api/music` (prefijo).
       '/api/music-search': {
-        target: 'http://mapi.foranly.space:24633',
+        target: 'http://localhost:3000',
         changeOrigin: true,
-        rewrite: (path) => path.replace('/api/music-search', '/api/music/search'),
       },
-      // API de música (búsqueda Deezer, stream yt-dlp, health) en dev:
-      // Apunta al servidor remoto (migrado de Termux a servidor con más ancho de banda).
-      // Si no está disponible, la petición falla rápido y el frontend usa el
-      // fallback de previews (iTunes directo funciona en dev sin server).
       '/api/music': {
-        target: 'http://mapi.foranly.space:24633',
+        target: 'http://localhost:3000',
         changeOrigin: true,
       },
       // Proxy de imágenes CORS (wallhaven, etc. bloquean el fetch del navegador):

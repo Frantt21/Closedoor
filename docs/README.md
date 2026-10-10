@@ -20,12 +20,9 @@ Indice de toda la documentacion del proyecto. La guia principal de instalacion y
 
 ## Musica
 
-| Documento | Descripcion |
-|---|---|
-| [music/TERMUX_SETUP.md](./music/TERMUX_SETUP.md) | Instalacion del music server (yt-dlp + ffmpeg) en Termux con tunel cloudflared |
-| [music/TERMUX_DIAGNOSTICO.md](./music/TERMUX_DIAGNOSTICO.md) | Diagnostico del cuello de botella del stream (YouTube vs tunel) |
-
-Scripts relacionados: [scripts/diagnostico-stream.sh](../scripts/diagnostico-stream.sh).
+La cancion del perfil no necesita documentacion de infraestructura: el audio se
+resuelve con la API innertube desde la propia app (`api/_innertube.js`, servido
+por `/api/music/stream`). Ver la seccion "Cancion del perfil" del README raiz.
 
 ## Deploy y redes
 
@@ -36,9 +33,8 @@ Scripts relacionados: [scripts/diagnostico-stream.sh](../scripts/diagnostico-str
 
 ## Otros componentes
 
-- [music-server/README.md](../music-server/README.md) — music server standalone con auto-setup (proxy residencial via Tailscale + Termux).
 - [src/hooks/AlphabetEncryption.md](../src/hooks/AlphabetEncryption.md) — detalle del sistema de encriptacion de publicaciones.
 
 ## Credenciales e infraestructura
 
-- [INFRAESTRUCTURA.md](./INFRAESTRUCTURA.md) — ubicaciones y credenciales de los servidores de musica y CDN. **No se sube a git** (ver `.gitignore`).
+- [INFRAESTRUCTURA.md](./INFRAESTRUCTURA.md) — ubicaciones y credenciales del servidor CDN. **No se sube a git** (ver `.gitignore`).

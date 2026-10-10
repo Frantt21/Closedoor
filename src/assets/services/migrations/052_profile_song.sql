@@ -15,7 +15,7 @@
 --     "previewUrl":  "URL del preview de 30s",
 --     "externalUrl": "URL del track en el proveedor",
 --     "duration":    "duración en segundos (matcheo del stream)",
---     "streamable":  "true si el server yt-dlp puede resolverla"
+--     "streamable":  "true si innertube puede resolver el audio completo"
 --   }
 --
 -- NULL = sin canción fijada.

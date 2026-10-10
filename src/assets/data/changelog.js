@@ -22,6 +22,17 @@ export const CHANGELOG_SEEN_KEY = 'fc_changelog_seen';
 
 export const RELEASES = [
   {
+    id: '2026-10-10+2',
+    date: '2026-10-10',
+    title: 'Your profile song, now streaming for real',
+    items: [
+      'The song you pin on your profile now plays the track itself, not only the 30-second preview.',
+      'You can seek within the track while it streams.',
+      'The audio is resolved inside the app itself, so it works the same in production and locally.',
+      'If a song cannot be played in full, the card falls back to the preview automatically.',
+    ],
+  },
+  {
     id: '2026-10-10',
     date: '2026-10-10',
     title: 'Markdown in posts',

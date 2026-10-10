@@ -510,8 +510,7 @@ function testWebSecurity() {
     { label: 'Plugin CSP existe', pattern: "name: 'inject-csp'", file: cspPlugin },
     { label: 'CSP solo en build (no rompe dev HMR)', pattern: "apply: 'build'", file: cspPlugin },
     { label: 'script-src SIN unsafe-eval/inline', pattern: "script-src 'self' https://challenges.cloudflare.com", file: cspPlugin },
-    { label: 'connect-src cubre túneles música (ngrok)', pattern: '*.ngrok-free.app', file: cspPlugin },
-    { label: 'connect-src cubre cloudflared', pattern: '*.trycloudflare.com', file: cspPlugin },
+    { label: "connect-src incluye 'self' (canción del perfil same-origin)", pattern: "    \"'self'\",", file: cspPlugin },
     { label: 'connect-src cubre LiveKit', pattern: '*.livekit.cloud', file: cspPlugin },
     { label: 'connect-src cubre Supabase Realtime (wss)', pattern: 'wss://', file: cspPlugin },
     { label: 'frame-src cubre Turnstile', pattern: 'https://challenges.cloudflare.com', file: cspPlugin },
@@ -554,6 +553,20 @@ function testWebSecurity() {
     pass++;
   } else {
     console.log('⚠️  script-src contiene unsafe-eval o unsafe-inline (¡NO permitido!)');
+    fail++;
+  }
+
+  // Check NEGATIVO (CSP): la canción del perfil se sirve same-origin
+  // (/api/music/stream → innertube) y el music server yt-dlp con sus túneles se
+  // eliminó. connect-src NO debe volver a abrir hosts de túnel: cada host extra
+  // amplía la superficie de exfiltración si entra un XSS.
+  const noMusicTunnels =
+    !/ngrok/i.test(cspPlugin) && !/trycloudflare/i.test(cspPlugin);
+  if (noMusicTunnels) {
+    console.log('✅ connect-src sin túneles de música (stream same-origin, sin ngrok/cloudflared)');
+    pass++;
+  } else {
+    console.log('⚠️  connect-src vuelve a abrir túneles de música (ngrok/cloudflared)');
     fail++;
   }
 

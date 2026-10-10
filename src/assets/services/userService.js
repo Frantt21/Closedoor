@@ -84,8 +84,7 @@ export const PROFILE_PUBLIC_COLUMNS = [
   'user_status',
   'user_status_updated_at',
   'show_global_bg',
-  // ⏸️ PAUSA: canción del perfil deshabilitada temporalmente
-  // 'song',
+  'song',
 ].join(', ');
 
 // ── Límites coherentes de caracteres (una sola fuente de verdad) ──

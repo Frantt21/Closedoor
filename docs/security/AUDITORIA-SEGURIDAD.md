@@ -100,7 +100,7 @@ que desactivaba toda la protección XSS!
 | Directiva | Configuración |
 |---|---|
 | `script-src` | `'self'` + `https://challenges.cloudflare.com` — **sin `unsafe-inline` ni `unsafe-eval`** |
-| `connect-src` | Supabase (REST + Realtime `wss://`), iTunes, Klipy, Turnstile, túneles dinámicos (`*.ngrok-free.app`, `*.trycloudflare.com`), LiveKit (`*.livekit.cloud`) |
+| `connect-src` | Supabase (REST + Realtime `wss://`), iTunes, Klipy, Turnstile, LiveKit (`*.livekit.cloud`). La canción del perfil y las búsquedas van por rutas **same-origin** (`/api/music/stream`, `/api/music-search`), así que `'self'` las cubre: **sin hosts de túnel** (el music server yt-dlp se eliminó) |
 | `style-src` | `'self'` + `'unsafe-inline'` (obligatorio: inlineCssPlugin + estilos inline de React) |
 | `frame-src` | Turnstile + YouTube + Vimeo |
 | `worker-src` `'self'` · `object-src 'none'` · `base-uri 'self'` · `form-action 'self'` | — |
@@ -545,12 +545,8 @@ Token de sesión:  localStorage cifrado    se descifra solo en memoria al cargar
 | `AuthContext.jsx` | waitForKeyReady, validación de email |
 | `Register.jsx` | Bloquea email fuera de whitelist |
 | `Login.jsx` | Valida formato Y dominio del email |
-| `music-server.js` | Servidor de música standalone (yt-dlp + ffmpeg) |
-| `music-server/setup.sh` | Auto-setup de binarios (linux arm64/x64) |
-| `music-server/music-server.js` | Server HTTP con auto-download de binarios |
-| `music-server/api/_musicStream.js` | Lógica de stream para container |
-| `music-server/package.json` | Configuración npm |
-| `music-server/README.md` | Documentación de migración |
+| `api/_innertube.js` | Resolución de streams con la API innertube (sustituye al music server yt-dlp) |
+| `api/music/stream.js` | Proxy same-origin del audio (reenvía Range, nunca expone la URL firmada) |
 | `supabaseclient.js` | pkce, __supabase solo DEV, storage cifrado |
 | `AuthCallback.jsx` | waitForKeyReady + re-consulta sesión |
 | `LinkPreview.jsx` | Cache cifrado |
@@ -570,5 +566,6 @@ Token de sesión:  localStorage cifrado    se descifra solo en memoria al cargar
 2. Habilitar **Leaked Password Protection** en Supabase Auth Password Settings
 3. Redeploy en Vercel (headers + CSP)
 4. CI activo en GitHub Actions
-5. Actualizar `.env.local` con `VITE_MUSIC_API_URL=http://mapi.foranly.space:24633/api/music`
+5. No hay nada que configurar para la música: el audio se resuelve con innertube
+   dentro de la app (`api/_innertube.js`, servido por `/api/music/stream`)
 6. Re-ejecutar `node scripts/test-security-full.mjs` tras cualquier cambio

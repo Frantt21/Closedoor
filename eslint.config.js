@@ -20,7 +20,7 @@ export default defineConfig([
   },
   // Archivos server-side (Express + funciones serverless de Vercel): Node globals
   {
-    files: ['api/**/*.js', 'server.js', 'music-server.js'],
+    files: ['api/**/*.js', 'server.js'],
     languageOptions: { globals: globals.node },
   },
 ])

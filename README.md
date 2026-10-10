@@ -60,12 +60,11 @@ FastChange/
   package.json
   vite.config.js
   eslint.config.js
-  server.js               -- API local (dev / self-hosted) + streaming de musica
+  server.js               -- API local (dev / self-hosted) + streaming de musica (innertube)
   README.md
   docs/                   -- Documentacion (indice en docs/README.md)
     database/             -- Referencia de Supabase y migraciones
     security/             -- Auditorias y pruebas de seguridad
-    music/                -- Music server: Termux, tuneles y diagnostico
     deployment/           -- Deploy en Vercel y tuneles ngrok
   src/
     main.jsx              -- Punto de entrada de la aplicacion
@@ -83,7 +82,6 @@ FastChange/
   api/                    -- Funciones serverless (Vercel) y helpers
   plugins/                -- Plugins de Vite (OG tags, CSP, preload, etc.)
   scripts/                -- Scripts de utilidad y diagnostico
-  music-server/           -- Music server standalone (yt-dlp + ffmpeg, con auto-setup)
   cdn-server/             -- Servidor CDN de archivos (Go)
   public/                 -- Archivos estaticos
 ```
@@ -141,10 +139,6 @@ VITE_SUPABASE_ANON_KEY=<clave_anon>
 | `VITE_SUPABASE_ANON_KEY` | Clave anonima/publica de Supabase |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Clave publicable (nomenclatura alternativa) |
 | `VITE_SUPABASE_PUBLIC_KEY` | Clave publica (nomenclatura alternativa) |
-| `VITE_MUSIC_API_URL` | URL del music server remoto (p. ej. tunel cloudflared) |
-| `YTDLP_BIN` | Ruta del binario de `yt-dlp` (solo server self-hosted) |
-| `FFMPEG_BIN` | Ruta del binario de `ffmpeg` (solo server self-hosted) |
-| `YTDLP_COOKIES_FILE` | Ruta del `cookies.txt` (anti-throttle de YouTube) |
 
 ---
 
@@ -157,7 +151,6 @@ VITE_SUPABASE_ANON_KEY=<clave_anon>
 | `npm run lint` | Analisis estatico con ESLint |
 | `npm run preview` | Vista previa de la build |
 | `npm run start` | Servidor de produccion (server.js: API + streaming) |
-| `npm run sync-music-server` | Sincroniza el music server standalone en `backend-music-server/` |
 
 ---
 
@@ -272,8 +265,6 @@ Para agregar un idioma:
 | Seguridad | [docs/security/AUDITORIA-SEGURIDAD.md](./docs/security/AUDITORIA-SEGURIDAD.md) |
 | Deploy en Vercel | [docs/deployment/VERCEL_DEPLOYMENT.md](./docs/deployment/VERCEL_DEPLOYMENT.md) |
 | Tuneles ngrok | [docs/deployment/NGROK_SETUP.md](./docs/deployment/NGROK_SETUP.md) |
-| Music server en Termux | [docs/music/TERMUX_SETUP.md](./docs/music/TERMUX_SETUP.md) |
-| Diagnostico del stream | [docs/music/TERMUX_DIAGNOSTICO.md](./docs/music/TERMUX_DIAGNOSTICO.md) |
 
 > Nota: `docs/INFRAESTRUCTURA.md` contiene credenciales de servidores y no se sube a git.
 
@@ -284,5 +275,6 @@ Para agregar un idioma:
 - El proyecto usa React Compiler (via `babel-plugin-react-compiler`) para optimizaciones automaticas.
 - El cliente de Supabase normaliza automaticamente la URL del proyecto.
 - El cache local usa prefijos `fc_` con expiracion por TTL.
-- La feature "Cancion del perfil" (card, servicio y estilos) esta temporalmente deshabilitada: el codigo esta comentado en `SongCard.jsx`, `musicService.js`, `ProfileSidebar.jsx` y `userService.js`. Para reactivarla, restaurar esos archivos desde git.
-- El servidor de musica (yt-dlp + ffmpeg) es un componente separado; ver [music-server/README.md](./music-server/README.md) y [docs/music/](./docs/music/).
+- "Cancion del perfil": la busqueda de metadatos usa iTunes (directo) o Deezer (via `/api/music-search`), y el audio completo lo resuelve **innertube** dentro de la propia app (`api/_innertube.js` + `/api/music/stream`). No hay servidor externo ni binarios (yt-dlp/ffmpeg): funciona igual en Vercel y en `npm start`.
+- Test del resolver de streams (offline, sin red): `node scripts/test-innertube-resolver.mjs`.
+- **Limite conocido del stream (medido, 2026-10)**: las URLs de innertube llevan `rqh=1` y googlevideo responde **403** a cualquier `Range` abierto (`bytes=0-`, lo que manda el navegador al arrancar) o cuyo final pase de ~1 MiB. Por eso el proxy pide siempre un bloque **acotado** de 1 MiB (`upstreamRangeHeader`): sin eso el `<audio>` no arrancaba nunca (502 directo). Medido en 2026-10 desde IP **residencial y de datacenter**, con ANDROID_VR y con IOS: con `rqh=1` el CDN entrega **solo el primer MiB del archivo**, y el tope es **posicional y absoluto** (en la misma URL `bytes=0-1048575` da 206 pero `bytes=1048576-...` da 403, incluso si es la primera petición de una URL recién resuelta). Es decir: una cancion de mas de ~1 MiB (~65 s a 128 kbps) suena hasta ahi y el `<audio>` dispara `onError` → la card cae al preview de 30 s de iTunes; las cortas (<1 MiB) suenan completas y verificadas byte a byte. La URL no lleva un param `range` que reescribir (anadirlo da 400; quitarlo o poner `rqh=0` da 403). Levantar ese tope requiere un **PO token** (servicio extra, p. ej. `bgutil-ytdlp-pot-provider`): es justo lo que hacia el music server de yt-dlp que se elimino.

@@ -1,500 +1,499 @@
-/* PAUSA: cancion del perfil deshabilitada temporalmente. Reactivar: git checkout -- src/assets/Resources/Components/css/songCard.css (o sed -i s"|\* /|\*/|g" del archivo y borrar esta linea 1). */
-/* /* ========================================== */
-/*    Song Card — "Mi canción" del perfil */
-/*    (disco de vinilo animado + preview 30s) */
-/*    ========================================== * / */
-/*  */
-/* /* ── Layout principal: columna (portada + disco en fila → info) ── * / */
-/* .song-card-main { */
-/*   display: flex; */
-/*   flex-direction: column; */
-/*   gap: 14px; */
-/* } */
-/*  */
-/* /* ── Portada grande ── * / */
-/* .song-card-cover { */
-/*   all: unset; */
-/*   position: relative; */
-/*   z-index: 1; /* la portada tapa la mitad izquierda del disco * / */
-/*   display: block; */
-/*   width: var(--song-disc, 140px); /* mismo tamaño que el disco * / */
-/*   aspect-ratio: 1 / 1; */
-/*   flex-shrink: 0; */
-/*   border-radius: var(--radius, 10px); */
-/*   overflow: hidden; */
-/*   cursor: pointer; */
-/*   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); */
-/* } */
-/*  */
-/* .song-card-cover-img { */
-/*   position: absolute; */
-/*   inset: 0; */
-/*   width: 100%; */
-/*   height: 100%; */
-/*   object-fit: cover; */
-/*   display: flex; */
-/*   align-items: center; */
-/*   justify-content: center; */
-/*   background: var(--color-surface-hover, #252525); */
-/*   color: var(--color-text-muted, #6b7280); */
-/*   font-size: 2rem; */
-/* } */
-/*  */
-/* .song-card-cover-img--empty { */
-/*   background: linear-gradient(135deg, var(--color-surface-hover, #252525), var(--color-surface, #1a1a1a)); */
-/* } */
-/*  */
-/* /* Botón de play flotante sobre la portada * / */
-/* .song-card-cover-btn { */
-/*   position: absolute; */
-/*   right: 10px; */
-/*   bottom: 10px; */
-/*   display: inline-flex; */
-/*   align-items: center; */
-/*   justify-content: center; */
-/*   width: 44px; */
-/*   height: 44px; */
-/*   border-radius: 50%; */
-/*   background: var(--accent-color, var(--color-accent, #6b7280)); */
-/*   color: var(--accent-text-color, #000000); */
-/*   font-size: 0.95rem; */
-/*   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45); */
-/*   transition: transform 0.18s ease, box-shadow 0.18s ease; */
-/* } */
-/*  */
-/* .song-card-cover:hover .song-card-cover-btn { */
-/*   transform: scale(1.1); */
-/*   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55); */
-/* } */
-/*  */
-/* .song-card-cover:active .song-card-cover-btn { */
-/*   transform: scale(0.95); */
-/* } */
-/*  */
-/* .song-card-cover:focus-visible { */
-/*   outline: 2px solid var(--accent-color, var(--color-accent, #6b7280)); */
-/*   outline-offset: 2px; */
-/* } */
-/*  */
-/* .song-card-cover:disabled { */
-/*   cursor: not-allowed; */
-/*   opacity: 0.6; */
-/* } */
-/*  */
-/* .song-card-cover:disabled .song-card-cover-btn { */
-/*   opacity: 0.6; */
-/* } */
-/*  */
-/* /* ── Contenedor de la portada: ancla tiempo y acciones sobre la imagen ── * / */
-/* .song-card-cover-wrap { */
-/*   position: relative; */
-/*   z-index: 1; /* por encima del disco (medio oculto tras la portada) * / */
-/*   flex-shrink: 0; */
-/* } */
-/*  */
-/* /* Tiempo: pill arriba a la izquierda de la portada * / */
-/* .song-card-cover-time { */
-/*   position: absolute; */
-/*   top: 8px; */
-/*   left: 8px; */
-/*   z-index: 2; */
-/*   padding: 3px 8px; */
-/*   border-radius: var(--radius-full, 9999px); */
-/*   background: rgba(0, 0, 0, 0.55); */
-/*   backdrop-filter: blur(4px); */
-/*   -webkit-backdrop-filter: blur(4px); */
-/*   color: #ffffff; */
-/*   font-size: 0.64rem; */
-/*   font-weight: 600; */
-/*   font-variant-numeric: tabular-nums; */
-/*   letter-spacing: 0.2px; */
-/*   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); */
-/* } */
-/*  */
-/* /* Acciones (editar/eliminar) sobre la portada: visibles en hover o al enfocar; */
-/*    en táctil (sin hover) siempre visibles para no perder la accesibilidad. */
-/*    Esquina inferior izquierda: el tiempo ocupa la sup. izq. y el play la inf. der. * / */
-/* .song-card-cover-actions { */
-/*   position: absolute; */
-/*   bottom: 8px; */
-/*   left: 8px; */
-/*   z-index: 3; */
-/*   display: flex; */
-/*   gap: 6px; */
-/* } */
-/*  */
-/* @media (hover: hover) { */
-/*   .song-card-cover-actions { */
-/*     opacity: 0; */
-/*     transform: translateY(-4px); */
-/*     transition: opacity 0.15s ease, transform 0.15s ease; */
-/*   } */
-/*  */
-/*   /* Visibles SOLO en hover real o foco por teclado (:has(:focus-visible)). */
-/*      NO en :focus-within: al hacer clic en play el botón conserva el foco y */
-/*      las acciones quedaban pegadas hasta clickear fuera. Con :focus-visible */
-/*      (solo teclado) un clic ya no las deja visibles. * / */
-/*   .song-card-cover-wrap:hover .song-card-cover-actions, */
-/*   .song-card-cover-wrap:has(:focus-visible) .song-card-cover-actions { */
-/*     opacity: 1; */
-/*     transform: translateY(0); */
-/*   } */
-/* } */
-/*  */
-/* .song-card-cover-action { */
-/*   all: unset; */
-/*   display: inline-flex; */
-/*   align-items: center; */
-/*   justify-content: center; */
-/*   width: 30px; */
-/*   height: 30px; */
-/*   border-radius: 50%; */
-/*   background: rgba(0, 0, 0, 0.55); */
-/*   backdrop-filter: blur(4px); */
-/*   -webkit-backdrop-filter: blur(4px); */
-/*   color: #ffffff; */
-/*   font-size: 0.72rem; */
-/*   cursor: pointer; */
-/*   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); */
-/*   transition: background 0.15s ease, transform 0.15s ease; */
-/* } */
-/*  */
-/* .song-card-cover-action:hover:not(:disabled) { */
-/*   background: rgba(0, 0, 0, 0.85); */
-/*   transform: scale(1.08); */
-/* } */
-/*  */
-/* .song-card-cover-action--danger:hover:not(:disabled) { */
-/*   background: rgba(239, 68, 68, 0.9); */
-/* } */
-/*  */
-/* .song-card-cover-action:disabled { */
-/*   opacity: 0.5; */
-/*   cursor: not-allowed; */
-/* } */
-/*  */
-/* /* ── Escenario: portada a la izquierda + disco a la derecha (asoma la mitad) ── * / */
-/* .song-card-stage { */
-/*   position: relative; */
-/*   display: flex; */
-/*   align-items: center; */
-/*   justify-content: center; */
-/*   /* Composición centrada: portada y disco del MISMO tamaño (140px). */
-/*      El disco se solapa con la portada quedando medio oculto tras ella. * / */
-/*   --song-disc: 140px; */
-/* } */
-/*  */
-/* .song-card-vinyl { */
-/*   all: unset; */
-/*   position: relative; */
-/*   /* Margen negativo de media anchura: se tira hacia la izquierda y queda */
-/*      medio oculto tras la portada (centro del disco = borde derecho de la */
-/*      portada). El centrado vertical lo resuelve align-items: center. * / */
-/*   margin-left: calc(var(--song-disc, 140px) / -2); */
-/*   width: var(--song-disc, 140px); */
-/*   aspect-ratio: 1 / 1; */
-/*   flex-shrink: 0; */
-/*   border-radius: 50%; */
-/*   z-index: 0; */
-/*   cursor: pointer; */
-/*   /* Surcos del vinilo + orificio central * / */
-/*   background: */
-/*     radial-gradient(circle at center, #0a0a0a 0 5px, #1d1d1f 5.5px 7px, transparent 7.5px), */
-/*     repeating-radial-gradient(circle at center, #101012 0 1px, #1b1b1e 1px 2.5px, #141417 2.5px 4px); */
-/*   box-shadow: */
-/*     inset 0 0 0 1px rgba(255, 255, 255, 0.08), */
-/*     0 4px 14px rgba(0, 0, 0, 0.45); */
-/*   animation: songCardSpin 5s linear infinite; */
-/*   animation-play-state: paused; */
-/* } */
-/*  */
-/* .song-card-vinyl:hover:not(:disabled) { */
-/*   box-shadow: */
-/*     inset 0 0 0 1px rgba(255, 255, 255, 0.16), */
-/*     0 6px 18px rgba(0, 0, 0, 0.55); */
-/* } */
-/*  */
-/* .song-card-vinyl:focus-visible { */
-/*   outline: 2px solid var(--accent-color, var(--color-accent, #6b7280)); */
-/*   outline-offset: 2px; */
-/* } */
-/*  */
-/* .song-card-vinyl:disabled { */
-/*   cursor: not-allowed; */
-/*   opacity: 0.6; */
-/* } */
-/*  */
-/* .song-card-vinyl--playing { */
-/*   animation-play-state: running; */
-/* } */
-/*  */
-/* .song-card-vinyl-art { */
-/*   position: absolute; */
-/*   inset: 17%; */
-/*   border-radius: 50%; */
-/*   background-size: cover; */
-/*   background-position: center; */
-/*   background-color: var(--color-surface-hover, #252525); */
-/*   box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.55); */
-/* } */
-/*  */
-/* @keyframes songCardSpin { */
-/*   to { */
-/*     transform: rotate(360deg); */
-/*   } */
-/* } */
-/*  */
-/* @media (prefers-reduced-motion: reduce) { */
-/*   .song-card-vinyl { */
-/*     animation: none; */
-/*   } */
-/* } */
-/*  */
-/* /* ── Info: título/artista (el progreso se ve en el contador de la portada) ── * / */
-/* .song-card-info { */
-/*   min-width: 0; */
-/*   display: flex; */
-/*   flex-direction: column; */
-/*   gap: 7px; */
-/* } */
-/*  */
-/* .song-card-texts { */
-/*   min-width: 0; */
-/*   display: flex; */
-/*   flex-direction: column; */
-/* } */
-/*  */
-/* .song-card-title { */
-/*   font-size: 0.84rem; */
-/*   font-weight: 700; */
-/*   color: var(--accent-surface-text-color, var(--color-text, #ffffff)); */
-/*   white-space: nowrap; */
-/*   overflow: hidden; */
-/*   text-overflow: ellipsis; */
-/* } */
-/*  */
-/* .song-card-artist { */
-/*   font-size: 0.72rem; */
-/*   color: var(--accent-surface-text-muted, var(--color-text-muted, #6b7280)); */
-/*   white-space: nowrap; */
-/*   overflow: hidden; */
-/*   text-overflow: ellipsis; */
-/* } */
-/*  */
-/* /* ── CTA "Agregar canción" ── * / */
-/* .song-card-add { */
-/*   all: unset; */
-/*   display: flex; */
-/*   align-items: center; */
-/*   justify-content: center; */
-/*   gap: 8px; */
-/*   width: 100%; */
-/*   padding: 9px 10px; */
-/*   border-radius: var(--radius-sm, 6px); */
-/*   border: 1px dashed var(--color-border, #2a2a2a); */
-/*   color: var(--color-text-secondary, #9ca3af); */
-/*   font-size: 0.8rem; */
-/*   cursor: pointer; */
-/*   transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease; */
-/* } */
-/*  */
-/* .song-card-add:hover { */
-/*   background: var(--overlay-bg, rgba(255, 255, 255, 0.08)); */
-/*   color: var(--color-text, #ffffff); */
-/*   border-color: var(--overlay-border-hover, rgba(255, 255, 255, 0.25)); */
-/* } */
-/*  */
-/* .song-card-add svg { */
-/*   font-size: 0.75rem; */
-/*   opacity: 0.6; */
-/* } */
-/*  */
-/* /* ── Editor inline ── * / */
-/* .song-card-search-row { */
-/*   display: flex; */
-/*   gap: 6px; */
-/* } */
-/*  */
-/* .song-card-search-input { */
-/*   flex: 1; */
-/*   min-width: 0; */
-/*   padding: 7px 10px; */
-/*   font-size: 0.8rem; */
-/*   font-family: inherit; */
-/*   color: var(--color-text, #ffffff); */
-/*   background: var(--overlay-bg-subtle, rgba(255, 255, 255, 0.06)); */
-/*   border: 1px solid var(--color-border, #2a2a2a); */
-/*   border-radius: var(--radius-sm, 6px); */
-/*   outline: none; */
-/*   transition: border-color 0.15s ease; */
-/* } */
-/*  */
-/* .song-card-search-input::placeholder { */
-/*   color: var(--color-text-muted, #6b7280); */
-/* } */
-/*  */
-/* .song-card-search-input:focus { */
-/*   border-color: var(--overlay-border-hover, rgba(255, 255, 255, 0.25)); */
-/* } */
-/*  */
-/* .song-card-search-btn { */
-/*   all: unset; */
-/*   display: inline-flex; */
-/*   align-items: center; */
-/*   justify-content: center; */
-/*   width: 32px; */
-/*   height: 32px; */
-/*   border-radius: var(--radius-sm, 6px); */
-/*   flex-shrink: 0; */
-/*   background: var(--overlay-bg, rgba(255, 255, 255, 0.08)); */
-/*   color: var(--color-text-secondary, #9ca3af); */
-/*   font-size: 0.72rem; */
-/*   cursor: pointer; */
-/*   transition: background 0.15s ease, color 0.15s ease; */
-/* } */
-/*  */
-/* .song-card-search-btn:hover:not(:disabled) { */
-/*   background: var(--overlay-bg-hover, rgba(255, 255, 255, 0.14)); */
-/*   color: var(--color-text, #ffffff); */
-/* } */
-/*  */
-/* .song-card-search-btn:disabled { */
-/*   opacity: 0.5; */
-/*   cursor: not-allowed; */
-/* } */
-/*  */
-/* .song-card-search-msg { */
-/*   margin: 8px 0 0; */
-/*   font-size: 0.75rem; */
-/*   color: var(--color-text-muted, #6b7280); */
-/* } */
-/*  */
-/* .song-card-select-hint { */
-/*   margin: 8px 0 4px; */
-/*   font-size: 0.68rem; */
-/*   color: var(--color-text-muted, #6b7280); */
-/*   text-transform: uppercase; */
-/*   letter-spacing: 0.4px; */
-/* } */
-/*  */
-/* /* ── Resultados de búsqueda ── * / */
-/* .song-card-results { */
-/*   display: flex; */
-/*   flex-direction: column; */
-/*   gap: 4px; */
-/*   max-height: 176px; */
-/*   overflow-y: auto; */
-/*   padding-right: 2px; */
-/*   margin-top: 2px; */
-/* } */
-/*  */
-/* .song-card-results::-webkit-scrollbar { */
-/*   width: 4px; */
-/* } */
-/*  */
-/* .song-card-results::-webkit-scrollbar-thumb { */
-/*   background: var(--color-border, #2a2a2a); */
-/*   border-radius: 2px; */
-/* } */
-/*  */
-/* .song-card-result { */
-/*   all: unset; */
-/*   display: flex; */
-/*   align-items: center; */
-/*   gap: 8px; */
-/*   padding: 5px 6px; */
-/*   border-radius: var(--radius-sm, 6px); */
-/*   cursor: pointer; */
-/*   transition: background 0.15s ease; */
-/* } */
-/*  */
-/* .song-card-result:hover { */
-/*   background: var(--overlay-bg, rgba(255, 255, 255, 0.08)); */
-/* } */
-/*  */
-/* .song-card-result--selected { */
-/*   background: var(--overlay-bg, rgba(255, 255, 255, 0.08)); */
-/*   outline: 1px solid var(--overlay-border-strong, rgba(255, 255, 255, 0.4)); */
-/* } */
-/*  */
-/* .song-card-result-art { */
-/*   width: 34px; */
-/*   height: 34px; */
-/*   border-radius: var(--radius-sm, 6px); */
-/*   object-fit: cover; */
-/*   flex-shrink: 0; */
-/*   background: var(--color-surface-hover, #252525); */
-/* } */
-/*  */
-/* .song-card-result-art--empty { */
-/*   display: inline-flex; */
-/*   align-items: center; */
-/*   justify-content: center; */
-/*   color: var(--color-text-muted, #6b7280); */
-/*   font-size: 0.7rem; */
-/* } */
-/*  */
-/* .song-card-result-info { */
-/*   min-width: 0; */
-/*   display: flex; */
-/*   flex-direction: column; */
-/* } */
-/*  */
-/* .song-card-result-title { */
-/*   font-size: 0.78rem; */
-/*   font-weight: 600; */
-/*   color: var(--color-text, #ffffff); */
-/*   white-space: nowrap; */
-/*   overflow: hidden; */
-/*   text-overflow: ellipsis; */
-/* } */
-/*  */
-/* .song-card-result-artist { */
-/*   font-size: 0.68rem; */
-/*   color: var(--color-text-muted, #6b7280); */
-/*   white-space: nowrap; */
-/*   overflow: hidden; */
-/*   text-overflow: ellipsis; */
-/* } */
-/*  */
-/* /* ── Acciones del editor ── * / */
-/* .song-card-editor-actions { */
-/*   display: flex; */
-/*   align-items: center; */
-/*   justify-content: space-between; */
-/*   gap: 8px; */
-/*   margin-top: 10px; */
-/* } */
-/*  */
-/* .song-card-cancel-btn, */
-/* .song-card-remove-btn { */
-/*   all: unset; */
-/*   padding: 6px 10px; */
-/*   font-size: 0.75rem; */
-/*   border-radius: var(--radius-sm, 6px); */
-/*   cursor: pointer; */
-/*   transition: background 0.15s ease, color 0.15s ease; */
-/* } */
-/*  */
-/* .song-card-cancel-btn { */
-/*   color: var(--color-text-secondary, #9ca3af); */
-/* } */
-/*  */
-/* .song-card-cancel-btn:hover:not(:disabled) { */
-/*   background: var(--overlay-bg, rgba(255, 255, 255, 0.08)); */
-/*   color: var(--color-text, #ffffff); */
-/* } */
-/*  */
-/* .song-card-remove-btn { */
-/*   color: #ef4444; */
-/* } */
-/*  */
-/* .song-card-remove-btn:hover:not(:disabled) { */
-/*   background: rgba(239, 68, 68, 0.15); */
-/* } */
-/*  */
-/* .song-card-cancel-btn:disabled, */
-/* .song-card-remove-btn:disabled { */
-/*   opacity: 0.5; */
-/*   cursor: not-allowed; */
-/* } */
+/* ==========================================
+   Song Card — "Mi canción" del perfil
+   (disco de vinilo animado + preview 30s)
+   ========================================== */
+
+/* ── Layout principal: columna (portada + disco en fila → info) ── */
+.song-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Portada grande ── */
+.song-card-cover {
+  all: unset;
+  position: relative;
+  z-index: 1; /* la portada tapa la mitad izquierda del disco */
+  display: block;
+  width: var(--song-disc, 140px); /* mismo tamaño que el disco */
+  aspect-ratio: 1 / 1;
+  flex-shrink: 0;
+  border-radius: var(--radius, 10px);
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.song-card-cover-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-hover, #252525);
+  color: var(--color-text-muted, #6b7280);
+  font-size: 2rem;
+}
+
+.song-card-cover-img--empty {
+  background: linear-gradient(135deg, var(--color-surface-hover, #252525), var(--color-surface, #1a1a1a));
+}
+
+/* Botón de play flotante sobre la portada */
+.song-card-cover-btn {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--accent-color, var(--color-accent, #6b7280));
+  color: var(--accent-text-color, #000000);
+  font-size: 0.95rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.song-card-cover:hover .song-card-cover-btn {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+}
+
+.song-card-cover:active .song-card-cover-btn {
+  transform: scale(0.95);
+}
+
+.song-card-cover:focus-visible {
+  outline: 2px solid var(--accent-color, var(--color-accent, #6b7280));
+  outline-offset: 2px;
+}
+
+.song-card-cover:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.song-card-cover:disabled .song-card-cover-btn {
+  opacity: 0.6;
+}
+
+/* ── Contenedor de la portada: ancla tiempo y acciones sobre la imagen ── */
+.song-card-cover-wrap {
+  position: relative;
+  z-index: 1; /* por encima del disco (medio oculto tras la portada) */
+  flex-shrink: 0;
+}
+
+/* Tiempo: pill arriba a la izquierda de la portada */
+.song-card-cover-time {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  padding: 3px 8px;
+  border-radius: var(--radius-full, 9999px);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: #ffffff;
+  font-size: 0.64rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.2px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Acciones (editar/eliminar) sobre la portada: visibles en hover o al enfocar;
+   en táctil (sin hover) siempre visibles para no perder la accesibilidad.
+   Esquina inferior izquierda: el tiempo ocupa la sup. izq. y el play la inf. der. */
+.song-card-cover-actions {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  z-index: 3;
+  display: flex;
+  gap: 6px;
+}
+
+@media (hover: hover) {
+  .song-card-cover-actions {
+    opacity: 0;
+    transform: translateY(-4px);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+
+  /* Visibles SOLO en hover real o foco por teclado (:has(:focus-visible)).
+     NO en :focus-within: al hacer clic en play el botón conserva el foco y
+     las acciones quedaban pegadas hasta clickear fuera. Con :focus-visible
+     (solo teclado) un clic ya no las deja visibles. */
+  .song-card-cover-wrap:hover .song-card-cover-actions,
+  .song-card-cover-wrap:has(:focus-visible) .song-card-cover-actions {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.song-card-cover-action {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: #ffffff;
+  font-size: 0.72rem;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.song-card-cover-action:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.85);
+  transform: scale(1.08);
+}
+
+.song-card-cover-action--danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.9);
+}
+
+.song-card-cover-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Escenario: portada a la izquierda + disco a la derecha (asoma la mitad) ── */
+.song-card-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Composición centrada: portada y disco del MISMO tamaño (140px).
+     El disco se solapa con la portada quedando medio oculto tras ella. */
+  --song-disc: 140px;
+}
+
+.song-card-vinyl {
+  all: unset;
+  position: relative;
+  /* Margen negativo de media anchura: se tira hacia la izquierda y queda
+     medio oculto tras la portada (centro del disco = borde derecho de la
+     portada). El centrado vertical lo resuelve align-items: center. */
+  margin-left: calc(var(--song-disc, 140px) / -2);
+  width: var(--song-disc, 140px);
+  aspect-ratio: 1 / 1;
+  flex-shrink: 0;
+  border-radius: 50%;
+  z-index: 0;
+  cursor: pointer;
+  /* Surcos del vinilo + orificio central */
+  background:
+    radial-gradient(circle at center, #0a0a0a 0 5px, #1d1d1f 5.5px 7px, transparent 7.5px),
+    repeating-radial-gradient(circle at center, #101012 0 1px, #1b1b1e 1px 2.5px, #141417 2.5px 4px);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 4px 14px rgba(0, 0, 0, 0.45);
+  animation: songCardSpin 5s linear infinite;
+  animation-play-state: paused;
+}
+
+.song-card-vinyl:hover:not(:disabled) {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+    0 6px 18px rgba(0, 0, 0, 0.55);
+}
+
+.song-card-vinyl:focus-visible {
+  outline: 2px solid var(--accent-color, var(--color-accent, #6b7280));
+  outline-offset: 2px;
+}
+
+.song-card-vinyl:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.song-card-vinyl--playing {
+  animation-play-state: running;
+}
+
+.song-card-vinyl-art {
+  position: absolute;
+  inset: 17%;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--color-surface-hover, #252525);
+  box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.55);
+}
+
+@keyframes songCardSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .song-card-vinyl {
+    animation: none;
+  }
+}
+
+/* ── Info: título/artista (el progreso se ve en el contador de la portada) ── */
+.song-card-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.song-card-texts {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.song-card-title {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--accent-surface-text-color, var(--color-text, #ffffff));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.song-card-artist {
+  font-size: 0.72rem;
+  color: var(--accent-surface-text-muted, var(--color-text-muted, #6b7280));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── CTA "Agregar canción" ── */
+.song-card-add {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px dashed var(--color-border, #2a2a2a);
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.song-card-add:hover {
+  background: var(--overlay-bg, rgba(255, 255, 255, 0.08));
+  color: var(--color-text, #ffffff);
+  border-color: var(--overlay-border-hover, rgba(255, 255, 255, 0.25));
+}
+
+.song-card-add svg {
+  font-size: 0.75rem;
+  opacity: 0.6;
+}
+
+/* ── Editor inline ── */
+.song-card-search-row {
+  display: flex;
+  gap: 6px;
+}
+
+.song-card-search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  font-size: 0.8rem;
+  font-family: inherit;
+  color: var(--color-text, #ffffff);
+  background: var(--overlay-bg-subtle, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--color-border, #2a2a2a);
+  border-radius: var(--radius-sm, 6px);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.song-card-search-input::placeholder {
+  color: var(--color-text-muted, #6b7280);
+}
+
+.song-card-search-input:focus {
+  border-color: var(--overlay-border-hover, rgba(255, 255, 255, 0.25));
+}
+
+.song-card-search-btn {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm, 6px);
+  flex-shrink: 0;
+  background: var(--overlay-bg, rgba(255, 255, 255, 0.08));
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.song-card-search-btn:hover:not(:disabled) {
+  background: var(--overlay-bg-hover, rgba(255, 255, 255, 0.14));
+  color: var(--color-text, #ffffff);
+}
+
+.song-card-search-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.song-card-search-msg {
+  margin: 8px 0 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.song-card-select-hint {
+  margin: 8px 0 4px;
+  font-size: 0.68rem;
+  color: var(--color-text-muted, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* ── Resultados de búsqueda ── */
+.song-card-results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 176px;
+  overflow-y: auto;
+  padding-right: 2px;
+  margin-top: 2px;
+}
+
+.song-card-results::-webkit-scrollbar {
+  width: 4px;
+}
+
+.song-card-results::-webkit-scrollbar-thumb {
+  background: var(--color-border, #2a2a2a);
+  border-radius: 2px;
+}
+
+.song-card-result {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.song-card-result:hover {
+  background: var(--overlay-bg, rgba(255, 255, 255, 0.08));
+}
+
+.song-card-result--selected {
+  background: var(--overlay-bg, rgba(255, 255, 255, 0.08));
+  outline: 1px solid var(--overlay-border-strong, rgba(255, 255, 255, 0.4));
+}
+
+.song-card-result-art {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm, 6px);
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--color-surface-hover, #252525);
+}
+
+.song-card-result-art--empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted, #6b7280);
+  font-size: 0.7rem;
+}
+
+.song-card-result-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.song-card-result-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text, #ffffff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.song-card-result-artist {
+  font-size: 0.68rem;
+  color: var(--color-text-muted, #6b7280);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Acciones del editor ── */
+.song-card-editor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.song-card-cancel-btn,
+.song-card-remove-btn {
+  all: unset;
+  padding: 6px 10px;
+  font-size: 0.75rem;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.song-card-cancel-btn {
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+.song-card-cancel-btn:hover:not(:disabled) {
+  background: var(--overlay-bg, rgba(255, 255, 255, 0.08));
+  color: var(--color-text, #ffffff);
+}
+
+.song-card-remove-btn {
+  color: #ef4444;
+}
+
+.song-card-remove-btn:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.song-card-cancel-btn:disabled,
+.song-card-remove-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

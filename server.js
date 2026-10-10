@@ -18,10 +18,11 @@ import { readFileSync, existsSync } from 'fs';
 import { resolve, join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import http from 'http';
+import { Readable } from 'stream';
 import { buildSitemapUrls, wrapSitemapXml } from './api/_sitemap.js';
 import { issueLiveKitToken } from './api/_livekit.js';
 import { searchMusicServer, resolveTrackPreview } from './api/_music.js';
-import { combinedMusicSearch, handleStreamRequest, getMusicHealth } from './api/_musicStream.js';
+import { resolveTrackAudio, getInnertubeInfo, upstreamRangeHeader } from './api/_innertube.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIST = join(__dirname, 'dist');
@@ -473,18 +474,16 @@ app.get('/api/music-search', async (req, res) => {
   }
 });
 
-// ── Música: stream completo vía yt-dlp + ffmpeg ──
-// ⚠️ Solo server self-hosted (Vercel serverless no puede correr yt-dlp).
-// Requiere yt-dlp y ffmpeg instalados; configurables con YTDLP_BIN/FFMPEG_BIN.
+// ── Música: stream completo vía innertube (sin yt-dlp ni server externo) ──
+// Paridad con las funciones serverless de api/music/*.js.
 //
-// CORS para /api/music: el server puede exponerse vía túnel (Termux + ngrok/
-// cloudflared) y el app desplegado lo consume cross-origin. El API no usa
-// cookies → `*` es seguro. OPTIONS responde al preflight que genera el header
-// custom `ngrok-skip-browser-warning` en las peticiones fetch.
+// CORS para /api/music: por si el server se expone por túnel y el app lo
+// consume cross-origin. El API no usa cookies → `*` es seguro.
 app.use('/api/music', (req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range, ngrok-skip-browser-warning');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
   if (req.method === 'OPTIONS') {
     res.status(204).end();
     return;
@@ -493,17 +492,19 @@ app.use('/api/music', (req, res, next) => {
 });
 
 app.get('/api/music/health', async (req, res) => {
-  res.status(200).json(await getMusicHealth());
+  res.status(200).json({ ok: true, stream: 'innertube', ...getInnertubeInfo() });
 });
 
+// Alias de búsqueda de metadatos (misma respuesta que /api/music-search).
 app.get('/api/music/search', async (req, res) => {
-  // ── Modo track: preview FRESCO de Deezer (expira ≈ 15 min) — paridad con
-  //    music-server.js (Termux) y api/music-search.js (Vercel serverless)
+  const provider = req.query?.provider === 'itunes' ? 'itunes' : 'deezer';
+
+  // ── Modo track: preview FRESCO de Deezer (expira ≈ 15 min) ──
   const trackId = req.query?.track;
   if (trackId) {
     try {
-      const previewUrl = await resolveTrackPreview(trackId, 'deezer');
-      res.status(200).json({ success: true, provider: 'deezer', previewUrl });
+      const previewUrl = await resolveTrackPreview(trackId, provider);
+      res.status(200).json({ success: true, provider, previewUrl });
     } catch (err) {
       console.warn('Music preview resolve error:', err.message);
       res.status(502).json({ success: false, error: err.message });
@@ -517,16 +518,16 @@ app.get('/api/music/search', async (req, res) => {
     return;
   }
   try {
-    const data = await combinedMusicSearch(q, req.query?.limit);
-    res.status(200).json(data);
+    const results = await searchMusicServer(q, provider, req.query?.limit);
+    res.status(200).json({ success: true, provider, results });
   } catch (err) {
-    console.warn('Music combined search error:', err.message);
+    console.warn('Music search error:', err.message);
     res.status(502).json({ success: false, error: err.message });
   }
 });
 
-// ── Rate limit simple por IP para el stream (resolver yt-dlp es caro y
-//    un abuso podría hacer que YouTube bloquee la IP del server) ──
+// ── Rate limit simple por IP para el stream (cada resolución nueva golpea a
+//    innertube, y un abuso podría hacer que YouTube pida verificación) ──
 const streamLimits = new Map(); // ip → { count, resetAt }
 function rateLimitStream(req) {
   const ip = req.ip || req.socket?.remoteAddress || 'unknown';
@@ -541,9 +542,74 @@ function rateLimitStream(req) {
   return entry.count <= 15; // máx 15 streams/min por IP
 }
 
+// Trae el audio de googlevideo reenviando el Range del cliente y pipea la
+// respuesta (206 parcial incluido) para que el <audio> haga streaming y seek.
+async function proxyInnertubeAudio(req, res, track, { fresh = false } = {}) {
+  let resolved;
+  try {
+    resolved = await resolveTrackAudio(track, { fresh });
+  } catch (err) {
+    const notFound = /coincidencia razonable/.test(err.message || '');
+    res.status(notFound ? 404 : 502).json({ success: false, error: err.message });
+    return;
+  }
+
+  // ⚠️ El rango del cliente NO se reenvía tal cual: googlevideo (rqh=1) responde
+  // 403 a los rangos abiertos (`bytes=0-`, lo que manda el navegador al
+  // arrancar) y a los que pasan de ~1 MiB. Se pide siempre un bloque acotado.
+  const upstreamRange = upstreamRangeHeader(req.headers.range, resolved.contentLength);
+  if (upstreamRange === null) {
+    res.status(416).json({ success: false, error: 'Rango fuera del archivo' });
+    return;
+  }
+  const headers = { Range: upstreamRange };
+  const isFirstChunk = upstreamRange.startsWith('bytes=0-');
+
+  let upstream;
+  try {
+    upstream = await fetch(resolved.url, { headers });
+    if ((upstream.status === 403 || upstream.status === 410) && isFirstChunk) {
+      // Sólo en el primer bloque un 403 significa "URL vencida" → resolver de
+      // nuevo y reintentar una vez. Más adelante, un 403 es el tope de YouTube
+      // (no entrega más audio de esta canción desde esta IP) y reintentar sólo
+      // gastaría otra resolución.
+      resolved = await resolveTrackAudio(track, { fresh: true });
+      upstream = await fetch(resolved.url, { headers });
+    }
+  } catch (err) {
+    res.status(502).json({ success: false, error: `Audio no disponible: ${err.message}` });
+    return;
+  }
+
+  if (!upstream.ok && upstream.status !== 206) {
+    const blocked = upstream.status === 403 || upstream.status === 410;
+    res.status(blocked ? 502 : upstream.status).json({
+      success: false,
+      error: blocked
+        ? 'YouTube no entrega más audio de esta canción desde esta IP'
+        : `El CDN de YouTube respondió ${upstream.status}`,
+    });
+    return;
+  }
+
+  res.status(upstream.status);
+  res.setHeader('Content-Type', upstream.headers.get('content-type') || resolved.mimeType || 'audio/mp4');
+  res.setHeader('Accept-Ranges', 'bytes');
+  res.setHeader('Cache-Control', 'no-store');
+  for (const header of ['content-length', 'content-range']) {
+    const value = upstream.headers.get(header);
+    if (value) res.setHeader(header, value);
+  }
+
+  const nodeStream = Readable.fromWeb(upstream.body);
+  nodeStream.on('error', () => res.destroy());
+  res.on('close', () => nodeStream.destroy());
+  nodeStream.pipe(res);
+}
+
 app.get('/api/music/stream', async (req, res) => {
-  const { artist = '', title = '', duration = 0, fresh } = req.query || {};
-  if (!title) {
+  const { artist = '', title = '', videoId = '', duration = 0, fresh } = req.query || {};
+  if (!title && !videoId) {
     res.status(400).json({ success: false, error: 'Missing ?title parameter' });
     return;
   }
@@ -551,7 +617,35 @@ app.get('/api/music/stream', async (req, res) => {
     res.status(429).json({ success: false, error: 'Too many stream requests, try again in a minute' });
     return;
   }
-  await handleStreamRequest(req, res, { artist, title, duration, fresh: fresh === '1' });
+  await proxyInnertubeAudio(
+    req,
+    res,
+    { artist, title, videoId, duration: Number(duration) || 0 },
+    { fresh: fresh === '1' }
+  );
+});
+
+// Precalienta la resolución sin enviar audio (mismo contrato que api/music/resolve.js).
+app.get('/api/music/resolve', async (req, res) => {
+  const { artist = '', title = '', videoId = '', duration = 0 } = req.query || {};
+  if (!title && !videoId) {
+    res.status(400).json({ success: false, error: 'Missing ?title parameter' });
+    return;
+  }
+  try {
+    const resolved = await resolveTrackAudio({ artist, title, videoId, duration: Number(duration) || 0 });
+    res.status(200).json({
+      success: true,
+      videoId: resolved.videoId,
+      itag: resolved.itag,
+      mimeType: resolved.mimeType,
+      contentLength: resolved.contentLength,
+      cached: !!resolved.cached,
+    });
+  } catch (err) {
+    const notFound = /coincidencia razonable/.test(err.message || '');
+    res.status(notFound ? 404 : 502).json({ success: false, error: err.message });
+  }
 });
 
 // ── Route-based OG tag configuration ──

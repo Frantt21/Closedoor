@@ -1,73 +1,153 @@
 /**
- * Vercel serverless function — proxy de STREAMING progresivo para el music server.
+ * Vercel serverless function — stream de audio de una canción.
  *
- * Los REWRITES de Vercel no dejan pasar streams chunked (403/timeout). Pero las
- * FUNCIONES serverless de Node.js sí soportan respuestas streaming (enviadas por
- * chunks, sin el límite de payload de 4.5MB): esto proxya /api/music/stream del
- * music server (yt-dlp + ffmpeg) en tiempo real, misma-origen y por HTTPS.
+ * Reemplaza al proxy del music server (yt-dlp + ffmpeg): ahora resuelve el
+ * stream con la API innertube (ver api/_innertube.js) y proxya el archivo de
+ * googlevideo.
  *
- * Cómo se usa:
- *   https://app.foranly.space/api/music/stream?artist=...&title=...&duration=...
+ * Por qué se proxya (y no se devuelve la URL al navegador):
+ *  - La URL de googlevideo está firmada para la IP que la resolvió: desde el
+ *    navegador daría 403.
+ *  - Está atada a una sesión/expira (~6 h), así que no se puede cachear en el
+ *    cliente indefinidamente.
+ * El proxy traduce el `Range` del cliente a un bloque acotado (googlevideo
+ * rechaza con 403 los rangos abiertos y los que pasan de ~1 MiB: ver
+ * upstreamRangeHeader) y devuelve el 206 con su `Content-Range` real, así el
+ * <audio> hace streaming progresivo y puede buscar (seek) dentro de la canción.
  *
- * Notas:
- *  - El tope de duración (maxDuration) aplica al reloj de TODA la descarga; si
- *    googlevideo va lento (throttling a IP de datacenter), el stream puede
- *    cortarse a los maxDuration segundos. Por eso el frontend usa por defecto
- *    el TÚNEL HTTPS automático (cloudflared, sin tope) y esta función solo si
- *    VITE_MUSIC_STREAM_VIA_VERCEL=1 o no hay túnel.
- *  - maxDuration: 60 es seguro en todos los planes Hobby (Fluid Compute permite
- *    hasta 300). Súbelo si tu plan lo admite y ves cortes.
- *  - No acumula el body en memoria: pipea el ReadableStream del upstream directo
- *    al Response (requiere Node >= 18 / fetch con body streaming).
+ * Uso:
+ *   GET /api/music/stream?artist=Daft%20Punk&title=Get%20Lucky&duration=248
+ *   GET /api/music/stream?videoId=dQw4w9WgXcQ          (atajo si ya se conoce)
+ *
+ * Respuestas: 200/206 audio, 400 falta título, 404 sin coincidencia razonable,
+ * 502 fallo al resolver o al traer el audio.
  */
+
+import { resolveTrackAudio, upstreamRangeHeader } from '../_innertube.js';
 
 export const config = {
   runtime: 'nodejs',
   supportsResponseStreaming: true,
+  // Tope del reloj de la función. Cada petición sirve como máximo un bloque de
+  // 1 MiB (ver upstreamRangeHeader), así que el tiempo de la función no depende
+  // de la duración de la canción: el <audio> pide el resto en peticiones
+  // sucesivas y cada una arranca su propio reloj.
   maxDuration: 60,
 };
 
-const UPSTREAM_BASE = process.env.MUSIC_SERVER_URL || 'http://mapi.foranly.space:24633';
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+  'Access-Control-Allow-Headers': 'Range, Content-Type',
+  'Access-Control-Expose-Headers': 'Content-Length, Content-Range, Accept-Ranges',
+};
+
+const AUDIO_TIMEOUT_MS = 20_000;
+
+function jsonResponse(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+  });
+}
+
+/**
+ * Trae el audio del CDN de YouTube con un rango ACOTADO.
+ *
+ * ⚠️ El `Range` del cliente nunca se reenvía tal cual: las URLs de innertube
+ * llevan `rqh=1` y googlevideo responde 403 tanto a los rangos abiertos
+ * (`bytes=0-`, justo lo que manda el navegador al arrancar el <audio>) como a los
+ * que pasan de ~1 MiB. Ver upstreamRangeHeader en api/_innertube.js.
+ */
+async function fetchAudio(streamUrl, rangeHeader, userAgent) {
+  const headers = { Range: rangeHeader };
+  if (userAgent) headers['User-Agent'] = userAgent;
+
+  return fetch(streamUrl, {
+    headers,
+    signal: AbortSignal.timeout(AUDIO_TIMEOUT_MS),
+  });
+}
 
 export default async function handler(req) {
-  const url = new URL(req.url, 'https://app.foranly.space');
-  const artist = url.searchParams.get('artist') || '';
-  const title = url.searchParams.get('title') || '';
-  const duration = url.searchParams.get('duration') || 0;
-
-  if (!title) {
-    return new Response(JSON.stringify({ success: false, error: 'Missing ?title parameter' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json' },
-    });
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    return jsonResponse({ success: false, error: 'Method not allowed' }, 405);
   }
 
-  const qs = new URLSearchParams({ artist, title });
-  if (duration) qs.set('duration', String(duration));
+  const url = new URL(req.url, 'https://app.foranly.space');
+  const artist = url.searchParams.get('artist') || '';
+  const title = (url.searchParams.get('title') || '').trim();
+  const videoId = url.searchParams.get('videoId') || '';
+  const duration = Number(url.searchParams.get('duration')) || 0;
+
+  if (!title && !videoId) {
+    return jsonResponse({ success: false, error: 'Falta ?title o ?videoId' }, 400);
+  }
+
+  // ── Resolver (con caché en memoria del proceso) ──
+  let resolved;
+  try {
+    resolved = await resolveTrackAudio({ artist, title, duration, videoId });
+  } catch (err) {
+    const notFound = /coincidencia razonable/.test(err.message || '');
+    return jsonResponse(
+      { success: false, error: err.message || 'No se pudo resolver el stream' },
+      notFound ? 404 : 502
+    );
+  }
+
+  // ── Traer el audio (y reintentar UNA vez re-resolviendo si la URL venció) ──
+  const upstreamRange = upstreamRangeHeader(req.headers.get('range'), resolved.contentLength);
+  if (upstreamRange === null) {
+    return jsonResponse({ success: false, error: 'Rango fuera del archivo' }, 416);
+  }
+  const isFirstChunk = upstreamRange.startsWith('bytes=0-');
+  const userAgent = req.headers.get('user-agent');
 
   let upstream;
   try {
-    upstream = await fetch(`${UPSTREAM_BASE}/api/music/stream?${qs.toString()}`);
+    upstream = await fetchAudio(resolved.url, upstreamRange, userAgent);
+    if ((upstream.status === 403 || upstream.status === 410) && isFirstChunk) {
+      // Sólo en el primer bloque un 403 significa "URL vencida" → resolver de
+      // nuevo y reintentar. Más adelante es el tope de YouTube (no entrega más
+      // audio de esta canción desde esta IP) y reintentar no ayudaría.
+      resolved = await resolveTrackAudio({ artist, title, duration, videoId }, { fresh: true });
+      upstream = await fetchAudio(resolved.url, upstreamRange, userAgent);
+    }
   } catch (err) {
-    return new Response(
-      JSON.stringify({ success: false, error: `Music server unreachable: ${err.message}` }),
-      { status: 502, headers: { 'Content-Type': 'application/json' } }
+    return jsonResponse({ success: false, error: `Audio no disponible: ${err.message}` }, 502);
+  }
+
+  if (!upstream.ok && upstream.status !== 206) {
+    const blocked = upstream.status === 403 || upstream.status === 410;
+    return jsonResponse(
+      {
+        success: false,
+        error: blocked
+          ? 'YouTube no entrega más audio de esta canción desde esta IP'
+          : `El CDN de YouTube respondió ${upstream.status}`,
+      },
+      blocked ? 502 : upstream.status
     );
   }
 
-  if (!upstream.ok) {
-    return new Response(
-      JSON.stringify({ success: false, error: `Music server responded ${upstream.status}` }),
-      { status: upstream.status, headers: { 'Content-Type': 'application/json' } }
-    );
-  }
-
-  // Pipea el stream del upstream directo al cliente (sin bufferizar).
+  // ── Pasar la respuesta tal cual (206 con Range, 200 sin él) ──
   const headers = {
-    'Content-Type': upstream.headers.get('content-type') || 'audio/mp4',
+    'Content-Type': upstream.headers.get('content-type') || resolved.mimeType || 'audio/mp4',
+    'Accept-Ranges': 'bytes',
     'Cache-Control': 'no-store',
+    ...CORS_HEADERS,
   };
-  const contentLength = upstream.headers.get('content-length');
-  if (contentLength) headers['Content-Length'] = contentLength;
-  return new Response(upstream.body, { status: 200, headers });
+  for (const header of ['content-length', 'content-range']) {
+    const value = upstream.headers.get(header);
+    if (value) headers[header === 'content-length' ? 'Content-Length' : 'Content-Range'] = value;
+  }
+
+  if (req.method === 'HEAD') {
+    return new Response(null, { status: upstream.status, headers });
+  }
+  return new Response(upstream.body, { status: upstream.status, headers });
 }

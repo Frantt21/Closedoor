@@ -78,5 +78,43 @@
         "メンションとハッシュタグは、書式設定されたテキスト内で引き続き機能します。"
       ]
     }
+  },
+  "2026-10-10+2:4x09xw": {
+    "es": {
+      "title": "La canción de tu perfil, ahora transmitida de verdad",
+      "items": [
+        "La canción que fijes en tu perfil ahora reproduce la pista en sí, no solo la vista previa de 30 segundos.",
+        "Puedes buscar dentro de la pista mientras se transmite.",
+        "El audio se resuelve dentro de la propia aplicación, por lo que funciona igual en producción y localmente.",
+        "Si una canción no se puede reproducir en su totalidad, la tarjeta vuelve automáticamente a la vista previa."
+      ]
+    },
+    "pt": {
+      "title": "Sua música de perfil, agora transmitida de verdade",
+      "items": [
+        "A música que você fixa em seu perfil agora reproduz a faixa em si, não apenas a prévia de 30 segundos.",
+        "Você pode pesquisar na faixa enquanto ela é transmitida.",
+        "O áudio é resolvido dentro do próprio aplicativo, por isso funciona da mesma forma em produção e localmente.",
+        "Se uma música não puder ser reproduzida por completo, o cartão volta automaticamente para a visualização."
+      ]
+    },
+    "ru": {
+      "title": "Песня из вашего профиля теперь звучит по-настоящему",
+      "items": [
+        "Песня, которую вы прикрепляете в своем профиле, теперь воспроизводит саму дорожку, а не только 30-секундный предварительный просмотр.",
+        "Вы можете искать трек во время его трансляции.",
+        "Звук обрабатывается внутри самого приложения, поэтому он работает одинаково как в рабочей среде, так и локально.",
+        "Если песню невозможно воспроизвести полностью, карта автоматически возвращается к предварительному просмотру."
+      ]
+    },
+    "ja": {
+      "title": "あなたのプロフィールソングが本格的にストリーミング配信中",
+      "items": [
+        "プロフィールにピン留めした曲は、30 秒のプレビューだけでなく、トラック自体も再生されるようになりました。",
+        "ストリーミング中にトラック内をシークできます。",
+        "オーディオはアプリ自体の内部で解決されるため、本番環境でもローカルでも同様に動作します。",
+        "曲を完全に再生できない場合、カードは自動的にプレビューに戻ります。"
+      ]
+    }
   }
 }
