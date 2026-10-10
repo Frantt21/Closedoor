@@ -386,6 +386,47 @@ check('health informa provider y clientes', info.provider === 'innertube' && inf
   clearInterval(keepAlive);
 }
 
+// ── 17. Pre-warm servido por el MISMO handler del stream ──
+// En Vercel cada archivo de api/ es una función distinta (memoria propia), así
+// que precalentar desde /api/music/resolve no compartía la caché con
+// /api/music/stream. El pre-warm se pide ahora a esta misma función con
+// `prewarm=1`: resuelve y cachea, y NO descarga audio.
+{
+  clearInnertubeCaches();
+  let gvHits = 0;
+  globalThis.fetch = async (url, options = {}) => {
+    const target = String(url);
+    if (target.startsWith('https://gv/')) gvHits++;
+    if (target.includes('/results?')) {
+      return { ok: true, status: 200, text: async () => SEARCH_HTML };
+    }
+    if (target.includes('/youtubei/v1/player')) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ playabilityStatus: { status: 'OK' }, streamingData: { adaptiveFormats: AUDIO_FORMATS, formats: [] } }),
+      };
+    }
+    throw new Error(`fetch inesperado en el test: ${target}`);
+  };
+
+  const { default: streamHandler } = await import('../api/music/stream.js');
+  const q = 'artist=Rick%20Astley&title=Never%20Gonna%20Give%20You%20Up&duration=213';
+
+  const warm = await streamHandler(
+    new Request(`https://app.foranly.space/api/music/stream?${q}&prewarm=1`)
+  );
+  const warmBody = await warm.json();
+  check('prewarm: responde JSON 200 (sin audio)', warm.status === 200 && /application\/json/.test(warm.headers.get('content-type') || ''), `status=${warm.status} ct=${warm.headers.get('content-type')}`);
+  check('prewarm: se identifica como prewarm', warmBody.prewarm === true && warmBody.success === true);
+  check('prewarm: devuelve el formato resuelto', warmBody.videoId === 'dQw4w9WgXcQ' && warmBody.itag === 140, `${warmBody.videoId}/${warmBody.itag}`);
+  check('prewarm: NO descarga audio del CDN', gvHits === 0, `${gvHits} peticiones a googlevideo`);
+
+  // Y deja la caché caliente para la petición real, en el mismo proceso
+  const cachedResolve = await resolveTrackAudio({ artist: 'Rick Astley', title: 'Never Gonna Give You Up', duration: 213 });
+  check('prewarm: la resolución posterior es caché', cachedResolve.cached === true);
+}
+
 globalThis.fetch = realFetch;
 console.log(failures === 0 ? '\nTODO OK' : `\nFALLARON ${failures}`);
 process.exit(failures === 0 ? 0 : 1);

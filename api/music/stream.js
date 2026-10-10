@@ -18,9 +18,17 @@
  * Uso:
  *   GET /api/music/stream?artist=Daft%20Punk&title=Get%20Lucky&duration=248
  *   GET /api/music/stream?videoId=dQw4w9WgXcQ          (atajo si ya se conoce)
+ *   GET /api/music/stream?artist=…&title=…&prewarm=1   (resuelve SIN audio)
  *
- * Respuestas: 200/206 audio, 400 falta título, 404 sin coincidencia razonable,
- * 502 fallo al resolver o al traer el audio.
+ * ⚠️ El pre-warm vive AQUÍ y no en /api/music/resolve a propósito: en Vercel cada
+ * archivo de `api/` es una función distinta (contenedor y memoria propios), así
+ * que precalentar desde otra función no compartía la caché y el stream pagaba la
+ * resolución completa igualmente. Pidiendo `prewarm=1` a ESTA función, la
+ * resolución queda cacheada en la instancia que después sirve el audio.
+ *
+ * Respuestas: 200/206 audio, 200 JSON (prewarm), 400 falta título, 404 sin
+ * coincidencia razonable, 504 presupuesto de resolución agotado, 502 fallo al
+ * resolver o al traer el audio.
  */
 
 import {
@@ -52,12 +60,14 @@ const CORS_HEADERS = {
 // Cada bloque es ≤1 MiB: en 12 s o llega o esa URL no sirve. Con dos intentos
 // posibles, un CDN colgado consume 24 s como máximo (y el total sigue por
 // debajo del tope de la función: ver maxDuration).
-const AUDIO_TIMEOUT_MS = 12_000;
+const AUDIO_TIMEOUT_MS = 10_000;
 
 // Presupuestos de resolución DENTRO de esta función. La suma del peor caso tiene
-// que caber en maxDuration (60 s): primera resolución + intento de audio +
-// re-resolución (URL caducada) + intento = 20 + 12 + 12 + 12 = 56 s. El default
-// del resolver (25 s) se reserva para /resolve (pre-warm, cuyo tope son 30 s).
+// que caber en maxDuration (60 s, verificado en producción que Vercel lo respeta:
+// la función moría a los 60,4 s): primera resolución + intento de audio +
+// re-resolución (URL caducada) + intento = 20 + 10 + 12 + 10 = 52 s, con ~8 s de
+// margen para el arranque en frío. El default del resolver (25 s) se reserva para
+// /resolve, cuyo tope son 30 s.
 const RESOLVE_BUDGET_FIRST_MS = 20_000;
 const RESOLVE_BUDGET_RETRY_MS = 12_000;
 
@@ -99,6 +109,7 @@ export default async function handler(req) {
   const title = (url.searchParams.get('title') || '').trim();
   const videoId = url.searchParams.get('videoId') || '';
   const duration = Number(url.searchParams.get('duration')) || 0;
+  const prewarm = url.searchParams.get('prewarm') === '1';
 
   if (!title && !videoId) {
     return jsonResponse({ success: false, error: 'Falta ?title o ?videoId' }, 400);
@@ -120,6 +131,21 @@ export default async function handler(req) {
       { success: false, error: err.message || 'No se pudo resolver el stream' },
       status
     );
+  }
+
+  // ── Pre-warm: resolver y cachear en ESTA instancia, sin tocar el CDN ──
+  if (prewarm) {
+    return jsonResponse({
+      success: true,
+      prewarm: true,
+      videoId: resolved.videoId,
+      itag: resolved.itag,
+      mimeType: resolved.mimeType,
+      contentLength: resolved.contentLength,
+      playable: resolved.playable !== false,
+      degraded: !!resolved.degraded,
+      cached: !!resolved.cached,
+    });
   }
 
   // ── Traer el audio ──

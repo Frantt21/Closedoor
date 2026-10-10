@@ -106,18 +106,21 @@ export function getStreamUrl(song) {
  * tramo que entrega el CDN → la card reproduce directo el preview de 30 s. Nunca
  * rechaza: el pre-warm no debe romper nada.
  *
- * NO se puerta detrás de /health: en producción la primera llamada a una función
- * serverless puede tardar (instancia fría) y con el gate el pre-warm se saltaba
- * justo cuando más falta hace (la primera reproducción), dejando que el stream
- * pagara la resolución completa dentro de su propio tiempo de función. El
- * endpoint /api/music/health sigue existiendo para diagnóstico.
+ * Se pide a `/stream?...&prewarm=1` y NO a `/api/music/resolve`: en Vercel cada
+ * archivo de `api/` es una función distinta (memoria propia), así que precalentar
+ * desde otra función no compartía la caché y el stream pagaba igualmente la
+ * resolución completa dentro de su reloj (de ahí los 504 de producción).
+ *
+ * NO se puerta detrás de /health: la primera llamada a una función serverless
+ * puede tardar (instancia fría) y con el gate el pre-warm se saltaba justo cuando
+ * más falta hace (la primera reproducción).
  */
 export function prewarmStream(song) {
   if (!song?.title || !song?.artist) return Promise.resolve(null);
-  const params = new URLSearchParams({ artist: song.artist, title: song.title });
+  const params = new URLSearchParams({ artist: song.artist, title: song.title, prewarm: '1' });
   if (song.duration) params.set('duration', String(song.duration));
 
-  return fetch(`${MUSIC_API}/resolve?${params.toString()}`, { signal: AbortSignal.timeout(20000) })
+  return fetch(`${MUSIC_API}/stream?${params.toString()}`, { signal: AbortSignal.timeout(20000) })
     .then((res) => (res.ok ? res.json() : null))
     .catch(() => null);
 }
