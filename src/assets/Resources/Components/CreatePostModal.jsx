@@ -311,9 +311,8 @@ export default function CreatePostModal({
     setImageUrls((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // ── Upload post image to CDN (optimistic: local preview, then background upload) ──
-  const handlePostImageUpload = async (e, index) => {
-    const file = e.target.files?.[0];
+  // ── Upload a post image file to CDN (optimistic: local preview, then background upload) ──
+  const uploadPostImage = useCallback(async (file, index) => {
     if (!file || !userId) return;
 
     if (!file.type.startsWith('image/')) {
@@ -367,9 +366,50 @@ export default function CreatePostModal({
       });
     } finally {
       setUploadingPostIndex(-1); // solo habilitar submit cuando ya tenemos la URL real
-      e.target.value = '';
     }
+  }, [userId, t]);
+
+  // ── Input file de las imágenes del post ──
+  const handlePostImageUpload = async (e, index) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    await uploadPostImage(file, index);
+    e.target.value = '';
   };
+
+  // ── Pegar imagen (Ctrl+V) en el editor → sube directo y agrega al media ──
+  const handlePostPaste = useCallback(async (e) => {
+    if (!userId) return;
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    // Buscar una imagen en el portapapeles (si es texto normal, dejar el paste por defecto)
+    let file = null;
+    for (const item of items) {
+      if (item.kind === 'file' && item.type.startsWith('image/')) {
+        file = item.getAsFile();
+        if (file) break;
+      }
+    }
+    if (!file) return;
+
+    e.preventDefault();
+    if (uploadingPostIndex !== -1) return; // evita uploads concurrentes (mismo guard que el input file)
+
+    // Reusar el primer slot vacío; si no hay, agregar uno nuevo (máx 4 imágenes)
+    const emptyIdx = imageUrls.findIndex((u) => !u.trim());
+    if (emptyIdx === -1 && imageUrls.length >= 4) {
+      setMediaLimitWarning(t('create_post.media_limit_warning'));
+      return;
+    }
+    const targetIndex = emptyIdx !== -1 ? emptyIdx : imageUrls.length;
+    if (targetIndex === imageUrls.length) {
+      setImageUrls((prev) => [...prev, '']);
+    }
+    setMediaLimitWarning(null);
+    setShowImageSection(true);
+    await uploadPostImage(file, targetIndex);
+  }, [userId, imageUrls, uploadingPostIndex, t, uploadPostImage]);
 
   const handleSubmit = async () => {
     const trimmed = content.trim();
@@ -683,9 +723,11 @@ export default function CreatePostModal({
                 value={content}
                 onChange={handleContentChange}
                 onKeyDown={handleTextareaKeyDown}
+                onPaste={handlePostPaste}
                 rows={5}
                 placeholder={t('create_post.placeholder')}
                 maxLength={2000}
+                title={t('create_post.paste_image_hint') || 'Paste an image with Ctrl+V'}
               />
               <span className="create-post-charcount">{content.length}/2000</span>
               {/* ── @mention autocomplete dropdown (portaled) ── */}

@@ -286,6 +286,7 @@
   "create_post.mention_hint": "What's on your mind? Use @user to mention someone.",
   "create_post.no_users_found": "No users found",
   "create_post.obfuscated_preview_label": "How others will see it:",
+  "create_post.paste_image_hint": "Paste an image with Ctrl+V",
   "create_post.placeholder": "What's on your mind?",
   "create_post.poll_add_option": "Add option",
   "create_post.poll_encrypted_conflict": "You can't have a poll in an obfuscated post",

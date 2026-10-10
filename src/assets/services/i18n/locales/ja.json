@@ -284,6 +284,7 @@
   "create_post.mention_hint": "何を考えていますか？ @user でメンションできます。",
   "create_post.no_users_found": "結果なし",
   "create_post.obfuscated_preview_label": "他の人にはこう見えます:",
+  "create_post.paste_image_hint": "Ctrl+Vで画像を貼り付け",
   "create_post.placeholder": "何を考えていますか？",
   "create_post.poll_add_option": "選択肢を追加",
   "create_post.poll_encrypted_conflict": "難読化された投稿にアンケートは追加できません",

@@ -284,6 +284,7 @@
   "create_post.mention_hint": "О чём вы думаете? Используйте @user для упоминания.",
   "create_post.no_users_found": "Ничего не найдено",
   "create_post.obfuscated_preview_label": "Как видят другие:",
+  "create_post.paste_image_hint": "Вставьте изображение с помощью Ctrl+V",
   "create_post.placeholder": "О чём вы думаете?",
   "create_post.poll_add_option": "Добавить вариант",
   "create_post.poll_encrypted_conflict": "Нельзя добавить опрос в скрытый пост",

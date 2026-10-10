@@ -284,6 +284,7 @@
   "create_post.mention_hint": "O que você está pensando? Use @usuario para mencionar alguém.",
   "create_post.no_users_found": "Sem resultados",
   "create_post.obfuscated_preview_label": "Como os outros veem:",
+  "create_post.paste_image_hint": "Cole uma imagem com Ctrl+V",
   "create_post.placeholder": "O que você está pensando?",
   "create_post.poll_add_option": "Adicionar opção",
   "create_post.poll_encrypted_conflict": "Você não pode ter uma enquete em um post ofuscado",
