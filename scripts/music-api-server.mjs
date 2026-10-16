@@ -17,6 +17,9 @@
  * Uso:
  *   MUSIC_PORT=5990 node scripts/music-api-server.mjs      (o `npm run music-api`)
  *   MUSIC_HOST=127.0.0.1 MUSIC_PORT=5990 npm run music-api  (solo loopback)
+ *   (en Pterodactyl/Wings, si no hay MUSIC_PORT ni PORT se usa SERVER_PORT, el
+ *   puerto que el panel ya tiene asignado: sin esto el proceso se queda en 5990
+ *   y la URL publica del contenedor da connection refused)
  *
  * Rutas: /api/music/health, /api/music/resolve, /api/music/stream (con Range y
  * `prewarm=1`), /api/music-search. CORS `*` para poder llamarlo también desde el
@@ -29,7 +32,18 @@
 import http from 'node:http';
 import { createMusicRequestListener } from '../api/_musicHttp.js';
 
-const PORT = Number(process.env.MUSIC_PORT || process.env.PORT || 5990);
+// Orden de precedencia: MUSIC_PORT (explicito) > PORT (convencion de PaaS) >
+// SERVER_PORT (Pterodactyl/Wings, el puerto asignado al contenedor) > 5990.
+// SERVER_PORT importa: en esos paneles el puerto publico es el asignado, y si
+// el proceso escucha en 5990 la URL publica no llega a nada.
+const PORT_SOURCE = process.env.MUSIC_PORT
+  ? 'MUSIC_PORT'
+  : process.env.PORT
+    ? 'PORT'
+    : process.env.SERVER_PORT
+      ? 'SERVER_PORT'
+      : 'por defecto';
+const PORT = Number(process.env.MUSIC_PORT || process.env.PORT || process.env.SERVER_PORT || 5990);
 const HOST = process.env.MUSIC_HOST || '0.0.0.0';
 const QUIET = process.env.MUSIC_QUIET === '1';
 
@@ -63,7 +77,7 @@ server.headersTimeout = 70_000;
 server.requestTimeout = 0; // el streaming de un bloque puede tardar
 
 server.listen(PORT, HOST, () => {
-  console.log(`🎵 music-api escuchando en http://${HOST}:${PORT}`);
+  console.log(`🎵 music-api escuchando en http://${HOST}:${PORT} (puerto: ${PORT_SOURCE})`);
   console.log(`   health: http://localhost:${PORT}/api/music/health`);
   console.log('   rewrite para vercel.json:');
   console.log(`     { "source": "/api/music/(.*)", "destination": "http://TU-HOST:${PORT}/api/music/$1" }`);

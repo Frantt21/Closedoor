@@ -27,8 +27,40 @@
  *   MUSIC_QUIET=1 para silenciar el log de peticiones.
  */
 
-import('./scripts/music-api-server.mjs').catch((err) => {
-  console.error('[music-server] no se pudo arrancar el servidor de música:');
+/** Modulo real del servidor, ojo: la ruta es relativa a ESTE archivo. */
+const SERVER_MODULE = './scripts/music-api-server.mjs';
+
+/**
+ * Los 7 archivos que tienen que estar en el host, en estas rutas exactas.
+ * Lista estatica a proposito: leer el disco aqui exigiria `fs` + `import.meta`
+ * (o `__dirname`), y eso ataria este archivo a ESM o a CommonJS. Un error claro
+ * con la lista es toda la ayuda que hace falta cuando falta un archivo.
+ */
+const REQUIRED_FILES = [
+  'scripts/music-api-server.mjs',
+  'api/_musicHttp.js',
+  'api/_music.js',
+  'api/_innertube.js',
+  'api/music/health.js',
+  'api/music/resolve.js',
+  'api/music/stream.js',
+];
+
+import(SERVER_MODULE).catch((err) => {
+  // ERR_MODULE_NOT_FOUND trae la ruta que no encontro: decirla evita tener que
+  // adivinar cual de los 7 falta (el stack de node la entierra entre frames).
+  const missing =
+    typeof err?.url === 'string' && err.url.startsWith('file:')
+      ? decodeURIComponent(new URL(err.url).pathname)
+      : null;
+
+  console.error('[music-server] no se pudo arrancar el servidor de música.');
+  if (missing) console.error(`[music-server] falta este archivo: ${missing}`);
+  console.error(
+    '[music-server] deben existir, junto a este music-server.js, estas rutas exactas:'
+  );
+  for (const file of REQUIRED_FILES) console.error(`  - ${file}`);
+  console.error('[music-server] error original:');
   console.error(err);
   process.exit(1);
 });
