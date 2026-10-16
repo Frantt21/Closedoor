@@ -534,6 +534,14 @@ export async function resolveVideoAudio(videoId, { budgetMs = 0 } = {}) {
   // sólo si ningún cliente ofrece un formato que sí quepa (playable:false → la
   // card reproduce el preview de 30 s en vez de un stream condenado).
   let tooBig = null;
+  // Resolución que SÍ cabría entera pero SIN red de seguridad (audio-only y el
+  // cliente no expone `formats` muxed). Las URLs audio-only están "gated": el
+  // CDN puede rechazar su primer bloque, y sin muxed no hay a qué caer → la
+  // card se quedaba en el preview de 30 s. Medido el 2026-10-16 con Feid -
+  // Ferxxo 100: ANDROID_VR bloqueado, IOS OK pero muxed=0 (y su itag 139 cabía
+  // entero → devolvía ahí), ANDROID OK con el itag 18 de reserva. Por eso una
+  // resolución sin red sólo se acepta si NINGÚN cliente ofrece una con red.
+  let bestEffort = null;
 
   for (const apiClient of CLIENTS) {
     // Sin presupuesto suficiente no se arranca otro cliente: es preferible
@@ -602,13 +610,23 @@ export async function resolveVideoAudio(videoId, { budgetMs = 0 } = {}) {
       fallbackLength: isMuxed ? 0 : Number(muxed?.contentLength) || 0,
     };
 
-    // Si cabe ENTERA es la buena y no se consulta a los demás clientes.
-    if (entry.playable) return entry;
+    // Cabe ENTERA y trae red de seguridad (muxed, o es el propio muxed): es la
+    // buena y no se consulta a los demás clientes.
+    if (entry.playable && (isMuxed || entry.fallbackUrl)) return entry;
+    // Cabe entera pero sin red: se guarda y se sigue probando por si otro
+    // cliente trae el muxed de reserva (ANDROID lo expone, VR/IOS no).
+    if (entry.playable) {
+      if (!bestEffort) bestEffort = entry;
+      continue;
+    }
     // Si no cabe se prueba el siguiente cliente (ANDROID expone los itags de
     // baja calidad, VR/IOS no) antes de rendirse con esta.
     if (!tooBig) tooBig = entry;
   }
 
+  // Preferencia: lo que cabe entero (con red si la hubo, si no sin ella) antes
+  // que una pista que no cabe y fuerza el preview de 30 s.
+  if (bestEffort) return bestEffort;
   if (tooBig) return tooBig;
   // Se agotó el presupuesto (o no quedaba margen para otro cliente) y no hay
   // nada utilizable: el error honesto es el timeout, no "todos los clientes
