@@ -12,6 +12,8 @@ import AppLoader from './assets/Resources/Components/AppLoader';
 import MobileNav from './assets/Resources/Components/MobileNav';
 import ChangelogModal from './assets/Resources/Components/ChangelogModal';
 import DesktopAppPrompt from './assets/Resources/Components/DesktopAppPrompt';
+import TitleBar from './assets/Resources/Components/TitleBar';
+import DeployUpdatePrompt from './assets/Resources/Components/DeployUpdatePrompt';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -187,7 +189,10 @@ function App() {
   return (
     <I18nProvider>
       <CallProvider>
-      <AppLoader>
+        {/* Barra de título propia: solo se pinta dentro de la app de escritorio
+            (Electron); en el navegador no renderiza nada. */}
+        <TitleBar />
+        <AppLoader>
         <div className={isChatRoute ? "app-layout app-layout--chat" : "app-layout"}>
           {/* Components */}
           <ScrollToTop />
@@ -234,6 +239,8 @@ function App() {
           {/* Aviso de la app de escritorio: sale al reproducir una canción en el
               navegador (SongCard → notifyBrowserPlayback). */}
           <DesktopAppPrompt />
+          {/* Aviso de build nuevo desplegado: deployWatcher → recargar. */}
+          <DeployUpdatePrompt />
           <ToastContainer
             position="top-right"
             autoClose={3000}

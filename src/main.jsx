@@ -5,6 +5,7 @@ import App from './App.jsx'
 import { AuthProvider } from './context/AuthContext'
 import { NotificationProvider } from './context/NotificationContext'
 import { UserStatusProvider } from './context/UserStatusContext'
+import { startDeployWatcher } from './assets/services/deployWatcher'
 import './assets/Resources/Styles/global.css'
 
 // ── Hide the pre-rendered hero placeholder as soon as JS executes ──
@@ -35,6 +36,9 @@ if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', setAppHeight);
   window.visualViewport.addEventListener('scroll', setAppHeight);
 }
+
+// ── Detectar un build nuevo desplegado en el servidor (avisa para recargar) ──
+startDeployWatcher();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

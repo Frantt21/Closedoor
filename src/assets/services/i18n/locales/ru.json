@@ -767,5 +767,9 @@
   "download.version": "Версия",
   "download.note": "Сборки пока не подписаны: Windows или macOS могут предупредить при первом запуске.",
   "download.note_unpublished": "Установщики готовятся — ссылки появятся здесь.",
-  "post.paste_image_hint": "Вставьте изображение через Ctrl+V"
+  "post.paste_image_hint": "Вставьте изображение через Ctrl+V",
+  "update.title": "Доступна новая версия",
+  "update.body": "Доступна новая версия Foranly. Перезагрузите, чтобы обновиться.",
+  "update.reload": "Перезагрузить",
+  "update.later": "Позже"
 }

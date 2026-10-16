@@ -767,5 +767,9 @@
   "download.version": "Versão",
   "download.note": "Os instaladores ainda não são assinados: Windows ou macOS podem avisar na primeira vez que você abrir.",
   "download.note_unpublished": "Estamos preparando os instaladores — os links aparecerão aqui.",
-  "post.paste_image_hint": "Cole uma imagem com Ctrl+V"
+  "post.paste_image_hint": "Cole uma imagem com Ctrl+V",
+  "update.title": "Nova versão disponível",
+  "update.body": "Há uma nova versão do Foranly. Recarregue para atualizar.",
+  "update.reload": "Recarregar",
+  "update.later": "Mais tarde"
 }

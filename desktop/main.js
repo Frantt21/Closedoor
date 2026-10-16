@@ -32,6 +32,9 @@ const { app, BrowserWindow, ipcMain, session, shell } = require('electron');
 
 // ── Configuración (todo por env, con valores por defecto de producción) ──
 const WEB_URL = process.env.FORANLY_WEB_URL || 'https://app.foranly.space';
+// Alto de la barra de título personalizada (la web reserva este espacio con
+// `--fc-titlebar-h`; el valor viaja en bridgeInfo para no desincronizar CSS y JS).
+const TITLEBAR_HEIGHT = Number(process.env.FORANLY_TITLEBAR_HEIGHT || 40);
 const MUSIC_HOST = '127.0.0.1';
 // Puerto FIJO a propósito: es el que autorizan la CSP (plugins/cspPlugin.js) y
 // el CORS del servidor; con un puerto aleatorio el navegador bloquearía el audio.
@@ -202,6 +205,7 @@ function bridgeInfo() {
     platform: process.platform,
     musicApiUrl: MUSIC_API_URL,
     musicReady,
+    titlebarHeight: TITLEBAR_HEIGHT,
   };
 }
 
@@ -219,6 +223,14 @@ function createWindow() {
     backgroundColor: '#0b0b0f', // mismo fondo que la app: sin flash blanco al abrir
     autoHideMenuBar: true,
     show: false, // se muestra en ready-to-show (arranque sin pantalla en blanco)
+    // Titlebar personalizada: nada de la barra del compositor/OS.
+    //   - Windows/Linux: ventana SIN marco; los botones los dibuja la web
+    //     (TitleBar.jsx) sobre una franja arrastrable de TITLEBAR_HEIGHT px.
+    //   - macOS: se conservan los semáforos nativos (hiddenInset) porque ahí
+    //     son la convención; la web solo reserva la franja superior.
+    ...(process.platform === 'darwin'
+      ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 14, y: (TITLEBAR_HEIGHT - 14) / 2 } }
+      : { frame: false }),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -228,6 +240,15 @@ function createWindow() {
   });
 
   mainWindow.once('ready-to-show', () => mainWindow.show());
+
+  // Avisa a la web cuando cambia el estado maximizado: así el título puede
+  // alternar el icono maximizar/restaurar (doble clic en la franja superior).
+  const sendWindowState = () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    mainWindow.webContents.send('window-state', { maximized: mainWindow.isMaximized() });
+  };
+  mainWindow.on('maximize', sendWindowState);
+  mainWindow.on('unmaximize', sendWindowState);
 
   // Enlaces externos → navegador del sistema (dentro de la app son incómodos y
   // rompen el login de terceros).
@@ -325,3 +346,22 @@ if (!app.requestSingleInstanceLock()) {
     app.quit();
   });
 }
+
+// ── Window controls handlers ──
+ipcMain.on('window-minimize', () => {
+  if (mainWindow) mainWindow.minimize();
+});
+ipcMain.on('window-maximize', () => {
+  if (!mainWindow) return;
+  if (mainWindow.isMaximized()) {
+    mainWindow.unmaximize();
+  } else {
+    mainWindow.maximize();
+  }
+});
+ipcMain.on('window-close', () => {
+  if (mainWindow) mainWindow.close();
+});
+ipcMain.on('window-is-maximized', (event) => {
+  event.returnValue = mainWindow ? mainWindow.isMaximized() : false;
+});

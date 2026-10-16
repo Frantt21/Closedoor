@@ -767,5 +767,9 @@
   "download.version": "バージョン",
   "download.note": "インストーラーは未署名のため、初回起動時に Windows や macOS が警告を表示することがあります。",
   "download.note_unpublished": "インストーラーを準備中です。リンクはここに表示されます。",
-  "post.paste_image_hint": "Ctrl+V で画像を貼り付け"
+  "post.paste_image_hint": "Ctrl+V で画像を貼り付け",
+  "update.title": "新しいバージョンが利用可能です",
+  "update.body": "Foranly の新しいバージョンが利用できます。再読み込みして更新してください。",
+  "update.reload": "再読み込み",
+  "update.later": "後で"
 }

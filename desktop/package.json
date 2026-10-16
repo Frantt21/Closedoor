@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "App de escritorio de Foranly: la misma web, con las canciones completas del perfil (servidor de música local en 127.0.0.1)",
+  "homepage": "https://app.foranly.space",
   "author": "Foranly",
   "license": "UNLICENSED",
   "main": "main.js",

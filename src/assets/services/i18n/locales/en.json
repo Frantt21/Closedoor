@@ -769,5 +769,9 @@
   "download.version": "Version",
   "download.note": "The builds aren't signed yet: Windows or macOS may warn you the first time you open them.",
   "download.note_unpublished": "The installers are being prepared — the links will appear here.",
-  "post.paste_image_hint": "Paste an image with Ctrl+V"
+  "post.paste_image_hint": "Paste an image with Ctrl+V",
+  "update.title": "New version available",
+  "update.body": "A new version of Foranly is ready. Reload to update.",
+  "update.reload": "Reload",
+  "update.later": "Later"
 }

@@ -1,0 +1,112 @@
+/* ==========================================
+   TitleBar — barra de título de la app de escritorio (Electron)
+   Solo se activa con la clase `fc-desktop` en <html> (TitleBar.jsx la pone).
+   En el navegador no cambia NADA: --fc-titlebar-h vale 0.
+   ========================================== */
+
+:root {
+    --fc-titlebar-h: 0px;
+}
+
+html.fc-desktop {
+    --fc-titlebar-h: 40px; /* se sobreescribe en JS con titlebarHeight del puente */
+}
+
+/* Reserva la franja superior en el layout en flujo (sidebar y paneles fijos
+   se ajustan más abajo). */
+html.fc-desktop body {
+    padding-top: var(--fc-titlebar-h);
+}
+
+/* La franja: arrastrable, por encima de todo (el loader incluido) para poder
+   mover/cerrar la ventana aunque la app todavía esté cargando. */
+.fc-titlebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--fc-titlebar-h, 40px);
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--color-bg, #0b0b0f);
+    color: var(--color-text-secondary, #9ca3af);
+    -webkit-app-region: drag;
+    user-select: none;
+    border-bottom: 1px solid color-mix(in srgb, var(--color-text, #fff) 6%, transparent);
+}
+
+.fc-titlebar__brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    pointer-events: none;
+}
+
+.fc-titlebar-logo {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 6px;
+    background: var(--accent-color, #6b7280);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+/* macOS: deja hueco a los semáforos nativos (hiddenInset). */
+.fc-titlebar--mac .fc-titlebar__brand {
+    padding-left: 76px;
+}
+
+/* ── Botones de ventana (Windows/Linux) ── */
+.fc-titlebar-controls {
+    display: flex;
+    align-items: stretch;
+    height: 100%;
+    -webkit-app-region: no-drag;
+}
+
+.fc-titlebar-btn {
+    width: 46px;
+    height: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: inherit;
+    padding: 0;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.fc-titlebar-btn:hover {
+    background: color-mix(in srgb, var(--color-text, #fff) 10%, transparent);
+    color: var(--color-text, #fff);
+}
+
+.fc-titlebar-btn--close:hover {
+    background: #e81123;
+    color: #fff;
+}
+
+/* ── Ajustes de elementos fijos/pegados al borde superior ── */
+html.fc-desktop .sidebar {
+    top: var(--fc-titlebar-h);
+    height: calc(100vh - var(--fc-titlebar-h));
+}
+
+html.fc-desktop .sidebar--chat {
+    top: calc(var(--fc-titlebar-h) + 12px);
+}
+
+html.fc-desktop .right-panel {
+    top: calc(30px + var(--fc-titlebar-h));
+}

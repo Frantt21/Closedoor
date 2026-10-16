@@ -6,6 +6,7 @@ import livekitTokenPlugin from './plugins/livekitTokenPlugin'
 import preloadRouteChunks from './plugins/preloadRouteChunks'
 import inlineCssPlugin from './plugins/inlineCssPlugin'
 import musicDevApiPlugin from './plugins/musicDevApiPlugin'
+import buildIdPlugin from './plugins/buildIdPlugin'
 import { cspPlugin } from './plugins/cspPlugin'
 
 // https://vite.dev/config/
@@ -63,6 +64,7 @@ export default defineConfig({
     preloadRouteChunks(),
     inlineCssPlugin(),
     musicDevApiPlugin(),
+    buildIdPlugin(),
     cspPlugin(),
     react(),
     babel({ presets: [reactCompilerPreset()] })

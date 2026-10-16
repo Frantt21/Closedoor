@@ -10,7 +10,11 @@
  *     platform: 'linux' | 'win32' | 'darwin',
  *     musicApiUrl: 'http://127.0.0.1:5990',  // base de /api/music/*
  *     musicReady: true,                      // el servidor local respondió
+ *     titlebarHeight: 40,                    // alto de la barra de título propia
  *   }
+ *
+ * También publica `window.electron` con el control de la ventana
+ * (minimize/maximize/close/onWindowState) que usa la titlebar personalizada.
  *
  * El cliente lo usa para (a) NO ofrecer la descarga a quien ya está en la app y
  * (b) resolver las canciones completas contra el loopback. La fuente de verdad
@@ -35,3 +39,21 @@ try {
 if (info && typeof info === 'object') {
   contextBridge.exposeInMainWorld('foranlyDesktop', Object.freeze({ ...info }));
 }
+
+// ── Window controls API (titlebar personalizada) ──
+// Solo Windows/Linux dibujan botones propios; en macOS la web conserva los
+// semáforos nativos, pero exponemos el API igualmente para no romper el código.
+contextBridge.exposeInMainWorld('electron', {
+  minimize: () => ipcRenderer.send('window-minimize'),
+  maximize: () => ipcRenderer.send('window-maximize'),
+  close: () => ipcRenderer.send('window-close'),
+  isMaximized: () => ipcRenderer.sendSync('window-is-maximized'),
+  platform: process.platform,
+  // Notifica cambios de estado (maximizado/restaurado) sin exponer el ipcRenderer.
+  onWindowState: (callback) => {
+    if (typeof callback !== 'function') return () => {};
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on('window-state', listener);
+    return () => ipcRenderer.removeListener('window-state', listener);
+  },
+});
