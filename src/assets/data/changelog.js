@@ -22,6 +22,18 @@ export const CHANGELOG_SEEN_KEY = 'fc_changelog_seen';
 
 export const RELEASES = [
   {
+    id: '2026-10-16',
+    date: '2026-10-16',
+    title: 'Full songs in the desktop app',
+    items: [
+      'Profile songs play as a 30-second preview in the browser: YouTube only serves the full track to connections it trusts, and a server never qualifies.',
+      'There is now a desktop app that resolves the song from your own connection, so it plays all the way through.',
+      'New download page with the installer for your platform.',
+      'You can now paste an image straight into a comment or reply with Ctrl+V.',
+      'When you play a song in the browser, the app offers you the desktop version — you can dismiss it for good.',
+    ],
+  },
+  {
     id: '2026-10-10+2',
     date: '2026-10-10',
     title: 'Your profile song, now streaming for real',

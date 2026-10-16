@@ -24,12 +24,21 @@ La cancion del perfil no necesita documentacion de infraestructura: el audio se
 resuelve con la API innertube desde la propia app (`api/_innertube.js`, servido
 por `/api/music/stream`). Ver la seccion "Cancion del perfil" del README raiz.
 
+En el navegador YouTube solo sirve la cancion completa a IPs con buena
+reputacion, asi que la via para oirla entera es la app de escritorio:
+
+- [../desktop/README.md](../desktop/README.md) — envoltorio Electron, servidor de
+  musica local en `127.0.0.1:5990` y piezas acopladas (CSP, puerto).
+- [deployment/ELECTRON_BUILD.md](./deployment/ELECTRON_BUILD.md) — lanzar la app
+  en desarrollo y generar los instaladores paso a paso.
+
 ## Deploy y redes
 
 | Documento | Descripcion |
 |---|---|
 | [deployment/VERCEL_DEPLOYMENT.md](./deployment/VERCEL_DEPLOYMENT.md) | Deploy en Vercel con OG tags y serverless functions |
 | [deployment/NGROK_SETUP.md](./deployment/NGROK_SETUP.md) | Probar OG tags localmente con tunel ngrok |
+| [deployment/ELECTRON_BUILD.md](./deployment/ELECTRON_BUILD.md) | App de escritorio: requisitos, lanzarla en dev, probarla sin pantalla, generar instaladores y publicar la descarga |
 
 ## Otros componentes
 

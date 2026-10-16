@@ -1,0 +1,120 @@
+/* DesktopAppPrompt — aviso de la app de escritorio (usa dialog.fc-modal de modal.css) */
+
+.desktop-prompt {
+    max-width: 400px;
+    /* % del viewport de layout (sin scrollbar) — nunca 100vw: al aparecer la
+       scrollbar el centrado se desplazaba. Mismo criterio que changelogModal.css. */
+    width: calc(100% - 40px);
+}
+
+.desktop-prompt-title-icon {
+    margin-right: 8px;
+    font-size: 0.95rem;
+    color: var(--accent-color, #7c5cff);
+}
+
+.desktop-prompt-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.desktop-prompt-text {
+    margin: 0;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--color-text-secondary, #9ca3af);
+}
+
+.desktop-prompt-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.desktop-prompt-item {
+    position: relative;
+    padding-left: 20px;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    color: var(--color-text, #eee);
+}
+
+.desktop-prompt-item::before {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 0.55em;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent-color, #7c5cff);
+    opacity: 0.85;
+}
+
+.desktop-prompt-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+
+.desktop-prompt-download {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: var(--radius, 10px);
+    background: var(--color-text, #ffffff);
+    color: var(--color-bg, #000000);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: opacity 0.2s ease, transform 0.15s ease;
+}
+
+.desktop-prompt-download:hover {
+    opacity: 0.85;
+    transform: translateY(-1px);
+}
+
+.desktop-prompt-later {
+    padding: 10px 14px;
+    border: none;
+    border-radius: var(--radius, 10px);
+    background: transparent;
+    color: var(--color-text-secondary, #9ca3af);
+    font-size: 0.85rem;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.desktop-prompt-later:hover {
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+}
+
+.desktop-prompt-note {
+    margin: 0;
+    font-size: 0.75rem;
+    line-height: 1.45;
+    color: var(--color-text-muted, #6b7280);
+}
+
+@media (max-width: 480px) {
+    .desktop-prompt-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .desktop-prompt-download,
+    .desktop-prompt-later {
+        justify-content: center;
+    }
+}

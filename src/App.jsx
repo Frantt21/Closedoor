@@ -11,6 +11,7 @@ import AppSurfaceTheme from './assets/Resources/Components/AppSurfaceTheme';
 import AppLoader from './assets/Resources/Components/AppLoader';
 import MobileNav from './assets/Resources/Components/MobileNav';
 import ChangelogModal from './assets/Resources/Components/ChangelogModal';
+import DesktopAppPrompt from './assets/Resources/Components/DesktopAppPrompt';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -69,6 +70,7 @@ const Chat = lazyPage(() => import('./assets/Pages/Chat.jsx'));
 const Comunidades = lazyPage(() => import('./assets/Pages/Comunidades.jsx'));
 const CommunityPage = lazyPage(() => import('./assets/Pages/CommunityPage.jsx'));
 const Trending = lazyPage(() => import('./assets/Pages/Trending.jsx'));
+const Download = lazyPage(() => import('./assets/Pages/Download.jsx'));
 
 // ── Minimal route-level loading fallback ──
 function PageFallback() {
@@ -220,6 +222,7 @@ function App() {
                 <Route path="/Communities" element={<Comunidades />} />
                 <Route path="/c/:slug" element={<CommunityPage />} />
                 <Route path="/Trending" element={<Trending />} />
+                <Route path="/download" element={<Download />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </Suspense>
@@ -228,6 +231,9 @@ function App() {
           {!isFullWidthRoute && <RightPanel />}
           <MobileNav />
           <ChangelogModal />
+          {/* Aviso de la app de escritorio: sale al reproducir una canción en el
+              navegador (SongCard → notifyBrowserPlayback). */}
+          <DesktopAppPrompt />
           <ToastContainer
             position="top-right"
             autoClose={3000}

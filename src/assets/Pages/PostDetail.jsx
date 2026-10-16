@@ -40,6 +40,7 @@ import CreatePostModal from '../Resources/Components/CreatePostModal';
 import useMentionAutocomplete from '../hooks/useMentionAutocomplete';
 import { getTimeAgo, IMG_RE, VID_RE, getImageStyle, sanitizeUrl } from '../services/helpers';
 import { uploadImage, uploadWithLocalPreview } from '../services/cdnService';
+import { getClipboardImageFile } from '../services/clipboard';
 import usePageTitle from '../../hooks/usePageTitle';
 import '../Resources/Styles/post.css';
 import '../Resources/Styles/skeleton.css';
@@ -564,8 +565,9 @@ export default function PostDetail() {
   };
 
   // ── CDN upload for comment media (optimistic: local preview, then background upload) ──
-  const handleCommentMediaUpload = async (e) => {
-    const file = e.target.files?.[0];
+  // Recibe el File en vez del evento para que lo compartan el input file y el
+  // pegado con Ctrl+V (services/clipboard.js): misma subida, mismo preview.
+  const uploadCommentImageFile = async (file) => {
     if (!file || !user?.id) return;
 
     setCommentUploading(true);
@@ -597,13 +599,31 @@ export default function PostDetail() {
       });
     } finally {
       setCommentUploading(false); // solo habilitar submit cuando tenemos URL real
-      e.target.value = '';
     }
   };
 
-  // ── CDN upload for reply media (optimistic: local preview, then background upload) ──
-  const handleReplyMediaUpload = async (e, commentId) => {
+  // ── Input file del formulario de comentario ──
+  const handleCommentMediaUpload = async (e) => {
     const file = e.target.files?.[0];
+    e.target.value = ''; // permite volver a elegir el mismo archivo
+    if (!file) return;
+    await uploadCommentImageFile(file);
+  };
+
+  // ── Pegar imagen (Ctrl+V) en el comentario → misma subida que el input file ──
+  // Si lo pegado es texto, `getClipboardImageFile` devuelve null y NO se llama a
+  // preventDefault: el pegado normal del textarea sigue funcionando.
+  const handleCommentPaste = (e) => {
+    if (commentUploading) return; // evita subidas concurrentes (mismo guard que el input file)
+    const file = getClipboardImageFile(e.clipboardData);
+    if (!file) return;
+    e.preventDefault();
+    uploadCommentImageFile(file);
+  };
+
+  // ── CDN upload for reply media (optimistic: local preview, then background upload) ──
+  // Igual que el de comentario: File en vez de evento, para reusarlo al pegar.
+  const uploadReplyImageFile = async (file, commentId) => {
     if (!file || !user?.id) return;
 
     setReplyUploading(commentId);
@@ -635,8 +655,24 @@ export default function PostDetail() {
       });
     } finally {
       setReplyUploading(null); // solo habilitar submit cuando tenemos URL real
-      e.target.value = '';
     }
+  };
+
+  // ── Input file del formulario de respuesta ──
+  const handleReplyMediaUpload = async (e, commentId) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    await uploadReplyImageFile(file, commentId);
+  };
+
+  // ── Pegar imagen (Ctrl+V) en la respuesta → misma subida que el input file ──
+  const handleReplyPaste = (e, commentId) => {
+    if (replyUploading === commentId) return;
+    const file = getClipboardImageFile(e.clipboardData);
+    if (!file) return;
+    e.preventDefault();
+    uploadReplyImageFile(file, commentId);
   };
 
 
@@ -948,7 +984,9 @@ export default function PostDetail() {
                 value={replyContent}
                 onChange={replyMention.handleContentChange}
                 onKeyDown={replyMention.handleTextareaKeyDown}
+                onPaste={(e) => handleReplyPaste(e, reply.id)}
                 placeholder={t('post.reply_placeholder', { user: replyTo?.username })}
+                title={t('post.paste_image_hint') || 'Paste an image with Ctrl+V'}
                 rows={2}
                 maxLength={1000}
               />
@@ -1198,6 +1236,8 @@ export default function PostDetail() {
                 placeholder={t('post.reply_placeholder', { user: replyTo?.username })}
                 rows={2}
                 maxLength={1000}
+                onPaste={(e) => handleReplyPaste(e, comment.id)}
+                title={t('post.paste_image_hint') || 'Paste an image with Ctrl+V'}
               />              <div className="comment-form-media-row">
                 <button
                   type="button"
@@ -1351,7 +1391,9 @@ export default function PostDetail() {
                 value={commentInput}
                 onChange={mainMention.handleContentChange}
                 onKeyDown={mainMention.handleTextareaKeyDown}
+                onPaste={handleCommentPaste}
                 placeholder={t('post.comment_placeholder')}
+                title={t('post.paste_image_hint') || 'Paste an image with Ctrl+V'}
                 rows={2}
                 maxLength={1000}
               />

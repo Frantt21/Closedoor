@@ -11,6 +11,7 @@ import Avatar from './Avatar';
 import Badge from './Badge';
 import GifPicker from './GifPicker';
 import { IMG_RE, VID_RE, YOUTUBE_PATTERN, VIMEO_PATTERN, extractUrls, detectMediaFromContent, getEmbedUrl as getEmbedUrlHelper } from '../../services/helpers';
+import { getClipboardImageFile } from '../../services/clipboard';
 import ConfirmModal from './ConfirmModal';
 import PostMarkdown from './PostMarkdown';
 import { applyMarkdownEdit } from '../../services/postMarkdown';
@@ -400,17 +401,9 @@ export default function CreatePostModal({
   // ── Pegar imagen (Ctrl+V) en el editor → sube directo y agrega al media ──
   const handlePostPaste = useCallback(async (e) => {
     if (!userId) return;
-    const items = e.clipboardData?.items;
-    if (!items) return;
 
-    // Buscar una imagen en el portapapeles (si es texto normal, dejar el paste por defecto)
-    let file = null;
-    for (const item of items) {
-      if (item.kind === 'file' && item.type.startsWith('image/')) {
-        file = item.getAsFile();
-        if (file) break;
-      }
-    }
+    // Imagen del portapapeles (si es texto normal, dejar el paste por defecto)
+    const file = getClipboardImageFile(e.clipboardData);
     if (!file) return;
 
     e.preventDefault();

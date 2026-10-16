@@ -62,6 +62,12 @@ export function sendWebResponse(req, res, response) {
     if (!HOP_BY_HOP.has(key.toLowerCase())) res.setHeader(key, value);
   });
 
+  // Chromium pide esta cabecera cuando una página pública (app.foranly.space)
+  // llama a la red local: es el caso de la app de escritorio, cuyo servidor de
+  // música escucha en 127.0.0.1:5990 (desktop/README.md). En el resto de usos es
+  // inofensiva: solo la mira el preflight de Private Network Access.
+  res.setHeader('Access-Control-Allow-Private-Network', 'true');
+
   if (req.method === 'HEAD' || !response.body) {
     res.end();
     return;

@@ -33,6 +33,7 @@ import Badge from '../Resources/Components/Badge';
 import Tooltip from '../Resources/Components/Tooltip';
 import GifPicker from '../Resources/Components/GifPicker';
 import { getTimeAgo, IMG_RE, detectMediaFromContent, getImageStyle, sanitizeUrl } from '../services/helpers';
+import { getClipboardImageFile } from '../services/clipboard';
 import NicknameModal from '../Resources/Components/NicknameModal';
 import BubbleColorModal from '../Resources/Components/BubbleColorModal';
 import { getPost } from '../services/postService';
@@ -1697,17 +1698,10 @@ export default function Chat() {
   // ── Pegar imagen (Ctrl+V) en el input → sube directo y muestra preview ──
   const handleChatPaste = useCallback((e) => {
     if (uploadingChatMedia) return; // evita uploads concurrentes (mismo guard que el input file)
-    const items = e.clipboardData?.items;
-    if (!items) return;
-    for (const item of items) {
-      if (item.kind === 'file' && item.type.startsWith('image/')) {
-        const file = item.getAsFile();
-        if (!file) continue; // item sin File → seguir con los demás
-        e.preventDefault();
-        uploadChatImageFile(file);
-        return;
-      }
-    }
+    const file = getClipboardImageFile(e.clipboardData);
+    if (!file) return; // texto pegado normal → no se toca
+    e.preventDefault();
+    uploadChatImageFile(file);
   }, [uploadChatImageFile, uploadingChatMedia]);
 
   // ── Insert emoji at cursor position in the input ──

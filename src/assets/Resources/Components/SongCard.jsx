@@ -3,6 +3,7 @@ import { FaMusic, FaPlay, FaPause, FaPencilAlt, FaTrash, FaSearch, FaSpinner } f
 import { useI18n } from '../../services/i18n/useI18n';
 import { useAuth } from '../../../hooks/useAuth';
 import { searchMusic, resolvePreviewUrl, getStreamUrl, prewarmStream } from '../../services/musicService';
+import { notifyBrowserPlayback } from '../../services/desktopApp';
 import { updateUserProfile } from '../../services/userService';
 import { toast } from 'react-toastify';
 import './css/songCard.css';
@@ -17,9 +18,16 @@ function formatTime(s) {
 /**
  * Card "Mi canción" del sidebar del perfil (arriba de los intereses).
  * - La canción completa se reproduce desde /api/music/stream: el backend la
- *   resuelve con innertube y la sirve por HTTPS desde el mismo origen, con
- *   soporte de Range → el <audio> hace streaming progresivo y permite seek.
- *   Ya no hay blob local ni túneles: el navegador consume el stream directo.
+ *   resuelve con innertube y la sirve con soporte de Range → el <audio> hace
+ *   streaming progresivo y permite seek. Ya no hay blob local ni túneles: el
+ *   navegador consume el stream directo. La base la elige musicService según
+ *   dónde corra la app (services/desktopApp.js): en el NAVEGADOR es el mismo
+ *   origen y YouTube suele negar el stream completo (IP de datacenter → bot
+ *   check), así que lo normal es caer al preview de 30 s; en la APP DE
+ *   ESCRITORIO apunta a su servidor local (127.0.0.1:5990) y la canción suena
+ *   entera por la IP del usuario.
+ * - Al arrancar la reproducción en el navegador se ofrece la app de escritorio
+ *   (Components/DesktopAppPrompt: descargar / cerrar / no volver a mostrar).
  * - El resolver elige el formato de audio que quepa ENTERO en el tramo que
  *   entrega YouTube (~1 MiB por URL): canciones cortas en 131 kbps y canciones
  *   largas en el mejor bitrate que quepa (p. ej. 32 kbps) para que suenen
@@ -204,7 +212,14 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
     wantsPlayRef.current = true;
     audio
       .play()
-      .then(() => setPlaying(true))
+      .then(() => {
+        setPlaying(true);
+        // Ya está sonando (completa o preview): en el navegador la canción
+        // completa no va a llegar, así que aprovechamos el momento para ofrecer
+        // la app de escritorio. Se autolimita a una vez por carga de página y
+        // nunca aparece dentro de la propia app (services/desktopApp.js).
+        notifyBrowserPlayback();
+      })
       .catch(ignorePlaybackError);
   };
 

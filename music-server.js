@@ -13,9 +13,13 @@
  * porque npm le instala como peer `typescript@7`, que ya no expone `ts.sys`.
  * El proyecto no tiene TypeScript ni tsconfig: ts-node no pinta nada aqui.
  *
- * Este archivo no tiene logica propia: solo carga el servidor real. El
- * `import()` es dinamico a proposito, para que funcione igual si el
- * `package.json` desplegado lleva `"type": "module"` o no.
+ * Este archivo no tiene logica propia: carga el servidor real y lo ARRANCA con
+ * la config del entorno (`startMusicServerFromEnv()`). Desde que el modulo
+ * exporta `startMusicServer()` ya no arranca nada al importarse — asi lo puede
+ * usar la app de escritorio (desktop/main.js) sin efectos colaterales —, y por
+ * eso aqui hace falta pedirlo explicitamente. El `import()` es dinamico a
+ * proposito, para que funcione igual si el `package.json` desplegado lleva
+ * `"type": "module"` o no.
  *
  * Uso:
  *   MAIN FILE del panel: music-server.js     (ADDITIONAL ARGUMENTS: vacio)
@@ -46,7 +50,16 @@ const REQUIRED_FILES = [
   'api/music/_stream.js',
 ];
 
-import(SERVER_MODULE).catch((err) => {
+import(SERVER_MODULE)
+  .then(({ startMusicServerFromEnv, installShutdownHandlers }) => {
+    // Desde el refactor el modulo ya NO arranca nada al importarse (asi lo puede
+    // usar la app de escritorio sin efectos colaterales): aqui hay que pedirlo.
+    return startMusicServerFromEnv().then((running) => {
+      installShutdownHandlers(running);
+      return running;
+    });
+  })
+  .catch((err) => {
   // ERR_MODULE_NOT_FOUND trae la ruta que no encontro: decirla evita tener que
   // adivinar cual de los 7 falta (el stack de node la entierra entre frames).
   const missing =

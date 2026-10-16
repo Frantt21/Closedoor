@@ -1,0 +1,4 @@
+{
+  "_comment": "Se copia a resources/app/package.json al empaquetar (ver build.extraResources en package.json). No tiene lógica: solo declara que los .js de api/ son ESM, porque en el repo eso lo dice el package.json raíz y en la app empaquetada no existe. Sin esto Node reparsea cada archivo como CommonJS antes de aceptarlo como ESM y avisa con MODULE_TYPELESS_PACKAGE_JSON en la consola del usuario.",
+  "type": "module"
+}

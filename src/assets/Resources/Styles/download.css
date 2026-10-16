@@ -1,0 +1,252 @@
+/* ==========================================
+   Download Page — app de escritorio
+   ========================================== */
+
+.download-page {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.download-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.download-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: none;
+  color: var(--color-text, #ffffff);
+  cursor: pointer;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+
+.download-back:hover {
+  background: var(--color-surface-hover, #252525);
+}
+
+.download-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--color-text, #ffffff);
+  margin: 0;
+}
+
+.download-subtitle {
+  margin: 0 0 20px 48px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+/* ── Bloque "por qué existe" ── */
+
+.download-hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px;
+  border-radius: var(--radius, 10px);
+  background: var(--color-surface, #1a1a1a);
+}
+
+.download-hero-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--color-surface-hover, #252525);
+  color: var(--accent-color, #7c5cff);
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.download-hero-title {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text, #ffffff);
+}
+
+.download-hero-text {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.55;
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+/* ── Ventajas ── */
+
+.download-features {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.download-feature {
+  position: relative;
+  padding-left: 20px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: var(--color-text, #eee);
+}
+
+.download-feature::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 0.55em;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent-color, #7c5cff);
+  opacity: 0.85;
+}
+
+/* ── Instaladores ── */
+
+.download-section {
+  margin-top: 26px;
+}
+
+.download-section-title {
+  margin: 0 0 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.download-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.download-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--radius, 10px);
+  background: var(--color-surface, #1a1a1a);
+  transition: background 0.15s ease;
+}
+
+.download-card:hover {
+  background: var(--color-surface-hover, #252525);
+}
+
+.download-card--soon {
+  opacity: 0.65;
+}
+
+.download-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--color-bg, #000000);
+  color: var(--color-text, #ffffff);
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.download-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.download-card-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text, #ffffff);
+}
+
+.download-card-arch {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+.download-card-file {
+  font-size: 0.7rem;
+  color: var(--color-text-muted, #6b7280);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.download-card-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius, 10px);
+  background: var(--color-text, #ffffff);
+  color: var(--color-bg, #000000);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: none;
+  flex-shrink: 0;
+  transition: opacity 0.2s ease;
+}
+
+.download-card-btn:hover {
+  opacity: 0.85;
+}
+
+.download-card-btn--soon {
+  background: var(--color-border, #2a2a2a);
+  color: var(--color-text-secondary, #9ca3af);
+  cursor: default;
+}
+
+.download-card-btn--soon:hover {
+  opacity: 1;
+}
+
+/* ── Pie ── */
+
+.download-meta {
+  margin: 24px 0 6px;
+  font-size: 0.72rem;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.download-note {
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: var(--color-text-muted, #6b7280);
+}
+
+@media (max-width: 480px) {
+  .download-subtitle {
+    margin-left: 0;
+  }
+
+  .download-grid {
+    grid-template-columns: 1fr;
+  }
+}

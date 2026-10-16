@@ -10,23 +10,27 @@
  *      server-side y, como último recurso, iTunes server-side.
  *
  * Stream de la canción completa: lo resuelve el backend con la API innertube
- * (YouTube) y se sirve proxyado desde el mismo origen (/api/music/stream, ver
- * api/_innertube.js). Ya no depende de ningún server externo con yt-dlp: en
- * `npm run dev` lo sirve plugins/musicDevApiPlugin.js (misma lógica que
- * producción), y en producción la función serverless de Vercel.
+ * (YouTube) y se sirve proxyado desde el MISMO CÓDIGO en tres sitios (ver
+ * api/_musicHttp.js): plugins/musicDevApiPlugin.js en `npm run dev`, el rewrite
+ * de /api/music/* a un host propio en producción, y el servidor LOCAL de la app
+ * de escritorio (127.0.0.1:5990, ver desktop/README.md).
  *
- * Si la resolución falla (p. ej. YouTube pidió verificación), la card cae al
- * preview de 30 s.
+ * La base se decide en getMusicApiBase() (services/desktopApp.js): en la app de
+ * escritorio apunta al loopback —YouTube ve la IP del usuario, no un datacenter—
+ * y en el navegador al mismo origen. YouTube solo entrega el stream completo a
+ * IPs con buena reputación, así que en la web lo normal es caer al preview de
+ * 30 s: eso es justo lo que anuncia el aviso de descarga (DesktopAppPrompt).
  *
  * Todos los resultados se normalizan a un shape único:
  *   { provider, trackId, title, artist, album, artwork, previewUrl, externalUrl }
  */
 
-// Mismo origen siempre: proxy de Vite en dev → server.js; función serverless en
-// producción. El navegador recibe el audio por HTTPS desde la propia app (sin
-// Mixed Content) y nunca ve la URL de googlevideo (está firmada para la IP del
-// server).
-const MUSIC_API = '/api/music';
+import { getMusicApiBase } from './desktopApp';
+
+// El navegador nunca ve la URL de googlevideo (está firmada para la IP que la
+// resuelve): el audio siempre llega por el backend de música. La base cambia
+// según dónde corra la app → getMusicApiBase() (loopback del escritorio o
+// mismo origen).
 const ITUNES_SEARCH_URL = 'https://itunes.apple.com/search';
 
 /** Escala la URL de arte de iTunes (ej. 100x100bb.jpg → 600x600bb.jpg). */
@@ -89,7 +93,7 @@ export function getStreamUrl(song) {
   if (!song?.title || !song?.artist) return null;
   const params = new URLSearchParams({ artist: song.artist, title: song.title });
   if (song.duration) params.set('duration', String(song.duration));
-  return `${MUSIC_API}/stream?${params.toString()}`;
+  return `${getMusicApiBase()}/stream?${params.toString()}`;
 }
 
 /**
@@ -120,7 +124,7 @@ export function prewarmStream(song) {
   const params = new URLSearchParams({ artist: song.artist, title: song.title, prewarm: '1' });
   if (song.duration) params.set('duration', String(song.duration));
 
-  return fetch(`${MUSIC_API}/stream?${params.toString()}`, { signal: AbortSignal.timeout(20000) })
+  return fetch(`${getMusicApiBase()}/stream?${params.toString()}`, { signal: AbortSignal.timeout(20000) })
     .then((res) => (res.ok ? res.json() : null))
     .catch(() => null);
 }

@@ -11,6 +11,10 @@
     "start": "node server.js",
     "music-api": "node scripts/music-api-server.mjs",
     "music-server": "node scripts/music-api-server.mjs",
+    "desktop:install": "npm --prefix desktop install",
+    "desktop": "npm --prefix desktop start",
+    "desktop:dev": "npm --prefix desktop run start:dev",
+    "desktop:dist": "npm --prefix desktop run dist",
     "lint": "eslint .",
     "preview": "vite preview",
     "validate-locales": "node scripts/validate-locales.mjs"

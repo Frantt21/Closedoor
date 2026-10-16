@@ -13,7 +13,7 @@ import { resolve } from 'path';
  * Supported routes:
  *   /profile/:username  — fetches profile from Supabase for rich OG
  *   /Post/:id           — fetches post content from Supabase for rich OG
- *   /Explore, /Trending, /Comunidades, /Hashtag/:tag — static OG per route
+ *   /Explore, /Trending, /Comunidades, /Hashtag/:tag, /download — static OG per route
  *   / (Home) and others — default OG tags
  */
 export default function ogTagsPlugin() {
@@ -47,6 +47,11 @@ export default function ogTagsPlugin() {
     } else if (path.startsWith('/Trending')) {
       title = 'Trending | Closedoor';
       description = "See what's trending on Closedoor.";
+    } else if (/^\/download/i.test(path)) {
+      // Página de descargas de la app de escritorio: se comparte fuera de la app
+      // (es el destino del aviso del reproductor), así que merece OG propio.
+      title = 'Foranly for desktop | Closedoor';
+      description = 'Get the desktop app: profile songs play in full, resolved from your own connection.';
     } else if (path.startsWith('/Comunidades')) {
       title = 'Comunidades | Closedoor';
       description = 'Join communities and connect with people who share your interests on Closedoor.';

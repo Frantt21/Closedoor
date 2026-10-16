@@ -14,6 +14,11 @@
  * - La canción del perfil se sirve same-origin (/api/music/stream), así que 'self'
  *   ya la cubre: no hace falta ningún host de música ni túnel en connect-src.
  *   LiveKit Cloud → *.livekit.cloud.
+ * - APP DE ESCRITORIO: carga esta misma web pero sirve /api/music/* desde
+ *   127.0.0.1:5990 (desktop/, ver desktop/README.md). Chromium considera a
+ *   127.0.0.1 un origen "potentially trustworthy" (no hay bloqueo de mixed
+ *   content https→http loopback), pero la CSP SÍ hay que autorizarla — por eso
+ *   el puerto es fijo: el cliente solo pide el puerto que aquí está permitido.
  *
  * ⚠️ MANTENER CONSISTENTE con la cabecera HTTP de vercel.json (la versión
  * HTTP añade frame-ancestors 'none', que la meta tag no soporta).
@@ -37,10 +42,15 @@ function buildCSP() {
   // proxy (vite dev), así que 'self' ya lo cubre; el origin explícito
   // cubre el caso en que VITE_CDN_URL apunte directo al servidor.
 
+  // Loopback de la app de escritorio (servidor de música local). Duplicado a
+  // propósito como literal: lo comparten connect-src y media-src.
+  const desktopLoopback = ['http://127.0.0.1:5990', 'http://localhost:5990'];
+
   const connect = [
     "'self'",
     supabaseOrigin, supabaseWss,
     cdnOrigin,
+    ...desktopLoopback,
     // Búsqueda de música: iTunes directo desde el navegador (los previews de
     // Deezer van por el proxy same-origin /api/music-search).
     'https://itunes.apple.com',
@@ -55,7 +65,9 @@ function buildCSP() {
     "script-src 'self' https://challenges.cloudflare.com",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
-    "media-src 'self' blob: https:",
+    // `https:` cubre los previews (Deezer/iTunes); el loopback, el audio
+    // completo que sirve la app de escritorio.
+    `media-src 'self' blob: https: ${desktopLoopback.join(' ')}`,
     "font-src 'self' data:",
     `connect-src ${connect.join(' ')}`,
     "frame-src 'self' https://challenges.cloudflare.com https://www.youtube.com https://player.vimeo.com",
