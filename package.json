@@ -10,6 +10,7 @@
     "translate-changelog": "node scripts/translate-changelog.mjs",
     "start": "node server.js",
     "music-api": "node scripts/music-api-server.mjs",
+    "music-server": "node scripts/music-api-server.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "validate-locales": "node scripts/validate-locales.mjs"
