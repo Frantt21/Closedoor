@@ -9,12 +9,13 @@
  *
  * Igual que plugins/livekitTokenPlugin.js, este middleware delega en la MISMA
  * lógica que producción: `api/_musicHttp.js`, que a su vez importa los handlers de
- * `api/music/*.js`. No hay copia de la lógica ni adaptador duplicado.
+ * `api/music/_*.js` (con `_` para que Vercel no los convierta en funciones, ver
+ * api/_musicHttp.js). No hay copia de la lógica ni adaptador duplicado.
  *
  * Rutas servidas:
- *   GET  /api/music/health          → api/music/health.js
- *   GET  /api/music/resolve?…       → api/music/resolve.js  (pre-warm)
- *   GET  /api/music/stream?…        → api/music/stream.js   (audio, con Range)
+ *   GET  /api/music/health          → api/music/_health.js
+ *   GET  /api/music/resolve?…       → api/music/_resolve.js  (pre-warm)
+ *   GET  /api/music/stream?…        → api/music/_stream.js   (audio, con Range)
  *   GET  /api/music-search?q=…      → api/_music.js (Deezer / iTunes server-side)
  */
 

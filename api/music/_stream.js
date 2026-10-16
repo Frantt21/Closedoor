@@ -40,11 +40,14 @@ import {
   activeStreamSource as activeSource,
 } from '../_innertube.js';
 
-// SIN `export const config` (ver api/music/health.js): era la única familia de
-// funciones que lo declaraba y las tres colgaban en producción. El tope del
-// reloj —cada petición sirve como máximo un bloque de 1 MiB (ver
-// upstreamRangeHeader), así que no depende de la duración de la canción— vive en
-// vercel.json (`functions["api/music/stream.js"].maxDuration = 60`).
+// ⚠️ El nombre lleva `_` a proposito y NO es una funcion serverless: en Vercel
+// cualquier archivo bajo `api/` crea una funcion en esa ruta, y una funcion GANA
+// al rewrite de vercel.json. Como este pipeline de funciones cuelga, tener
+// `api/music/stream.js` hacia que /api/music/stream nunca llegara al host propio
+// (medido: 12 s colgado con la funcion vs 0,47 s por el rewrite sin archivo).
+// Con `_`, la ruta no existe en Vercel y la sirve el host via `/api/music/(.*)`.
+// Sin funcion tampoco hay `maxDuration`: el bloque de 1 MiB (upstreamRangeHeader)
+// es lo que acota cada peticion, no el reloj de la plataforma.
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',

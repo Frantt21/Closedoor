@@ -19,9 +19,10 @@
 
 import { resolveTrackAudio, isResolveTimeout } from '../_innertube.js';
 
-// SIN `export const config` (ver api/music/health.js): era la única familia de
-// funciones que lo declaraba y las tres colgaban en producción. El tope de 30 s
-// vive en vercel.json (`functions["api/music/resolve.js"].maxDuration`).
+// ⚠️ El `_` del nombre es deliberado: sin el, este archivo seria una funcion
+// serverless en /api/music/resolve, y una funcion gana al rewrite de vercel.json
+// (ver api/music/_stream.js). Aqui no hay funcion ni `maxDuration`: la ruta la
+// sirve el host propio via `/api/music/(.*)`.
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',

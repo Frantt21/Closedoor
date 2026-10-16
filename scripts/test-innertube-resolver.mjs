@@ -365,8 +365,8 @@ check('health informa provider y clientes', info.provider === 'innertube' && inf
       signal?.addEventListener('abort', () => reject(signal.reason));
     });
 
-  const { default: streamHandler } = await import('../api/music/stream.js');
-  const { default: resolveHandler } = await import('../api/music/resolve.js');
+  const { default: streamHandler } = await import('../api/music/_stream.js');
+  const { default: resolveHandler } = await import('../api/music/_resolve.js');
   const query = 'artist=Nadie&title=Colgada%20Handlers%20Test&duration=180';
 
   for (const [name, handler] of [['stream', streamHandler], ['resolve', resolveHandler]]) {
@@ -410,7 +410,7 @@ check('health informa provider y clientes', info.provider === 'innertube' && inf
     throw new Error(`fetch inesperado en el test: ${target}`);
   };
 
-  const { default: streamHandler } = await import('../api/music/stream.js');
+  const { default: streamHandler } = await import('../api/music/_stream.js');
   const q = 'artist=Rick%20Astley&title=Never%20Gonna%20Give%20You%20Up&duration=213';
 
   const warm = await streamHandler(
@@ -430,30 +430,20 @@ check('health informa provider y clientes', info.provider === 'innertube' && inf
 // ── 18. Marcador de build en health ──
 // Un solo request debe bastar para saber qué código corre en produccion.
 {
-  const { default: healthHandler } = await import('../api/music/health.js');
+  const { default: healthHandler } = await import('../api/music/_health.js');
   const res = await healthHandler(new Request('https://app.foranly.space/api/music/health'));
   const body = await res.json();
   check('health: responde con marcador de build', res.status === 200 && /^music-\d+$/.test(body.build || ''), String(body.build));
   check('health: sigue informando el resolver', body.ok === true && body.stream === 'innertube' && Array.isArray(body.clients));
 }
 
-// ── 19. Sondas de despliegue (temporales) ──
-// Aislan por qué api/music/* colgaba en produccion: subcarpeta vs `config`.
-// Se invocan aquí para que un cambio que las rompa se vea antes de desplegar.
-{
-  const probes = [
-    ['anidada sin config', '../api/music/diag-nested.js', 'nested-no-config'],
-    ['plana con config', '../api/diag-flat.js', 'flat-with-config'],
-    ['plana nueva sin config', '../api/diag-plain.js', 'flat-new-no-config'],
-  ];
-
-  for (const [name, path, expected] of probes) {
-    const { default: handler } = await import(path);
-    const res = await handler(new Request('https://app.foranly.space/api/diag'));
-    const body = await res.json();
-    check(`sonda ${name}: responde JSON 200`, res.status === 200 && body.probe === expected, `status=${res.status} probe=${body.probe}`);
-  }
-}
+// ── 19. (eliminada) Sondas de despliegue ──
+// api/diag-plain.js, api/diag-flat.js y api/music/diag-nested.js existían sólo
+// para aislar por qué api/music/* colgaba en produccion. Ya está diagnosticado
+// (las funciones serverless de Vercel tienen prioridad sobre los rewrites, y el
+// pipeline de funciones de ese proyecto cuelga cualquier función nueva o
+// modificada) y las tres sondas se borraron: sin archivo no hay función y el
+// rewrite /api/music/(.*) llega al host propio.
 
 globalThis.fetch = realFetch;
 console.log(failures === 0 ? '\nTODO OK' : `\nFALLARON ${failures}`);

@@ -26,7 +26,7 @@
  *
  * ⚠️ Las URLs de googlevideo están atadas a la IP que las resolvió y expiran
  * (~6 h). Por eso el frontend nunca las recibe: se proxian desde el server
- * (ver api/music/stream.js) y se cachean acá con TTL conservador.
+ * (ver api/music/_stream.js) y se cachean acá con TTL conservador.
  *
  * ⚠️ Legal/ToS: extraer streams completa de YouTube va contra sus términos de
  * servicio; queda bajo tu criterio en tu infraestructura.

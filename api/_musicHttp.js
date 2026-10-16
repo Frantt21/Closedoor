@@ -6,7 +6,7 @@
  *
  *   1. `plugins/musicDevApiPlugin.js`      → `npm run dev` (vite, :5173)
  *   2. `scripts/music-api-server.mjs`      → host propio (rewrite de Vercel)
- *   3. las funciones de `api/music/*.js`   → Vercel (delegan en los mismos handlers)
+ *   3. el rewrite de Vercel (`/api/music/(.*)` → host propio) en produccion
  *
  * Los handlers de `api/music/*.js` son Web-standard ((Request) => Response), así
  * que aquí se convierten a los `(req, res)` de Node http / Connect. El audio se
@@ -17,9 +17,14 @@
  */
 
 import { Readable } from 'node:stream';
-import healthHandler from './music/health.js';
-import resolveHandler from './music/resolve.js';
-import streamHandler from './music/stream.js';
+// ⚠️ Los handlers llevan `_` delante A PROPÓSITO: en Vercel cualquier archivo
+// bajo `api/` se convierte en una función serverless, y una función en esa ruta
+// GANA al rewrite de `vercel.json` (comprobado en produccion: /api/music/health
+// colgaba 12 s con la función, mientras /api/music/nonexistent lo servia el host
+// propio en 0,47 s). Con `_` no hay función, y /api/music/(.*) llega al host.
+import healthHandler from './music/_health.js';
+import resolveHandler from './music/_resolve.js';
+import streamHandler from './music/_stream.js';
 import { searchMusicServer, resolveTrackPreview } from './_music.js';
 
 /** Rutas con handler Web-standard ((req) => Response). */

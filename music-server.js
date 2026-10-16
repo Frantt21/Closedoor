@@ -41,9 +41,9 @@ const REQUIRED_FILES = [
   'api/_musicHttp.js',
   'api/_music.js',
   'api/_innertube.js',
-  'api/music/health.js',
-  'api/music/resolve.js',
-  'api/music/stream.js',
+  'api/music/_health.js',
+  'api/music/_resolve.js',
+  'api/music/_stream.js',
 ];
 
 import(SERVER_MODULE).catch((err) => {

@@ -8,12 +8,6 @@
     },
     "api/sitemap.xml.js": {
       "maxDuration": 15
-    },
-    "api/music/stream.js": {
-      "maxDuration": 60
-    },
-    "api/music/resolve.js": {
-      "maxDuration": 30
     }
   },
   "headers": [

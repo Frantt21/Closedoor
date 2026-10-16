@@ -546,7 +546,7 @@ Token de sesión:  localStorage cifrado    se descifra solo en memoria al cargar
 | `Register.jsx` | Bloquea email fuera de whitelist |
 | `Login.jsx` | Valida formato Y dominio del email |
 | `api/_innertube.js` | Resolución de streams con la API innertube (sustituye al music server yt-dlp) |
-| `api/music/stream.js` | Proxy same-origin del audio (reenvía Range, nunca expone la URL firmada) |
+| `api/music/_stream.js` | Proxy same-origin del audio (reenvía Range, nunca expone la URL firmada). El `_` evita que Vercel lo convierta en función: una función en esa ruta gana al rewrite y nunca llega al host propio |
 | `supabaseclient.js` | pkce, __supabase solo DEV, storage cifrado |
 | `AuthCallback.jsx` | waitForKeyReady + re-consulta sesión |
 | `LinkPreview.jsx` | Cache cifrado |
