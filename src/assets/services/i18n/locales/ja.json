@@ -13,7 +13,7 @@
   "auth.login_discord": "Discordで続ける",
   "auth.login_error": "ログインに失敗しました",
   "auth.login_link": "ログイン",
-  "auth.login_placeholder": "メールアドレス",
+  "auth.login_placeholder": "メールまたはユーザー名",
   "auth.login_required": "この操作を行うにはログインが必要です",
   "auth.login_subtitle": "おかえりなさい！認証情報を入力してください。",
   "auth.login_title": "ログイン",

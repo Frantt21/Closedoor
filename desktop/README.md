@@ -33,6 +33,9 @@ npm run desktop                  # abre la app con la web de producción
 npm run desktop:dev              # apunta a http://localhost:5173 (requiere `npm run dev`)
 ```
 
+La ventana abre **maximizada** (1280×820 es el tamaño de restauración); el botón
+de la titlebar o el doble clic en la franja superior la restauran.
+
 Guía paso a paso (incluye probarla sin pantalla y el checklist de publicación):
 [`docs/deployment/ELECTRON_BUILD.md`](../docs/deployment/ELECTRON_BUILD.md).
 

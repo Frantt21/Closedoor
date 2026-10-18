@@ -5,7 +5,7 @@ import {
   checkEmailExists,
   createUserProfile,
   ensureUserProfile,
-  getEmailByUsername,
+  loginEmailByUsername,
   getUserProfile,
   getCachedProfile,
   setCachedProfile,
@@ -369,14 +369,14 @@ export function AuthProvider({ children }) {
         }
       }
 
-      // If input doesn't contain @, treat it as username and fetch email
+      // Si el input no contiene @, es un username: resolver su email vía
+      // RPC password-gated (migración 074). El RPC solo devuelve el email si
+      // la contraseña es correcta, así que un username inexistente y una
+      // contraseña incorrecta producen el mismo resultado (NULL).
       if (!emailOrUsername.includes('@')) {
-        // ⚠️ Desde la migración 054, get_email_by_username exige sesión
-        // (estaba expuesto a anon: fuga de emails). El login por username
-        // dejó de estar disponible para usuarios anónimos.
-        const foundEmail = await getEmailByUsername(emailOrUsername);
+        const foundEmail = await loginEmailByUsername(emailOrUsername, password);
         if (!foundEmail) {
-          const err = 'Login with username is no longer available — use your email address';
+          const err = 'Incorrect username or password';
           setError(err);
           return { success: false, error: err };
         }

@@ -239,7 +239,17 @@ function createWindow() {
     },
   });
 
-  mainWindow.once('ready-to-show', () => mainWindow.show());
+  // La ventana abre MAXIMIZADA: es la única forma de aprovechar la pantalla del
+  // usuario sin depender de su resolución (width/height quedan como tamaño de
+  // restauración). Se maximiza ANTES de mostrar para que no haya reescalado
+  // visible, y la titlebar personalizada recibe el estado real: su useState
+  // inicial consulta `window-is-maximized` por IPC síncrono y el evento
+  // 'maximize' mantiene el icono maximizar/restaurar al día.
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.maximize();
+    mainWindow.show();
+    console.log(`[desktop] ventana lista (maximizada: ${mainWindow.isMaximized()})`);
+  });
 
   // Avisa a la web cuando cambia el estado maximizado: así el título puede
   // alternar el icono maximizar/restaurar (doble clic en la franja superior).

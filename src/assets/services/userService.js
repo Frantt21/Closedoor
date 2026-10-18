@@ -137,11 +137,6 @@ export function validateProfileFields(fields = {}, { minUsername = true } = {}) 
   return null;
 }
 
-/**
- * Get email by username
- * @param {string} username - Username to find
- * @returns {Promise<string|null>} - Email associated with username or null
- */
 function isUnknownColumnError(error, column) {
   const message = `${error?.message || ''} ${error?.details || ''}`.toLowerCase();
   return (
@@ -151,16 +146,28 @@ function isUnknownColumnError(error, column) {
   );
 }
 
-export async function getEmailByUsername(username) {
-  const normalized = username.toLowerCase();
+/**
+ * Resolve the email for a username ONLY when the password is correct.
+ *
+ * Usado por el login por username (migración 074). El RPC
+ * `login_email_by_username` corre como SECURITY DEFINER, compara la
+ * contraseña contra auth.users.encrypted_password y devuelve el email
+ * únicamente si coincide; con credenciales inválidas devuelve NULL. Así no
+ * se pueden enumerar emails/usernames (antes `get_email_by_username` los
+ * filtraba con solo conocer el username).
+ *
+ * @param {string} username - Username de la cuenta
+ * @param {string} password - Contraseña en claro (viaja por HTTPS al RPC)
+ * @returns {Promise<string|null>} - Email de la cuenta o null si no coincide
+ */
+export async function loginEmailByUsername(username, password) {
+  const normalized = username.trim().toLowerCase();
+  if (!normalized || !password) return null;
 
   try {
-    // La columna email está revocada para anon/authenticated (migración 053).
-    // El email por username se resuelve vía RPC SECURITY DEFINER: corre con
-    // permisos del definer (postgres) y solo devuelve el email del username
-    // pedido, nunca un SELECT masivo de la tabla.
-    const { data, error } = await supabase.rpc('get_email_by_username', {
+    const { data, error } = await supabase.rpc('login_email_by_username', {
       uname: normalized,
+      pwd: password,
     });
 
     if (error) {

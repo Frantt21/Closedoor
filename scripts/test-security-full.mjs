@@ -97,15 +97,25 @@ async function testDB() {
       }
     },
     {
-      n: '1d', label: 'RPC get_email_by_username bloqueado para anon (migración 054 — anti-scraping)',
+      n: '1d', label: 'RPC login_email_by_username no filtra email con clave incorrecta (074 — anti-enumeración)',
+      fn: () => supabase.rpc('login_email_by_username', { uname: '__sec_test_no_existe__', pwd: '__wrong_password__' }),
+      check: (data, err) => {
+        // ⚠️ Función inexistente = migración 074 sin aplicar (falla el check).
+        // data === null SIN error = no se puede saber si el username existe.
+        // Cualquier dato devuelto = fuga de emails.
+        if (err) return { pass: false, msg: `⚠️  RPC no disponible (aplica la migración 074): ${err.message}` };
+        return data === null
+          ? { pass: true, msg: '✅ NULL sin error (sin enumeración de emails)' }
+          : { pass: false, msg: `⚠️  Devolvió datos sin credenciales válidas: ${JSON.stringify(data)}` };
+      }
+    },
+    {
+      n: '1d4', label: 'RPC get_email_by_username eliminado (074 — anti-scraping)',
       fn: () => supabase.rpc('get_email_by_username', { uname: 'usuario_que_no_existe_xyz' }),
       check: (data, err) => {
-        // Tras migración 054 el RPC exige sesión → anon recibe error de permiso.
-        // ⚠️ data === null SIN error NO es seguro: significa que anon pudo
-        // ejecutar el RPC (respondió 200 null) — la fuga persiste.
-        const blocked = !!err;
-        return blocked ? { pass: true, msg: '✅ Anon bloqueado (permiso denegado)' }
-          : { pass: false, msg: `⚠️  Anon pudo ejecutar el RPC (fuga de emails, respuesta: ${JSON.stringify(data)})` };
+        const removed = !!err;
+        return removed ? { pass: true, msg: '✅ RPC inexistente (404)' }
+          : { pass: false, msg: `⚠️  El RPC viejo sigue expuesto: ${JSON.stringify(data)}` };
       }
     },
     {
@@ -521,7 +531,7 @@ function testWebSecurity() {
     { label: 'HSTS en vercel.json', pattern: 'Strict-Transport-Security', file: vercelJson },
     { label: 'Permissions-Policy en vercel.json', pattern: 'Permissions-Policy', file: vercelJson },
     { label: '__supabase SOLO en DEV (import.meta.env.DEV)', pattern: 'import.meta.env.DEV', file: supabaseClient },
-    { label: 'getEmailByUsername via RPC (sin SELECT email)', pattern: "rpc('get_email_by_username'", file: userService },
+    { label: 'loginEmailByUsername via RPC password-gated (sin SELECT email)', pattern: "rpc('login_email_by_username'", file: userService },
     { label: 'checkEmailExists via RPC (sin SELECT email)', pattern: "rpc('email_exists'", file: userService },
     { label: 'getUserProfile sin select("*") (columna email revocada)', pattern: 'PROFILE_PUBLIC_COLUMNS', file: userService },
     { label: 'Login valida dominio del email', pattern: 'email_domain_not_allowed', file: loginContent },

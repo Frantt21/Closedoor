@@ -4,9 +4,10 @@ Guía práctica de `desktop/`: cómo arrancar la app en desarrollo y cómo gener
 instaladores. Para el **por qué** y las piezas acopladas (puerto `5990`, CSP,
 detección desde la web) ver [`desktop/README.md`](../../desktop/README.md).
 
-Resumen de una línea: la app abre la **web publicada** en una ventana de Electron y
-levanta en paralelo el **servidor de música del repo** en `127.0.0.1:5990`, para que
-la canción del perfil suene completa saliendo por la conexión del usuario.
+Resumen de una línea: la app abre la **web publicada** en una ventana de Electron
+(**maximizada**) y levanta en paralelo el **servidor de música del repo** en
+`127.0.0.1:5990`, para que la canción del perfil suene completa saliendo por la
+conexión del usuario.
 
 ---
 

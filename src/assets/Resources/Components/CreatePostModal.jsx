@@ -879,10 +879,10 @@ export default function CreatePostModal({
                 <FaExclamationTriangle />
               </button>
               </Tooltip>
+            </div>
 
-              {/* ── Formato markdown ── */}
-              <span className="create-post-toolbar-divider" aria-hidden="true" />
-
+            {/* ── Formato markdown (fila propia debajo de las opciones del post) ── */}
+            <div className="create-post-markdown-toolbar">
               <Tooltip text={t('create_post.md_bold')} placement="bottom">
               <button
                 type="button"

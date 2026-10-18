@@ -1,8 +1,9 @@
 # Auditoría y Endurecimiento de Seguridad — FastChange
 
 **Fecha:** Agosto 2026
-**Estado final:** Auditoría **107/107 (100%)** — TODAS las pruebas pasan
-**Migraciones de seguridad:** 053, 054, 055, 056, 057, 058, 059, 060
+**Estado final:** Auditoría **108/108 (100%)** una vez aplicada la migración 074 en Supabase
+(hoy **106/108** local: los 2 checks que dependen de 074 siguen en rojo hasta aplicar la migración)
+**Migraciones de seguridad:** 053, 054, 055, 056, 057, 058, 059, 060, 069, 071, 074
 
 ---
 
@@ -10,11 +11,11 @@
 
 Se realizó una auditoría de seguridad integral (DB + cliente + servidor) y se corrigieron
 **3 vulnerabilidades reales** y varios puntos débiles. La suite de pruebas
-(`scripts/test-security-full.mjs`) pasó de **66/69** a **96/96 (100%)**.
+(`scripts/test-security-full.mjs`) pasó de **66/69** a **108 checks** (100% con 074 aplicada).
 
 | Área | Resultado |
 |---|---|
-| DB (RLS, columnas, RPCs, tablas sociales) | 28/28 |
+| DB (RLS, columnas, RPCs, tablas sociales) | 29/29 (tras aplicar 074) |
 | SQL Injection (API REST) | 6/6 |
 | XSS (helpers reales) | 12/12 |
 | Auth (validaciones, whitelist de email) | 25/25 |
@@ -161,7 +162,12 @@ texto plano:
 - `bump_hashtag_usage` `REVOKE PUBLIC` + exige `auth.uid()` (solo usuarios logueados crean posts con hashtags).
 - `unfollow_both_ways` `REVOKE PUBLIC` + exige `auth.uid() = blocker_id` (solo el que bloquea des-followea).
 - `get_email_by_username` `REVOKE` de `anon`, solo `authenticated`. **El login por username deja de funcionar para anon** (trade-off aceptado para matar el scraping de emails).
-- Frontend: `AuthContext.login` ahora muestra "Login with username is no longer available — use your email address" y el placeholder de login pasó a solo "Email" en los 5 idiomas.
+- Frontend: `AuthContext.login` pasó a solo email con el placeholder "Email" en los 5 idiomas.
+
+> **Actualización (migración 074):** `get_email_by_username` fue **eliminado** (la columna
+> `profiles.email` ya no existe desde 069). El login por username se recuperó con
+> `login_email_by_username(uname, pwd)`, que solo devuelve el email si la contraseña es
+> correcta. Ver sección 14.
 
 **El test de seguridad ahora EXIGE estos bloqueos** (checks `1d`, `1d2`, `1d3`): si la migración no está aplicada, la auditoría baja de 100% y el CI bloquea el merge.
 
@@ -267,6 +273,34 @@ crear una cuenta con un correo falso/desechable (`user@tempmail.com`, dominios i
  de la whitelist — evita cuentas basura nuevas.
 - **Login (`Login.jsx` + `AuthContext.login`):** valida **formato Y dominio** (mismo que el registro).
 - Mensajes localizados en los 5 idiomas (`auth.email_invalid`, `auth.email_domain_not_allowed`).
+
+---
+
+### 14. Login por username sin filtrar emails (migración 074)
+
+**Problema:** tras 060 el login por username estaba deshabilitado, y tras 069
+(`DROP COLUMN profiles.email`) los RPCs `get_email_by_username` y `email_exists`
+seguían apuntando a una columna inexistente (siempre devolvían NULL/false).
+
+**Solución (`src/assets/services/migrations/074_username_login.sql`):**
+- Se **elimina** `get_email_by_username(uname)`: devolvía el email con solo conocer
+ el username (enumeración/scraping).
+- Se crea `login_email_by_username(uname, pwd)` `SECURITY DEFINER`:
+ - Cruza `profiles.username` con `auth.users` (el email real vive ahí).
+ - Devuelve el email **solo si** `crypt(pwd, encrypted_password) = encrypted_password`
+ (bcrypt vía pgcrypto).
+ - Contraseña incorrecta, username inexistente o throttle → `NULL` (misma respuesta).
+ - Throttle por `(username, IP)` usando `request.headers` de PostgREST: 8 fallos en
+ 15 min bloquean temporalmente el par. Evita fuerza bruta directa al RPC, que no
+ pasa por el CAPTCHA de GoTrue.
+- `email_exists(addr)` se reescribe contra `auth.users` y sigue devolviendo solo `boolean`.
+
+**Frontend:**
+- `userService.loginEmailByUsername(username, password)` llama al nuevo RPC.
+- `AuthContext.login` resuelve el username vía RPC y luego `signInWithPassword`
+ (GoTrue revalida la contraseña y el CAPTCHA). Error genérico
+ "Incorrect username or password" (no distingue username inexistente de clave mala).
+- Placeholder de login: "Email or username" en los 5 idiomas.
 
 ---
 
@@ -425,6 +459,7 @@ Token de sesión:  localStorage cifrado    se descifra solo en memoria al cargar
 │  │  - Leer posts_public (sin encrypted_content)          │  │
 │  │  - Leer comments (contenido público)                  │  │
 │  │  - Llamar email_exists (necesario para registro)      │  │
+│  │  - Login por username SOLO con contraseña correcta    │  │
 │  │  - Llamar get_trending_words (datos agregados)        │  │
 │  │                                                       │  │
 │  │   NO PUEDE:                                         │  │
@@ -433,7 +468,7 @@ Token de sesión:  localStorage cifrado    se descifra solo en memoria al cargar
 │  │  - Leer conversations, messages (RLS)                 │  │
 │  │  - Leer notifications (RLS)                           │  │
 │  │  - INSERT/UPDATE/DELETE en cualquier tabla (RLS)       │  │
-│  │  - Llamar get_email_by_username (REVOKE)              │  │
+│  │  - Enumerar emails/usernames (RPC devuelve NULL)      │  │
 │  │  - Llamar bump_hashtag_usage (REVOKE + role check)    │  │
 │  │  - Llamar increment_post_views (REVOKE + role check)  │  │
 │  │  - Llamar unfollow_both_ways (REVOKE + role check)    │  │
@@ -473,7 +508,8 @@ Token de sesión:  localStorage cifrado    se descifra solo en memoria al cargar
 │  - Turnstile CAPTCHA (protección contra bots)              │
 │                                                             │
 │  Login:                                                     │
-│  - Solo email + password (login por username deshabilitado) │
+│  - Email o username + password                              │
+│  - Username → RPC password-gated (sin enumeración)          │
 │  - Validación de formato Y dominio de email (whitelist)     │
 │                                                             │
 │  Contenido:                                                 │
@@ -496,7 +532,7 @@ Token de sesión:  localStorage cifrado    se descifra solo en memoria al cargar
 │                                                             │
 │  En cada push/PR a main:                                    │
 │  1. npm ci                                                  │
-│  2. node scripts/test-security-full.mjs (107 checks)        │
+│  2. node scripts/test-security-full.mjs (108 checks)        │
 │  3. npx vite build (verifica CSP + build)                   │
 │                                                             │
 │  Si ALGUNO falla  exit 1  merge bloqueado                │
@@ -523,7 +559,7 @@ Token de sesión:  localStorage cifrado    se descifra solo en memoria al cargar
 | Inflar vistas | | | REVOKE + role check |
 | Habilitar RLS | | | REVOKE |
 | Login con email basura | | | Whitelist de proveedores |
-| Login por username | | | REVOKE (email only) |
+| Login por username | (solo con password correcta) | (solo con password correcta) | RPC password-gated + throttle (074) |
 | Registro con email basura | | | Whitelist de proveedores |
 
 ---
@@ -540,6 +576,7 @@ Token de sesión:  localStorage cifrado    se descifra solo en memoria al cargar
 | `migrations/058_fix_advisor_warnings.sql` | SET search_path, role checks, REVOKE triggers |
 | `migrations/059_fix_remaining_advisor_warnings.sql` | REVOKE post-CREATE OR REPLACE |
 | `migrations/060_close_final_gaps.sql` | REVOKE get_email_by_username + rls_auto_enable de authenticated |
+| `migrations/074_username_login.sql` | Login por username password-gated: elimina `get_email_by_username`, crea `login_email_by_username` + throttle, y reescribe `email_exists` contra `auth.users` |
 | `emailValidation.js` | Whitelist de proveedores de email |
 | `userService.js` | RPCs para email, PROFILE_PUBLIC_COLUMNS |
 | `AuthContext.jsx` | waitForKeyReady, validación de email |
@@ -555,7 +592,7 @@ Token de sesión:  localStorage cifrado    se descifra solo en memoria al cargar
 | `cspPlugin.js` | Meta CSP en build |
 | `vercel.json` | HSTS, Permissions-Policy |
 | `server.js` | Security headers |
-| `test-security-full.mjs` | 107 checks, helpers reales, CI exit code |
+| `test-security-full.mjs` | 108 checks, helpers reales, CI exit code |
 | `security-audit.yml` | CI en cada push/PR |
 
 ---

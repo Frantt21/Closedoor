@@ -13,7 +13,7 @@
   "auth.login_discord": "Продолжить с Discord",
   "auth.login_error": "Ошибка входа",
   "auth.login_link": "Войти",
-  "auth.login_placeholder": "Эл. почта",
+  "auth.login_placeholder": "Почта или имя пользователя",
   "auth.login_required": "Вам нужно войти, чтобы сделать это",
   "auth.login_subtitle": "С возвращением! Введите свои данные.",
   "auth.login_title": "Вход",

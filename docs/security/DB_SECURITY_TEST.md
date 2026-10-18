@@ -306,6 +306,106 @@ console.log(' Votos de encuestas:', data, error);
 
 ---
 
+## Nivel 5: Login por username (migración 074)
+
+> Aplicar `src/assets/services/migrations/074_username_login.sql` antes de estas pruebas.
+> Objetivo: el login por username funciona **solo** con la contraseña correcta y la DB
+> **nunca** devuelve emails de terceros.
+>
+> **Estado de la última corrida (`node scripts/test-security-full.mjs`, sin 074 aplicada):**
+> `1d` falla porque `login_email_by_username` aún no existe y `1e` falla porque
+> `email_exists` sigue apuntando a `profiles.email` (eliminada en 069). Ambas quedan
+> verdes al aplicar 074.
+
+### 5.1 `profiles.email` ya no existe
+```js
+const { data, error } = await supabase
+  .from('profiles')
+  .select('id, email')
+  .limit(1);
+console.log('profiles.email:', data, error);
+// ✅ Debe fallar: "column profiles.email does not exist"
+```
+
+### 5.2 `auth.users` inaccesible para el cliente
+```js
+const { data, error } = await supabase
+  .from('users')
+  .select('id, email')
+  .limit(1);
+console.log('auth.users:', data, error);
+// ✅ Debe fallar (tabla en schema auth, sin grants a anon/authenticated)
+```
+
+### 5.3 RPC viejo eliminado (anti-enumeración)
+```js
+const { data, error } = await supabase.rpc('get_email_by_username', {
+  uname: 'cualquiera',
+});
+console.log('get_email_by_username:', data, error);
+// ✅ Debe fallar con 404: la función ya no existe (migración 074)
+```
+
+### 5.4 Username inexistente → NULL, sin error
+```js
+const { data, error } = await supabase.rpc('login_email_by_username', {
+  uname: 'usuario_que_no_existe_xyz',
+  pwd: 'cualquier_cosa',
+});
+console.log('Username inexistente:', data, error);
+// ✅ data = null y SIN error: no se puede saber si el username existe
+```
+
+### 5.5 Username real + contraseña incorrecta → NULL, sin error
+```js
+const { data, error } = await supabase.rpc('login_email_by_username', {
+  uname: 'TU_USERNAME_REAL',
+  pwd: 'clave_incorrecta_123',
+});
+console.log('Clave incorrecta:', data, error);
+// ✅ data = null y SIN error: no se filtra el email
+```
+
+### 5.6 Credenciales correctas → email de la PROPIA cuenta
+```js
+const { data, error } = await supabase.rpc('login_email_by_username', {
+  uname: 'TU_USERNAME_REAL',
+  pwd: 'TU_PASSWORD_REAL',
+});
+console.log('Login correcto:', data, error);
+// ✅ Devuelve SOLO el email de esa cuenta (el tuyo) y resetea el throttle.
+// ⚠️ No pegues capturas con tu email real.
+```
+
+### 5.7 Throttle anti fuerza bruta
+```js
+// ⚠️ Usa un username de PRUEBA (no el tuyo): 8 fallos bloquean 15 min el par
+// (username + tu IP) e incluso la contraseña correcta devolverá null.
+for (let i = 0; i < 8; i++) {
+  await supabase.rpc('login_email_by_username', {
+    uname: 'usuario_de_prueba_throttle',
+    pwd: 'mala_' + i,
+  });
+}
+const { data, error } = await supabase.rpc('login_email_by_username', {
+  uname: 'usuario_de_prueba_throttle',
+  pwd: 'otra_mala',
+});
+console.log('Throttle:', data, error);
+// ✅ data = null: el límite está activo (8 intentos / 15 min)
+```
+
+### 5.8 `email_exists` sigue funcionando sin leer emails
+```js
+const { data, error } = await supabase.rpc('email_exists', {
+  addr: 'nadie@example.com',
+});
+console.log('email_exists:', data, error);
+// ✅ data = false (boolean) y sin error. Nunca devuelve el email.
+```
+
+---
+
 ## Resultados de la auditoría (12 tests)
 
 | # | Tabla | Operación | Resultado | Estado |
@@ -324,6 +424,17 @@ console.log(' Votos de encuestas:', data, error);
 | 12 | `calls` | SELECT ajenas | `[]` (vacío) | |
 
 **Resultado: 10/12 pasaron, 2/12 requieren la migración 051**
+
+### Login por username (migración 074)
+
+| # | RPC / Tabla | Operación | Resultado | Estado |
+|---|---|---|---|---|
+| 13 | `profiles` | SELECT `email` | error: columna inexistente (069) | |
+| 14 | `login_email_by_username` | username inexistente | `null` sin error | ⏳ requiere 074 |
+| 15 | `login_email_by_username` | username real + clave mala | `null` sin error | ⏳ requiere 074 |
+| 16 | `login_email_by_username` | credenciales correctas | email de la propia cuenta | ⏳ requiere 074 |
+| 17 | `login_email_by_username` | 8 fallos seguidos | `null` (throttle 15 min) | ⏳ requiere 074 |
+| 18 | `get_email_by_username` | RPC eliminado | error 404 | ⏳ requiere 074 |
 
 ### Migración 051 — Para aplicar en SQL Editor de Supabase:
 
