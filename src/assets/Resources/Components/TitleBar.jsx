@@ -14,6 +14,8 @@ import './css/titleBar.css';
  * En el navegador no se renderiza nada y el layout queda igual: el offset
  * superior se activa con la clase `fc-desktop` en <html> (ver titleBar.css).
  *
+ * Lleva SOLO el nombre de la app, centrado (sin logo ni borde inferior); el
+ * icono lo pone el sistema operativo (ventana/taskbar) desde desktop/assets.
  * macOS conserva los semáforos nativos: no pintamos botones ahí.
  */
 export default function TitleBar() {
@@ -47,10 +49,7 @@ export default function TitleBar() {
       className={`fc-titlebar${isMac ? ' fc-titlebar--mac' : ''}`}
       onDoubleClick={() => window.electron?.maximize()}
     >
-      <div className="fc-titlebar__brand">
-        <span className="fc-titlebar-logo" aria-hidden="true">F</span>
-        <span className="fc-titlebar-name">Foranly</span>
-      </div>
+      <span className="fc-titlebar__title">Foranly</span>
 
       {!isMac && (
         <div className="fc-titlebar-controls" role="group" aria-label="Controles de ventana">

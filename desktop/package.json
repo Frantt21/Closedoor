@@ -29,7 +29,8 @@
     "files": [
       "main.js",
       "preload.js",
-      "package.json"
+      "package.json",
+      "assets/**"
     ],
     "extraResources": [
       {
@@ -51,7 +52,8 @@
     "win": {
       "target": [
         "nsis"
-      ]
+      ],
+      "icon": "assets/icon.png"
     },
     "nsis": {
       "oneClick": false,
@@ -63,6 +65,7 @@
         "dmg"
       ],
       "category": "public.app-category.social-networking",
+      "icon": "assets/icon.png",
       "artifactName": "Foranly-${version}-${arch}.${ext}"
     },
     "linux": {
@@ -72,6 +75,7 @@
       ],
       "category": "Network",
       "maintainer": "Foranly <dev@foranly.space>",
+      "icon": "assets/icon.png",
       "artifactName": "Foranly-${version}-${arch}.${ext}"
     }
   }

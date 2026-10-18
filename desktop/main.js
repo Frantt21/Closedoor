@@ -28,7 +28,7 @@
 
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
-const { app, BrowserWindow, ipcMain, session, shell } = require('electron');
+const { app, BrowserWindow, Menu, Tray, ipcMain, nativeImage, session, shell } = require('electron');
 
 // ── Configuración (todo por env, con valores por defecto de producción) ──
 const WEB_URL = process.env.FORANLY_WEB_URL || 'https://app.foranly.space';
@@ -43,6 +43,13 @@ const MUSIC_API_URL = `http://${MUSIC_HOST}:${MUSIC_PORT}`;
 const BRIDGE_INFO_CHANNEL = 'foranly:desktop-info';
 const APP_VERSION = require('./package.json').version;
 
+// ── Iconos (ventana, taskbar, bandeja e instaladores) ──
+// Viven en desktop/assets y viajan DENTRO del asar (build.files), así que la
+// misma ruta vale en dev y empaquetado. tray.png es el mismo logo recortado a
+// 32x32 porque la bandeja no escala tan bien como la ventana.
+const APP_ICON_PATH = path.join(__dirname, 'assets', 'icon.png');
+const TRAY_ICON_PATH = path.join(__dirname, 'assets', 'tray.png');
+
 // Chromium ya considera 127.0.0.1 un origen seguro (así que no hay bloqueo de
 // mixed content en una página https→http://127.0.0.1), pero las versiones nuevas
 // pasan las peticiones a red local por "Local Network Access". El servidor
@@ -51,6 +58,14 @@ const APP_VERSION = require('./package.json').version;
 app.commandLine.appendSwitch('disable-features', 'LocalNetworkAccessChecks,PrivateNetworkAccessChecks');
 
 let mainWindow = null;
+/** Icono de la bandeja: mantiene la app viva con la ventana oculta. */
+let tray = null;
+/**
+ * `true` solo cuando la app está saliendo DE VERDAD (tray → Salir / app.quit()).
+ * Distingue "cerrar la ventana" (se oculta a la bandeja) de "salir"; sin esta
+ * bandera el handler de 'close' secuestraría también el cierre real.
+ */
+let isQuitting = false;
 /** Servidor que arrancamos NOSOTROS (null si lo reutilizamos de otra instancia). */
 let ownMusicServer = null;
 /** Resultado del arranque: la web decide con esto si puede pedir canción completa. */
@@ -209,6 +224,61 @@ function bridgeInfo() {
   };
 }
 
+/** Icono de la bandeja (con respaldo al de la app si faltara el recorte 32x32). */
+function trayIcon() {
+  const icon = nativeImage.createFromPath(TRAY_ICON_PATH);
+  return icon.isEmpty() ? nativeImage.createFromPath(APP_ICON_PATH) : icon;
+}
+
+/**
+ * Muestra y enfoca la ventana. La usan la bandeja, el segundo lanzamiento y la
+ * reactivación en macOS; si la ventana no existe (aún) la crea.
+ */
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow();
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+/**
+ * Icono de bandeja: es lo que hace que la app pueda quedarse en segundo plano.
+ * Con la ventana oculta siguen vivos la sesión, el audio y el servidor de música
+ * local; el menú de la bandeja (Abrir / Salir) es la única forma de cerrar del
+ * todo, porque la X solo oculta.
+ */
+function createTray() {
+  if (tray) return;
+
+  const icon = trayIcon();
+  if (icon.isEmpty()) {
+    console.warn('[desktop] no se pudo cargar el icono de bandeja (desktop/assets/tray.png)');
+  }
+
+  tray = new Tray(icon);
+  tray.setToolTip('Foranly');
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      { label: 'Abrir Foranly', click: showMainWindow },
+      { type: 'separator' },
+      {
+        label: 'Salir',
+        click: () => {
+          isQuitting = true;
+          app.quit();
+        },
+      },
+    ])
+  );
+  // Clic izquierdo: trae la ventana al frente (convención Windows/Linux).
+  tray.on('click', showMainWindow);
+
+  console.log('[desktop] icono de bandeja listo (cerrar la ventana deja la app en segundo plano)');
+}
+
 function openExternal(url) {
   // Solo http(s): nunca file:// ni esquemas raros desde contenido remoto.
   if (/^https?:\/\//i.test(url)) shell.openExternal(url).catch(() => {});
@@ -221,6 +291,7 @@ function createWindow() {
     minWidth: 960,
     minHeight: 620,
     backgroundColor: '#0b0b0f', // mismo fondo que la app: sin flash blanco al abrir
+    icon: APP_ICON_PATH, // taskbar/alt-tab en dev; empaquetado lo fija el .exe
     autoHideMenuBar: true,
     show: false, // se muestra en ready-to-show (arranque sin pantalla en blanco)
     // Titlebar personalizada: nada de la barra del compositor/OS.
@@ -259,6 +330,16 @@ function createWindow() {
   };
   mainWindow.on('maximize', sendWindowState);
   mainWindow.on('unmaximize', sendWindowState);
+
+  // Cerrar la ventana NO cierra la app: se oculta a la bandeja y sigue en
+  // segundo plano (sesión, audio y servidor de música intactos). La salida real
+  // es bandeja → Salir, que marca isQuitting antes de app.quit().
+  mainWindow.on('close', (event) => {
+    if (isQuitting) return;
+    event.preventDefault();
+    mainWindow.hide();
+    console.log('[desktop] ventana oculta en la bandeja');
+  });
 
   // Enlaces externos → navegador del sistema (dentro de la app son incómodos y
   // rompen el login de terceros).
@@ -311,9 +392,7 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    if (!mainWindow) return;
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.focus();
+    showMainWindow();
   });
 
   app.whenReady().then(async () => {
@@ -337,10 +416,22 @@ if (!app.requestSingleInstanceLock()) {
     // consulta el puente, `musicReady` ya es definitivo (sin carreras).
     await startLocalMusicServer();
     createWindow();
+    createTray();
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
+      else showMainWindow();
     });
+  });
+
+  // Salida real (tray → Salir, Ctrl+Q, cierre del sistema): a partir de aquí el
+  // handler de 'close' deja pasar el cierre en vez de ocultar.
+  app.on('before-quit', () => {
+    isQuitting = true;
+    if (tray) {
+      tray.destroy();
+      tray = null;
+    }
   });
 
   app.on('window-all-closed', async () => {

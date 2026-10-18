@@ -44,11 +44,27 @@ npm run desktop                # la ventana carga https://app.foranly.space
 npm run desktop:dev            # la ventana carga http://localhost:5173  (antes: npm run dev)
 ```
 
+La ventana abre **maximizada** (1280×820 es el tamaño de restauración) y lleva el
+icono de la app (`desktop/assets/icon.png`) en la barra de tareas.
+
 Qué verás en consola al arrancar:
 
 ```
 [desktop] servidor de música local en http://127.0.0.1:5990
+[desktop] icono de bandeja listo (cerrar la ventana deja la app en segundo plano)
+[desktop] ventana lista (maximizada: true)
 ```
+
+### Segundo plano (bandeja del sistema)
+
+La **X de la ventana no cierra la app**: la oculta en la bandeja del sistema y todo
+sigue vivo (sesión, audio y servidor de música local). Se vuelve con clic en el
+icono de la bandeja, con *Abrir Foranly* en su menú o lanzando `npm run desktop`
+otra vez (instancia única: la trae al frente).
+
+La única forma de salir del todo es **bandeja → Salir** (o cerrar la sesión del
+sistema). Si necesitas el cierre clásico al pulsar la X, comenta el handler
+`mainWindow.on('close', …)` de `desktop/main.js`.
 
 Comprobaciones útiles mientras está abierta:
 
@@ -148,10 +164,25 @@ desktop/dist/<target>/
 
 ### Iconos
 
-No hay iconos propios todavía: sale el icono genérico de Electron. Para
-personalizarlos, añade `build/icon.png` (≥512×512) para Linux y `build/icon.ico` /
-`build/icon.icns` para Windows/macOS, y declara la ruta en `build.linux.icon`,
-`build.win.icon` y `build.mac.icon`.
+Los iconos salen de `desktop/assets/`, declarados en `build.win/mac/linux.icon`:
+
+| Archivo | Tamaño | Uso |
+| --- | --- | --- |
+| `assets/icon.png` | 512×512 | Ventana y barra de tareas (`BrowserWindow.icon`), instalador y `.exe`/`.AppImage`/`.dmg` (electron-builder genera `.ico`/`.icns` desde este PNG) |
+| `assets/tray.png` | 32×32 | Icono de la **bandeja del sistema** |
+
+Ambos se generan con `npm run desktop:icons` (`scripts/make-desktop-icons.mjs`) a
+partir del tile cuadrado de marca `public/mini_icon.png`: recorta al bounding box
+del alpha, lo centra en un cuadrado y escribe los PNG en Node puro (determinista),
+**re-decodificando el resultado** para no publicar un icono vacío.
+
+⚠️ **No uses `public/logo.svg`** como fuente: medido, su PNG embebido es un trazo
+blanco muy fino (0,59% de píxeles con alpha > 8, alpha máximo 200) pensado para el
+header sobre fondo oscuro; como icono de 32 px desaparece. Si el asset de marca
+cambia, vuelve a correr `npm run desktop:icons`.
+
+`assets/**` va en `build.files`, así que la ruta del código
+(`path.join(__dirname, 'assets', …)`) vale igual en dev y empaquetado.
 
 ### Firma de código (pendiente)
 
@@ -232,6 +263,8 @@ bloquea el audio y todo cae al preview.
 | La canción suena solo 30 s dentro de la app | Lo primero: `FORANLY_DEBUG=1 npm run desktop` y mira `audio local visto por la página`. Si sale `health: 200` pero `audio` bloqueado, **la web desplegada no autoriza el loopback** → despliega la web nueva (ver 6.1). Si `musicReady: false`, el server local no arrancó |
 | `[desktop] la web cargada no puede leer el servidor de música local` | Misma causa: web publicada anterior a la CSP con `127.0.0.1`. La app lo avisa sola en consola al arrancar |
 | El segundo `npm run desktop` no hace nada | Ya hay una ventana abierta (instancia única): el lanzamiento la enfoca y termina. Lo avisa en consola |
+| Cierro la ventana y la app sigue viva | Es el comportamiento intencional: se oculta en la **bandeja** para seguir en segundo plano. Salir del todo: clic derecho en el icono de la bandeja → *Salir* |
+| No aparece el icono de la bandeja | `desktop/assets/tray.png` no se pudo leer (mira la consola: `no se pudo cargar el icono de bandeja`). En Linux necesita soporte de bandeja (libappindicator/AppIndicator) |
 | `electron: command not found` | Falta `npm run desktop:install` |
 | El primer `electron --version` tarda | Está descargando el binario de Electron |
 

@@ -14,6 +14,7 @@
     "desktop:install": "npm --prefix desktop install",
     "desktop": "npm --prefix desktop start",
     "desktop:dev": "npm --prefix desktop run start:dev",
+    "desktop:icons": "node scripts/make-desktop-icons.mjs",
     "desktop:dist": "npm --prefix desktop run dist",
     "lint": "eslint .",
     "preview": "vite preview",

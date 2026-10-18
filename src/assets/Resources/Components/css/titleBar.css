@@ -19,7 +19,9 @@ html.fc-desktop body {
 }
 
 /* La franja: arrastrable, por encima de todo (el loader incluido) para poder
-   mover/cerrar la ventana aunque la app todavía esté cargando. */
+   mover/cerrar la ventana aunque la app todavía esté cargando.
+   Sin borde inferior: el nombre va centrado y los botones se colocan encima,
+   en una capa absoluta, para que el centro no dependa de su ancho. */
 .fc-titlebar {
     position: fixed;
     top: 0;
@@ -29,45 +31,28 @@ html.fc-desktop body {
     z-index: 100000;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
     background: var(--color-bg, #0b0b0f);
     color: var(--color-text-secondary, #9ca3af);
     -webkit-app-region: drag;
     user-select: none;
-    border-bottom: 1px solid color-mix(in srgb, var(--color-text, #fff) 6%, transparent);
 }
 
-.fc-titlebar__brand {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding-left: 12px;
+/* Nombre de la app, centrado en la ventana (sin logo: el icono lo pone el SO). */
+.fc-titlebar__title {
     font-size: 0.8rem;
     font-weight: 600;
     letter-spacing: 0.02em;
+    color: var(--color-text, #fff);
+    opacity: 0.85;
     pointer-events: none;
-}
-
-.fc-titlebar-logo {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    height: 20px;
-    border-radius: 6px;
-    background: var(--accent-color, #6b7280);
-    color: #fff;
-    font-size: 0.75rem;
-    font-weight: 700;
-}
-
-/* macOS: deja hueco a los semáforos nativos (hiddenInset). */
-.fc-titlebar--mac .fc-titlebar__brand {
-    padding-left: 76px;
 }
 
 /* ── Botones de ventana (Windows/Linux) ── */
 .fc-titlebar-controls {
+    position: absolute;
+    top: 0;
+    right: 0;
     display: flex;
     align-items: stretch;
     height: 100%;

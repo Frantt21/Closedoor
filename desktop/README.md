@@ -36,6 +36,25 @@ npm run desktop:dev              # apunta a http://localhost:5173 (requiere `npm
 La ventana abre **maximizada** (1280×820 es el tamaño de restauración); el botón
 de la titlebar o el doble clic en la franja superior la restauran.
 
+**Segundo plano:** cerrar la ventana (X) **no** cierra la app — la oculta en la
+**bandeja del sistema** y todo sigue vivo (sesión, audio y servidor de música
+local). Se recupera con clic en el icono de la bandeja, con *Abrir Foranly* en su
+menú, o relanzando `npm run desktop` (instancia única: la trae al frente). Para
+salir del todo: **bandeja → Salir**.
+
+Iconos: `desktop/assets/icon.png` (512, ventana/taskbar/instalador) y
+`desktop/assets/tray.png` (32, bandeja), declarados en `build.win/mac/linux.icon`
+(`assets/**` viaja dentro del asar vía `build.files`).
+
+Se generan del tile cuadrado de marca `public/mini_icon.png`:
+
+```bash
+npm run desktop:icons     # 512×512 y 32×32 desde public/mini_icon.png
+```
+
+⚠️ No uses `public/logo.svg` para esto: su PNG embebido es un trazo blanco finísimo
+(0,59% de píxeles opacos) para el header sobre fondo oscuro — a 32 px desaparece.
+
 Guía paso a paso (incluye probarla sin pantalla y el checklist de publicación):
 [`docs/deployment/ELECTRON_BUILD.md`](../docs/deployment/ELECTRON_BUILD.md).
 
