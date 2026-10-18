@@ -448,6 +448,42 @@ if (!app.requestSingleInstanceLock()) {
   });
 }
 
+// ── Zoom de la ventana ──
+// Electron trae el zoom en el menú por defecto (Ctrl + / Ctrl -), pero en una
+// ventana sin marco (frame: false) el acelerador de "Reset Zoom" (Ctrl+0) no
+// siempre llega al proceso. La web expone por eso Ayustes → Zoom y su propio
+// atajo Ctrl+0, ambos a través de este IPC. El nivel se recuerda por origen
+// (lo persiste Electron), así que restablecer deja el 100% para siempre.
+const ZOOM_LEVEL_MIN = -3; // 1.2^-3 ≈ 58%
+const ZOOM_LEVEL_MAX = 3; // 1.2^3 ≈ 173%
+const ZOOM_STEP = 0.5;
+
+/** Nivel/factor de zoom actuales de la ventana principal. */
+function zoomState() {
+  const wc = mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents : null;
+  if (!wc || wc.isDestroyed()) return { ok: false, level: 0, factor: 1, percent: 100, min: ZOOM_LEVEL_MIN, max: ZOOM_LEVEL_MAX };
+  const factor = wc.getZoomFactor();
+  return {
+    ok: true,
+    level: wc.getZoomLevel(),
+    factor,
+    percent: Math.round(factor * 100),
+    min: ZOOM_LEVEL_MIN,
+    max: ZOOM_LEVEL_MAX,
+  };
+}
+
+ipcMain.handle('window-zoom', (_event, action = 'get') => {
+  const wc = mainWindow && !mainWindow.isDestroyed() ? mainWindow.webContents : null;
+  if (!wc || wc.isDestroyed()) return { ok: false };
+
+  if (action === 'reset') wc.setZoomLevel(0);
+  else if (action === 'in') wc.setZoomLevel(Math.min(ZOOM_LEVEL_MAX, wc.getZoomLevel() + ZOOM_STEP));
+  else if (action === 'out') wc.setZoomLevel(Math.max(ZOOM_LEVEL_MIN, wc.getZoomLevel() - ZOOM_STEP));
+
+  return zoomState();
+});
+
 // ── Window controls handlers ──
 ipcMain.on('window-minimize', () => {
   if (mainWindow) mainWindow.minimize();

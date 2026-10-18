@@ -265,6 +265,7 @@ bloquea el audio y todo cae al preview.
 | El segundo `npm run desktop` no hace nada | Ya hay una ventana abierta (instancia única): el lanzamiento la enfoca y termina. Lo avisa en consola |
 | Cierro la ventana y la app sigue viva | Es el comportamiento intencional: se oculta en la **bandeja** para seguir en segundo plano. Salir del todo: clic derecho en el icono de la bandeja → *Salir* |
 | No aparece el icono de la bandeja | `desktop/assets/tray.png` no se pudo leer (mira la consola: `no se pudo cargar el icono de bandeja`). En Linux necesita soporte de bandeja (libappindicator/AppIndicator) |
+| `Ctrl +` / `Ctrl −` cambian el zoom pero `Ctrl + 0` no lo restablece | En una ventana sin marco el acelerador del menú no siempre llega. Usa **Ajustes → Zoom de la ventana → Restablecer** o el `Ctrl+0` de la web (lo maneja `TitleBar.jsx` por el IPC `window-zoom`) |
 | `electron: command not found` | Falta `npm run desktop:install` |
 | El primer `electron --version` tarda | Está descargando el binario de Electron |
 

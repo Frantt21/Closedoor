@@ -42,6 +42,23 @@ export default function TitleBar() {
     return window.electron.onWindowState((state) => setMaximized(!!state?.maximized));
   }, [desktop]);
 
+  // Ctrl+0 (Cmd+0 en macOS): devuelve el zoom al 100%.
+  // El menú por defecto de Electron ya trae "Reset Zoom", pero en una ventana
+  // sin marco el acelerador no siempre llega (Ctrl+- sí funcionaba, Ctrl+0 no) y
+  // el teclado numérico tampoco coincide siempre. Es idempotente, así que no hay
+  // doble efecto si el menú también lo maneja.
+  useEffect(() => {
+    if (!desktop || typeof window.electron?.zoom?.reset !== 'function') return;
+    const onKeyDown = (event) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+      if (event.key !== '0') return;
+      event.preventDefault();
+      window.electron.zoom.reset();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [desktop]);
+
   if (!desktop) return null;
 
   return (

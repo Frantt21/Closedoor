@@ -42,6 +42,18 @@ local). Se recupera con clic en el icono de la bandeja, con *Abrir Foranly* en s
 menú, o relanzando `npm run desktop` (instancia única: la trae al frente). Para
 salir del todo: **bandeja → Salir**.
 
+**Zoom:** `Ctrl +` / `Ctrl −` cambian el tamaño de la interfaz (menú de Electron) y
+`Ctrl + 0` — o **Ajustes → Zoom de la ventana** — lo devuelve al 100%. El atajo de
+teclado lo maneja la web (`TitleBar.jsx`) además del menú, porque en una ventana
+sin marco el acelerador de "Reset Zoom" no siempre llega; ambos usan el IPC
+`window-zoom` de `desktop/main.js`. El nivel se recuerda por origen.
+
+**CSS de escritorio:** los ajustes de layout que solo valen dentro de la app viven
+en `src/assets/Resources/Components/css/titleBar.css`, todos bajo `html.fc-desktop`
+(la clase que pone `TitleBar.jsx`). Ahí se descuenta la franja de la titlebar de las
+alturas de página (`100vh`, `--app-height`) — sin eso, el documento ganaba 40 px de
+scroll y en `/chat` el composer y la sidebar flotante quedaban cortados.
+
 Iconos: `desktop/assets/icon.png` (512, ventana/taskbar/instalador) y
 `desktop/assets/tray.png` (32, bandeja), declarados en `build.win/mac/linux.icon`
 (`assets/**` viaja dentro del asar vía `build.files`).

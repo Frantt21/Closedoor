@@ -7,9 +7,10 @@ import { clearAllAppCaches } from '../services/postService';
 import { getBlockedUsers, getCachedBlockedUsers, unblockUser, cacheBlockStatus, subscribeBlockChanges, clearBlockedListsCache } from '../services/blockService';
 import { useNavigate } from 'react-router-dom';
 import { getItem } from '../services/secureStorage';
+import { isWindowZoomAvailable, controlWindowZoom } from '../services/desktopApp';
 import { supabase } from '../services/supabaseclient';
 import { getNicknames, getCachedNicknames, cacheNicknames, setNickname, removeNickname } from '../services/chatService';
-import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaHeartBroken, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaChartBar, FaBell, FaBrush, FaBan, FaClock, FaAt, FaTrashAlt, FaTimes, FaDiscord, FaEdit, FaImage } from 'react-icons/fa';
+import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaHeartBroken, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaChartBar, FaBell, FaBrush, FaBan, FaClock, FaAt, FaTrashAlt, FaTimes, FaDiscord, FaEdit, FaImage, FaCompress, FaUndo } from 'react-icons/fa';
 import { MdLogout } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import ConfirmModal from '../Resources/Components/ConfirmModal';
@@ -89,6 +90,9 @@ export default function Settings() {
   const [privacyUpdating, setPrivacyUpdating] = useState(false);
   const [statsPrivacyUpdating, setStatsPrivacyUpdating] = useState(false);
   const [activeCategory, setActiveCategory] = useState('system');
+  // ── Zoom de la ventana (solo tiene sentido en la app de escritorio) ──
+  const zoomAvailable = isWindowZoomAvailable();
+  const [zoomPercent, setZoomPercent] = useState(100);
   const [accentExpanded, setAccentExpanded] = useState(false);
   const [cardsExpanded, setCardsExpanded] = useState(false);
   const [statsExpanded, setStatsExpanded] = useState(false);
@@ -137,6 +141,35 @@ export default function Settings() {
     setShowClearCacheModal(false);
     toast.success(t('settings.cache_cleared'));
   };
+
+  // ── Zoom de la ventana (Electron) ──
+  // Se relee al montar y en cada resize: cambiar el zoom cambia el viewport del
+  // documento, así que Ctrl +/- (menú de Electron) queda reflejado en el %.
+  useEffect(() => {
+    if (!zoomAvailable) return;
+    let alive = true;
+    let timer = null;
+    const sync = async () => {
+      const state = await controlWindowZoom('get');
+      if (alive && state?.ok) setZoomPercent(state.percent);
+    };
+    sync();
+    const onResize = () => {
+      clearTimeout(timer);
+      timer = setTimeout(sync, 150);
+    };
+    window.addEventListener('resize', onResize);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [zoomAvailable]);
+
+  const handleResetZoom = useCallback(async () => {
+    const state = await controlWindowZoom('reset');
+    if (state?.ok) setZoomPercent(state.percent);
+  }, []);
 
   // ── Forzar re-render cuando cambia el estado de bloqueo (subscribeBlockChanges) ──
   const [blockRevision, setBlockRevision] = useState(0);
@@ -600,6 +633,33 @@ export default function Settings() {
               </div>
 
               <div className="settings-row-divider" />
+
+              {/* ── Zoom (solo app de escritorio: el navegador no puede
+                     cambiar el zoom de la ventana) ── */}
+              {zoomAvailable && (
+                <>
+                  <div className="settings-row">
+                    <div className="settings-row-header">
+                      <span className="settings-section-icon"><FaCompress /></span>
+                      <div>
+                        <h2 className="settings-section-title">{t('settings.zoom_title')}</h2>
+                        <p className="settings-section-desc">{t('settings.zoom_desc')}</p>
+                      </div>
+                    </div>
+                    <span className="settings-cache-size">{zoomPercent}%</span>
+                    <button
+                      type="button"
+                      className="settings-edit-btn"
+                      onClick={handleResetZoom}
+                    >
+                      <FaUndo style={{ marginRight: 6 }} />
+                      {t('settings.zoom_reset')}
+                    </button>
+                  </div>
+
+                  <div className="settings-row-divider" />
+                </>
+              )}
 
               {/* ── Caché ── */}
               <div className="settings-row">

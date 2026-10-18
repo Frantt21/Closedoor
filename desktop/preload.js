@@ -14,7 +14,8 @@
  *   }
  *
  * También publica `window.electron` con el control de la ventana
- * (minimize/maximize/close/onWindowState) que usa la titlebar personalizada.
+ * (minimize/maximize/close/onWindowState) que usa la titlebar personalizada, más
+ * `zoom` (get/reset/in/out) para el zoom de la interfaz.
  *
  * El cliente lo usa para (a) NO ofrecer la descarga a quien ya está en la app y
  * (b) resolver las canciones completas contra el loopback. La fuente de verdad
@@ -55,5 +56,13 @@ contextBridge.exposeInMainWorld('electron', {
     const listener = (_event, state) => callback(state);
     ipcRenderer.on('window-state', listener);
     return () => ipcRenderer.removeListener('window-state', listener);
+  },
+  // Zoom de la ventana (Ajustes → Zoom y el atajo Ctrl+0 de la web).
+  // Devuelve siempre el estado resultante: { ok, factor, percent, level }.
+  zoom: {
+    get: () => ipcRenderer.invoke('window-zoom', 'get'),
+    reset: () => ipcRenderer.invoke('window-zoom', 'reset'),
+    in: () => ipcRenderer.invoke('window-zoom', 'in'),
+    out: () => ipcRenderer.invoke('window-zoom', 'out'),
   },
 });

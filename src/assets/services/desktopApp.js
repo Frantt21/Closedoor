@@ -45,6 +45,42 @@ export function isDesktopApp() {
 }
 
 /**
+ * API de zoom de la ventana (`window.electron.zoom`, ver desktop/preload.js).
+ * `null` en el navegador o si el puente no llegó a cargar.
+ */
+function zoomApi() {
+  try {
+    const api = window.electron?.zoom;
+    return api && typeof api.get === 'function' ? api : null;
+  } catch {
+    return null;
+  }
+}
+
+/** ¿Se puede controlar el zoom? Solo dentro de la app de escritorio. */
+export function isWindowZoomAvailable() {
+  return !!zoomApi();
+}
+
+/**
+ * Lee o cambia el zoom de la ventana.
+ *
+ * @param {'get'|'reset'|'in'|'out'} action - 'reset' vuelve al 100%
+ * @returns {Promise<{ok: boolean, factor: number, percent: number, level: number}|null>}
+ *   Estado resultante, o null si no estamos en la app de escritorio.
+ */
+export async function controlWindowZoom(action = 'get') {
+  const api = zoomApi();
+  if (!api) return null;
+  const call = action === 'reset' ? api.reset : action === 'in' ? api.in : action === 'out' ? api.out : api.get;
+  try {
+    return await call();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Base de `/api/music/*` para las peticiones de reproducción.
  * - App de escritorio con el servidor local vivo → `http://127.0.0.1:5990/api/music`
  *   (el audio sale por la IP del usuario; la URL firmada coincide con quien pide).

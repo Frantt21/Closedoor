@@ -90,8 +90,43 @@ html.fc-desktop .sidebar {
 
 html.fc-desktop .sidebar--chat {
     top: calc(var(--fc-titlebar-h) + 12px);
+    /* La card flotante de /chat mide 100vh - 24px (12px arriba + 12px abajo) y
+       en la app arranca DESPUÉS de la titlebar: sin descontarla, su footer
+       (modo de sidebar / logout) se sale por abajo. */
+    height: calc(100vh - var(--fc-titlebar-h) - 24px);
 }
 
 html.fc-desktop .right-panel {
     top: calc(30px + var(--fc-titlebar-h));
+}
+
+/* ── Alturas de página: el body ya reserva la franja de la titlebar con
+   `padding-top`, pero las páginas siguen midiendo 100vh → el documento ganaba
+   40px de scroll en TODAS las rutas (en /chat se veía como el composer y la
+   sidebar "por debajo"). Descontarla aquí deja el layout clavado al viewport. ── */
+html.fc-desktop .app-layout {
+    min-height: calc(100vh - var(--fc-titlebar-h, 40px));
+}
+
+html.fc-desktop .chat-page {
+    height: calc(var(--app-height, 100vh) - var(--fc-titlebar-h, 40px));
+}
+
+/* Los paneles flotantes del chat se anclan al viewport (70px desde arriba, a
+   la altura de la cabecera del chat): en la app hay que sumarles la franja de
+   la titlebar o quedan metidos dentro de la card. */
+html.fc-desktop .chat-float-panel {
+    top: calc(70px + var(--fc-titlebar-h, 40px));
+}
+
+/* Ventana estrecha de escritorio (minWidth 960): el layout móvil reserva 64px
+   para la nav inferior, así que también hay que descontar la titlebar. */
+@media (max-width: 1024px) {
+    html.fc-desktop .chat-page {
+        height: calc(var(--app-height, 100vh) - 64px - var(--fc-titlebar-h, 40px));
+    }
+
+    html.fc-desktop body.fc-chat-open-mobile .chat-page {
+        height: calc(var(--app-height, 100vh) - var(--fc-titlebar-h, 40px));
+    }
 }
