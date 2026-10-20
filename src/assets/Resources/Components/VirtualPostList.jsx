@@ -41,12 +41,21 @@ function VirtualPostList({
     const [range, setRange] = useState({ start: 0, end: 0 });
     // Fuerza re-render manual (para mediciones de altura de rows).
     const [, forceRender] = useReducer((x) => x + 1, 0);
-    // Alturas medidas por índice (index → px). Fallback ESTIMATE.
-    const heightsRef = useRef({});
+    // Alturas medidas por CLAVE de fila (no por índice): al insertar/borrar
+    // posts los índices se desplazan y las alturas quedarían desalineadas.
+    // Fallback ESTIMATE.
+    const heightsRef = useRef(Object.create(null));
     const roRef = useRef(null);
     // Ref al array actual: los listeners/observers (creados una vez) siempre
     // leen la última versión → sin closures stale al cambiar posts.length.
     const postsRef = useRef(posts);
+    // Claves normalizadas del array actual (mismo orden que postsRef). Las
+    // funciones estables (computeRange, observers) las leen de aquí: getKey
+    // suele ser una arrow inline nueva en cada render.
+    const keysRef = useRef([]);
+
+    // Clave de una fila en el render (getKey suele venir por props).
+    const keyOfPost = (post) => String(getKey ? getKey(post) : post.id);
     // Altura estimada por row para el primer paint, antes de que el
     // ResizeObserver mida la real. 332 = PostCard; ~96 = NotificationItem.
     // computeRange es un callback estable ([]) que captura ESTIMATE al
@@ -64,7 +73,8 @@ function VirtualPostList({
         const off = Math.round(el.getBoundingClientRect().top + window.scrollY);
         const relTop = window.scrollY - off;
         const relBottom = relTop + window.innerHeight;
-        const h = heightsRef.current;
+        const heights = heightsRef.current;
+        const keys = keysRef.current;
         const n = postsRef.current.length;
         if (n === 0) {
             setRange((prev) => (prev.start === 0 && prev.end === -1 ? prev : { start: 0, end: -1 }));
@@ -73,7 +83,7 @@ function VirtualPostList({
         let start = 0;
         let acc = 0;
         for (let i = 0; i < n; i++) {
-            const size = h[i] || ESTIMATE;
+            const size = heights[keys[i]] || ESTIMATE;
             if (acc + size > relTop - OVERSCAN) {
                 start = i;
                 break;
@@ -83,7 +93,7 @@ function VirtualPostList({
         acc = 0;
         let end = n - 1;
         for (let i = 0; i < n; i++) {
-            const size = h[i] || ESTIMATE;
+            const size = heights[keys[i]] || ESTIMATE;
             if (acc > relBottom + OVERSCAN) {
                 end = i - 1;
                 break;
@@ -96,9 +106,11 @@ function VirtualPostList({
     }, []);
 
     // Mantener el ref de posts siempre fresco (se actualiza tras cada render,
-    // antes de que los listeners/observers lo lean).
+    // antes de que los listeners/observers lo lean). Las claves se normalizan
+    // aquí una sola vez: los efectos de abajo corren después.
     useEffect(() => {
         postsRef.current = posts;
+        keysRef.current = posts.map((post) => String(getKey ? getKey(post) : post.id));
     });
 
     // Scroll + resize + re-mediciones retrasadas (header inestable) →
@@ -136,22 +148,34 @@ function VirtualPostList({
         };
     }, []);
 
-    // Reset de mediciones al cambiar de perfil o filtrar la lista:
-    // re-mide los rows montados y fuerza el re-render con posiciones frescas.
+    // Al cambiar la lista NO se borran todas las mediciones: solo se
+    // descartan las claves que ya no existen y se re-miden las filas
+    // montadas. Antes se hacía `heightsRef.current = {}` y cada actualización
+    // de realtime (likes, contadores) devolvía cientos de filas a la altura
+    // estimada → el contenido saltaba y quedaban huecos/solapes.
     useEffect(() => {
-        heightsRef.current = {};
+        const heights = heightsRef.current;
+        const valid = new Set(keysRef.current);
+        for (const key of Object.keys(heights)) {
+            if (!valid.has(key)) delete heights[key];
+        }
+
+        let changed = false;
         const el = listRef.current;
         if (el) {
             el.querySelectorAll('.virtual-post-row').forEach((node) => {
-                const idx = Number(node.getAttribute('data-index'));
-                if (!Number.isNaN(idx)) {
-                    heightsRef.current[idx] = Math.round(node.getBoundingClientRect().height);
+                const key = node.getAttribute('data-row-key');
+                if (!key) return;
+                const px = Math.round(node.offsetHeight);
+                if (heights[key] !== px) {
+                    heights[key] = px;
+                    changed = true;
                 }
             });
         }
+
         computeRange();
-        forceRender();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        if (changed) forceRender();
     }, [posts, computeRange]);
 
     // Mide la altura real de cada row montado y reposiciona al cambiar
@@ -162,11 +186,11 @@ function VirtualPostList({
     const handleRowResize = useCallback((entries) => {
         let changed = false;
         for (const entry of entries) {
-            const idx = Number(entry.target.getAttribute('data-index'));
-            if (Number.isNaN(idx)) continue;
+            const key = entry.target.getAttribute('data-row-key');
+            if (!key) continue;
             const px = Math.round(entry.target.offsetHeight);
-            if ((heightsRef.current[idx] || 0) !== px) {
-                heightsRef.current[idx] = px;
+            if (heightsRef.current[key] !== px) {
+                heightsRef.current[key] = px;
                 changed = true;
             }
         }
@@ -194,10 +218,10 @@ function VirtualPostList({
     // Posiciones acumuladas, alto total y rango visible (O(n) barato).
     const positions = [];
     let total = 0;
-    const h = heightsRef.current;
+    const heights = heightsRef.current;
     for (let i = 0; i < posts.length; i++) {
         positions[i] = total;
-        total += h[i] || ESTIMATE;
+        total += heights[keyOfPost(posts[i])] || ESTIMATE;
     }
     const visible = [];
     for (let i = range.start; i <= range.end; i++) {
@@ -209,11 +233,15 @@ function VirtualPostList({
             <div style={{ height: total, position: 'relative', width: '100%' }}>
                 {visible.map((i) => {
                     const post = posts[i];
+                    // Clave original (número/string) para key y lookups de
+                    // liked/saved/repost; las alturas usan la forma
+                    // normalizada a string.
                     const rowKey = getKey ? getKey(post) : post.id;
                     return (
                         <div
                             key={rowKey}
                             data-index={i}
+                            data-row-key={String(rowKey)}
                             ref={rowRef}
                             className="virtual-post-row"
                             style={{
