@@ -338,7 +338,7 @@ function Home() {
                     </div>
                 </div>
             ) : (
-                <div className="posts-section">
+                <div className="posts-section posts-section--home">
                     <div className="posts-section-header">
                         <div className="posts-section-tabs">
                             <button

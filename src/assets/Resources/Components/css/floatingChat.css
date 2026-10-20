@@ -1,0 +1,455 @@
+/* ==========================================
+   Lanzador de chats recientes + ventana flotante
+   (Components/FloatingChat.jsx)
+   ========================================== */
+
+.fc-dock {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+}
+
+/* ── Lanzador ── */
+.fc-dock-launcher {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 54px;
+    height: 54px;
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: 50%;
+    background: var(--color-surface, #1a1a1a);
+    color: var(--color-text, #ffffff);
+    font-size: 1.15rem;
+    cursor: pointer;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.fc-dock-launcher:hover {
+    transform: translateY(-2px);
+    background: var(--color-surface-hover, #252525);
+}
+
+.fc-dock-badge {
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #ffffff;
+    font-size: 0.66rem;
+    font-weight: 700;
+    line-height: 20px;
+    text-align: center;
+    box-shadow: 0 0 0 2px var(--color-bg, #000000);
+}
+
+/* ── Avatares de chats recientes (apilados sobre el lanzador) ── */
+.fc-dock-recents {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.fc-dock-recent {
+    position: relative;
+    width: 42px;
+    height: 42px;
+    padding: 0;
+    border: 2px solid var(--color-surface, #1a1a1a);
+    border-radius: 50%;
+    background: var(--color-surface, #1a1a1a);
+    cursor: pointer;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+    transition: transform 0.15s ease;
+}
+
+.fc-dock-recent:hover {
+    transform: translateX(-3px) scale(1.05);
+}
+
+.fc-dock-recent-avatar {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    display: block;
+    object-fit: cover;
+}
+
+.fc-dock-recent-badge {
+    position: absolute;
+    top: -0.5px;
+    right: -0.5px;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 4px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #ffffff;
+    font-size: 0.6rem;
+    font-weight: 700;
+    line-height: 17px;
+    text-align: center;
+    box-shadow: 0 0 0 2px var(--color-bg, #000000);
+}
+
+/* ── Ventana ── */
+.fc-panel {
+    display: flex;
+    flex-direction: column;
+    width: 344px;
+    height: min(540px, 72vh);
+    background: var(--color-surface, #1a1a1a);
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius-lg, 14px);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+    overflow: hidden;
+    animation: fc-panel-in 0.16s ease;
+}
+
+@keyframes fc-panel-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.fc-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 10px 10px 12px;
+    border-bottom: 1px solid var(--color-border, #2a2a2a);
+    flex-shrink: 0;
+}
+
+.fc-panel-title {
+    flex: 1;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--color-text, #ffffff);
+}
+
+.fc-panel-icon-static {
+    display: flex;
+    align-items: center;
+    color: var(--color-text-secondary, #9ca3af);
+    font-size: 0.85rem;
+}
+
+.fc-panel-peer-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    object-fit: cover;
+}
+
+.fc-panel-peer {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.fc-panel-peer-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text, #ffffff);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fc-panel-peer-handle {
+    font-size: 0.7rem;
+    color: var(--color-text-muted, #6b7280);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fc-panel-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.fc-panel-icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--color-text-secondary, #9ca3af);
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.fc-panel-icon-btn:hover {
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+}
+
+/* ── Lista de conversaciones ── */
+.fc-list {
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.fc-list-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    height: 100%;
+    padding: 24px;
+    text-align: center;
+    color: var(--color-text-secondary, #9ca3af);
+}
+
+.fc-list-state-title {
+    margin: 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--color-text, #ffffff);
+}
+
+.fc-list-state-sub {
+    margin: 0;
+    font-size: 0.76rem;
+    color: var(--color-text-muted, #6b7280);
+}
+
+.fc-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 9px 12px;
+    border: none;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.fc-item:hover {
+    background: var(--color-surface-hover, #252525);
+}
+
+.fc-item-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    object-fit: cover;
+}
+
+.fc-item-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.fc-item-top {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.fc-item-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--color-text, #ffffff);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fc-item-time {
+    flex-shrink: 0;
+    font-size: 0.66rem;
+    color: var(--color-text-muted, #6b7280);
+}
+
+.fc-item-preview {
+    font-size: 0.74rem;
+    color: var(--color-text-secondary, #9ca3af);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fc-item-unread {
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #ffffff;
+    font-size: 0.62rem;
+    font-weight: 700;
+    line-height: 18px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+/* ── Conversación ── */
+.fc-thread {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+
+.fc-msg {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    max-width: 82%;
+}
+
+.fc-msg--own {
+    align-self: flex-end;
+    align-items: flex-end;
+}
+
+.fc-msg--pending {
+    opacity: 0.6;
+}
+
+.fc-msg-bubble {
+    padding: 7px 10px;
+    border-radius: 14px 14px 14px 4px;
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+    font-size: 0.8rem;
+    line-height: 1.35;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.fc-msg--own .fc-msg-bubble {
+    border-radius: 14px 14px 4px 14px;
+    background: var(--accent-color, #6b7280);
+    color: #ffffff;
+}
+
+.fc-msg-img {
+    display: block;
+    max-width: 100%;
+    max-height: 190px;
+    border-radius: 9px;
+    margin-bottom: 4px;
+    object-fit: cover;
+}
+
+.fc-msg-time {
+    font-size: 0.6rem;
+    color: var(--color-text-muted, #6b7280);
+}
+
+/* ── Composer ── */
+.fc-compose {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    padding: 9px 10px;
+    border-top: 1px solid var(--color-border, #2a2a2a);
+    flex-shrink: 0;
+}
+
+.fc-input {
+    flex: 1;
+    min-height: 34px;
+    max-height: 96px;
+    padding: 8px 11px;
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: 17px;
+    background: var(--color-bg, #000000);
+    color: var(--color-text, #ffffff);
+    font-family: inherit;
+    font-size: 0.8rem;
+    line-height: 1.35;
+    resize: none;
+    outline: none;
+}
+
+.fc-input:focus {
+    border-color: var(--accent-color, #6b7280);
+}
+
+.fc-send {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 50%;
+    background: var(--accent-color, #6b7280);
+    color: #ffffff;
+    font-size: 0.8rem;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.fc-send:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.fc-send:not(:disabled):hover {
+    transform: scale(1.05);
+}
+
+/* ── Móvil: por encima de la barra inferior ── */
+@media (max-width: 1024px) {
+    .fc-dock {
+        right: 16px;
+        bottom: 76px;
+    }
+
+    .fc-panel {
+        width: min(360px, calc(100vw - 24px));
+        height: min(520px, 68vh);
+    }
+}
+
+@media (max-width: 480px) {
+    .fc-dock {
+        right: 14px;
+    }
+
+    .fc-panel {
+        width: calc(100vw - 20px);
+        height: 66vh;
+    }
+}

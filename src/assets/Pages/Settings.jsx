@@ -72,11 +72,268 @@ const LANGUAGES = [
 ];
 
 const CATEGORIES = [
+  { id: 'account', icon: FaLock, titleKey: 'settings.category_account', descKey: 'settings.category_account_desc' },
   { id: 'system', icon: FaCog, titleKey: 'settings.category_system', descKey: 'settings.category_system_desc' },
   { id: 'profile', icon: FaUser, titleKey: 'settings.category_profile', descKey: 'settings.category_profile_desc' },
   { id: 'privacy', icon: FaEyeSlash, titleKey: 'settings.category_privacy', descKey: 'settings.category_privacy_desc' },
   { id: 'notifications', icon: FaBell, titleKey: 'settings.category_notifications', descKey: 'settings.category_notifications_desc' },
 ];
+
+/* ── Cuenta: nombre de usuario, correo y contraseña ──
+   Los tres cambios exigen la contraseña ACTUAL: el servidor la verifica con
+   bcrypt (RPC verify_password, migración 075) y aplica throttle. Los métodos
+   de AuthContext devuelven códigos estables que aquí se traducen. */
+function AccountSettings({ t }) {
+  const { user, profile, changeUsername, changeEmail, changePassword } = useAuth();
+  const [uForm, setUForm] = useState({ value: '', password: '', saving: false, result: null });
+  const [eForm, setEForm] = useState({ value: '', password: '', saving: false, result: null });
+  const [pForm, setPForm] = useState({ current: '', next: '', confirm: '', saving: false, result: null });
+
+  const messages = {
+    invalid_username: t('settings.account_err_invalid_username'),
+    invalid_password: t('settings.account_err_invalid_password'),
+    not_authenticated: t('settings.account_err_not_authenticated'),
+    same: t('settings.account_err_same_username'),
+    taken: t('settings.account_err_username_taken'),
+    invalid_email: t('settings.account_err_invalid_email'),
+    email_domain: t('settings.account_err_email_domain'),
+    same_email: t('settings.account_err_same_email'),
+    email_taken: t('settings.account_err_email_taken'),
+    weak_password: t('settings.account_err_weak_password'),
+    password_too_long: t('settings.account_err_password_too_long'),
+    same_password: t('settings.account_err_same_password'),
+    password_mismatch: t('settings.account_err_password_mismatch'),
+    generic: t('settings.account_err_generic'),
+  };
+
+  const failText = (res) => messages[res?.code] || messages.generic;
+
+  const submitUsername = async (event) => {
+    event.preventDefault();
+    if (uForm.saving) return;
+    if (!uForm.value.trim()) {
+      setUForm((f) => ({ ...f, result: { ok: false, text: messages.invalid_username } }));
+      return;
+    }
+    setUForm((f) => ({ ...f, saving: true, result: null }));
+    const res = await changeUsername(uForm.value, uForm.password);
+    setUForm((f) => ({
+      ...f,
+      saving: false,
+      password: res.success ? '' : f.password,
+      value: res.success ? '' : f.value,
+      result: res.success
+        ? { ok: true, text: t('settings.account_username_updated') }
+        : { ok: false, text: failText(res) },
+    }));
+  };
+
+  const submitEmail = async (event) => {
+    event.preventDefault();
+    if (eForm.saving) return;
+    if (!eForm.value.trim()) {
+      setEForm((f) => ({ ...f, result: { ok: false, text: messages.invalid_email } }));
+      return;
+    }
+    setEForm((f) => ({ ...f, saving: true, result: null }));
+    const res = await changeEmail(eForm.value, eForm.password);
+    setEForm((f) => ({
+      ...f,
+      saving: false,
+      password: res.success ? '' : f.password,
+      value: res.success ? '' : f.value,
+      result: res.success
+        ? { ok: true, text: t('settings.account_email_sent') }
+        : { ok: false, text: failText(res) },
+    }));
+  };
+
+  const submitPassword = async (event) => {
+    event.preventDefault();
+    if (pForm.saving) return;
+    if (pForm.next !== pForm.confirm) {
+      setPForm((f) => ({ ...f, result: { ok: false, text: messages.password_mismatch } }));
+      return;
+    }
+    setPForm((f) => ({ ...f, saving: true, result: null }));
+    const res = await changePassword(pForm.next, pForm.current);
+    setPForm((f) => ({
+      ...f,
+      saving: false,
+      current: res.success ? '' : f.current,
+      next: res.success ? '' : f.next,
+      confirm: res.success ? '' : f.confirm,
+      result: res.success
+        ? { ok: true, text: t('settings.account_password_updated') }
+        : { ok: false, text: failText(res) },
+    }));
+  };
+
+  const feedback = (result) => (
+    result ? (
+      <p className={`settings-account-feedback ${result.ok ? 'settings-account-feedback--ok' : 'settings-account-feedback--err'}`}>
+        {result.text}
+      </p>
+    ) : null
+  );
+
+  return (
+    <>
+      {/* ── Nombre de usuario ── */}
+      <form className="settings-account-form" onSubmit={submitUsername}>
+        <div className="settings-row">
+          <div className="settings-row-header">
+            <span className="settings-section-icon"><FaUser /></span>
+            <div>
+              <h2 className="settings-section-title">{t('settings.account_username')}</h2>
+              <p className="settings-section-desc">
+                {t('settings.account_username_desc', { username: profile?.username || '—' })}
+              </p>
+            </div>
+          </div>
+          <div className="settings-account-fields">
+            <input
+              className="settings-account-input"
+              type="text"
+              name="new-username"
+              autoComplete="username"
+              spellCheck={false}
+              maxLength={20}
+              placeholder={t('settings.account_new_username')}
+              aria-label={t('settings.account_new_username')}
+              value={uForm.value}
+              disabled={uForm.saving}
+              onChange={(e) => setUForm((f) => ({ ...f, value: e.target.value, result: null }))}
+            />
+            <input
+              className="settings-account-input"
+              type="password"
+              name="current-password-username"
+              autoComplete="current-password"
+              placeholder={t('settings.account_current_password')}
+              aria-label={t('settings.account_current_password')}
+              value={uForm.password}
+              disabled={uForm.saving}
+              onChange={(e) => setUForm((f) => ({ ...f, password: e.target.value, result: null }))}
+            />
+            <button
+              type="submit"
+              className="settings-account-submit"
+              disabled={uForm.saving || !uForm.value.trim() || !uForm.password}
+            >
+              {uForm.saving ? t('common.loading') : t('settings.account_save')}
+            </button>
+          </div>
+          {feedback(uForm.result)}
+        </div>
+      </form>
+
+      {/* ── Correo electrónico ── */}
+      <form className="settings-account-form" onSubmit={submitEmail}>
+        <div className="settings-row">
+          <div className="settings-row-header">
+            <span className="settings-section-icon"><FaAt /></span>
+            <div>
+              <h2 className="settings-section-title">{t('settings.account_email')}</h2>
+              <p className="settings-section-desc">
+                {t('settings.account_email_desc', { email: user?.email || '—' })}
+              </p>
+            </div>
+          </div>
+          <div className="settings-account-fields">
+            <input
+              className="settings-account-input"
+              type="email"
+              name="new-email"
+              autoComplete="email"
+              spellCheck={false}
+              placeholder={t('settings.account_new_email')}
+              aria-label={t('settings.account_new_email')}
+              value={eForm.value}
+              disabled={eForm.saving}
+              onChange={(e) => setEForm((f) => ({ ...f, value: e.target.value, result: null }))}
+            />
+            <input
+              className="settings-account-input"
+              type="password"
+              name="current-password-email"
+              autoComplete="current-password"
+              placeholder={t('settings.account_current_password')}
+              aria-label={t('settings.account_current_password')}
+              value={eForm.password}
+              disabled={eForm.saving}
+              onChange={(e) => setEForm((f) => ({ ...f, password: e.target.value, result: null }))}
+            />
+            <button
+              type="submit"
+              className="settings-account-submit"
+              disabled={eForm.saving || !eForm.value.trim() || !eForm.password}
+            >
+              {eForm.saving ? t('common.loading') : t('settings.account_save')}
+            </button>
+          </div>
+          {feedback(eForm.result)}
+        </div>
+      </form>
+
+      {/* ── Contraseña ── */}
+      <form className="settings-account-form" onSubmit={submitPassword}>
+        <div className="settings-row">
+          <div className="settings-row-header">
+            <span className="settings-section-icon"><FaLock /></span>
+            <div>
+              <h2 className="settings-section-title">{t('settings.account_password')}</h2>
+              <p className="settings-section-desc">{t('settings.account_password_desc')}</p>
+            </div>
+          </div>
+          <div className="settings-account-fields">
+            <input
+              className="settings-account-input"
+              type="password"
+              name="current-password"
+              autoComplete="current-password"
+              placeholder={t('settings.account_current_password')}
+              aria-label={t('settings.account_current_password')}
+              value={pForm.current}
+              disabled={pForm.saving}
+              onChange={(e) => setPForm((f) => ({ ...f, current: e.target.value, result: null }))}
+            />
+            <input
+              className="settings-account-input"
+              type="password"
+              name="new-password"
+              autoComplete="new-password"
+              placeholder={t('settings.account_new_password')}
+              aria-label={t('settings.account_new_password')}
+              value={pForm.next}
+              disabled={pForm.saving}
+              onChange={(e) => setPForm((f) => ({ ...f, next: e.target.value, result: null }))}
+            />
+            <input
+              className="settings-account-input"
+              type="password"
+              name="confirm-password"
+              autoComplete="new-password"
+              placeholder={t('settings.account_confirm_password')}
+              aria-label={t('settings.account_confirm_password')}
+              value={pForm.confirm}
+              disabled={pForm.saving}
+              onChange={(e) => setPForm((f) => ({ ...f, confirm: e.target.value, result: null }))}
+            />
+            <button
+              type="submit"
+              className="settings-account-submit"
+              disabled={pForm.saving || !pForm.current || !pForm.next || !pForm.confirm}
+            >
+              {pForm.saving ? t('common.loading') : t('settings.account_save')}
+            </button>
+          </div>
+          {feedback(pForm.result)}
+        </div>
+      </form>
+    </>
+  );
+}
 
 /* ── Main Settings Component ── */
 
@@ -480,6 +737,8 @@ export default function Settings() {
 
         {/* ── Right Panel: Active Category Content ── */}
         <div className="settings-panel">
+          {activeCategory === 'account' && <AccountSettings t={t} />}
+
           {activeCategory === 'system' && (
             <>
               {/* ── Apariencia ── */}

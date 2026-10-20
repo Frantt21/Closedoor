@@ -85,6 +85,14 @@ async function searchMusicProxy(query, provider, limit) {
 }
 
 /**
+ * Clave estable de una canción (provider:trackId). Se usa para saber si la
+ * canción que suena es la misma que pinta una card / ventana flotante.
+ */
+export function songKey(song) {
+  return song?.trackId ? `${song.provider || ''}:${song.trackId}` : '';
+}
+
+/**
  * URL de stream completo de una canción. Same-origin, servida por el backend
  * con innertube. La URL de googlevideo no se expone al navegador.
  * Retorna null si la canción no tiene artista/título.

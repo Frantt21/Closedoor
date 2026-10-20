@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { FaMusic, FaPlay, FaPause, FaPencilAlt, FaTrash, FaSearch, FaSpinner } from 'react-icons/fa';
 import { useI18n } from '../../services/i18n/useI18n';
 import { useAuth } from '../../../hooks/useAuth';
-import { searchMusic, resolvePreviewUrl, getStreamUrl, prewarmStream } from '../../services/musicService';
-import { notifyBrowserPlayback } from '../../services/desktopApp';
+import { searchMusic, songKey } from '../../services/musicService';
+import { useMusicPlayer } from '../../../hooks/useMusicPlayer';
 import { updateUserProfile } from '../../services/userService';
 import { toast } from 'react-toastify';
 import './css/songCard.css';
@@ -35,8 +35,12 @@ function formatTime(s) {
  *   (iTunes / Deezer).
  * - En el perfil propio permite buscar, elegir, cambiar y quitar la canción
  *   inline (sin abrir el modal de edición).
+ * - La reproducción la lleva el REPRODUCTOR GLOBAL (context/MusicPlayerContext):
+ *   esta card sólo pinta el estado. Así la música sigue sonando al navegar y la
+ *   ventana flotante (Components/MusicMiniPlayer) ofrece play/pausa, arrastre,
+ *   cierre y salto al perfil del dueño de la canción.
  */
-export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
+export default function SongCard({ song, isOwnProfile, surfaceStyle, owner }) {
   const { t } = useI18n();
   const { user } = useAuth();
 
@@ -52,32 +56,29 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
   const [searchError, setSearchError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  // ── Playback ──
-  const [playing, setPlaying] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(songObj?.duration || 0);
-  // true cuando el stream completo falló y hay que caer al preview de 30s
-  const [usePreview, setUsePreview] = useState(false);
-  // Resultado de /api/music/resolve para la canción actual. `playable: false`
-  // significa que la pista NO cabe entera en el tramo que entrega YouTube
-  // (~1 MiB por URL): el navegador pide la continuación en paralelo al arrancar
-  // y ese 502 tumba el pipeline a los ~1,5 s, así que en ese caso se reproduce
-  // directo el preview de 30 s en vez de intentarlo.
-  const [streamInfo, setStreamInfo] = useState({ sig: '', playable: true });
-  // Intento de stream en curso (0 = primero). Al fallar se reintenta UNA vez con
-  // otro valor: el backend ignora el parámetro, solo sirve para forzar al <audio>
-  // a recargar la misma URL (en serverless el primer intento puede expirar en una
-  // instancia fría y el segundo encontrar la instancia caliente y la resolución
-  // ya cacheada).
-  const [streamAttempt, setStreamAttempt] = useState(0);
-  const streamRetriedRef = useRef(false);
-  // true mientras el <audio> está resolviendo el stream (spinner en la portada)
-  const [loadingStream, setLoadingStream] = useState(false);
-  const wantsPlayRef = useRef(false); // el usuario pulsó play → autoplay al estar listo
-  // URL de preview resuelta con la sig de la canción a la que pertenece
-  // (los previews de Deezer expiran ≈ 15 min → se re-consultan al reproducir)
-  const [resolvedPreview, setResolvedPreview] = useState({ sig: '', url: null });
-  const audioRef = useRef(null);
+  // ── Playback: lo gestiona el reproductor GLOBAL ──
+  // El <audio> ya no vive aquí: al navegar a otra ruta la música sigue sonando
+  // (context/MusicPlayerContext.jsx + ventana flotante MusicMiniPlayer).
+  const {
+    track,
+    playing: playerPlaying,
+    currentTime: playerTime,
+    duration: playerDuration,
+    loadingStream,
+    sourceReady,
+    toggleTrack,
+  } = useMusicPlayer();
+
+  const activeKey = songKey(selected);
+  const isActive = !!activeKey && activeKey === songKey(track?.song);
+  const playing = isActive && playerPlaying;
+  const currentTime = isActive ? playerTime : 0;
+  const duration = isActive ? (playerDuration || selected?.duration || 0) : (selected?.duration || 0);
+  const loadingHere = isActive && loadingStream;
+  // Fuera de la canción activa el player todavía no resolvió nada: se permite
+  // pulsar (él resuelve y arranca). Si es la activa, se espera a tener fuente.
+  const canPlay = !isActive || sourceReady;
+
 
   // ── Sync cuando cambia el song del perfil (realtime / navegación) ──
   const songSig = songObj ? `${songObj.provider}:${songObj.trackId}` : '';
@@ -87,140 +88,16 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
     if (prevSigRef.current === songSig) return;
     prevSigRef.current = songSig;
     setSelected(songObj || null);
-    setPlaying(false);
-    setCurrentTime(0);
-    setDuration(songObj?.duration || 0);
-    setUsePreview(false);
-    setLoadingStream(false);
-    setStreamAttempt(0);
-    streamRetriedRef.current = false;
-    const audio = audioRef.current;
-    if (audio) {
-      audio.pause();
-      audio.currentTime = 0;
-    }
-    wantsPlayRef.current = false;
   }, [songObj, songSig]);
-
-  const selSig = selected ? `${selected.provider}:${selected.trackId}` : '';
-  const isDeezer = selected?.provider === 'deezer' && !!selected?.trackId;
-  // iTunes: preview estable → src derivado directo del selected.
-  // Deezer: usa la URL resuelta SOLO si pertenece a la canción actual
-  // (si no, null hasta que la resolución termine).
-  const effectivePreviewSrc = isDeezer
-    ? (resolvedPreview.sig === selSig ? resolvedPreview.url : null)
-    : (selected?.previewUrl || null);
-
-  // ── Resolver preview fresco (Deezer) cuando cambia la canción visible ──
-  // Se basa en `selected` (no en el prop) para cubrir también el guardado local
-  // inline, sin esperar al realtime. setState solo en callbacks async.
-  useEffect(() => {
-    if (!isDeezer || !selected?.trackId) return;
-    let cancelled = false;
-    resolvePreviewUrl(selected)
-      .then((url) => {
-        if (cancelled) return;
-        setResolvedPreview({ sig: selSig, url: url || selected.previewUrl });
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setResolvedPreview({ sig: selSig, url: selected.previewUrl });
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected]);
-
-  // Pre-warm: cuando la card monta con una canción se anticipa la resolución en
-  // background (buscar el videoId en YouTube + traer el formato de audio, ~1-2 s)
-  // SIN esperar a ningún health check: en producción esa espera (instancia fría)
-  // dejaba la resolución para dentro del propio stream. El audio en sí lo
-  // descarga progresivo el <audio> y queda cacheado en el server.
-  useEffect(() => {
-    if (!selected) return;
-    let cancelled = false;
-    const sig = `${selected.provider}:${selected.trackId}`;
-    prewarmStream(selected).then((info) => {
-      if (cancelled || !info) return;
-      setStreamInfo({ sig, playable: info.playable !== false });
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [selected]);
-
-  // Pausar al desmontar (el <audio> siempre está montado → el ref es estable).
-  useEffect(() => {
-    const audio = audioRef.current;
-    return () => {
-      if (audio) audio.pause();
-    };
-  }, []);
-
-  // ── Fuente de reproducción ──
-  // Stream completo same-origin servido por /api/music/stream (innertube). El
-  // <audio> hace streaming progresivo y puede hacer seek (el backend reenvía el
-  // header Range). Si el backend no está, la canción no cabe entera en el tramo
-  // servible (`playable: false`) o el stream falla → preview de 30 s.
-  // No se espera al health para fijar el src: si el endpoint no responde, el
-  // propio <audio> dispara onError y cae al preview. Si el resolve confirma que
-  // la canción no cabe entera, el src cambia a mitad de la reproducción y
-  // resumeIfWanted lo reanuda.
-  const streamUnplayable =
-    !!selected && streamInfo.sig === selSig && streamInfo.playable === false;
-  const baseStreamUrl = usePreview || streamUnplayable ? null : getStreamUrl(selected);
-  // `&r=N` solo en los reintentos: fuerza al <audio> a recargar la MISMA url (el
-  // backend ignora el parámetro).
-  const streamUrl =
-    baseStreamUrl && streamAttempt > 0 ? `${baseStreamUrl}&r=${streamAttempt}` : baseStreamUrl;
-  const playbackSrc = streamUrl || effectivePreviewSrc;
-
-  const ignorePlaybackError = (err) => {
-    // AbortError = el src cambió (nuevo load) antes de que play() arrancara.
-    // Es benigno (el preview nuevo se encargará) → no loguear.
-    if (err?.name === 'AbortError') return;
-    console.warn('[song] playback error:', err?.message || err);
-  };
-
-  // El src cambia solo (p. ej. el resolve confirma que la canción no cabe
-  // entera → pasamos de stream a preview): el <audio> se recarga, así que hay
-  // que reanudar si el usuario ya había pulsado play (event-driven, sin estado
-  // en efectos).
-  const resumeIfWanted = () => {
-    if (!wantsPlayRef.current) return;
-    requestAnimationFrame(() => {
-      const a = audioRef.current;
-      if (a && wantsPlayRef.current && a.paused) {
-        a.play().then(() => setPlaying(true)).catch(ignorePlaybackError);
-      }
-    });
-  };
 
   // Perfil ajeno sin canción → no mostrar la card (después de los hooks)
   if (!isOwnProfile && !selected) return null;
 
   const togglePlay = () => {
-    const audio = audioRef.current;
-    if (!audio || !playbackSrc) return;
-    if (playing) {
-      audio.pause();
-      setPlaying(false);
-      wantsPlayRef.current = false;
-      return;
-    }
-    wantsPlayRef.current = true;
-    audio
-      .play()
-      .then(() => {
-        setPlaying(true);
-        // Ya está sonando (completa o preview): en el navegador la canción
-        // completa no va a llegar, así que aprovechamos el momento para ofrecer
-        // la app de escritorio. Se autolimita a una vez por carga de página y
-        // nunca aparece dentro de la propia app (services/desktopApp.js).
-        notifyBrowserPlayback();
-      })
-      .catch(ignorePlaybackError);
+    if (!selected || !canPlay) return;
+    // El reproductor global resuelve el stream (y cae al preview si hace falta)
+    // y sigue sonando aunque naveguemos fuera del perfil.
+    toggleTrack(selected, owner || null);
   };
 
   const handleSearch = async () => {
@@ -401,11 +278,11 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
             <div className="song-card-cover-wrap">
               <button
                 type="button"
-                className={`song-card-cover ${!playbackSrc && !loadingStream ? 'song-card-cover--disabled' : ''}`}
+                className={`song-card-cover ${!canPlay ? 'song-card-cover--disabled' : ''}`}
                 onClick={togglePlay}
                 aria-pressed={playing}
-                disabled={!playbackSrc && !loadingStream}
-                title={loadingStream ? t('profile.song_loading') || 'Loading…' : (playing ? t('profile.song_pause') : t('profile.song_play'))}
+                disabled={!canPlay}
+                title={loadingHere ? t('profile.song_loading') || 'Loading…' : (playing ? t('profile.song_pause') : t('profile.song_play'))}
               >
                 {selected.artwork ? (
                   <img
@@ -424,7 +301,7 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
                   {formatTime(currentTime)} / {formatTime(duration)}
                 </span>
                 <span className="song-card-cover-btn">
-                  {loadingStream ? <FaSpinner className="fc-spin" /> : (playing ? <FaPause /> : <FaPlay />)}
+                  {loadingHere ? <FaSpinner className="fc-spin" /> : (playing ? <FaPause /> : <FaPlay />)}
                 </span>
               </button>
 
@@ -458,7 +335,7 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
               className={`song-card-vinyl ${playing ? 'song-card-vinyl--playing' : ''}`}
               onClick={togglePlay}
               aria-pressed={playing}
-              disabled={!playbackSrc && !loadingStream}
+              disabled={!canPlay}
               title={playing ? t('profile.song_pause') : t('profile.song_play')}
             >
               <span className="song-card-vinyl-art" style={{ backgroundImage: `url(${selected.artwork})` }} />
@@ -475,48 +352,8 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle }) {
         </div>
       )}
 
-      {/* ── Reproductor oculto (siempre montado: ref estable para el cleanup) ── */}
-      <audio
-        ref={audioRef}
-        src={playbackSrc || undefined}
-        preload="none"
-        onLoadStart={resumeIfWanted}
-        onTimeUpdate={(e) => {
-          setCurrentTime(e.currentTarget.currentTime);
-        }}
-        onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
-        onWaiting={() => setLoadingStream(true)}
-        onPlaying={() => setLoadingStream(false)}
-        onEnded={() => {
-          setPlaying(false);
-          setCurrentTime(0);
-        }}
-        onError={() => {
-          // Si ya está en preview, no hay más fallbacks
-          if (usePreview) return;
-          setLoadingStream(false);
-          // Reintento único antes de rendirse: un 504/502 de la primera petición
-          // (instancia fría o resolución lenta) no significa que la canción no
-          // se pueda servir; el segundo intento suele entrar.
-          if (streamUrl && !streamRetriedRef.current) {
-            streamRetriedRef.current = true;
-            setStreamAttempt((n) => n + 1);
-            return;
-          }
-          // El stream completo no cargó (sin backend, rate limit de YouTube o
-          // red) → caer al preview de 30 s y seguir reproduciendo si el usuario
-          // ya había pulsado play.
-          if (streamUrl) {
-            setUsePreview(true);
-            requestAnimationFrame(() => {
-              const a = audioRef.current;
-              if (a && wantsPlayRef.current && effectivePreviewSrc) {
-                a.play().then(() => setPlaying(true)).catch(ignorePlaybackError);
-              }
-            });
-          }
-        }}
-      />
+      {/* El <audio> vive en el reproductor global (context/MusicPlayerContext)
+          para que la música siga sonando al cambiar de ruta. */}
     </div>
   );
 }

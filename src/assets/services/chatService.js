@@ -390,6 +390,59 @@ export async function decryptMessage(message, currentUserId) {
 }
 
 /**
+ * Mensajes FIJADOS de una conversación, descifrados para el usuario actual.
+ *
+ * Se consultan directamente por `is_pinned` en la BD en vez de derivarlos del
+ * array `messages` de la UI: así el panel de fijados se rellena al instante
+ * aunque la conversación aún no haya terminado de cargar (y aunque los
+ * fijados estén fuera de la página de mensajes cargada).
+ */
+export async function getPinnedMessages(conversationId, currentUserId) {
+  if (!conversationId || !currentUserId) return [];
+
+  const { data, error } = await supabase
+    .from('messages')
+    .select()
+    .eq('conversation_id', conversationId)
+    .eq('is_pinned', true)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  const rows = (data || []).filter(m => !m.deleted_for?.includes(currentUserId));
+  return Promise.all(rows.map(async (m) => ({
+    ...m,
+    decryptedContent: await decryptMessage(m, currentUserId),
+  })));
+}
+
+/**
+ * Últimos mensajes de una conversación descifrados (para la galería de media).
+ *
+ * El contenido va cifrado en la BD, así que no se puede filtrar por imagen en
+ * SQL: se traen los últimos `limit` y se descifran en cliente. Esto permite
+ * mostrar las imágenes al instante sin esperar a que Chat cargue sus páginas.
+ */
+export async function getDecryptedMessages(conversationId, currentUserId, limit = 300) {
+  if (!conversationId || !currentUserId) return [];
+
+  const { data, error } = await supabase
+    .from('messages')
+    .select()
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+
+  const rows = (data || []).filter(m => !m.deleted_for?.includes(currentUserId));
+  return Promise.all(rows.map(async (m) => ({
+    ...m,
+    decryptedContent: await decryptMessage(m, currentUserId),
+  })));
+}
+
+/**
  * Subscribe to new messages in a conversation (realtime)
  */
 export function subscribeToMessages(conversationId, onMessage, onDelete) {

@@ -16,6 +16,27 @@
     gap: 12px;
 }
 
+/* ---- Home: cabecera sticky con blur ----
+   Solo en Home (modificador --home); en perfiles el header sigue en flujo.
+   El padding vertical se compensa con márgenes negativos para que el layout
+   no se mueva ni un píxel respecto al original. */
+.posts-section--home .posts-section-header {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    padding: 10px 0;
+    margin: -10px 0 2px;
+    /* Fallback sin color-mix; el navegador moderno usa la mezcla translúcida. */
+    background: var(--overlay-bg, rgba(0, 0, 0, 0.72));
+    background: color-mix(in srgb, var(--color-bg, #000000) 72%, transparent);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+}
+
+html.fc-desktop .posts-section--home .posts-section-header {
+    top: var(--fc-titlebar-h, 40px);
+}
+
 .posts-section-action {
     display: flex;
     align-items: center;

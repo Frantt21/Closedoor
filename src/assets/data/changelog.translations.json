@@ -1,38 +1,4 @@
 {
-  "2026-10-10:is2cuf": {
-    "es": {
-      "title": "Rebaja en publicaciones",
-      "items": [
-        "Las publicaciones ahora admiten rebajas: negrita, cursiva, tachado, código en línea, listas, citas, encabezados, tablas y bloques de código.",
-        "Un nuevo grupo de formato en la barra de herramientas del compositor inserta la sintaxis por usted.",
-        "Las menciones y los hashtags siguen funcionando dentro del texto formateado."
-      ]
-    },
-    "pt": {
-      "title": "Markdown em postagens",
-      "items": [
-        "As postagens agora suportam marcação: negrito, itálico, tachado, código embutido, listas, aspas, títulos, tabelas e blocos de código.",
-        "Um novo grupo de formatação na barra de ferramentas do compositor insere a sintaxe para você.",
-        "Menções e hashtags continuam funcionando dentro do texto formatado."
-      ]
-    },
-    "ru": {
-      "title": "Уценка в постах",
-      "items": [
-        "Сообщения теперь поддерживают уценку: жирный шрифт, курсив, зачеркивание, встроенный код, списки, кавычки, заголовки, таблицы и блоки кода.",
-        "Новая группа форматирования на панели инструментов композитора вставляет синтаксис за вас.",
-        "Упоминания и хэштеги продолжают работать внутри форматированного текста."
-      ]
-    },
-    "ja": {
-      "title": "投稿のマークダウン",
-      "items": [
-        "投稿では、マークダウン (太字、斜体、取り消し線、インライン コード、リスト、引用符、見出し、表、コード ブロック) がサポートされるようになりました。",
-        "Composer ツールバーの新しい書式設定グループにより、構文が挿入されます。",
-        "メンションとハッシュタグは、書式設定されたテキスト内で引き続き機能します。"
-      ]
-    }
-  },
   "2026-10-10+2:4x09xw": {
     "es": {
       "title": "La canción de tu perfil, ahora transmitida de verdad",
@@ -110,6 +76,56 @@
         "プラットフォーム用のインストーラーを含む新しいダウンロード ページ。",
         "画像をコメントに直接貼り付けたり、Ctrl+V で返信したりできるようになりました。",
         "ブラウザで曲を再生すると、アプリはデスクトップ バージョンを提供しますが、それは永久に無視できます。"
+      ]
+    }
+  },
+  "2026-10-20:1tgafd3": {
+    "es": {
+      "title": "Reproductor flotante, base de chat y configuración de cuenta",
+      "items": [
+        "La canción de tu perfil ahora sigue sonando mientras navegas, en un reproductor flotante que puedes arrastrar a cualquier lugar de la pantalla.",
+        "Una nueva base de chat mantiene tus conversaciones recientes a un clic de distancia, además de una ventana de chat flotante para responder sin salir de la página.",
+        "Las pestañas de Inicio permanecen fijadas en la parte superior con un fondo borroso mientras te desplazas por el feed.",
+        "En la aplicación de escritorio, la barra de título ahora muestra el fondo de su perfil en lugar de una franja opaca.",
+        "La configuración tiene una nueva sección Cuenta: cambie su nombre de usuario, correo electrónico y contraseña; cada cambio solicita primero su contraseña actual.",
+        "Los mensajes multimedia y fijados en un chat ahora están disponibles en el momento en que abres la conversación.",
+        "La insignia \"Fijado\" en las publicaciones ahora se puede leer en fondos claros."
+      ]
+    },
+    "pt": {
+      "title": "Player flutuante, chat dock e configurações da conta",
+      "items": [
+        "A música do seu perfil agora continua tocando enquanto você navega, em um player flutuante que você pode arrastar para qualquer lugar da tela.",
+        "Um novo dock de bate-papo mantém suas conversas recentes a um clique de distância, além de uma janela de bate-papo flutuante para responder sem sair da página.",
+        "As guias iniciais permanecem fixadas na parte superior com um fundo desfocado enquanto você rola o feed.",
+        "No aplicativo de desktop, a barra de título agora mostra o plano de fundo do seu perfil em vez de uma faixa opaca.",
+        "As configurações têm uma nova seção de conta: altere seu nome de usuário, e-mail e senha – cada alteração solicita primeiro sua senha atual.",
+        "A mídia e as mensagens fixadas em um bate-papo agora ficam disponíveis no momento em que você abre a conversa.",
+        "O emblema \"Fixado\" nas postagens agora pode ser lido em fundos claros."
+      ]
+    },
+    "ru": {
+      "title": "Плавающий плеер, док-станция для чата и настройки учетной записи",
+      "items": [
+        "Песня вашего профиля теперь продолжает играть, пока вы просматриваете страницы, а в плавающем плеере вы можете перетащить его в любое место экрана.",
+        "Новая док-станция для чата позволяет хранить ваши недавние разговоры одним щелчком мыши, а также плавающее окно чата, где можно ответить, не покидая страницу.",
+        "Вкладки «Главная» остаются закрепленными вверху с размытым фоном при прокрутке ленты.",
+        "В настольном приложении в строке заголовка теперь отображается фон вашего профиля вместо непрозрачной полосы.",
+        "В настройках появился новый раздел «Учетная запись»: измените имя пользователя, адрес электронной почты и пароль — при каждом изменении сначала требуется ввести текущий пароль.",
+        "Медиа и закрепленные сообщения в чате теперь доступны в тот момент, когда вы открываете беседу.",
+        "Значок «Закреплено» на публикациях теперь читается на светлом фоне."
+      ]
+    },
+    "ja": {
+      "title": "フローティング プレーヤー、チャット ドック、アカウント設定",
+      "items": [
+        "ブラウジング中にプロフィール曲が再生され続けるようになりました。フローティング プレーヤーでは、画面上のどこにでもドラッグできます。",
+        "新しいチャット ドックでは、最近の会話を 1 クリックで保存できるほか、ページから離れることなく返信できるフローティング チャット ウィンドウも備えています。",
+        "フィードをスクロールしている間、[ホーム] タブは背景がぼやけて上部に固定されたままになります。",
+        "デスクトップ アプリでは、タイトル バーに不透明なストリップの代わりにプロフィールの背景が表示されるようになりました。",
+        "[設定] には新しい [アカウント] セクションがあり、ユーザー名、電子メール、パスワードを変更します。変更するたびに、最初に現在のパスワードが要求されます。",
+        "チャット内のメディアと固定メッセージは、会話を開いた瞬間に利用できるようになりました。",
+        "投稿の「固定」バッジが明るい背景でも読めるようになりました。"
       ]
     }
   }

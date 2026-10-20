@@ -11,6 +11,9 @@ import {
   setCachedProfile,
   clearCachedProfile,
   clearCachedProfileByUsername,
+  changeUsername as requestUsernameChange,
+  verifyCurrentPassword,
+  validateProfileFields,
 } from '../assets/services/userService';
 import { clearAllAppCaches } from '../assets/services/postService';
 import { clearDecryptedCache } from '../assets/services/alphabetEncryption';
@@ -542,6 +545,95 @@ export function AuthProvider({ children }) {
     }
   };
 
+  // ── Cambio de credenciales desde Ajustes ──
+  // Los tres exigen la CONTRASEÑA ACTUAL. verify_password (migración 075)
+  // compara con bcrypt en el servidor y aplica throttle por uid, así que una
+  // sesión robada no basta para apropiarse de la cuenta.
+  // Devuelven códigos estables; la UI los traduce (Settings.jsx).
+
+  const changeUsername = async (newUsername, currentPassword) => {
+    setError(null);
+    if (!user?.id) return { success: false, code: 'not_authenticated' };
+
+    const normalized = String(newUsername || '').trim().toLowerCase();
+    const validationError = validateProfileFields({ username: normalized });
+    if (validationError) {
+      setError(validationError);
+      return { success: false, code: 'invalid_username', error: validationError };
+    }
+    if (!currentPassword) return { success: false, code: 'invalid_password' };
+
+    const previousUsername = profile?.username;
+    const code = await requestUsernameChange(normalized, currentPassword);
+    if (code !== 'ok') return { success: false, code };
+
+    // El perfil público se cachea por id y por username: invalidar el viejo.
+    if (previousUsername) clearCachedProfileByUsername(previousUsername);
+    clearCachedProfile(user.id);
+
+    const fresh = await refreshProfile(user.id);
+    if (!fresh) {
+      // Sin red: al menos reflejar el cambio ya confirmado por el servidor.
+      setProfile((prev) => (prev ? { ...prev, username: normalized } : prev));
+    }
+    return { success: true, code: 'ok', profile: fresh };
+  };
+
+  const changeEmail = async (newEmail, currentPassword) => {
+    setError(null);
+    if (!user?.id) return { success: false, code: 'not_authenticated' };
+
+    const email = String(newEmail || '').trim().toLowerCase();
+    const emailErr = validateEmail(email);
+    if (emailErr === 'invalid') return { success: false, code: 'invalid_email' };
+    if (emailErr === 'domain') return { success: false, code: 'email_domain' };
+    if (!currentPassword) return { success: false, code: 'invalid_password' };
+    if (String(user?.email || '').toLowerCase() === email) {
+      return { success: false, code: 'same_email' };
+    }
+    if (!(await verifyCurrentPassword(currentPassword))) {
+      return { success: false, code: 'invalid_password' };
+    }
+
+    try {
+      if (await checkEmailExists(email)) return { success: false, code: 'email_taken' };
+    } catch (err) {
+      console.warn('Could not check email availability:', err);
+    }
+
+    // Supabase envía el/los correos de confirmación según la config del
+    // proyecto ("Secure email change" → confirma en la dirección antigua y en
+    // la nueva). El email real solo cambia al confirmar.
+    const { error } = await supabase.auth.updateUser({ email });
+    if (error) {
+      setError(error.message);
+      return { success: false, code: 'error', error: error.message };
+    }
+    return { success: true, code: 'ok' };
+  };
+
+  const changePassword = async (newPassword, currentPassword) => {
+    setError(null);
+    if (!user?.id) return { success: false, code: 'not_authenticated' };
+    if (typeof newPassword !== 'string' || newPassword.length < 6) {
+      return { success: false, code: 'weak_password' };
+    }
+    // bcrypt solo usa los primeros 72 bytes: rechazar en vez de truncar.
+    if (newPassword.length > 72) return { success: false, code: 'password_too_long' };
+    if (!currentPassword) return { success: false, code: 'invalid_password' };
+    if (newPassword === currentPassword) return { success: false, code: 'same_password' };
+    if (!(await verifyCurrentPassword(currentPassword))) {
+      return { success: false, code: 'invalid_password' };
+    }
+
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      setError(error.message);
+      return { success: false, code: 'error', error: error.message };
+    }
+    return { success: true, code: 'ok' };
+  };
+
   const logout = async () => {
     try {
       setError(null);
@@ -595,6 +687,9 @@ export function AuthProvider({ children }) {
         register,
         logout,
         refreshProfile,
+        changeUsername,
+        changeEmail,
+        changePassword,
         isAuthenticated: !!user,
       }}
     >

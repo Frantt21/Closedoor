@@ -22,6 +22,20 @@ export const CHANGELOG_SEEN_KEY = 'fc_changelog_seen';
 
 export const RELEASES = [
   {
+    id: '2026-10-20',
+    date: '2026-10-20',
+    title: 'Floating player, chat dock and account settings',
+    items: [
+      'Your profile song now keeps playing while you browse, in a floating player you can drag anywhere on screen.',
+      'A new chat dock keeps your recent conversations one click away, plus a floating chat window to reply without leaving the page.',
+      'The Home tabs stay pinned to the top with a blurred background while you scroll the feed.',
+      'In the desktop app, the title bar now shows your profile background instead of an opaque strip.',
+      'Settings has a new Account section: change your username, email and password — every change asks for your current password first.',
+      'Media and pinned messages in a chat are now available the moment you open the conversation.',
+      'The "Pinned" badge on posts is now readable on light backgrounds.',
+    ],
+  },
+  {
     id: '2026-10-16',
     date: '2026-10-16',
     title: 'Full songs in the desktop app',

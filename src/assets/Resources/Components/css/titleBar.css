@@ -22,6 +22,10 @@ html.fc-desktop body {
    mover/cerrar la ventana aunque la app todavía esté cargando.
    Sin borde inferior: el nombre va centrado y los botones se colocan encima,
    en una capa absoluta, para que el centro no dependa de su ancho. */
+/* Misma receta que la sidebar: superficie traslúcida + blur → se ve el fondo
+   global (GlobalProfileBg) detrás en vez de una franja opaca. En la app de
+   escritorio el fondo del perfil llega hasta el borde superior de la ventana,
+   así que la barra se integra en lugar de cortar la imagen. */
 .fc-titlebar {
     position: fixed;
     top: 0;
@@ -32,10 +36,28 @@ html.fc-desktop body {
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--color-bg, #0b0b0f);
+    background: var(--accent-surface-rgba, color-mix(in srgb, var(--color-bg, #0b0b0f) 55%, transparent));
+    backdrop-filter: var(--accent-surface-blur, blur(16px) saturate(140%));
+    -webkit-backdrop-filter: var(--accent-surface-blur, blur(16px) saturate(140%));
     color: var(--color-text-secondary, #9ca3af);
     -webkit-app-region: drag;
     user-select: none;
+}
+
+/* Sombra suave inferior para separar del contenido sin dibujar un borde duro. */
+.fc-titlebar::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 10px;
+    pointer-events: none;
+    background: linear-gradient(
+        to bottom,
+        color-mix(in srgb, var(--color-bg, #0b0b0f) 45%, transparent),
+        transparent
+    );
 }
 
 /* Nombre de la app, centrado en la ventana (sin logo: el icono lo pone el SO). */

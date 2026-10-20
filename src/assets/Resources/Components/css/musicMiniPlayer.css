@@ -1,0 +1,197 @@
+/* ==========================================
+   Mini reproductor flotante "Mi canción"
+   (Components/MusicMiniPlayer.jsx)
+   ========================================== */
+
+.music-mini {
+    position: fixed;
+    left: 20px;
+    bottom: 20px;
+    width: 300px;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    padding: 10px 12px 8px;
+    background: var(--color-surface, #1a1a1a);
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius-lg, 14px);
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.music-mini--dragging {
+    cursor: grabbing;
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.6);
+}
+
+.music-mini-body {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+/* ── Portada (click = ir al perfil del dueño) ── */
+.music-mini-art {
+    position: relative;
+    width: 46px;
+    height: 46px;
+    flex-shrink: 0;
+    padding: 0;
+    border: none;
+    border-radius: 9px;
+    overflow: hidden;
+    background: var(--color-surface-hover, #252525);
+    cursor: pointer;
+}
+
+.music-mini-art:disabled {
+    cursor: grab;
+}
+
+.music-mini-art-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    pointer-events: none;
+}
+
+.music-mini-art-img--empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-muted, #6b7280);
+    font-size: 1rem;
+}
+
+.music-mini-art-disc {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    color: #ffffff;
+    background: rgba(0, 0, 0, 0.45);
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.music-mini-art:hover .music-mini-art-disc,
+.music-mini-art-disc--playing {
+    opacity: 1;
+}
+
+/* ── Título / artista ── */
+.music-mini-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.music-mini-title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--color-text, #ffffff);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.music-mini-artist {
+    font-size: 0.72rem;
+    color: var(--color-text-muted, #6b7280);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ── Controles ── */
+.music-mini-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.music-mini-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--color-text-secondary, #9ca3af);
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.music-mini-btn:hover {
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+    transform: scale(1.06);
+}
+
+.music-mini-btn--toggle {
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+}
+
+.music-mini-btn--close:hover {
+    color: #ef4444;
+}
+
+/* ── Progreso ── */
+.music-mini-progress {
+    position: relative;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--color-surface-hover, #252525);
+    cursor: pointer;
+    overflow: hidden;
+}
+
+.music-mini-progress-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background: var(--accent-color, #6b7280);
+    border-radius: 999px;
+}
+
+.music-mini-times {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.66rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text-muted, #6b7280);
+}
+
+/* ── Móvil: por encima de la barra inferior y del lanzador de chats ── */
+@media (max-width: 1024px) {
+    .music-mini {
+        right: 16px;
+        bottom: 150px;
+        width: 268px;
+    }
+}
+
+@media (max-width: 480px) {
+    .music-mini {
+        left: 12px;
+        right: 12px;
+        width: auto;
+    }
+}

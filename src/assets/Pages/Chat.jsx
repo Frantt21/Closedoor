@@ -22,6 +22,7 @@ import {
   subscribeToTyping,
   getNicknames, getCachedNicknames, cacheNicknames,
   getBubbleColors, getCachedBubbleColors, cacheBubbleColors,
+  getPinnedMessages, getDecryptedMessages,
 } from '../services/chatService';
 import { getFollowing } from '../services/followService';
 import { isBlocked, blockUser, unblockUser, unfollowBothWays, getCachedBlockStatus, cacheBlockStatus } from '../services/blockService';
@@ -207,6 +208,11 @@ export default function Chat() {
   const [inputEmojiTab, setInputEmojiTab] = useState(0);
   const [mediaPreviewUrl, setMediaPreviewUrl] = useState('');
   const [uploadingChatMedia, setUploadingChatMedia] = useState(false);
+  // Media/Pinned cargados DIRECTAMENTE de la BD al abrir la conversación (sin
+  // esperar a que la lista de mensajes termine). Se guardan con el convId al
+  // que pertenecen para no mostrar datos viejos al cambiar de chat.
+  const [eagerPinned, setEagerPinned] = useState({ convId: null, items: [] });
+  const [eagerMedia, setEagerMedia] = useState({ convId: null, urls: [] });
   const editRef = useRef(null);
   // Preserve content during modal close animation (ref survives state clears)
   const editContentRef = useRef('');
@@ -1483,10 +1489,19 @@ export default function Chat() {
     try {
       await pinMessage(msg.id, newPinned);
       setMessages((prev) => prev.map(m => m.id === msg.id ? { ...m, is_pinned: newPinned } : m));
+      // Mantener el panel de fijados (datos eager) en sincronía al instante.
+      setEagerPinned((prev) => {
+        if (prev.convId !== activeConvId) return prev;
+        const exists = prev.items.some(m => m.id === msg.id);
+        if (newPinned) {
+          return exists ? prev : { convId: prev.convId, items: [{ ...msg, is_pinned: true }, ...prev.items] };
+        }
+        return { convId: prev.convId, items: prev.items.filter(m => m.id !== msg.id) };
+      });
     } catch (err) {
       console.error('Error pinning message:', err);
     }
-  }, [msgMenu.msg]);
+  }, [msgMenu.msg, activeConvId]);
 
   const handleStartEdit = useCallback(() => {
     const msg = msgMenu.msg;
@@ -2126,6 +2141,44 @@ export default function Chat() {
       setSending(false);
     }
   }, [activeConvId, otherUser, user?.id, replyingTo, loadConvs, t]);
+
+  // ── Cargar Media + fijados DIRECTAMENTE de la BD al elegir conversación ──
+  // No dependen de `messages` (que puede tardar en cargar o tener solo la
+  // primera página): el panel enseña las imágenes y los fijados al instante.
+  useEffect(() => {
+    if (!activeConvId || !user?.id) return undefined;
+    let cancelled = false;
+    const convId = activeConvId;
+    const userId = user.id;
+
+    // Diferido un tick: setState dentro del callback del fetch, nunca síncrono
+    // en el cuerpo del efecto.
+    Promise.resolve().then(async () => {
+      try {
+        const [pinned, recent] = await Promise.all([
+          getPinnedMessages(convId, userId),
+          getDecryptedMessages(convId, userId, 300),
+        ]);
+        if (cancelled) return;
+        setEagerPinned({ convId, items: pinned });
+        const urls = [];
+        const seen = new Set();
+        for (const m of recent) {
+          if (!m.decryptedContent) continue;
+          const { imageUrl } = detectMediaFromContent(m.decryptedContent);
+          if (imageUrl && IMG_RE.test(imageUrl) && !seen.has(imageUrl)) {
+            seen.add(imageUrl);
+            urls.push(imageUrl);
+          }
+        }
+        setEagerMedia({ convId, urls });
+      } catch (err) {
+        console.warn('[Chat] eager media/pinned load failed:', err?.message || err);
+      }
+    });
+
+    return () => { cancelled = true; };
+  }, [activeConvId, user?.id]);
 
   // ── Actualizar allChatMediaUrlsRef cuando cambian los mensajes ──
   useEffect(() => {
@@ -3463,7 +3516,14 @@ export default function Chat() {
           </div>
           <div className="chat-media-gallery-grid">
             {(() => {
-              const allImages = allChatMediaUrlsRef.current;
+              // Prioridad: galería traída aparte de la BD (no espera a la carga
+              // de la conversación). Se completa con las URLs de los mensajes ya
+              // cargados (páginas antiguas) sin duplicar.
+              const eager = eagerMedia.convId === activeConvId ? eagerMedia.urls : [];
+              const loaded = allChatMediaUrlsRef.current;
+              const allImages = eager.length
+                ? [...eager, ...loaded.filter((u) => !eager.includes(u))]
+                : loaded;
               if (allImages.length === 0) {
                 return <p className="chat-float-panel-empty">{t('chat.no_messages')}</p>;
               }
@@ -3496,11 +3556,17 @@ export default function Chat() {
           </div>
           <div className="chat-pinned-list">
             {(() => {
-              const pinned = messages.filter(m => m.is_pinned);
+              // Mismos datos eager que el panel de media: los fijados salen de
+              // la BD al instante, sin esperar a que cargue la conversación.
+              const fromEager = eagerPinned.convId === activeConvId;
+              const pinned = fromEager ? eagerPinned.items : messages.filter(m => m.is_pinned);
               if (pinned.length === 0) {
                 return <p className="chat-float-panel-empty">{t('chat.no_messages')}</p>;
               }
-              return [...pinned].reverse().map(msg => {
+              // El eager ya viene ordenado del más nuevo al más viejo (consulta
+              // DESC); el derivado de `messages` viene ascendente.
+              const ordered = fromEager ? pinned : [...pinned].reverse();
+              return ordered.map(msg => {
                 const sender = msg.sender_id === user?.id
                   ? { name: t('chat.replying_self'), avatar: profile?.avatar_url }
                   : { name: otherUser?.username || '?', avatar: otherUser?.avatar_url };

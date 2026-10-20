@@ -183,6 +183,57 @@ export async function loginEmailByUsername(username, password) {
 }
 
 /**
+ * Verifica la contraseña ACTUAL de la cuenta autenticada.
+ *
+ * No se hace en el cliente: el RPC `verify_password` (migración 075) compara
+ * con bcrypt contra auth.users del uid de la sesión y aplica throttle
+ * (10 fallos / 15 min). Necesario antes de cambiar username/email/contraseña.
+ *
+ * @param {string} password - Contraseña en claro (viaja por HTTPS)
+ * @returns {Promise<boolean>}
+ */
+export async function verifyCurrentPassword(password) {
+  if (!password) return false;
+  try {
+    const { data, error } = await supabase.rpc('verify_password', { pwd: password });
+    if (error) {
+      console.error('Error verifying password:', error);
+      return false;
+    }
+    return data === true;
+  } catch (err) {
+    console.error('Verify password error:', err);
+    return false;
+  }
+}
+
+/**
+ * Cambia el username de la cuenta autenticada (requiere contraseña actual).
+ *
+ * @param {string} newUsername
+ * @param {string} password - Contraseña actual
+ * @returns {Promise<string>} código: 'ok' | 'invalid_username' |
+ *   'invalid_password' | 'same' | 'taken' | 'not_authenticated' | 'error'
+ */
+export async function changeUsername(newUsername, password) {
+  const normalized = String(newUsername || '').trim().toLowerCase();
+  try {
+    const { data, error } = await supabase.rpc('change_username', {
+      new_username: normalized,
+      pwd: password,
+    });
+    if (error) {
+      console.error('Error changing username:', error);
+      return 'error';
+    }
+    return data || 'error';
+  } catch (err) {
+    console.error('Change username error:', err);
+    return 'error';
+  }
+}
+
+/**
  * Check if a username already exists
  * @param {string} username - Username to check
  * @returns {Promise<boolean>} - True if username exists

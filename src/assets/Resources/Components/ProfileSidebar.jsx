@@ -202,6 +202,7 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
           song={profile?.song || null}
           isOwnProfile={isOwnProfile}
           surfaceStyle={surfaceStyle}
+          owner={profile || null}
         />
       )}
 

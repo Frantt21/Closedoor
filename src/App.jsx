@@ -5,11 +5,13 @@ import FollowCountsWatcher from './assets/Resources/Components/FollowCountsWatch
 import BlockRealtimeWatcher from './assets/Resources/Components/BlockRealtimeWatcher.jsx';
 import { I18nProvider } from './assets/services/i18n/I18nContext';
 import { CallProvider } from './context/CallContext';
+import { MusicPlayerProvider } from './context/MusicPlayerContext';
 import RightPanel from './assets/Resources/Components/RightPanel';
 import GlobalProfileBg from './assets/Resources/Components/GlobalProfileBg';
 import AppSurfaceTheme from './assets/Resources/Components/AppSurfaceTheme';
 import AppLoader from './assets/Resources/Components/AppLoader';
 import MobileNav from './assets/Resources/Components/MobileNav';
+import FloatingChat from './assets/Resources/Components/FloatingChat';
 import ChangelogModal from './assets/Resources/Components/ChangelogModal';
 import DesktopAppPrompt from './assets/Resources/Components/DesktopAppPrompt';
 import TitleBar from './assets/Resources/Components/TitleBar';
@@ -188,6 +190,7 @@ function App() {
 
   return (
     <I18nProvider>
+      <MusicPlayerProvider>
       <CallProvider>
         {/* Barra de título propia: solo se pinta dentro de la app de escritorio
             (Electron); en el navegador no renderiza nada. */}
@@ -235,6 +238,8 @@ function App() {
 
           {!isFullWidthRoute && <RightPanel />}
           <MobileNav />
+          {/* Lanzador de chats recientes + ventana de chat flotante (global) */}
+          <FloatingChat />
           <ChangelogModal />
           {/* Aviso de la app de escritorio: sale al reproducir una canción en el
               navegador (SongCard → notifyBrowserPlayback). */}
@@ -258,6 +263,7 @@ function App() {
         </div>
       </AppLoader>
       </CallProvider>
+      </MusicPlayerProvider>
     </I18nProvider>
   );
 }
