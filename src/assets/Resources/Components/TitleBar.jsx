@@ -66,7 +66,7 @@ export default function TitleBar() {
       className={`fc-titlebar${isMac ? ' fc-titlebar--mac' : ''}`}
       onDoubleClick={() => window.electron?.maximize()}
     >
-      <span className="fc-titlebar__title">Foranly</span>
+      <span className="fc-titlebar__title">Closedoor</span>
 
       {!isMac && (
         <div className="fc-titlebar-controls" role="group" aria-label="Controles de ventana">
