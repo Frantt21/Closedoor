@@ -22,7 +22,7 @@
   },
   "build": {
     "appId": "space.foranly.desktop",
-    "productName": "Foranly",
+    "productName": "Closedoor",
     "directories": {
       "output": "dist"
     },
