@@ -56,6 +56,19 @@ html.fc-desktop .fc-titlebar-controls {
     right: 6px;
 }
 
+/* El scrollbar del documento arrancaba en el borde superior y se metía en la
+   titlebar. Se desplaza el track para que empiece justo debajo. */
+html.fc-desktop {
+    /* Reactiva los pseudo-elementos ::-webkit-scrollbar (scrollbar-width/
+       scrollbar-color estándar los desactivan en Chromium). */
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+}
+
+html.fc-desktop::-webkit-scrollbar-track {
+    margin-top: var(--fc-titlebar-h, 40px);
+}
+
 /* Sin "profile background" global → sólida, igual que .sidebar--solid. */
 .fc-titlebar--solid {
     background: var(--color-bg, #000000);
