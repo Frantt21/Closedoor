@@ -815,5 +815,10 @@
   "update.title": "Nova versão disponível",
   "update.body": "Há uma nova versão do Foranly. Recarregue para atualizar.",
   "update.reload": "Recarregar",
-  "update.later": "Mais tarde"
+  "update.later": "Mais tarde",
+  "window.close": "Fechar",
+  "window.controls": "Controles da janela",
+  "window.maximize": "Maximizar",
+  "window.minimize": "Minimizar",
+  "window.restore": "Restaurar"
 }

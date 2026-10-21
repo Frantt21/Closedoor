@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getDesktopBridge, isDesktopApp } from '../../services/desktopApp';
 import { useI18n } from '../../services/i18n/useI18n';
+import Tooltip from './Tooltip';
 import './css/titleBar.css';
 
 /**
@@ -24,7 +25,7 @@ export default function TitleBar() {
   const bridge = getDesktopBridge();
   const platform = bridge?.platform || window.electron?.platform || '';
   const isMac = platform === 'darwin';
-  const { showGlobalBg } = useI18n();
+  const { showGlobalBg, t } = useI18n();
   const [maximized, setMaximized] = useState(() => !!window.electron?.isMaximized?.());
 
   useEffect(() => {
@@ -71,47 +72,50 @@ export default function TitleBar() {
       <span className="fc-titlebar__title">Closedoor</span>
 
       {!isMac && (
-        <div className="fc-titlebar-controls" role="group" aria-label="Controles de ventana">
-          <button
-            type="button"
-            className="fc-titlebar-btn"
-            title="Minimizar"
-            aria-label="Minimizar"
-            onClick={() => window.electron?.minimize()}
-          >
-            <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-              <rect x="0" y="4.5" width="10" height="1" fill="currentColor" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            className="fc-titlebar-btn"
-            title={maximized ? 'Restaurar' : 'Maximizar'}
-            aria-label={maximized ? 'Restaurar' : 'Maximizar'}
-            onClick={() => window.electron?.maximize()}
-          >
-            {maximized ? (
+        <div className="fc-titlebar-controls" role="group" aria-label={t('window.controls')}>
+          <Tooltip text={t('window.minimize')} placement="bottom" style={{ height: '100%' }}>
+            <button
+              type="button"
+              className="fc-titlebar-btn"
+              aria-label={t('window.minimize')}
+              onClick={() => window.electron?.minimize()}
+            >
               <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-                <rect x="0" y="2.5" width="7.5" height="7.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1" />
-                <path d="M2.5 2.5 V1 A1 1 0 0 1 3.5 0 H9 A1 1 0 0 1 10 1 V6.5 A1 1 0 0 1 9 7.5 H7.5" fill="none" stroke="currentColor" strokeWidth="1" />
+                <rect x="0" y="4.5" width="10" height="1" fill="currentColor" />
               </svg>
-            ) : (
+            </button>
+          </Tooltip>
+          <Tooltip text={maximized ? t('window.restore') : t('window.maximize')} placement="bottom" style={{ height: '100%' }}>
+            <button
+              type="button"
+              className="fc-titlebar-btn"
+              aria-label={maximized ? t('window.restore') : t('window.maximize')}
+              onClick={() => window.electron?.maximize()}
+            >
+              {maximized ? (
+                <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+                  <rect x="0" y="2.5" width="7.5" height="7.5" rx="1" fill="none" stroke="currentColor" strokeWidth="1" />
+                  <path d="M2.5 2.5 V1 A1 1 0 0 1 3.5 0 H9 A1 1 0 0 1 10 1 V6.5 A1 1 0 0 1 9 7.5 H7.5" fill="none" stroke="currentColor" strokeWidth="1" />
+                </svg>
+              ) : (
+                <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+                  <rect x="0.5" y="0.5" width="9" height="9" rx="1" fill="none" stroke="currentColor" strokeWidth="1" />
+                </svg>
+              )}
+            </button>
+          </Tooltip>
+          <Tooltip text={t('window.close')} placement="bottom" style={{ height: '100%' }}>
+            <button
+              type="button"
+              className="fc-titlebar-btn fc-titlebar-btn--close"
+              aria-label={t('window.close')}
+              onClick={() => window.electron?.close()}
+            >
               <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-                <rect x="0.5" y="0.5" width="9" height="9" rx="1" fill="none" stroke="currentColor" strokeWidth="1" />
+                <path d="M0.5 0.5 L9.5 9.5 M9.5 0.5 L0.5 9.5" stroke="currentColor" strokeWidth="1.2" />
               </svg>
-            )}
-          </button>
-          <button
-            type="button"
-            className="fc-titlebar-btn fc-titlebar-btn--close"
-            title="Cerrar"
-            aria-label="Cerrar"
-            onClick={() => window.electron?.close()}
-          >
-            <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-              <path d="M0.5 0.5 L9.5 9.5 M9.5 0.5 L0.5 9.5" stroke="currentColor" strokeWidth="1.2" />
-            </svg>
-          </button>
+            </button>
+          </Tooltip>
         </div>
       )}
     </div>

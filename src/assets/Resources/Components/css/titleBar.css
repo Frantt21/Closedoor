@@ -69,6 +69,14 @@ html.fc-desktop::-webkit-scrollbar-track {
     margin-top: var(--fc-titlebar-h, 40px);
 }
 
+/* Sin botones de flecha: ocupaban espacio y dejaban un hueco entre la titlebar
+   y el inicio del thumb. */
+html.fc-desktop::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+}
+
 /* Sin "profile background" global → sólida, igual que .sidebar--solid. */
 .fc-titlebar--solid {
     background: var(--color-bg, #000000);

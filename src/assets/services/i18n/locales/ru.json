@@ -815,5 +815,10 @@
   "update.title": "Доступна новая версия",
   "update.body": "Доступна новая версия Foranly. Перезагрузите, чтобы обновиться.",
   "update.reload": "Перезагрузить",
-  "update.later": "Позже"
+  "update.later": "Позже",
+  "window.close": "Закрыть",
+  "window.controls": "Управление окном",
+  "window.maximize": "Развернуть",
+  "window.minimize": "Свернуть",
+  "window.restore": "Восстановить"
 }

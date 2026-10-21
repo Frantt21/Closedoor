@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 
 const TOOLTIP_STYLES = {
@@ -35,6 +35,7 @@ export default function Tooltip({ text, children, style, className, placement = 
   const [visible, setVisible] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const targetRef = useRef(null);
+  const tooltipRef = useRef(null);
   const showTimeoutRef = useRef(null);
   const hideTimeoutRef = useRef(null);
 
@@ -94,6 +95,21 @@ export default function Tooltip({ text, children, style, className, placement = 
       window.removeEventListener('resize', onScroll);
     };
   }, [visible, updatePosition]);
+
+  // Keep the tooltip inside the viewport horizontally. Titlebar buttons (close)
+  // sit against the right edge, so a centered tooltip would be clipped.
+  useLayoutEffect(() => {
+    if (!visible || isRight || !tooltipRef.current) return;
+    const rect = tooltipRef.current.getBoundingClientRect();
+    const margin = 8;
+    const viewportWidth = document.documentElement.clientWidth;
+    let delta = 0;
+    if (rect.left < margin) delta = margin - rect.left;
+    else if (rect.right > viewportWidth - margin) delta = (viewportWidth - margin) - rect.right;
+    if (Math.abs(delta) > 0.5) {
+      setPosition((prev) => ({ ...prev, left: prev.left + delta }));
+    }
+  }, [visible, position.left, isRight]);
 
   const handleMouseEnter = useCallback(() => {
     if (suppress) return;
@@ -173,6 +189,7 @@ export default function Tooltip({ text, children, style, className, placement = 
       </span>
       {createPortal(
         <div
+          ref={tooltipRef}
           style={{
             ...TOOLTIP_STYLES,
             top: position.top,
