@@ -11,11 +11,10 @@
   flex-direction: column;
   gap: 12px;
   align-self: flex-start;
-  /* En pantallas con DPI alto / ventanas bajas las cards (canción, intereses,
-     stats) se cortaban porque el panel es sticky y no tenía scroll propio: solo
-     scrolleaban los posts. Ahora el panel scrollea de forma independiente y
+  /* El panel ocupa toda la altura disponible hasta el borde inferior de la
+     ventana. Si el contenido es más alto, scrollea de forma independiente y
      sin barra visible. */
-  max-height: calc(100vh - 60px);
+  height: calc(100vh - 30px);
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
@@ -31,7 +30,8 @@
 
 /* En la app de escritorio hay titlebar fija arriba: descontarla. */
 html.fc-desktop .right-panel {
-  max-height: calc(100vh - var(--fc-titlebar-h, 40px) - 60px);
+  top: calc(30px + var(--fc-titlebar-h, 40px));
+  height: calc(100vh - var(--fc-titlebar-h, 40px) - 30px);
 }
 
 /* ── Card base ── */
