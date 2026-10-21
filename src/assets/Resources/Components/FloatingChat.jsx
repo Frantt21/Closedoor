@@ -264,7 +264,10 @@ export default function FloatingChat() {
       {/* ── Ventana flotante ── */}
       {open && (
         <div className="fc-panel" role="dialog" aria-label={t('chat.title') || 'Chat'}>
-          <div className="fc-panel-header">
+          <div
+            className="fc-panel-header"
+            style={{ '--fc-user-accent': activeConv?.otherUser?.accent_color || undefined }}
+          >
             {view === 'thread' ? (
               <>
                 <button
@@ -279,6 +282,7 @@ export default function FloatingChat() {
                   src={activeConv?.otherUser?.avatar_url}
                   alt={peerName(activeConv)}
                   className="fc-panel-peer-avatar"
+                  userId={activeConv?.otherUser?.id}
                 />
                 <div className="fc-panel-peer">
                   <span className="fc-panel-peer-name">{peerName(activeConv)}</span>
@@ -328,12 +332,14 @@ export default function FloatingChat() {
                     type="button"
                     key={conv.id}
                     className="fc-item"
+                    style={{ '--fc-user-accent': conv.otherUser?.accent_color || undefined }}
                     onClick={() => openThread(conv)}
                   >
                     <Avatar
                       src={conv.otherUser?.avatar_url}
                       alt={peerName(conv)}
                       className="fc-item-avatar"
+                      userId={conv.otherUser?.id}
                     />
                     <div className="fc-item-body">
                       <span className="fc-item-top">
@@ -414,10 +420,16 @@ export default function FloatingChat() {
               type="button"
               key={conv.id}
               className="fc-dock-recent"
+              style={{ '--fc-user-accent': conv.otherUser?.accent_color || undefined }}
               onClick={() => openThread(conv)}
               title={peerName(conv)}
             >
-              <Avatar src={conv.otherUser?.avatar_url} alt={peerName(conv)} className="fc-dock-recent-avatar" />
+              <Avatar
+                src={conv.otherUser?.avatar_url}
+                alt={peerName(conv)}
+                className="fc-dock-recent-avatar"
+                userId={conv.otherUser?.id}
+              />
               {conv.unreadCount > 0 && (
                 <span className="fc-dock-recent-badge">{conv.unreadCount > 9 ? '9+' : conv.unreadCount}</span>
               )}

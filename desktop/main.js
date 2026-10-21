@@ -43,6 +43,16 @@ const MUSIC_API_URL = `http://${MUSIC_HOST}:${MUSIC_PORT}`;
 const BRIDGE_INFO_CHANNEL = 'foranly:desktop-info';
 const APP_VERSION = require('./package.json').version;
 
+// ── Identidad del proceso/ventana ──
+// Sin esto, Windows muestra "Electron" en el Administrador de tareas y agrupa
+// la app bajo el icono genérico de Electron (sobre todo al ejecutar en dev).
+// setName afecta al nombre visible (ventana, bandeja, diálogos) y el AppUserModelID
+// es lo que usa Windows para agrupar la tarea con SU icono en la barra.
+app.setName('Closedoor');
+if (process.platform === 'win32') {
+  app.setAppUserModelId('space.foranly.desktop');
+}
+
 // ── Iconos (ventana, taskbar, bandeja e instaladores) ──
 // Viven en desktop/assets y viajan DENTRO del asar (build.files), así que la
 // misma ruta vale en dev y empaquetado. tray.png es el mismo logo recortado a
@@ -259,10 +269,10 @@ function createTray() {
   }
 
   tray = new Tray(icon);
-  tray.setToolTip('Foranly');
+  tray.setToolTip('Closedoor');
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: 'Abrir Foranly', click: showMainWindow },
+      { label: 'Abrir Closedoor', click: showMainWindow },
       { type: 'separator' },
       {
         label: 'Salir',
@@ -291,6 +301,7 @@ function createWindow() {
     minWidth: 960,
     minHeight: 620,
     backgroundColor: '#0b0b0f', // mismo fondo que la app: sin flash blanco al abrir
+    title: 'Closedoor',
     icon: APP_ICON_PATH, // taskbar/alt-tab en dev; empaquetado lo fija el .exe
     autoHideMenuBar: true,
     show: false, // se muestra en ready-to-show (arranque sin pantalla en blanco)

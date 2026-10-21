@@ -67,7 +67,8 @@
     width: 42px;
     height: 42px;
     padding: 0;
-    border: 2px solid var(--color-surface, #1a1a1a);
+    /* Anillo con el color acento del usuario (fallback: superficie de la app). */
+    border: 2px solid var(--fc-user-accent, var(--color-surface, #1a1a1a));
     border-radius: 50%;
     background: var(--color-surface, #1a1a1a);
     cursor: pointer;
@@ -152,6 +153,8 @@
     border-radius: 50%;
     flex-shrink: 0;
     object-fit: cover;
+    /* Anillo acento del usuario (--fc-user-accent viene del header del panel). */
+    box-shadow: 0 0 0 2px var(--fc-user-accent, transparent);
 }
 
 .fc-panel-peer {
@@ -261,6 +264,8 @@
     border-radius: 50%;
     flex-shrink: 0;
     object-fit: cover;
+    /* Anillo acento del usuario (--fc-user-accent viene de .fc-item). */
+    box-shadow: 0 0 0 2px var(--fc-user-accent, transparent);
 }
 
 .fc-item-body {

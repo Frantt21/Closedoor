@@ -200,7 +200,7 @@ function AccountSettings({ t }) {
             </div>
             <button
               type="button"
-              className={`settings-account-toggle${openForm === 'username' ? ' is-open' : ''}`}
+              className="settings-edit-btn settings-account-toggle"
               onClick={() => toggleForm('username')}
               aria-expanded={openForm === 'username'}
               aria-controls="account-username-fields"
@@ -260,7 +260,7 @@ function AccountSettings({ t }) {
             </div>
             <button
               type="button"
-              className={`settings-account-toggle${openForm === 'email' ? ' is-open' : ''}`}
+              className="settings-edit-btn settings-account-toggle"
               onClick={() => toggleForm('email')}
               aria-expanded={openForm === 'email'}
               aria-controls="account-email-fields"
@@ -317,7 +317,7 @@ function AccountSettings({ t }) {
             </div>
             <button
               type="button"
-              className={`settings-account-toggle${openForm === 'password' ? ' is-open' : ''}`}
+              className="settings-edit-btn settings-account-toggle"
               onClick={() => toggleForm('password')}
               aria-expanded={openForm === 'password'}
               aria-controls="account-password-fields"

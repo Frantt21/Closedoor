@@ -23,6 +23,7 @@
   "build": {
     "appId": "space.foranly.desktop",
     "productName": "Closedoor",
+    "executableName": "Closedoor",
     "directories": {
       "output": "dist"
     },
@@ -58,6 +59,7 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
+      "shortcutName": "Closedoor",
       "artifactName": "Foranly-Setup-${version}.${ext}"
     },
     "mac": {

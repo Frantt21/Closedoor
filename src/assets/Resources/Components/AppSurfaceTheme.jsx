@@ -36,7 +36,11 @@ export default function AppSurfaceTheme() {
 
   useEffect(() => {
     const el = document.querySelector('.sidebar');
+    const root = document.documentElement;
     if (!el) return;
+    // También en <html>: titlebar y la cabecera sticky de Home deben usar las
+    // mismas superficies (color/glass/blur) que la sidebar, y no son sus hijas.
+    const targets = [el, root];
 
     const surfColor = profile?.accent_surface_color;
     const surfGlass = profile?.accent_surface_glass === true;
@@ -44,23 +48,29 @@ export default function AppSurfaceTheme() {
 
     if (active) {
       // Mismas reglas que RightPanel/ProfileSidebar (glass mode o color custom)
-      el.style.setProperty(
-        '--accent-surface-rgba',
-        surfGlass ? 'rgba(255, 255, 255, 0.04)' : (surfColor || 'var(--color-surface, #1a1a1a)')
-      );
-      el.style.setProperty(
-        '--accent-surface-rgba-hover',
-        surfGlass ? 'rgba(255, 255, 255, 0.07)' : (surfColor ? `color-mix(in srgb, ${surfColor} 85%, #000)` : 'var(--color-surface-hover, #252525)')
-      );
-      el.style.setProperty('--accent-surface-blur', surfGlass ? 'blur(20px)' : 'none');
-      el.style.setProperty('--accent-surface-border', 'none');
+      for (const node of targets) {
+        node.style.setProperty(
+          '--accent-surface-rgba',
+          surfGlass ? 'rgba(255, 255, 255, 0.04)' : (surfColor || 'var(--color-surface, #1a1a1a)')
+        );
+        node.style.setProperty(
+          '--accent-surface-rgba-hover',
+          surfGlass ? 'rgba(255, 255, 255, 0.07)' : (surfColor ? `color-mix(in srgb, ${surfColor} 85%, #000)` : 'var(--color-surface-hover, #252525)')
+        );
+        node.style.setProperty('--accent-surface-blur', surfGlass ? 'blur(20px)' : 'none');
+        node.style.setProperty('--accent-surface-border', 'none');
+      }
     } else {
       // Sin glass: quitar vars → el fallback CSS del sidebar (translúcido) aplica
-      SURFACE_VARS.forEach((v) => el.style.removeProperty(v));
+      for (const node of targets) {
+        SURFACE_VARS.forEach((v) => node.style.removeProperty(v));
+      }
     }
 
     return () => {
-      SURFACE_VARS.forEach((v) => el.style.removeProperty(v));
+      for (const node of targets) {
+        SURFACE_VARS.forEach((v) => node.style.removeProperty(v));
+      }
     };
   }, [profile, showAccent, location.pathname]);
 

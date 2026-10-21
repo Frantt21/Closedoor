@@ -76,7 +76,7 @@ import NicknameModal from "../Resources/Components/NicknameModal";
 import VirtualPostList from "../Resources/Components/VirtualPostList";
 
 function Profile() {
-    const { t, showAccent, accentVisibility, showLikes, showBadges, locale } = useI18n();
+    const { t, showAccent, accentVisibility, showBadges, locale } = useI18n();
     const { username: profileUsername } = useParams();
     const navigate = useNavigate();
     const { user, profile: ownProfile, refreshProfile, isAuthenticated, loading } = useAuth();
@@ -2042,7 +2042,7 @@ function Profile() {
                                 document.body
                             )}
                         </div>
-                        {(isOwnProfile ? showLikes : activeProfile?.show_likes) && (
+                        {(isOwnProfile || activeProfile?.show_likes) && (
                             <button
                                 className={`posts-section-tab ${tab === 'likes' ? 'posts-section-tab--active' : ''}`}
                                 onClick={() => setTab('likes')}
@@ -2197,7 +2197,7 @@ function Profile() {
                                     : t('profile.no_likes_sub_other')}
                             </p>
                         </div>
-                    ) : (isOwnProfile ? showLikes : activeProfile?.show_likes) && (
+                    ) : (isOwnProfile || activeProfile?.show_likes) && (
                             <VirtualPostList
                                 posts={likedPosts}
                                 likedIds={likedLikedIds}

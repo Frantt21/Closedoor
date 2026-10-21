@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getDesktopBridge, isDesktopApp } from '../../services/desktopApp';
+import { useI18n } from '../../services/i18n/useI18n';
 import './css/titleBar.css';
 
 /**
@@ -23,6 +24,7 @@ export default function TitleBar() {
   const bridge = getDesktopBridge();
   const platform = bridge?.platform || window.electron?.platform || '';
   const isMac = platform === 'darwin';
+  const { showGlobalBg } = useI18n();
   const [maximized, setMaximized] = useState(() => !!window.electron?.isMaximized?.());
 
   useEffect(() => {
@@ -63,7 +65,7 @@ export default function TitleBar() {
 
   return (
     <div
-      className={`fc-titlebar${isMac ? ' fc-titlebar--mac' : ''}`}
+      className={`fc-titlebar${isMac ? ' fc-titlebar--mac' : ''}${!showGlobalBg ? ' fc-titlebar--solid' : ''}`}
       onDoubleClick={() => window.electron?.maximize()}
     >
       <span className="fc-titlebar__title">Closedoor</span>

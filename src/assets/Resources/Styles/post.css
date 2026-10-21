@@ -26,11 +26,12 @@
     z-index: 20;
     padding: 10px 0;
     margin: -10px 0 2px;
-    /* Fallback sin color-mix; el navegador moderno usa la mezcla translúcida. */
+    /* Color original de la cabecera (bg al 72%); el blur sigue siendo el mismo
+       que la sidebar/titlebar. */
     background: var(--overlay-bg, rgba(0, 0, 0, 0.72));
     background: color-mix(in srgb, var(--color-bg, #000000) 72%, transparent);
-    backdrop-filter: blur(16px) saturate(140%);
-    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    backdrop-filter: var(--accent-surface-blur, blur(16px));
+    -webkit-backdrop-filter: var(--accent-surface-blur, blur(16px));
 }
 
 html.fc-desktop .posts-section--home .posts-section-header {

@@ -838,7 +838,9 @@ dialog.fc-modal.settings-blocked-modal {
   width: 100%;
 }
 
-/* Cabecera plegable: título + botón para desplegar los inputs. */
+/* Cabecera plegable: título + botón para desplegar los inputs. El botón usa
+   el mismo estilo que el resto de acciones de Ajustes (.settings-edit-btn);
+   esta clase solo lo coloca a la derecha. */
 .settings-account-heading {
   flex: 1 1 auto;
   min-width: 0;
@@ -848,26 +850,6 @@ dialog.fc-modal.settings-blocked-modal {
   flex: 0 0 auto;
   margin-left: auto;
   align-self: center;
-  padding: 6px 14px;
-  font-size: 0.78rem;
-  font-weight: 600;
-  font-family: inherit;
-  color: var(--accent-color, #ffffff);
-  background: transparent;
-  border: 1px solid color-mix(in srgb, var(--accent-color, #ffffff) 40%, transparent);
-  border-radius: 999px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s ease, border-color 0.15s ease;
-}
-
-.settings-account-toggle:hover {
-  background: var(--overlay-bg-hover, rgba(255, 255, 255, 0.1));
-}
-
-.settings-account-toggle.is-open {
-  color: var(--color-text-muted, #6b7280);
-  border-color: var(--color-border, #2a2a2a);
 }
 
 .settings-account-input {
