@@ -88,6 +88,11 @@ function AccountSettings({ t }) {
   const [uForm, setUForm] = useState({ value: '', password: '', saving: false, result: null });
   const [eForm, setEForm] = useState({ value: '', password: '', saving: false, result: null });
   const [pForm, setPForm] = useState({ current: '', next: '', confirm: '', saving: false, result: null });
+  // Los formularios arrancan plegados: solo se muestran los inputs del que el
+  // usuario decide cambiar, en vertical y uno a la vez.
+  const [openForm, setOpenForm] = useState(null);
+
+  const toggleForm = (name) => setOpenForm((current) => (current === name ? null : name));
 
   const messages = {
     invalid_username: t('settings.account_err_invalid_username'),
@@ -126,6 +131,7 @@ function AccountSettings({ t }) {
         ? { ok: true, text: t('settings.account_username_updated') }
         : { ok: false, text: failText(res) },
     }));
+    if (res.success) setOpenForm(null);
   };
 
   const submitEmail = async (event) => {
@@ -146,6 +152,7 @@ function AccountSettings({ t }) {
         ? { ok: true, text: t('settings.account_email_sent') }
         : { ok: false, text: failText(res) },
     }));
+    if (res.success) setOpenForm(null);
   };
 
   const submitPassword = async (event) => {
@@ -167,6 +174,7 @@ function AccountSettings({ t }) {
         ? { ok: true, text: t('settings.account_password_updated') }
         : { ok: false, text: failText(res) },
     }));
+    if (res.success) setOpenForm(null);
   };
 
   const feedback = (result) => (
@@ -184,46 +192,57 @@ function AccountSettings({ t }) {
         <div className="settings-row">
           <div className="settings-row-header">
             <span className="settings-section-icon"><FaUser /></span>
-            <div>
+            <div className="settings-account-heading">
               <h2 className="settings-section-title">{t('settings.account_username')}</h2>
               <p className="settings-section-desc">
                 {t('settings.account_username_desc', { username: profile?.username || '—' })}
               </p>
             </div>
-          </div>
-          <div className="settings-account-fields">
-            <input
-              className="settings-account-input"
-              type="text"
-              name="new-username"
-              autoComplete="username"
-              spellCheck={false}
-              maxLength={20}
-              placeholder={t('settings.account_new_username')}
-              aria-label={t('settings.account_new_username')}
-              value={uForm.value}
-              disabled={uForm.saving}
-              onChange={(e) => setUForm((f) => ({ ...f, value: e.target.value, result: null }))}
-            />
-            <input
-              className="settings-account-input"
-              type="password"
-              name="current-password-username"
-              autoComplete="current-password"
-              placeholder={t('settings.account_current_password')}
-              aria-label={t('settings.account_current_password')}
-              value={uForm.password}
-              disabled={uForm.saving}
-              onChange={(e) => setUForm((f) => ({ ...f, password: e.target.value, result: null }))}
-            />
             <button
-              type="submit"
-              className="settings-account-submit"
-              disabled={uForm.saving || !uForm.value.trim() || !uForm.password}
+              type="button"
+              className={`settings-account-toggle${openForm === 'username' ? ' is-open' : ''}`}
+              onClick={() => toggleForm('username')}
+              aria-expanded={openForm === 'username'}
+              aria-controls="account-username-fields"
             >
-              {uForm.saving ? t('common.loading') : t('settings.account_save')}
+              {openForm === 'username' ? t('common.cancel') : t('common.edit')}
             </button>
           </div>
+          {openForm === 'username' && (
+            <div className="settings-account-fields" id="account-username-fields">
+              <input
+                className="settings-account-input"
+                type="text"
+                name="new-username"
+                autoComplete="username"
+                spellCheck={false}
+                maxLength={20}
+                placeholder={t('settings.account_new_username')}
+                aria-label={t('settings.account_new_username')}
+                value={uForm.value}
+                disabled={uForm.saving}
+                onChange={(e) => setUForm((f) => ({ ...f, value: e.target.value, result: null }))}
+              />
+              <input
+                className="settings-account-input"
+                type="password"
+                name="current-password-username"
+                autoComplete="current-password"
+                placeholder={t('settings.account_current_password')}
+                aria-label={t('settings.account_current_password')}
+                value={uForm.password}
+                disabled={uForm.saving}
+                onChange={(e) => setUForm((f) => ({ ...f, password: e.target.value, result: null }))}
+              />
+              <button
+                type="submit"
+                className="settings-account-submit"
+                disabled={uForm.saving || !uForm.value.trim() || !uForm.password}
+              >
+                {uForm.saving ? t('common.loading') : t('settings.account_save')}
+              </button>
+            </div>
+          )}
           {feedback(uForm.result)}
         </div>
       </form>
@@ -233,45 +252,56 @@ function AccountSettings({ t }) {
         <div className="settings-row">
           <div className="settings-row-header">
             <span className="settings-section-icon"><FaAt /></span>
-            <div>
+            <div className="settings-account-heading">
               <h2 className="settings-section-title">{t('settings.account_email')}</h2>
               <p className="settings-section-desc">
                 {t('settings.account_email_desc', { email: user?.email || '—' })}
               </p>
             </div>
-          </div>
-          <div className="settings-account-fields">
-            <input
-              className="settings-account-input"
-              type="email"
-              name="new-email"
-              autoComplete="email"
-              spellCheck={false}
-              placeholder={t('settings.account_new_email')}
-              aria-label={t('settings.account_new_email')}
-              value={eForm.value}
-              disabled={eForm.saving}
-              onChange={(e) => setEForm((f) => ({ ...f, value: e.target.value, result: null }))}
-            />
-            <input
-              className="settings-account-input"
-              type="password"
-              name="current-password-email"
-              autoComplete="current-password"
-              placeholder={t('settings.account_current_password')}
-              aria-label={t('settings.account_current_password')}
-              value={eForm.password}
-              disabled={eForm.saving}
-              onChange={(e) => setEForm((f) => ({ ...f, password: e.target.value, result: null }))}
-            />
             <button
-              type="submit"
-              className="settings-account-submit"
-              disabled={eForm.saving || !eForm.value.trim() || !eForm.password}
+              type="button"
+              className={`settings-account-toggle${openForm === 'email' ? ' is-open' : ''}`}
+              onClick={() => toggleForm('email')}
+              aria-expanded={openForm === 'email'}
+              aria-controls="account-email-fields"
             >
-              {eForm.saving ? t('common.loading') : t('settings.account_save')}
+              {openForm === 'email' ? t('common.cancel') : t('common.edit')}
             </button>
           </div>
+          {openForm === 'email' && (
+            <div className="settings-account-fields" id="account-email-fields">
+              <input
+                className="settings-account-input"
+                type="email"
+                name="new-email"
+                autoComplete="email"
+                spellCheck={false}
+                placeholder={t('settings.account_new_email')}
+                aria-label={t('settings.account_new_email')}
+                value={eForm.value}
+                disabled={eForm.saving}
+                onChange={(e) => setEForm((f) => ({ ...f, value: e.target.value, result: null }))}
+              />
+              <input
+                className="settings-account-input"
+                type="password"
+                name="current-password-email"
+                autoComplete="current-password"
+                placeholder={t('settings.account_current_password')}
+                aria-label={t('settings.account_current_password')}
+                value={eForm.password}
+                disabled={eForm.saving}
+                onChange={(e) => setEForm((f) => ({ ...f, password: e.target.value, result: null }))}
+              />
+              <button
+                type="submit"
+                className="settings-account-submit"
+                disabled={eForm.saving || !eForm.value.trim() || !eForm.password}
+              >
+                {eForm.saving ? t('common.loading') : t('settings.account_save')}
+              </button>
+            </div>
+          )}
           {feedback(eForm.result)}
         </div>
       </form>
@@ -281,53 +311,64 @@ function AccountSettings({ t }) {
         <div className="settings-row">
           <div className="settings-row-header">
             <span className="settings-section-icon"><FaLock /></span>
-            <div>
+            <div className="settings-account-heading">
               <h2 className="settings-section-title">{t('settings.account_password')}</h2>
               <p className="settings-section-desc">{t('settings.account_password_desc')}</p>
             </div>
-          </div>
-          <div className="settings-account-fields">
-            <input
-              className="settings-account-input"
-              type="password"
-              name="current-password"
-              autoComplete="current-password"
-              placeholder={t('settings.account_current_password')}
-              aria-label={t('settings.account_current_password')}
-              value={pForm.current}
-              disabled={pForm.saving}
-              onChange={(e) => setPForm((f) => ({ ...f, current: e.target.value, result: null }))}
-            />
-            <input
-              className="settings-account-input"
-              type="password"
-              name="new-password"
-              autoComplete="new-password"
-              placeholder={t('settings.account_new_password')}
-              aria-label={t('settings.account_new_password')}
-              value={pForm.next}
-              disabled={pForm.saving}
-              onChange={(e) => setPForm((f) => ({ ...f, next: e.target.value, result: null }))}
-            />
-            <input
-              className="settings-account-input"
-              type="password"
-              name="confirm-password"
-              autoComplete="new-password"
-              placeholder={t('settings.account_confirm_password')}
-              aria-label={t('settings.account_confirm_password')}
-              value={pForm.confirm}
-              disabled={pForm.saving}
-              onChange={(e) => setPForm((f) => ({ ...f, confirm: e.target.value, result: null }))}
-            />
             <button
-              type="submit"
-              className="settings-account-submit"
-              disabled={pForm.saving || !pForm.current || !pForm.next || !pForm.confirm}
+              type="button"
+              className={`settings-account-toggle${openForm === 'password' ? ' is-open' : ''}`}
+              onClick={() => toggleForm('password')}
+              aria-expanded={openForm === 'password'}
+              aria-controls="account-password-fields"
             >
-              {pForm.saving ? t('common.loading') : t('settings.account_save')}
+              {openForm === 'password' ? t('common.cancel') : t('common.edit')}
             </button>
           </div>
+          {openForm === 'password' && (
+            <div className="settings-account-fields" id="account-password-fields">
+              <input
+                className="settings-account-input"
+                type="password"
+                name="current-password"
+                autoComplete="current-password"
+                placeholder={t('settings.account_current_password')}
+                aria-label={t('settings.account_current_password')}
+                value={pForm.current}
+                disabled={pForm.saving}
+                onChange={(e) => setPForm((f) => ({ ...f, current: e.target.value, result: null }))}
+              />
+              <input
+                className="settings-account-input"
+                type="password"
+                name="new-password"
+                autoComplete="new-password"
+                placeholder={t('settings.account_new_password')}
+                aria-label={t('settings.account_new_password')}
+                value={pForm.next}
+                disabled={pForm.saving}
+                onChange={(e) => setPForm((f) => ({ ...f, next: e.target.value, result: null }))}
+              />
+              <input
+                className="settings-account-input"
+                type="password"
+                name="confirm-password"
+                autoComplete="new-password"
+                placeholder={t('settings.account_confirm_password')}
+                aria-label={t('settings.account_confirm_password')}
+                value={pForm.confirm}
+                disabled={pForm.saving}
+                onChange={(e) => setPForm((f) => ({ ...f, confirm: e.target.value, result: null }))}
+              />
+              <button
+                type="submit"
+                className="settings-account-submit"
+                disabled={pForm.saving || !pForm.current || !pForm.next || !pForm.confirm}
+              >
+                {pForm.saving ? t('common.loading') : t('settings.account_save')}
+              </button>
+            </div>
+          )}
           {feedback(pForm.result)}
         </div>
       </form>

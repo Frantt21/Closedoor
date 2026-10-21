@@ -883,6 +883,8 @@ export default function CreatePostModal({
 
             {/* ── Formato markdown (fila propia debajo de las opciones del post) ── */}
             <div className="create-post-markdown-toolbar">
+              <span className="create-post-markdown-label">{t('create_post.md_format') || 'Formato'}</span>
+
               <Tooltip text={t('create_post.md_bold')} placement="bottom">
               <button
                 type="button"

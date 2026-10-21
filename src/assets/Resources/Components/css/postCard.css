@@ -121,7 +121,7 @@
 /* Chip que deriva SIEMPRE del color de texto de la propia card: en los fondos
    claros (perfil con superficie de acento) `--color-text` ya es el color
    validado por contraste (--accent-surface-text-*), así que el badge deja de
-   perderse en gris sobre blanco. */
+   perderse en gris sobre blanco. Sin borde y con fondo oscurecido. */
 .post-card-pin {
     display: inline-flex;
     align-items: center;
@@ -130,8 +130,9 @@
     font-size: 0.72rem;
     font-weight: 600;
     color: var(--color-text, #ffffff);
-    background: color-mix(in srgb, var(--color-text, #ffffff) 12%, transparent);
-    border: 1px solid color-mix(in srgb, var(--color-text, #ffffff) 24%, transparent);
+    background: rgba(0, 0, 0, 0.24);
+    background: color-mix(in srgb, #000000 24%, transparent);
+    border: none;
     border-radius: 999px;
     padding: 2px 9px;
     margin-bottom: 8px;

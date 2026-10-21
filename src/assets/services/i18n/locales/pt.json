@@ -285,6 +285,7 @@
   "create_post.invalid_schedule_date": "Data de agendamento inválida",
   "create_post.md_bold": "Negrito",
   "create_post.md_code": "Código em linha",
+  "create_post.md_format": "Formato",
   "create_post.md_italic": "Itálico",
   "create_post.md_list": "Lista com marcadores",
   "create_post.md_quote": "Citação",

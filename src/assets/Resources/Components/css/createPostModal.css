@@ -75,10 +75,23 @@
 /* Fila de formato markdown: separada de las opciones del post */
 .create-post-markdown-toolbar {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 6px;
     margin-bottom: 12px;
     padding-top: 8px;
     border-top: 1px solid var(--color-border, #2a2a2a);
+}
+
+/* Título "Formato" encima de los botones: la línea sola no explicaba el grupo. */
+.create-post-markdown-label {
+    flex: 0 0 100%;
+    margin-bottom: 2px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--color-text-muted, #6b7280);
 }
 
 .create-post-toolbar-btn {

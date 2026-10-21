@@ -831,13 +831,48 @@ dialog.fc-modal.settings-blocked-modal {
 
 .settings-account-fields {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
   gap: 8px;
+  width: 100%;
+}
+
+/* Cabecera plegable: título + botón para desplegar los inputs. */
+.settings-account-heading {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.settings-account-toggle {
+  flex: 0 0 auto;
+  margin-left: auto;
+  align-self: center;
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--accent-color, #ffffff);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--accent-color, #ffffff) 40%, transparent);
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.settings-account-toggle:hover {
+  background: var(--overlay-bg-hover, rgba(255, 255, 255, 0.1));
+}
+
+.settings-account-toggle.is-open {
+  color: var(--color-text-muted, #6b7280);
+  border-color: var(--color-border, #2a2a2a);
 }
 
 .settings-account-input {
-  flex: 1 1 170px;
+  flex: 0 0 auto;
+  width: 100%;
   min-width: 0;
   padding: 9px 12px;
   font-size: 0.84rem;
@@ -866,6 +901,8 @@ dialog.fc-modal.settings-blocked-modal {
 
 .settings-account-submit {
   flex: 0 0 auto;
+  align-self: flex-start;
+  margin-top: 2px;
   padding: 9px 18px;
   font-size: 0.82rem;
   font-weight: 600;

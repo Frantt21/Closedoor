@@ -213,6 +213,12 @@ export default function Chat() {
   // que pertenecen para no mostrar datos viejos al cambiar de chat.
   const [eagerPinned, setEagerPinned] = useState({ convId: null, items: [] });
   const [eagerMedia, setEagerMedia] = useState({ convId: null, urls: [] });
+  // Fetch único por conversación: evita duplicarlo con StrictMode y permite
+  // reintentar al abrir el panel si el primer intento falló.
+  const eagerLoadRef = useRef({ convId: null, promise: null });
+  // Mensaje al que hay que saltar cuando termine una carga puntual.
+  const pendingJumpRef = useRef(null);
+  const jumpingRef = useRef(false);
   const editRef = useRef(null);
   // Preserve content during modal close animation (ref survives state clears)
   const editContentRef = useRef('');
@@ -1802,21 +1808,98 @@ export default function Chat() {
   }, [chatGalleryUrls, chatGalleryIndex, closeChatGallery, goChatGalleryPrev, goChatGalleryNext]);
 
   const highlightTimeoutRef = useRef(null);
-  // ── Navigate to a message by ID (scroll + highlight) ──
-  const handleGoToMessage = useCallback((msgId) => {
-    if (!msgId || !messagesContainerRef.current) return;
-    // Clear any previous highlight
+  // ── Scroll + highlight de un mensaje ya montado ──
+  const scrollToMessageEl = useCallback((el) => {
+    if (!el) return;
     if (highlightTimeoutRef.current) {
       clearTimeout(highlightTimeoutRef.current);
-      document.querySelectorAll('.chat-message--highlighted').forEach(el => el.classList.remove('chat-message--highlighted'));
+      document.querySelectorAll('.chat-message--highlighted')
+        .forEach(node => node.classList.remove('chat-message--highlighted'));
     }
-    const el = document.querySelector(`[data-msg-id="${CSS.escape(msgId)}"]`);
-    if (el) {
-      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      el.classList.add('chat-message--highlighted');
-      highlightTimeoutRef.current = setTimeout(() => el.classList.remove('chat-message--highlighted'), 2000);
-    }
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    el.classList.add('chat-message--highlighted');
+    highlightTimeoutRef.current = setTimeout(() => el.classList.remove('chat-message--highlighted'), 2000);
   }, []);
+
+  // ── Navigate to a message by ID (scroll + highlight) ──
+  // Si el mensaje fijado NO está en la página actual (los fijados pueden ser
+  // muy antiguos), carga páginas hacia atrás hasta encontrarlo y luego salta.
+  const handleGoToMessage = useCallback(async (msgId) => {
+    if (!msgId || !messagesContainerRef.current) return;
+
+    const existing = document.querySelector(`[data-msg-id="${CSS.escape(msgId)}"]`);
+    if (existing) {
+      scrollToMessageEl(existing);
+      return;
+    }
+
+    if (!activeConvId || !user?.id || jumpingRef.current) return;
+    jumpingRef.current = true;
+    const convIdAtStart = activeConvId;
+    const userId = user.id;
+
+    try {
+      let cursor = messages.length ? messages[0].created_at : null;
+      let collected = [];
+      let found = false;
+      let moreAvailable = false;
+
+      for (let page = 0; page < 25; page += 1) {
+        const raw = await getMessages(convIdAtStart, PAGE_SIZE + 1, cursor);
+        if (convIdAtStart !== activeConvId) return;
+        if (raw.length === 0) { moreAvailable = false; break; }
+        collected = raw.concat(collected);
+        if (raw.some(m => m.id === msgId)) {
+          found = true;
+          moreAvailable = raw.length > PAGE_SIZE || page > 0;
+          break;
+        }
+        moreAvailable = raw.length > PAGE_SIZE;
+        if (!moreAvailable) break;
+        cursor = raw[0].created_at;
+      }
+
+      if (!found) return;
+
+      const filtered = collected.filter(m => !m.deleted_for?.includes(userId));
+      const decrypted = await Promise.all(
+        filtered.map(async (msg) => ({
+          ...msg,
+          decryptedContent: await decryptMessage(msg, userId),
+        }))
+      );
+      if (convIdAtStart !== activeConvId) return;
+      // Si el mensaje estaba eliminado para mí no hay nada a lo que saltar.
+      if (!decrypted.some(m => m.id === msgId)) return;
+
+      setMessages(prev => {
+        const seen = new Set(prev.map(m => m.id));
+        const older = decrypted.filter(m => !seen.has(m.id));
+        if (older.length === 0) return prev;
+        return [...older, ...prev].sort(
+          (a, b) => new Date(a.created_at) - new Date(b.created_at)
+        );
+      });
+      if (decrypted.length) setOldestMessageDate(decrypted[0].created_at);
+      setHasMoreMessages(moreAvailable);
+      pendingJumpRef.current = msgId;
+    } catch (err) {
+      console.warn('[Chat] Error jumping to message:', err?.message || err);
+    } finally {
+      jumpingRef.current = false;
+    }
+  }, [activeConvId, user?.id, messages, scrollToMessageEl]);
+
+  // El mensaje objetivo puede no existir todavía en el DOM cuando termina la
+  // carga: este efecto espera al render con los mensajes nuevos y entonces salta.
+  useEffect(() => {
+    const id = pendingJumpRef.current;
+    if (!id) return;
+    const el = document.querySelector(`[data-msg-id="${CSS.escape(id)}"]`);
+    if (!el) return;
+    pendingJumpRef.current = null;
+    requestAnimationFrame(() => scrollToMessageEl(el));
+  }, [messages, scrollToMessageEl]);
 
   const toggleEmojiPicker = useCallback((msgId) => {
     if (!msgId) return;
@@ -2145,21 +2228,20 @@ export default function Chat() {
   // ── Cargar Media + fijados DIRECTAMENTE de la BD al elegir conversación ──
   // No dependen de `messages` (que puede tardar en cargar o tener solo la
   // primera página): el panel enseña las imágenes y los fijados al instante.
-  useEffect(() => {
-    if (!activeConvId || !user?.id) return undefined;
-    let cancelled = false;
-    const convId = activeConvId;
-    const userId = user.id;
+  const loadEagerForConversation = useCallback((convId, userId) => {
+    if (!convId || !userId) return null;
+    const current = eagerLoadRef.current;
+    if (current.convId === convId && current.promise) return current.promise;
 
-    // Diferido un tick: setState dentro del callback del fetch, nunca síncrono
-    // en el cuerpo del efecto.
-    Promise.resolve().then(async () => {
+    let ownPromise = null;
+    ownPromise = (async () => {
       try {
         const [pinned, recent] = await Promise.all([
           getPinnedMessages(convId, userId),
           getDecryptedMessages(convId, userId, 300),
         ]);
-        if (cancelled) return;
+        // Otra conversación tomó el relevo: no pisar su estado con datos viejos.
+        if (eagerLoadRef.current.convId !== convId) return;
         setEagerPinned({ convId, items: pinned });
         const urls = [];
         const seen = new Set();
@@ -2174,11 +2256,47 @@ export default function Chat() {
         setEagerMedia({ convId, urls });
       } catch (err) {
         console.warn('[Chat] eager media/pinned load failed:', err?.message || err);
+      } finally {
+        // Solo limpiar si sigue siendo esta misma carga (evita pisar un reintento).
+        if (eagerLoadRef.current.promise === ownPromise) {
+          eagerLoadRef.current = { convId, promise: null };
+        }
       }
-    });
+    })();
 
+    eagerLoadRef.current = { convId, promise: ownPromise };
+    return ownPromise;
+  }, []);
+
+  useEffect(() => {
+    if (!activeConvId || !user?.id) return undefined;
+    let cancelled = false;
+    const convId = activeConvId;
+    const userId = user.id;
+    // Diferido un tick: setState dentro del callback del fetch, nunca síncrono
+    // en el cuerpo del efecto.
+    Promise.resolve().then(() => {
+      if (!cancelled) loadEagerForConversation(convId, userId);
+    });
     return () => { cancelled = true; };
-  }, [activeConvId, user?.id]);
+  }, [activeConvId, user?.id, loadEagerForConversation]);
+
+  // Reintento al abrir el panel: si el primer fetch falló (red, RLS temporal,
+  // StrictMode) el usuario veía "sin mensajes" para siempre.
+  useEffect(() => {
+    if (!activeConvId || !user?.id) return;
+    if (!showMediaGallery && !showPinnedPanel) return;
+    if (eagerPinned.convId === activeConvId && eagerMedia.convId === activeConvId) return;
+    Promise.resolve().then(() => loadEagerForConversation(activeConvId, user.id));
+  }, [
+    showMediaGallery,
+    showPinnedPanel,
+    activeConvId,
+    user?.id,
+    eagerPinned.convId,
+    eagerMedia.convId,
+    loadEagerForConversation,
+  ]);
 
   // ── Actualizar allChatMediaUrlsRef cuando cambian los mensajes ──
   useEffect(() => {
@@ -3519,12 +3637,22 @@ export default function Chat() {
               // Prioridad: galería traída aparte de la BD (no espera a la carga
               // de la conversación). Se completa con las URLs de los mensajes ya
               // cargados (páginas antiguas) sin duplicar.
-              const eager = eagerMedia.convId === activeConvId ? eagerMedia.urls : [];
+              const eagerReady = eagerMedia.convId === activeConvId;
+              const eager = eagerReady ? eagerMedia.urls : [];
               const loaded = allChatMediaUrlsRef.current;
               const allImages = eager.length
                 ? [...eager, ...loaded.filter((u) => !eager.includes(u))]
                 : loaded;
               if (allImages.length === 0) {
+                // Mientras el fetch eager sigue en curso, no mostrar "sin
+                // mensajes": era lo que parecía que el panel nunca cargaba.
+                if (!eagerReady) {
+                  return (
+                    <p className="chat-float-panel-empty">
+                      <FaSpinner className="fc-spin" />
+                    </p>
+                  );
+                }
                 return <p className="chat-float-panel-empty">{t('chat.no_messages')}</p>;
               }
               return allImages.map((url, i) => (
@@ -3561,6 +3689,13 @@ export default function Chat() {
               const fromEager = eagerPinned.convId === activeConvId;
               const pinned = fromEager ? eagerPinned.items : messages.filter(m => m.is_pinned);
               if (pinned.length === 0) {
+                if (!fromEager) {
+                  return (
+                    <p className="chat-float-panel-empty">
+                      <FaSpinner className="fc-spin" />
+                    </p>
+                  );
+                }
                 return <p className="chat-float-panel-empty">{t('chat.no_messages')}</p>;
               }
               // El eager ya viene ordenado del más nuevo al más viejo (consulta

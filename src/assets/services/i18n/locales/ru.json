@@ -285,6 +285,7 @@
   "create_post.invalid_schedule_date": "Неверная дата планирования",
   "create_post.md_bold": "Жирный",
   "create_post.md_code": "Код в строке",
+  "create_post.md_format": "Формат",
   "create_post.md_italic": "Курсив",
   "create_post.md_list": "Маркированный список",
   "create_post.md_quote": "Цитата",

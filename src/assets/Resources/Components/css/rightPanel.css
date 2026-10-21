@@ -11,6 +11,27 @@
   flex-direction: column;
   gap: 12px;
   align-self: flex-start;
+  /* En pantallas con DPI alto / ventanas bajas las cards (canción, intereses,
+     stats) se cortaban porque el panel es sticky y no tenía scroll propio: solo
+     scrolleaban los posts. Ahora el panel scrollea de forma independiente y
+     sin barra visible. */
+  max-height: calc(100vh - 60px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  /* Deja aire para que las sombras de las cards no se recorten al scrollear. */
+  padding-bottom: 4px;
+}
+
+.right-panel::-webkit-scrollbar {
+  display: none;
+}
+
+/* En la app de escritorio hay titlebar fija arriba: descontarla. */
+html.fc-desktop .right-panel {
+  max-height: calc(100vh - var(--fc-titlebar-h, 40px) - 60px);
 }
 
 /* ── Card base ── */
