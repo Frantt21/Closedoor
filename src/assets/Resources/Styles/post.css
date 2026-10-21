@@ -34,7 +34,7 @@
 }
 
 html.fc-desktop .posts-section--home .posts-section-header {
-    top: var(--fc-titlebar-h, 40px);
+    top: 0;
 }
 
 .posts-section-action {

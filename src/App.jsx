@@ -175,7 +175,11 @@ function NotFound() {
 
 function ScrollToTop() {
   const { pathname } = useLocation();
-  useLayoutEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+    // En escritorio el scroll vive en #root (debajo de la titlebar).
+    document.getElementById('root')?.scrollTo(0, 0);
+  }, [pathname]);
   return null;
 }
 

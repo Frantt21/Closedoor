@@ -12,10 +12,43 @@ html.fc-desktop {
     --fc-titlebar-h: 40px; /* se sobreescribe en JS con titlebarHeight del puente */
 }
 
-/* Reserva la franja superior en el layout en flujo (sidebar y paneles fijos
-   se ajustan más abajo). */
+/* El documento no scrollea: el scroll vive en #root, que empieza debajo de la
+   titlebar. Así el scrollbar (y su zona clicable) no invade la franja superior. */
+html.fc-desktop,
 html.fc-desktop body {
-    padding-top: var(--fc-titlebar-h);
+    height: 100%;
+    overflow: hidden;
+}
+
+html.fc-desktop #root {
+    position: fixed;
+    top: var(--fc-titlebar-h, 40px);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+    scrollbar-gutter: stable;
+}
+
+html.fc-desktop #root::-webkit-scrollbar {
+    width: 6px;
+}
+
+html.fc-desktop #root::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+html.fc-desktop #root::-webkit-scrollbar-thumb {
+    background: var(--color-border, #2a2a2a);
+    border-radius: 3px;
+}
+
+html.fc-desktop #root::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-muted, #6b7280);
 }
 
 /* La franja: arrastrable, por encima de todo (el loader incluido) para poder
@@ -42,40 +75,6 @@ html.fc-desktop body {
     -webkit-app-region: drag;
     user-select: none;
     transition: background 0.2s ease, backdrop-filter 0.2s ease;
-}
-
-/* El documento reserva el gutter del scrollbar (scrollbar-gutter: stable, 6px)
-   y los elementos fixed terminan antes de ese gutter: la titlebar parecía
-   "cortada" en el borde derecho. Se extiende sobre el gutter y los controles
-   llegan hasta el borde (el scrollbar ya empieza debajo de la titlebar, así
-   que no los tapa). */
-html.fc-desktop .fc-titlebar {
-    right: -6px;
-}
-
-html.fc-desktop .fc-titlebar-controls {
-    right: 0;
-}
-
-/* El scrollbar del documento arrancaba en el borde superior y se metía en la
-   titlebar. Se desplaza el track para que empiece justo debajo. */
-html.fc-desktop {
-    /* Reactiva los pseudo-elementos ::-webkit-scrollbar (scrollbar-width/
-       scrollbar-color estándar los desactivan en Chromium). */
-    scrollbar-width: auto;
-    scrollbar-color: auto;
-}
-
-html.fc-desktop::-webkit-scrollbar-track {
-    margin-top: var(--fc-titlebar-h, 40px);
-}
-
-/* Sin botones de flecha: ocupaban espacio y dejaban un hueco entre la titlebar
-   y el inicio del thumb. */
-html.fc-desktop::-webkit-scrollbar-button {
-    display: none;
-    width: 0;
-    height: 0;
 }
 
 /* Sin "profile background" global → sólida, igual que .sidebar--solid. */
@@ -143,14 +142,7 @@ html.fc-desktop .sidebar--chat {
     height: calc(100vh - var(--fc-titlebar-h) - 24px);
 }
 
-html.fc-desktop .right-panel {
-    top: calc(30px + var(--fc-titlebar-h));
-}
-
-/* ── Alturas de página: el body ya reserva la franja de la titlebar con
-   `padding-top`, pero las páginas siguen midiendo 100vh → el documento ganaba
-   40px de scroll en TODAS las rutas (en /chat se veía como el composer y la
-   sidebar "por debajo"). Descontarla aquí deja el layout clavado al viewport. ── */
+/* ── Alturas de página: #root (el scroller) mide 100vh - titlebar. ── */
 html.fc-desktop .app-layout {
     min-height: calc(100vh - var(--fc-titlebar-h, 40px));
 }

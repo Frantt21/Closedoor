@@ -4,13 +4,21 @@ import PostCard from "./PostCard";
 /**
  * VirtualPostList
  *
- * Virtualización propia (sin librería externa): el scroll es de ventana, así
- * que medimos EN VIVO la posición del contenedor (header/banner arriba) y
- * calculamos el rango visible desde window.scrollY con las alturas medidas
- * (fallback: estimación). Solo se montan las cards del rango + overscan →
- * FPS estable con cientos de posts. Un ResizeObserver por row re-mide al
- * cargar imágenes y reposiciona sin huecos ni superposiciones.
+ * Virtualización propia (sin librería externa): en el navegador el scroll es de
+ * ventana; en la app de escritorio el documento no scrollea y el scroll vive en
+ * #root (debajo de la titlebar). Medimos EN VIVO la posición del contenedor
+ * (header/banner arriba) contra el scroller activo y calculamos el rango
+ * visible con las alturas medidas (fallback: estimación). Solo se montan las
+ * cards del rango + overscan → FPS estable con cientos de posts. Un
+ * ResizeObserver por row re-mide al cargar imágenes y reposiciona sin huecos ni
+ * superposiciones.
  */
+const getAppScroller = () => (
+    document.documentElement.classList.contains('fc-desktop')
+        ? document.getElementById('root')
+        : null
+);
+
 function VirtualPostList({
     posts,
     likedIds,
@@ -70,9 +78,13 @@ function VirtualPostList({
     const computeRange = useCallback(() => {
         const el = listRef.current;
         if (!el) return;
-        const off = Math.round(el.getBoundingClientRect().top + window.scrollY);
-        const relTop = window.scrollY - off;
-        const relBottom = relTop + window.innerHeight;
+        const scroller = getAppScroller();
+        const rect = el.getBoundingClientRect();
+        // relTop = posición del scroll relativa al inicio de la lista.
+        const relTop = scroller
+            ? scroller.getBoundingClientRect().top - rect.top
+            : -rect.top;
+        const relBottom = relTop + (scroller ? scroller.clientHeight : window.innerHeight);
         const heights = heightsRef.current;
         const keys = keysRef.current;
         const n = postsRef.current.length;
@@ -124,13 +136,15 @@ function VirtualPostList({
                 computeRange();
             });
         };
-        window.addEventListener('scroll', schedule, { passive: true });
+        // capture: true → también recibimos el scroll de #root en escritorio
+        // (los eventos scroll no burbujean, pero sí pasan por la fase capture).
+        window.addEventListener('scroll', schedule, { passive: true, capture: true });
         window.addEventListener('resize', schedule, { passive: true });
         schedule();
         const t1 = setTimeout(schedule, 250);
         const t2 = setTimeout(schedule, 800);
         return () => {
-            window.removeEventListener('scroll', schedule);
+            window.removeEventListener('scroll', schedule, { capture: true });
             window.removeEventListener('resize', schedule);
             if (raf) cancelAnimationFrame(raf);
             clearTimeout(t1);
