@@ -46,14 +46,15 @@ html.fc-desktop body {
 
 /* El documento reserva el gutter del scrollbar (scrollbar-gutter: stable, 6px)
    y los elementos fixed terminan antes de ese gutter: la titlebar parecía
-   "cortada" en el borde derecho. Se extiende sobre el gutter; los controles
-   de ventana se devuelven 6px para no quedar tapados por el scrollbar. */
+   "cortada" en el borde derecho. Se extiende sobre el gutter y los controles
+   llegan hasta el borde (el scrollbar ya empieza debajo de la titlebar, así
+   que no los tapa). */
 html.fc-desktop .fc-titlebar {
     right: -6px;
 }
 
 html.fc-desktop .fc-titlebar-controls {
-    right: 6px;
+    right: 0;
 }
 
 /* El scrollbar del documento arrancaba en el borde superior y se metía en la
