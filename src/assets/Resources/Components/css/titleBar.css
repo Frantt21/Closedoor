@@ -44,6 +44,18 @@ html.fc-desktop body {
     transition: background 0.2s ease, backdrop-filter 0.2s ease;
 }
 
+/* El documento reserva el gutter del scrollbar (scrollbar-gutter: stable, 6px)
+   y los elementos fixed terminan antes de ese gutter: la titlebar parecía
+   "cortada" en el borde derecho. Se extiende sobre el gutter; los controles
+   de ventana se devuelven 6px para no quedar tapados por el scrollbar. */
+html.fc-desktop .fc-titlebar {
+    right: -6px;
+}
+
+html.fc-desktop .fc-titlebar-controls {
+    right: 6px;
+}
+
 /* Sin "profile background" global → sólida, igual que .sidebar--solid. */
 .fc-titlebar--solid {
     background: var(--color-bg, #000000);

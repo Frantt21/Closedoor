@@ -26,12 +26,11 @@
     z-index: 20;
     padding: 10px 0;
     margin: -10px 0 2px;
-    /* Color original de la cabecera (bg al 72%); el blur sigue siendo el mismo
-       que la sidebar/titlebar. */
-    background: var(--overlay-bg, rgba(0, 0, 0, 0.72));
-    background: color-mix(in srgb, var(--color-bg, #000000) 72%, transparent);
-    backdrop-filter: var(--accent-surface-blur, blur(16px));
-    -webkit-backdrop-filter: var(--accent-surface-blur, blur(16px));
+    /* Sin franja propia: una banda sólida/translúcida aquí se notaba contra la
+       titlebar y el fondo global. Los controles llevan su propia superficie. */
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
 }
 
 html.fc-desktop .posts-section--home .posts-section-header {
@@ -87,10 +86,9 @@ html.fc-desktop .posts-section--home .posts-section-header {
     padding: 8px 18px;
     border: none;
     border-radius: var(--radius, 10px);
-    background: var(--overlay-bg, rgba(255, 255, 255, 0.08));
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    color: var(--overlay-text, rgba(255, 255, 255, 0.8));
+    /* Botones sólidos (sin glass) sobre la cabecera transparente. */
+    background: var(--color-surface, #1a1a1a);
+    color: var(--color-text-secondary, #9ca3af);
     font-size: 0.85rem;
     font-weight: 500;
     font-family: inherit;
@@ -172,7 +170,7 @@ html.fc-desktop .posts-section--home .posts-section-header {
 
 
 .posts-section-tab:hover {
-    background: var(--overlay-bg-hover, rgba(255, 255, 255, 0.14));
+    background: var(--color-surface-hover, #252525);
     color: var(--color-text, #ffffff);
 }
 

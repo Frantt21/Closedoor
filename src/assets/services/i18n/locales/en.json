@@ -749,6 +749,8 @@
   "settings.show_badges_desc": "Show or hide badges (Admin, Mod, Verified, etc.) on your profile.",
   "settings.show_global_bg": "Profile background across the app",
   "settings.show_global_bg_desc": "Show your profile background as a fullscreen wallpaper on every page (only visible to you).",
+  "settings.show_cards_glass": "Transparent cards",
+  "settings.show_cards_glass_desc": "Applies the same translucent profile effect to post, settings, notification and other cards across the app.",
   "settings.show_interests": "Show interests",
   "settings.show_interests_desc": "Show or hide the interests card on profiles.",
   "settings.show_likes": "Show my likes",

@@ -558,3 +558,54 @@ body:has(.sidebar--collapsed) .app-layout--chat {
 .fc-dropdown-status-dot--disconnected {
     background: #6b7280;
 }
+
+/* ==========================================
+   Cards translúcidas en todo el app
+   Toggle "Tarjetas transparentes" (showCardsGlass → html.fc-cards-glass).
+   Mantiene el vidrio translúcido (tinte + blur) pero fuerza el texto y los
+   iconos a negro para que se lean sobre el fondo claro que deja ver.
+   ========================================== */
+html.fc-cards-glass :is(
+    .post-card,
+    .settings-card,
+    .notification-item,
+    .explore-card,
+    .profile-card,
+    .profile-blocked-card,
+    .chat-list,
+    .chat-messages,
+    .right-panel-card,
+    .sidebar--chat,
+    .community-header,
+    .community-composer,
+    .community-feed-controls,
+    .community-join-prompt
+) {
+    background-color: var(--accent-surface-rgba, color-mix(in srgb, #ffffff 55%, transparent));
+    backdrop-filter: var(--accent-surface-blur, blur(16px));
+    -webkit-backdrop-filter: var(--accent-surface-blur, blur(16px));
+    --color-text: #000000;
+    --color-text-secondary: #000000;
+    --color-text-muted: #000000;
+}
+
+html.fc-cards-glass :is(
+    .post-card:hover,
+    .notification-item:hover
+) {
+    background-color: var(--accent-surface-rgba-hover, color-mix(in srgb, #ffffff 65%, transparent));
+}
+
+/* Los botones conservan el color de texto del tema (la navegación de Ajustes
+   usa los mismos colores que el resto del texto de la card). */
+html.fc-cards-glass :is(button, [role="button"]):not(.settings-nav-btn) {
+    --color-text: #ffffff;
+    --color-text-secondary: #9ca3af;
+    --color-text-muted: #6b7280;
+}
+
+[data-theme="light"].fc-cards-glass :is(button, [role="button"]):not(.settings-nav-btn) {
+    --color-text: #1a1a1a;
+    --color-text-secondary: #6b7280;
+    --color-text-muted: #9ca3af;
+}

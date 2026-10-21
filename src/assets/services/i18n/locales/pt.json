@@ -747,6 +747,8 @@
   "settings.show_badges_desc": "Mostra ou oculta as badges no seu perfil.",
   "settings.show_global_bg": "Fundo de perfil em todo o app",
   "settings.show_global_bg_desc": "Mostra seu fundo de perfil como papel de parede em todas as páginas (só você vê).",
+  "settings.show_cards_glass": "Cards transparentes",
+  "settings.show_cards_glass_desc": "Aplica o mesmo efeito translúcido do perfil aos cards de posts, configurações, notificações e outros cards do app.",
   "settings.show_interests": "Mostrar interesses",
   "settings.show_interests_desc": "Mostra ou oculta o card de interesses nos perfis.",
   "settings.show_likes": "Mostrar minhas curtidas",

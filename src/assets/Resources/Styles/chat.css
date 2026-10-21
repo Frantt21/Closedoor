@@ -7,7 +7,9 @@
     display: flex;
     height: var(--app-height, 100vh);
     overflow: hidden;
-    background: var(--color-bg, #000000);
+    /* Transparente: deja ver el fondo global del perfil. Cuando no hay fondo
+       activo se ve el background del body (mismo color, sin cambios). */
+    background: transparent;
     margin: 0;
     border-radius: 0;
 }

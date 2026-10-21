@@ -12,6 +12,7 @@ const SHOW_INTERESTS_KEY = 'fc_show_interests';
 const SHOW_PROFILE_STATS_KEY = 'fc_show_profile_stats';
 const SHOW_TOAST_NOTIFS_KEY = 'fc_show_toast_notifications';
 const SHOW_GLOBAL_BG_KEY = 'fc_show_global_bg';
+const SHOW_CARDS_GLASS_KEY = 'fc_show_cards_glass';
 const SHOW_PUSH_NOTIFS_KEY = 'fc_show_push_notifications';
 const SHOW_LIKES_KEY = 'fc_show_likes';
 const FILTER_ENCRYPTED_KEY = 'fc_filter_encrypted';
@@ -127,6 +128,13 @@ function getSavedShowGlobalBg() {
   } catch { return false; }
 }
 
+function getSavedShowCardsGlass() {
+  try {
+    const val = getItem(SHOW_CARDS_GLASS_KEY);
+    return val === null ? false : val === 'true';
+  } catch { return false; }
+}
+
 function getSavedShowToastNotifications() {
   try {
     const val = getItem(SHOW_TOAST_NOTIFS_KEY);
@@ -211,6 +219,8 @@ export const I18nContext = createContext({
   setShowToastNotifications: () => {},
   showGlobalBg: false,
   setShowGlobalBg: () => {},
+  showCardsGlass: false,
+  setShowCardsGlass: () => {},
   showPushNotifications: false,
   setShowPushNotifications: () => {},
   showLikes: false,
@@ -240,6 +250,7 @@ export function I18nProvider({ children }) {
   const [showProfileStats, setShowProfileStatsState] = useState(getSavedShowProfileStats);
   const [showToastNotifications, setShowToastNotificationsState] = useState(getSavedShowToastNotifications);
   const [showGlobalBg, setShowGlobalBgState] = useState(getSavedShowGlobalBg);
+  const [showCardsGlass, setShowCardsGlassState] = useState(getSavedShowCardsGlass);
   const [showPushNotifications, setShowPushNotificationsState] = useState(getSavedShowPushNotifications);
   const [showLikes, setShowLikesState] = useState(getSavedShowLikes);
   const [filterEncrypted, setFilterEncryptedState] = useState(getSavedFilterEncrypted);
@@ -329,6 +340,13 @@ export function I18nProvider({ children }) {
     } catch {}
   }, []);
 
+  const setShowCardsGlass = useCallback((value) => {
+    setShowCardsGlassState(value);
+    try {
+      setItem(SHOW_CARDS_GLASS_KEY, String(value));
+    } catch {}
+  }, []);
+
   const setShowPushNotifications = useCallback((value) => {
     setShowPushNotificationsState(value);
     try {
@@ -390,6 +408,12 @@ export function I18nProvider({ children }) {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
+  // Clase global: aplica el tratamiento translúcido de las cards del perfil a
+  // las cards del resto de la app (posts, ajustes, notificaciones, chat...).
+  useEffect(() => {
+    document.documentElement.classList.toggle('fc-cards-glass', showCardsGlass);
+  }, [showCardsGlass]);
+
   const t = useCallback((key, params = {}) => {
     if (!translations) return key;
     let text = translations[key];
@@ -402,7 +426,7 @@ export function I18nProvider({ children }) {
   }, [translations]);
 
   return (
-    <I18nContext.Provider      value={{ locale, t, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showGlobalBg, setShowGlobalBg, showPushNotifications, setShowPushNotifications, showLikes, setShowLikes, filterEncrypted, setFilterEncrypted, allowMention, setAllowMention, allowEncryptedAdd, setAllowEncryptedAdd, hour24, setHour24, showBadges, setShowBadges, theme, setTheme }}>
+    <I18nContext.Provider      value={{ locale, t, setLocale, showAccent, setShowAccent, showAccentProfile, setShowAccentProfile, showAccentExplore, setShowAccentExplore, accentVisibility, setAccentVisibility, showInterests, setShowInterests, showProfileStats, setShowProfileStats, showToastNotifications, setShowToastNotifications, showGlobalBg, setShowGlobalBg, showCardsGlass, setShowCardsGlass, showPushNotifications, setShowPushNotifications, showLikes, setShowLikes, filterEncrypted, setFilterEncrypted, allowMention, setAllowMention, allowEncryptedAdd, setAllowEncryptedAdd, hour24, setHour24, showBadges, setShowBadges, theme, setTheme }}>
       {children}
     </I18nContext.Provider>
   );
