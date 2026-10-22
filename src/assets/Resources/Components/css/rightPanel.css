@@ -35,6 +35,17 @@ html.fc-desktop .right-panel {
   height: calc(100vh - var(--fc-titlebar-h, 40px) - 30px);
 }
 
+/* Web de escritorio: mismo modelo (la página es el scroller), así que el panel
+   tampoco debe responder al scroll. En móvil se mantiene el comportamiento
+   base del layout de documento. */
+@media (min-width: 1025px) {
+  .right-panel {
+    position: static;
+    margin-top: 30px;
+    height: calc(var(--app-height, 100vh) - 30px);
+  }
+}
+
 /* ── Card base ── */
 
 .right-panel-card {

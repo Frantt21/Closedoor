@@ -177,6 +177,79 @@ body:has(.sidebar--collapsed) .app-layout--chat {
     flex-direction: column;
 }
 
+/* ==========================================
+   Scroll en .app-content (web de escritorio y app)
+   ==========================================
+   El documento no scrollea y el layout tampoco: la columna central
+   (.app-content) es el único scroller. Así el sidebar y el right panel
+   quedan fijos, el scrollbar ocupa todo el alto disponible y las páginas
+   no necesitan ser contenedores de scroll.
+   En <=1024 se mantiene el scroll de documento del layout móvil. */
+@media (min-width: 1025px) {
+    html,
+    body {
+        height: 100%;
+        /* `clip` (no `hidden`): el documento no puede scrollear ni por
+           programa; el único scroller es .app-content. */
+        overflow: clip;
+    }
+
+    /* En la app de escritorio #root lo fija titleBar.css bajo la titlebar. */
+    html:not(.fc-desktop) #root {
+        height: var(--app-height, 100vh);
+        min-height: 0;
+        overflow: clip;
+    }
+
+    .app-layout {
+        height: 100%;
+        min-height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+        /* `clip`: nadie puede scrollear el layout por programa (scrollIntoView,
+           anclaje…) y arrastrar con él el right panel. */
+        overflow: clip;
+    }
+
+    .app-content {
+        height: 100%;
+        min-height: 0;
+        padding-top: 30px;
+        padding-bottom: 30px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        overscroll-behavior: contain;
+        scrollbar-width: auto;
+        scrollbar-color: auto;
+        scrollbar-gutter: stable;
+    }
+
+    .app-content::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .app-content::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .app-content::-webkit-scrollbar-thumb {
+        background: var(--color-border, #2a2a2a);
+        border-radius: 3px;
+    }
+
+    .app-content::-webkit-scrollbar-thumb:hover {
+        background: var(--color-text-muted, #6b7280);
+    }
+
+    /* /chat gestiona su propio scroll interno. */
+    .app-layout--chat .app-content {
+        padding-top: 0;
+        padding-bottom: 0;
+        overflow: hidden;
+        scrollbar-gutter: auto;
+    }
+}
+
 /* ── Responsive: <= 1024px (ocultar sidebar, block layout, bottom nav) ── */
 @media (max-width: 1024px) {
     .app-layout {

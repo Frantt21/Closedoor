@@ -177,8 +177,8 @@ function ScrollToTop() {
   const { pathname } = useLocation();
   useLayoutEffect(() => {
     window.scrollTo(0, 0);
-    // En escritorio cada página (.xxx-page) es su propio scroller.
-    document.querySelector('.app-content > [class*="-page"]')?.scrollTo(0, 0);
+    // En escritorio (web y app) la columna .app-content es el scroller.
+    document.querySelector('.app-content')?.scrollTo(0, 0);
   }, [pathname]);
   return null;
 }
