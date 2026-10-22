@@ -296,10 +296,10 @@ function openExternal(url) {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 820,
-    minWidth: 960,
-    minHeight: 620,
+    width: 1490,
+    height: 805,
+    minWidth: 1490,
+    minHeight: 805,
     backgroundColor: '#0b0b0f', // mismo fondo que la app: sin flash blanco al abrir
     title: 'Closedoor',
     icon: APP_ICON_PATH, // taskbar/alt-tab en dev; empaquetado lo fija el .exe
