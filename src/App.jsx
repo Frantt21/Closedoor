@@ -113,7 +113,7 @@ function ProfileWrapper() {
 // ── 404 page for unmatched routes ──
 function NotFound() {
   return (
-    <div style={{
+    <div className="not-found-page" style={{
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
@@ -177,8 +177,8 @@ function ScrollToTop() {
   const { pathname } = useLocation();
   useLayoutEffect(() => {
     window.scrollTo(0, 0);
-    // En escritorio el scroll vive en #root (debajo de la titlebar).
-    document.getElementById('root')?.scrollTo(0, 0);
+    // En escritorio cada página (.xxx-page) es su propio scroller.
+    document.querySelector('.app-content > [class*="-page"]')?.scrollTo(0, 0);
   }, [pathname]);
   return null;
 }

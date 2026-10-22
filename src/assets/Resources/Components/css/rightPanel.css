@@ -28,8 +28,9 @@
   display: none;
 }
 
-/* En escritorio #root ya empieza debajo de la titlebar: el `top: 30px` base es
-   el correcto y solo hay que descontar la titlebar de la altura. */
+/* En escritorio el panel no es sticky: es un hermano fijo de la columna que
+   scrollea (la página), alineado con su padding superior. Solo hay que
+   descontar la titlebar de la altura. */
 html.fc-desktop .right-panel {
   height: calc(100vh - var(--fc-titlebar-h, 40px) - 30px);
 }

@@ -5,17 +5,16 @@ import PostCard from "./PostCard";
  * VirtualPostList
  *
  * Virtualización propia (sin librería externa): en el navegador el scroll es de
- * ventana; en la app de escritorio el documento no scrollea y el scroll vive en
- * #root (debajo de la titlebar). Medimos EN VIVO la posición del contenedor
- * (header/banner arriba) contra el scroller activo y calculamos el rango
- * visible con las alturas medidas (fallback: estimación). Solo se montan las
- * cards del rango + overscan → FPS estable con cientos de posts. Un
- * ResizeObserver por row re-mide al cargar imágenes y reposiciona sin huecos ni
- * superposiciones.
+ * ventana; en la app de escritorio cada página (.xxx-page) es su propio
+ * scroller. Medimos EN VIVO la posición del contenedor (header/banner arriba)
+ * contra el scroller activo y calculamos el rango visible con las alturas
+ * medidas (fallback: estimación). Solo se montan las cards del rango + overscan
+ * → FPS estable con cientos de posts. Un ResizeObserver por row re-mide al
+ * cargar imágenes y reposiciona sin huecos ni superposiciones.
  */
 const getAppScroller = () => (
     document.documentElement.classList.contains('fc-desktop')
-        ? document.getElementById('root')
+        ? document.querySelector('.app-content > [class*="-page"]')
         : null
 );
 
@@ -136,8 +135,9 @@ function VirtualPostList({
                 computeRange();
             });
         };
-        // capture: true → también recibimos el scroll de #root en escritorio
-        // (los eventos scroll no burbujean, pero sí pasan por la fase capture).
+        // capture: true → también recibimos el scroll de la página en
+        // escritorio (los eventos scroll no burbujean, pero sí pasan por la
+        // fase capture).
         window.addEventListener('scroll', schedule, { passive: true, capture: true });
         window.addEventListener('resize', schedule, { passive: true });
         schedule();

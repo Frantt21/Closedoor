@@ -12,8 +12,9 @@ html.fc-desktop {
     --fc-titlebar-h: 40px; /* se sobreescribe en JS con titlebarHeight del puente */
 }
 
-/* El documento no scrollea: el scroll vive en #root, que empieza debajo de la
-   titlebar. Así el scrollbar (y su zona clicable) no invade la franja superior. */
+/* El documento no scrollea. #root ocupa el área bajo la titlebar y cada página
+   (.xxx-page) es su propio scroller; sidebar y right panel quedan fijos y el
+   scrollbar no invade la franja superior. */
 html.fc-desktop,
 html.fc-desktop body {
     height: 100%;
@@ -27,27 +28,47 @@ html.fc-desktop #root {
     right: 0;
     bottom: 0;
     min-height: 0;
+    /* `clip` (no `hidden`): nadie puede scrollear este contenedor por
+       programa (scrollIntoView, anclaje, etc.) y arrastrar con él el
+       right panel. El scroll real vive en la página. */
+    overflow: clip;
+}
+
+/* .app-content ya no scrollea: cada página (.xxx-page) es su propio scroller. */
+html.fc-desktop .app-content {
+    height: 100%;
+    min-height: 0;
+    padding-top: 30px;
+    padding-bottom: 30px;
+    overflow: hidden;
+}
+
+/* Scroller de la página activa: el div raíz con clase .nombre-page. */
+html.fc-desktop .app-content > [class*="-page"] {
+    height: 100%;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
+    overscroll-behavior: contain;
     scrollbar-width: auto;
     scrollbar-color: auto;
     scrollbar-gutter: stable;
 }
 
-html.fc-desktop #root::-webkit-scrollbar {
+html.fc-desktop .app-content > [class*="-page"]::-webkit-scrollbar {
     width: 6px;
 }
 
-html.fc-desktop #root::-webkit-scrollbar-track {
+html.fc-desktop .app-content > [class*="-page"]::-webkit-scrollbar-track {
     background: transparent;
 }
 
-html.fc-desktop #root::-webkit-scrollbar-thumb {
+html.fc-desktop .app-content > [class*="-page"]::-webkit-scrollbar-thumb {
     background: var(--color-border, #2a2a2a);
     border-radius: 3px;
 }
 
-html.fc-desktop #root::-webkit-scrollbar-thumb:hover {
+html.fc-desktop .app-content > [class*="-page"]::-webkit-scrollbar-thumb:hover {
     background: var(--color-text-muted, #6b7280);
 }
 
@@ -142,9 +163,37 @@ html.fc-desktop .sidebar--chat {
     height: calc(100vh - var(--fc-titlebar-h) - 24px);
 }
 
-/* ── Alturas de página: #root (el scroller) mide 100vh - titlebar. ── */
+/* ── Alturas: el layout ocupa el viewport; scrollea la página activa. ── */
 html.fc-desktop .app-layout {
-    min-height: calc(100vh - var(--fc-titlebar-h, 40px));
+    height: 100%;
+    min-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    /* Igual que #root: el layout no debe poder scrollear nunca. Si scrollase,
+       el right panel (que ya llena el alto) se desplazaría con él. */
+    overflow: clip;
+}
+
+/* El right panel no depende del scroll de la página: en la app es un hermano
+   fijo de la columna que scrollea, así que no necesita sticky. La base sticky
+   se mantiene para el navegador (donde scrollea el documento). */
+html.fc-desktop .right-panel {
+    position: static;
+    margin-top: 30px;
+}
+
+/* /chat gestiona su propio scroll interno (lista + mensajes): el scroller de
+   la columna no debe añadir otra barra ni padding. */
+html.fc-desktop .app-layout--chat .app-content {
+    padding-top: 0;
+    padding-bottom: 0;
+    overflow: hidden;
+    scrollbar-gutter: auto;
+}
+
+html.fc-desktop .app-layout--chat .app-content > .chat-page {
+    overflow: hidden;
+    scrollbar-gutter: auto;
 }
 
 html.fc-desktop .chat-page {

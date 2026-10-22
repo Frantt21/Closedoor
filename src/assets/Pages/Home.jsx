@@ -318,7 +318,7 @@ function Home() {
     }, []);
 
     return (
-        <div>
+        <div className="home-page">
             {!isAuthenticated ? (
                 <div className="home-hero">
                     <h1 className="home-hero-title">{t('home.hero_title')}</h1>
