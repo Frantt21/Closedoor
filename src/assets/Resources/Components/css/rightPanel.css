@@ -28,9 +28,9 @@
   display: none;
 }
 
-/* En la app de escritorio hay titlebar fija arriba: descontarla. */
+/* En escritorio #root ya empieza debajo de la titlebar: el `top: 30px` base es
+   el correcto y solo hay que descontar la titlebar de la altura. */
 html.fc-desktop .right-panel {
-  top: calc(30px + var(--fc-titlebar-h, 40px));
   height: calc(100vh - var(--fc-titlebar-h, 40px) - 30px);
 }
 
