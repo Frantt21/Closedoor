@@ -4,18 +4,18 @@ import PostCard from "./PostCard";
 /**
  * VirtualPostList
  *
- * Virtualización propia (sin librería externa): el documento no scrollea; en
- * escritorio (web y app) la columna .app-content es el scroller. En el layout
- * móvil se sigue usando el scroll de ventana. Medimos EN VIVO la posición del
- * contenedor (header/banner arriba) contra el scroller activo y calculamos el
- * rango visible con las alturas medidas (fallback: estimación). Solo se montan
- * las cards del rango + overscan → FPS estable con cientos de posts. Un
+ * Virtualización propia (sin librería externa): en el navegador el scroll es de
+ * ventana; en la app de escritorio el documento no scrollea y el scroll vive en
+ * #root (debajo de la titlebar). Medimos EN VIVO la posición del contenedor
+ * (header/banner arriba) contra el scroller activo y calculamos el rango
+ * visible con las alturas medidas (fallback: estimación). Solo se montan las
+ * cards del rango + overscan → FPS estable con cientos de posts. Un
  * ResizeObserver por row re-mide al cargar imágenes y reposiciona sin huecos ni
  * superposiciones.
  */
 const getAppScroller = () => (
-    window.matchMedia('(min-width: 1025px)').matches
-        ? document.querySelector('.app-content')
+    document.documentElement.classList.contains('fc-desktop')
+        ? document.getElementById('root')
         : null
 );
 

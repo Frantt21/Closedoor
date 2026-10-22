@@ -11,10 +11,11 @@
   flex-direction: column;
   gap: 12px;
   align-self: flex-start;
-  /* El panel ocupa toda la altura disponible hasta el borde inferior de la
-     ventana. Si el contenido es más alto, scrollea de forma independiente y
-     sin barra visible. */
-  height: calc(100vh - 30px);
+  /* El panel se pega arriba y ocupa como máximo hasta el borde inferior de la
+     ventana. Usamos max-height (no height fija): si llenara justo el viewport,
+     al llegar al final del scroll se desplazaría; con max-height permanece
+     pegado. Si su contenido es más alto, scrollea de forma independiente. */
+  max-height: calc(100vh - 30px);
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
@@ -28,22 +29,9 @@
   display: none;
 }
 
-/* En escritorio el panel no es sticky: es un hermano fijo de la columna que
-   scrollea (la página), alineado con su padding superior. Solo hay que
-   descontar la titlebar de la altura. */
+/* En la app de escritorio hay que descontar la titlebar de la altura máxima. */
 html.fc-desktop .right-panel {
-  height: calc(100vh - var(--fc-titlebar-h, 40px) - 30px);
-}
-
-/* Web de escritorio: mismo modelo (la página es el scroller), así que el panel
-   tampoco debe responder al scroll. En móvil se mantiene el comportamiento
-   base del layout de documento. */
-@media (min-width: 1025px) {
-  .right-panel {
-    position: static;
-    margin-top: 30px;
-    height: calc(var(--app-height, 100vh) - 30px);
-  }
+  max-height: calc(100vh - var(--fc-titlebar-h, 40px) - 30px);
 }
 
 /* ── Card base ── */

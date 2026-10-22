@@ -12,9 +12,10 @@ html.fc-desktop {
     --fc-titlebar-h: 40px; /* se sobreescribe en JS con titlebarHeight del puente */
 }
 
-/* El documento no scrollea. #root ocupa el área bajo la titlebar y el scroll
-   vive en .app-content (la columna que renderiza las páginas), así sidebar y
-   right panel quedan fijos y el scrollbar no invade la franja superior. */
+/* El documento no scrollea. #root ocupa el área bajo la titlebar y es el
+   scroller de la app (como en el original); el sidebar queda fijo y el
+   scrollbar no invade la franja superior. El right panel es sticky respecto a
+   #root y, con `max-height`, no se desplaza al llegar al final. */
 html.fc-desktop,
 html.fc-desktop body {
     height: 100%;
@@ -28,10 +29,33 @@ html.fc-desktop #root {
     right: 0;
     bottom: 0;
     min-height: 0;
-    /* `clip` (no `hidden`): nadie puede scrollear este contenedor por
-       programa (scrollIntoView, anclaje, etc.) y arrastrar con él el
-       right panel. El scroll real vive en .app-content. */
-    overflow: clip;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+    scrollbar-gutter: stable;
+}
+
+html.fc-desktop #root::-webkit-scrollbar {
+    width: 6px;
+}
+
+html.fc-desktop #root::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+html.fc-desktop #root::-webkit-scrollbar-thumb {
+    background: var(--color-border, #2a2a2a);
+    border-radius: 3px;
+}
+
+html.fc-desktop #root::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-muted, #6b7280);
+}
+
+/* #root mide 100vh - titlebar: el layout no debe forzar scroll extra. */
+html.fc-desktop .app-layout {
+    min-height: calc(100vh - var(--fc-titlebar-h, 40px));
 }
 
 /* La franja: arrastrable, por encima de todo (el loader incluido) para poder
@@ -125,12 +149,12 @@ html.fc-desktop .sidebar--chat {
     height: calc(100vh - var(--fc-titlebar-h) - 24px);
 }
 
-/* ── Alturas: el layout ocupa el viewport; scrollea .app-content. ──
-   Las reglas de layout/app-content/right-panel para web y app viven en
-   global.css (media min-width: 1025px), compartidas por ambas. */
+/* ── Alturas: el layout ocupa el viewport (min-height) y scrollea #root. ──
+   El hueco de 30px superior/inferior vive en .app-content (global.css,
+   media min-width: 1025px), compartido por web y app. */
 
-/* /chat gestiona su propio scroll interno (lista + mensajes): el scroller de
-   la columna no debe añadir otra barra ni padding. */
+/* /chat gestiona su propio scroll interno (lista + mensajes): sin padding
+   extra en la columna. */
 html.fc-desktop .app-layout--chat .app-content {
     padding-top: 0;
     padding-bottom: 0;
