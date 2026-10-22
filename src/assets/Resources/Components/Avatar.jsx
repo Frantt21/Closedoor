@@ -45,7 +45,7 @@ export default function Avatar({ src, alt = 'avatar', className, style, onClick,
           onError={handleError}
         />
       </div>
-      {showStatus && <span className={`status-dot status-dot--lg status-dot--${effectiveStatus}`} />}
+      {showStatus && <span className={`status-dot status-dot--${effectiveStatus}`} />}
     </div>
   );
 }

@@ -273,11 +273,16 @@ body:has(.sidebar--collapsed) .app-layout--chat {
 }
 
 .status-dot {
+    /* Tamaño proporcional al avatar (10–16px): el mismo dot se usa en avatares
+       de 34px (panel), 38px (dock), 48px (lista) y 90px (perfil). */
+    --status-dot-size: clamp(10px, 30%, 16px);
     position: absolute;
-    bottom: 2px;
-    right: 2px;
-    width: 12px;
-    height: 12px;
+    /* Centro del dot sobre el punto a 45° del círculo del avatar
+       (14.65% del lado). Así queda igual en todos los tamaños/contextos. */
+    bottom: calc(14.65% - var(--status-dot-size) / 2);
+    right: calc(14.65% - var(--status-dot-size) / 2);
+    width: var(--status-dot-size);
+    height: var(--status-dot-size);
     border-radius: 50%;
     border: 2px solid var(--color-bg, #000000);
     z-index: 3;
@@ -299,20 +304,6 @@ body:has(.sidebar--collapsed) .app-layout--chat {
 
 .status-dot--disconnected {
     background: #6b7280;
-}
-
-/* ── Small status dot (chat list items, smaller avatars) ── */
-.status-dot--sm {
-    width: 10px;
-    height: 10px;
-    border-width: 1.5px;
-}
-
-/* ── Large status dot (profile banner avatar) ── */
-.status-dot--lg {
-    width: 16px;
-    height: 16px;
-    border-width: 2.5px;
 }
 
 /* ── Standalone status indicator (non-avatar, like text label) ── */

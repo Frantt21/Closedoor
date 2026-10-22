@@ -179,17 +179,6 @@
     display: block;
 }
 
-/* ── Status dot positioning inside profile avatar ── */
-/* The wrapper is a square inside the container (which has 3px border).
-   The avatar circle (border-radius: 50%) has its edge at ~14.65% from
-   any square corner. calc(12% - 8px) shifts the dot 3% closer to the
-   corner so it overlaps the avatar circle by ~30% and extends outside
-   the circular border, making it visually attached with no gap. */
-.profile-avatar-container .status-dot {
-    bottom: calc(12% - 8px);
-    right: calc(12% - 1px);
-}
-
 /* ---- User info overlay ---- */
 
 .profile-user-info {
