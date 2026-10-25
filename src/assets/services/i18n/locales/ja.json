@@ -118,6 +118,8 @@
   "chat.select_chat": "会話を選択してチャットを始めましょう",
   "chat.send_error": "メッセージの送信に失敗しました",
   "chat.set_nickname": "ニックネームを設定",
+  "chat.share_song": "曲を共有",
+  "chat.song_picker_hint": "曲名やアーティストを検索し、結果をタップして送信します",
   "chat.title": "チャット",
   "chat.today": "今日",
   "chat.typing": "入力中...",

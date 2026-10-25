@@ -1,0 +1,126 @@
+/* SongPicker — filas de resultados sobre la shell compartida de gifPicker.css
+   (.gif-picker / .gif-picker-header / .gif-picker-results). */
+
+/* El header añade un botón de búsqueda al del picker de GIF: sin
+   min-width:0 el input flex puede desbordar en pantallas estrechas. */
+.chat-song-picker .gif-picker-search-wrap {
+    min-width: 0;
+}
+
+.chat-song-picker-search-btn {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    font-family: inherit;
+    border: none;
+    border-radius: var(--radius-sm, 6px);
+    background: var(--color-text, #ffffff);
+    color: var(--color-bg, #000000);
+    cursor: pointer;
+    transition: opacity 0.12s ease;
+}
+
+.chat-song-picker-search-btn:hover:not(:disabled) {
+    opacity: 0.85;
+}
+
+.chat-song-picker-search-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.chat-song-picker-hint {
+    flex-direction: row;
+    gap: 8px;
+    opacity: 0.85;
+}
+
+.chat-song-picker-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-song-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 7px 10px;
+    border: none;
+    background: transparent;
+    color: var(--color-text, #ffffff);
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+
+.chat-song-picker-item:hover {
+    background: var(--color-surface-hover, #252525);
+}
+
+.chat-song-picker-art {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border-radius: var(--radius-sm, 6px);
+    object-fit: cover;
+    display: block;
+    background: var(--overlay-bg-subtle, rgba(255, 255, 255, 0.04));
+}
+
+.chat-song-picker-art--empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-muted, #6b7280);
+    font-size: 0.8rem;
+}
+
+.chat-song-picker-info {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+    flex: 1;
+}
+
+.chat-song-picker-title,
+.chat-song-picker-artist {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.chat-song-picker-title {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--color-text, #ffffff);
+}
+
+.chat-song-picker-artist {
+    font-size: 0.72rem;
+    color: var(--color-text-muted, #6b7280);
+}
+
+.chat-song-picker-send {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--color-surface, #1a1a1a);
+    color: var(--color-text-muted, #6b7280);
+    transition: background 0.12s ease, color 0.12s ease;
+}
+
+.chat-song-picker-item:hover .chat-song-picker-send {
+    background: var(--color-text, #ffffff);
+    color: var(--color-bg, #000000);
+}

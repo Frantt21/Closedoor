@@ -196,7 +196,7 @@ VITE_SUPABASE_ANON_KEY=<clave_anon>
 
 - Seguidores, solicitudes para perfiles privados y bloqueos
 - Notificaciones en tiempo real (likes, comentarios, reposts, menciones, etc.)
-- Chat con mensajes cifrados, reacciones, respuestas y llamadas
+- Chat con mensajes cifrados, reacciones, respuestas, llamadas y canciones compartidas
 - Comunidades
 
 ### Exploracion

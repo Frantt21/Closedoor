@@ -274,9 +274,47 @@ export async function markAsRead(conversationId, userId) {
 // ── Messages ──
 
 /**
+ * Normaliza la canción compartida al shape que consume la tarjeta del chat
+ * (mismo que devuelve services/musicService.searchMusic).
+ *
+ * Solo se guardan campos conocidos y URLs http(s): `shared_song` es jsonb
+ * escrito por el remitente, así que no se persiste un blob arbitrario.
+ */
+function normalizeSharedSong(song) {
+  if (!song || typeof song !== 'object') return null;
+  const text = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+  const httpUrl = (v) => {
+    if (typeof v !== 'string' || !v.trim()) return '';
+    try {
+      const url = new URL(v);
+      return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : '';
+    } catch {
+      return '';
+    }
+  };
+
+  const title = text(song.title, 200);
+  const artist = text(song.artist, 200);
+  if (!title || !artist) return null; // sin esto no hay tarjeta ni stream posible
+
+  const duration = Number(song.duration);
+  return {
+    provider: text(song.provider, 20) || 'unknown',
+    trackId: text(song.trackId, 100),
+    title,
+    artist,
+    album: text(song.album, 200),
+    artwork: httpUrl(song.artwork),
+    previewUrl: httpUrl(song.previewUrl),
+    externalUrl: httpUrl(song.externalUrl),
+    duration: Number.isFinite(duration) && duration > 0 ? Math.round(duration) : 0,
+  };
+}
+
+/**
  * Send an encrypted message
  */
-export async function sendMessage(conversationId, senderId, content, participantIds, replyTo = null, sharedPostId = null, sharedCommunityId = null, sharedInviteToken = null) {
+export async function sendMessage(conversationId, senderId, content, participantIds, replyTo = null, sharedPostId = null, sharedCommunityId = null, sharedInviteToken = null, sharedSong = null) {
   const allIds = [...new Set([senderId, ...participantIds])];
 
   // Sanitizar contenido antes de cifrarlo (anti-XSS: no guardar scripts)
@@ -304,6 +342,10 @@ export async function sendMessage(conversationId, senderId, content, participant
   if (sharedInviteToken) {
     insertPayload.shared_invite_token = sharedInviteToken;
   }
+  const cleanSharedSong = normalizeSharedSong(sharedSong);
+  if (cleanSharedSong) {
+    insertPayload.shared_song = cleanSharedSong;
+  }
 
   // Insert message with sender_id, then fetch profile separately
   const { data: msg, error } = await supabase
@@ -328,6 +370,8 @@ export async function sendMessage(conversationId, senderId, content, participant
     ? '📌 Shared a post'
     : sharedCommunityId
     ? '🏘️ Community invite'
+    : cleanSharedSong
+    ? '🎵 Shared a song'
     : (cleanContent.length > 80 ? cleanContent.slice(0, 80) + '...' : cleanContent);
   await supabase
     .from('conversations')

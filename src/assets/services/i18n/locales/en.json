@@ -118,6 +118,8 @@
   "chat.select_chat": "Select a conversation to start chatting",
   "chat.send_error": "Failed to send message",
   "chat.set_nickname": "Set nickname",
+  "chat.share_song": "Share a song",
+  "chat.song_picker_hint": "Search for a song or artist and tap a result to send it",
   "chat.title": "Chat",
   "chat.today": "Today",
   "chat.typing": "typing...",

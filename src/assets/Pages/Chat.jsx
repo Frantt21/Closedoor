@@ -33,6 +33,8 @@ import Avatar from '../Resources/Components/Avatar';
 import Badge from '../Resources/Components/Badge';
 import Tooltip from '../Resources/Components/Tooltip';
 import GifPicker from '../Resources/Components/GifPicker';
+import SongPicker from '../Resources/Components/SongPicker';
+import ChatSongCard from '../Resources/Components/ChatSongCard';
 import { getTimeAgo, IMG_RE, detectMediaFromContent, getImageStyle, sanitizeUrl } from '../services/helpers';
 import { getClipboardImageFile } from '../services/clipboard';
 import NicknameModal from '../Resources/Components/NicknameModal';
@@ -202,6 +204,7 @@ export default function Chat() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null); // mensaje al que se está respondiendo
   const [showGifPicker, setShowGifPicker] = useState(false);
+  const [showSongPicker, setShowSongPicker] = useState(false);
   const [showMediaInput, setShowMediaInput] = useState(false);
   const [mediaUrl, setMediaUrl] = useState('');
   const [showInputEmojiPicker, setShowInputEmojiPicker] = useState(false);
@@ -905,7 +908,7 @@ export default function Chat() {
           delete localConvOverridesRef.current[convForThisEffect];
           updateConvPreview(
             convForThisEffect,
-            content || '',
+            newMsg.shared_song ? '🎵 Shared a song' : (content || ''),
             newMsg.created_at,
             newMsg.sender_id !== user.id
           );
@@ -2098,8 +2101,8 @@ export default function Chat() {
   }, [msgMenu.msg, activeConvId, updateConvPreview, user?.id]);
 
   // ── Shared send logic (optimistic + API + dedup) ──
-  const sendContent = useCallback(async (content, { clearInput = false } = {}) => {
-    if (!content || !user?.id || sendingRef.current) return null;
+  const sendContent = useCallback(async (content, { clearInput = false, sharedSong = null } = {}) => {
+    if ((!content && !sharedSong) || !user?.id || sendingRef.current) return null;
 
     // ── Resolve conversation ID (create pending conversation in DB if needed) ──
     let convId = activeConvId;
@@ -2174,6 +2177,7 @@ export default function Chat() {
       conversation_id: convId,
       sender_id: user.id,
       decryptedContent: content,
+      shared_song: sharedSong,
       reply_to: replyToId,
       created_at: new Date().toISOString(),
       edited_at: null,
@@ -2198,7 +2202,7 @@ export default function Chat() {
         .select('user_id')
         .eq('conversation_id', convId);
       const participantIds = (participants || []).map(p => p.user_id).filter(id => id !== user.id);
-      const sentMsg = await sendMessage(convId, user.id, content, participantIds, replyToId);
+      const sentMsg = await sendMessage(convId, user.id, content, participantIds, replyToId, null, null, null, sharedSong);
 
       setMessages((prev) => {
         const replaced = prev.map(m =>
@@ -2212,7 +2216,8 @@ export default function Chat() {
         });
       });
       // Update conversation preview immediately (optimistic), then sync in background
-      updateConvPreview(convId, content, sentMsg.created_at || new Date().toISOString());
+      // Preview optimista con el mismo texto que guarda chatService en la BD
+      updateConvPreview(convId, sharedSong ? '🎵 Shared a song' : content, sentMsg.created_at || new Date().toISOString());
       loadConvs();
       return sentMsg;
     } catch (err) {
@@ -2508,6 +2513,13 @@ export default function Chat() {
     if (!gifUrl) return;
     await sendContent(gifUrl);
   }, [sendContent]);
+
+  // ── Send song (card fuera de la burbuja, como la invitación a comunidad) ──
+  const handleSongSelect = async (song) => {
+    setShowSongPicker(false);
+    if (!song?.title) return;
+    await sendContent('', { sharedSong: song });
+  };
 
   // ── Defensive dedup: some async races can introduce duplicate IDs ──
   const dedupedMessages = React.useMemo(() => {
@@ -2943,9 +2955,10 @@ export default function Chat() {
               if (uid === user.id) groupedReactions[em].isOwn = true;
             });
             const ownReaction = reactions[user.id];
-            // Invitación "pura" (sin texto): la burbuja se vuelve transparente
-            // para que la card se vea suelta, fuera de la burbuja visualmente
-            const isPureInvite = !!(msg.shared_community_id && !(msg.decryptedContent || '').trim());
+            // Tarjeta "pura" (invitación o canción, sin texto): la burbuja se
+            // vuelve transparente para que la card se vea suelta, fuera de la
+            // burbuja visualmente
+            const isBareCard = !!((msg.shared_community_id || msg.shared_song) && !(msg.decryptedContent || '').trim());
 
             return (
               <React.Fragment key={msg.id}>
@@ -2967,7 +2980,7 @@ export default function Chat() {
                     />
                   )}
                   {!isOwn && !showAvatar && <div className="chat-message-avatar-spacer" />}
-                  <div className={`chat-message-bubble ${groupClass} ${msg.is_pinned ? 'chat-message-bubble--pinned' : ''}${isPureInvite ? ' chat-message-bubble--bare' : ''}`}>
+                  <div className={`chat-message-bubble ${groupClass} ${msg.is_pinned ? 'chat-message-bubble--pinned' : ''}${isBareCard ? ' chat-message-bubble--bare' : ''}`}>
                     {msg.is_pinned && (
                       <div className="chat-message-pin-badge">
                         <FaThumbtack />
@@ -2998,6 +3011,9 @@ export default function Chat() {
                               </span>
                               <span className="chat-message-reply-preview-text">
                                 {(() => {
+                                  if (replied.shared_song?.title) {
+                                    return <><FaMusic className="chat-list-item-preview-icon" /> {replied.shared_song.title}</>;
+                                  }
                                   const txt = replied.decryptedContent || '';
                                   if (!txt) return <span>{t('chat.encrypted')}</span>;
                                   if (IMG_RE.test(txt) || /(giphy|tenor|klipy)\.com|(\.|\/)gif/i.test(txt)) {
@@ -3133,6 +3149,10 @@ export default function Chat() {
                         </div>
                       );
                     })()}
+                    {/* ── Canción compartida (card fuera de la burbuja) ── */}
+                    {msg.shared_song && (
+                      <ChatSongCard song={msg.shared_song} />
+                    )}
                     {(() => {
                       const content = msg.decryptedContent || '';
                       if (!content) return null;
@@ -3283,8 +3303,10 @@ export default function Chat() {
                   : otherUser?.username || t('common.unknown')}
               </span>
               <span className="chat-reply-bar-preview">
-                {replyingTo.decryptedContent?.slice(0, 80) || t('chat.encrypted')}
-                {replyingTo.decryptedContent?.length > 80 ? '...' : ''}
+                {replyingTo.shared_song?.title
+                  ? `🎵 ${replyingTo.shared_song.title}`
+                  : (replyingTo.decryptedContent?.slice(0, 80) || t('chat.encrypted'))}
+                {!replyingTo.shared_song?.title && replyingTo.decryptedContent?.length > 80 ? '...' : ''}
               </span>
             </div>
           </div>
@@ -3343,6 +3365,13 @@ export default function Chat() {
           <GifPicker
             onSelect={handleGifSelect}
             onClose={() => setShowGifPicker(false)}
+          />
+        )}
+        {/* Song picker — mismo contenedor embebido que el de GIF */}
+        {showSongPicker && (
+          <SongPicker
+            onSelect={handleSongSelect}
+            onClose={() => setShowSongPicker(false)}
           />
         )}
         {/* Input emoji picker */}
@@ -3425,29 +3454,29 @@ export default function Chat() {
             <div className="chat-input-actions-desktop">
               <button
                 className={`chat-input-action-btn ${showInputEmojiPicker ? 'chat-input-action-btn--active' : ''}`}
-                onClick={() => { setShowInputEmojiPicker(s => !s); setShowGifPicker(false); }}
+                onClick={() => { setShowInputEmojiPicker(s => !s); setShowGifPicker(false); setShowSongPicker(false); }}
                 title="Emoji"
               >
                 <FaSmile />
               </button>
               <button
                 className={`chat-input-action-btn ${showGifPicker ? 'chat-input-action-btn--active' : ''}`}
-                onClick={() => { setShowGifPicker(s => !s); setShowInputEmojiPicker(false); }}
+                onClick={() => { setShowGifPicker(s => !s); setShowInputEmojiPicker(false); setShowSongPicker(false); }}
                 title="GIF"
               >
                 <span className="chat-input-action-btn-gif">GIF</span>
               </button>
               <button
                 className={`chat-input-action-btn ${showMediaInput ? 'chat-input-action-btn--active' : ''}`}
-                onClick={() => setShowMediaInput(s => !s)}
+                onClick={() => { setShowMediaInput(s => !s); setShowSongPicker(false); }}
                 title="Media"
               >
                 <FaImage />
               </button>
               <button
-                className="chat-input-action-btn"
-                disabled
-                title="Audio"
+                className={`chat-input-action-btn ${showSongPicker ? 'chat-input-action-btn--active' : ''}`}
+                onClick={() => { setShowSongPicker(s => !s); setShowGifPicker(false); setShowInputEmojiPicker(false); setShowMediaInput(false); }}
+                title={t('chat.share_song')}
               >
                 <FaMusic />
               </button>
@@ -3713,6 +3742,9 @@ export default function Chat() {
                       <span className="chat-pinned-item-sender">{sender.name}</span>
                       <span className="chat-pinned-item-text">
                         {(() => {
+                          if (msg.shared_song?.title) {
+                            return <><FaMusic className="chat-list-item-preview-icon" /> {msg.shared_song.title}</>;
+                          }
                           const txt = msg.decryptedContent || '';
                           if (!txt) return t('chat.encrypted');
                           if (IMG_RE.test(txt) || /(giphy|tenor|klipy)\.com|(\.|\/)gif/i.test(txt)) {

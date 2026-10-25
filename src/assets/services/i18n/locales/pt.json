@@ -118,6 +118,8 @@
   "chat.select_chat": "Selecione uma conversa para começar a conversar",
   "chat.send_error": "Erro ao enviar a mensagem",
   "chat.set_nickname": "Definir apelido",
+  "chat.share_song": "Compartilhar música",
+  "chat.song_picker_hint": "Procure uma música ou artista e toque em um resultado para enviá-lo",
   "chat.title": "Chat",
   "chat.today": "Hoje",
   "chat.typing": "digitando...",
