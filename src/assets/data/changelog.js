@@ -55,7 +55,7 @@ export const RELEASES = [
       'The song you pin on your profile now plays the track itself, not only the 30-second preview.',
       'You can seek within the track while it streams.',
       'The audio is resolved inside the app itself, so it works the same in production and locally.',
-      'If a song cannot be played in full, the card falls back to the preview automatically.',
+        'If a song cannot be played in full, the card falls back to the preview automatically.',
     ],
   },
   {
