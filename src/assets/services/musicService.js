@@ -1,11 +1,18 @@
 /**
- * musicService.js — Búsqueda de canciones para la card "Mi canción" del perfil.
+ * musicService.js — Búsqueda de canciones para la card "Mi canción" del perfil
+ * y para las canciones compartidas en el chat.
  *
  * Estrategia (verificada contra las APIs):
- *   1. iTunes Search API directo desde el navegador — devuelve
+ *   1. YouTube Music vía innertube (`/api/music/ytsearch`, servido por el
+ *      backend de música) — fuente PRIMARIA: solo catálogo musical (descarta
+ *      subidas de YouTube/UGC, podcasts y colecciones) y encuentra la canción
+ *      real casi siempre. Sus resultados no traen preview de 30 s, así que al
+ *      fijar/enviar la canción se pide uno a iTunes con withPreviewFallback()
+ *      (solo respaldo del player).
+ *   2. iTunes Search API directo desde el navegador — devuelve
  *      `Access-Control-Allow-Origin: *` con peticiones de navegador y trae
  *      previewUrl (30s), artworkUrl100 (redimensionable) y trackName/artistName.
- *   2. Si falla (red/CORS/edge), fallback al proxy `/api/music-search`
+ *   3. Si falla (red/CORS/edge), fallback al proxy `/api/music-search`
  *      (función serverless de Vercel + ruta en server.js) que consulta Deezer
  *      server-side y, como último recurso, iTunes server-side.
  *
@@ -57,25 +64,42 @@ function normalizeItunesTrack(t) {
 /**
  * Busca en iTunes directamente desde el navegador (CORS OK).
  */
-export async function searchMusicDirect(query, limit = 10) {
+export async function searchMusicDirect(query, limit = 10, { signal } = {}) {
   const url =
     `${ITUNES_SEARCH_URL}?term=${encodeURIComponent(query)}` +
     `&media=music&entity=song&limit=${limit}`;
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  const res = await fetch(url, { headers: { Accept: 'application/json' }, signal });
   if (!res.ok) throw new Error(`iTunes search failed (${res.status})`);
   const data = await res.json();
   return (data.results || []).map(normalizeItunesTrack).filter(Boolean);
 }
 
 /**
+ * Busca canciones en el catálogo de YouTube Music (innertube) vía backend.
+ * Devuelve el shape normalizado del frontend
+ * ({ provider: 'youtube', trackId: videoId, title, artist, artwork, duration, … })
+ * con `previewUrl` vacío (YouTube no ofrece preview de 30 s).
+ */
+export async function searchMusicYouTube(query, limit = 10) {
+  const url = `${getMusicApiBase()}/ytsearch?q=${encodeURIComponent(query)}&limit=${limit}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(`YouTube search failed (${res.status})`);
+  const data = await res.json();
+  if (!data?.success || !Array.isArray(data.results)) {
+    throw new Error(data?.error || 'YouTube search returned no results');
+  }
+  return data.results;
+}
+
+/**
  * Busca a través del proxy /api/music-search (Deezer por defecto, iTunes como
  * respaldo server-side). Retorna el objeto crudo { success, provider, results }.
  */
-async function searchMusicProxy(query, provider, limit) {
+async function searchMusicProxy(query, provider, limit, { signal } = {}) {
   const url =
     `/api/music-search?q=${encodeURIComponent(query)}` +
     `&provider=${provider}&limit=${limit}`;
-  const res = await fetch(url);
+  const res = await fetch(url, { signal });
   if (!res.ok) throw new Error(`Music proxy failed (${res.status})`);
   const data = await res.json();
   if (!data?.success || !Array.isArray(data.results)) {
@@ -95,12 +119,16 @@ export function songKey(song) {
 /**
  * URL de stream completo de una canción. Same-origin, servida por el backend
  * con innertube. La URL de googlevideo no se expone al navegador.
- * Retorna null si la canción no tiene artista/título.
+ * Retorna null si la canción no tiene título. Para resultados de YouTube se
+ * manda `videoId`, que fija el vídeo exacto y evita re-buscarlo en el backend.
  */
 export function getStreamUrl(song) {
-  if (!song?.title || !song?.artist) return null;
-  const params = new URLSearchParams({ artist: song.artist, title: song.title });
+  if (!song?.title) return null;
+  const params = new URLSearchParams({ title: song.title });
+  if (song.artist) params.set('artist', song.artist);
   if (song.duration) params.set('duration', String(song.duration));
+  // Resultados de innertube: el videoId evita re-buscar y fija la versión exacta.
+  if (song.provider === 'youtube' && song.trackId) params.set('videoId', song.trackId);
   return `${getMusicApiBase()}/stream?${params.toString()}`;
 }
 
@@ -128,20 +156,104 @@ export function getStreamUrl(song) {
  * más falta hace (la primera reproducción).
  */
 export function prewarmStream(song) {
-  if (!song?.title || !song?.artist) return Promise.resolve(null);
-  const params = new URLSearchParams({ artist: song.artist, title: song.title, prewarm: '1' });
+  if (!song?.title) return Promise.resolve(null);
+  const params = new URLSearchParams({ title: song.title, prewarm: '1' });
+  if (song.artist) params.set('artist', song.artist);
   if (song.duration) params.set('duration', String(song.duration));
+  if (song.provider === 'youtube' && song.trackId) params.set('videoId', song.trackId);
 
   return fetch(`${getMusicApiBase()}/stream?${params.toString()}`, { signal: AbortSignal.timeout(20000) })
     .then((res) => (res.ok ? res.json() : null))
     .catch(() => null);
 }
 
+/** Clave de comparación para títulos/artistas (sin acentos ni puntuación). */
+function previewKey(text) {
+  return String(text || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+/**
+ * Elige el candidato de iTunes cuyo preview corresponde a la canción de YouTube.
+ * Exige título compatible y, si ambos artistas se conocen, que coincidan: un
+ * preview de otra versión/cover sería peor que no tener respaldo.
+ */
+function pickPreviewCandidate(song, candidates) {
+  const title = previewKey(song.title);
+  const artist = previewKey(song.artist);
+  let best = null;
+  let bestScore = 0;
+
+  for (const candidate of candidates) {
+    if (!candidate?.previewUrl) continue;
+    const candidateTitle = previewKey(candidate.title);
+    const candidateArtist = previewKey(candidate.artist);
+    if (!candidateTitle || !title) continue;
+
+    const titleScore = candidateTitle === title
+      ? 2
+      : (candidateTitle.includes(title) || title.includes(candidateTitle) ? 1 : 0);
+    if (!titleScore) continue;
+
+    if (artist && candidateArtist && !(candidateArtist.includes(artist) || artist.includes(candidateArtist))) {
+      continue;
+    }
+
+    const score = titleScore + (artist ? 1 : 0);
+    if (score > bestScore) {
+      best = candidate;
+      bestScore = score;
+    }
+  }
+
+  return best;
+}
+
+/**
+ * Añade un preview de 30 s a una canción de YouTube (solo si no tiene uno).
+ *
+ * Los resultados de innertube no traen preview y el reproductor lo necesita
+ * como respaldo cuando YouTube bloquea el stream completo (lo normal en el
+ * navegador). Se consulta iTunes (URLs estables, no caducan) y el preview se
+ * guarda JUNTO a la canción de YouTube (provider/trackId no cambian, así el
+ * stream sigue yendo al vídeo exacto). Best-effort: si no hay coincidencia
+ * razonable, devuelve la canción sin preview.
+ */
+export async function withPreviewFallback(song) {
+  if (!song?.title || song.previewUrl) return song;
+  const q = [song.artist, song.title].filter(Boolean).join(' ').trim();
+  if (!q) return song;
+
+  // Presupuesto corto: es un respaldo, no debe retrasar el guardado/envío.
+  let candidates = [];
+  try {
+    candidates = await searchMusicDirect(q, 8, { signal: AbortSignal.timeout(5000) });
+  } catch (err) {
+    console.warn('[music] preview fallback (iTunes direct) failed:', err?.message || err);
+  }
+
+  if (!candidates.length) {
+    try {
+      candidates = (await searchMusicProxy(q, 'itunes', 8, { signal: AbortSignal.timeout(5000) })).results || [];
+    } catch (err) {
+      console.warn('[music] preview fallback (iTunes proxy) failed:', err?.message || err);
+    }
+  }
+
+  const best = pickPreviewCandidate(song, candidates);
+  return best ? { ...song, previewUrl: best.previewUrl } : song;
+}
+
 /**
  * Busca canciones con fallback en cascada (solo metadatos; el stream lo
  * resuelve innertube aparte):
- *   1) iTunes directo → Deezer vía proxy → iTunes vía proxy (previews 30s).
- * Devuelve { results, provider, stream? }.
+ *   1) YouTube (innertube) vía backend → iTunes directo → Deezer vía proxy →
+ *      iTunes vía proxy.
+ * Devuelve { results, provider }.
  *
  * Si un proveedor respondió OK pero sin resultados, se devuelve la lista
  * vacía (para que la UI muestre "sin resultados"); solo se lanza error
@@ -152,6 +264,15 @@ export async function searchMusic(query, { limit = 10 } = {}) {
   if (!q) return { results: [], provider: null };
 
   let anySucceeded = false;
+
+  // 0) YouTube Music (innertube) — fuente primaria: catálogo musical, sin UGC.
+  try {
+    const results = await searchMusicYouTube(q, limit);
+    anySucceeded = true;
+    if (results.length) return { results, provider: 'youtube' };
+  } catch (err) {
+    console.warn('[music] YouTube search failed:', err?.message || err);
+  }
 
   // 1) iTunes directo (ruta rápida, sin servidor)
   try {

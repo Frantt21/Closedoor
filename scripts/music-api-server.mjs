@@ -28,7 +28,7 @@
  *        await srv.close();
  *
  * Rutas: /api/music/health, /api/music/resolve, /api/music/stream (con Range y
- * `prewarm=1`), /api/music-search. CORS `*` para poder llamarlo también desde el
+ * `prewarm=1`), /api/music/ytsearch (búsqueda innertube), /api/music-search. CORS `*` para poder llamarlo también desde el
  * navegador (en escritorio la web vive en https://app.foranly.space y el audio
  * sale de 127.0.0.1 — origen distinto pero "potentially trustworthy", ver
  * plugins/cspPlugin.js).

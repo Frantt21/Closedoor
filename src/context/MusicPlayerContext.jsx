@@ -145,7 +145,10 @@ export function MusicPlayerProvider({ children }) {
   }, []);
 
   const toggleTrack = useCallback((nextSong, owner = null) => {
-    if (!nextSong?.title || !nextSong?.previewUrl) return;
+    // Los resultados de YouTube pueden no tener preview: el stream completo se
+    // resuelve por artist+title (o videoId). El preview, si existe, es el
+    // respaldo cuando el stream falla.
+    if (!nextSong?.title) return;
     const nextKey = songKey(nextSong);
     const currentKey = track ? songKey(track.song) : '';
     if (nextKey && nextKey === currentKey) {

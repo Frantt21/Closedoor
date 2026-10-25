@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { FaMusic, FaPlay, FaPause, FaPencilAlt, FaTrash, FaSearch, FaSpinner } from 'react-icons/fa';
 import { useI18n } from '../../services/i18n/useI18n';
 import { useAuth } from '../../../hooks/useAuth';
-import { searchMusic, songKey } from '../../services/musicService';
+import { searchMusic, songKey, withPreviewFallback } from '../../services/musicService';
 import { useMusicPlayer } from '../../../hooks/useMusicPlayer';
 import { updateUserProfile } from '../../services/userService';
 import { toast } from 'react-toastify';
@@ -44,8 +44,10 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle, owner }) {
   const { t } = useI18n();
   const { user } = useAuth();
 
-  // Guard: solo tratar como canción si el shape es válido
-  const songObj = song && typeof song === 'object' && song?.title && song?.previewUrl ? song : null;
+  // Guard: solo tratar como canción si el shape es válido. `previewUrl` es
+  // opcional: las canciones de YouTube se reproducen con el stream completo y
+  // el preview solo existe como respaldo.
+  const songObj = song && typeof song === 'object' && song?.title ? song : null;
 
   // ── Estado del song (synced desde el perfil) ──
   const [selected, setSelected] = useState(songObj || null);
@@ -122,8 +124,11 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle, owner }) {
     if (!user?.id || saving) return;
     setSaving(true);
     try {
-      await updateUserProfile(user.id, { song: track });
-      setSelected(track);
+      // Las canciones de YouTube no traen preview: se pide uno a iTunes como
+      // respaldo del reproductor antes de guardar (best-effort).
+      const songToSave = await withPreviewFallback(track);
+      await updateUserProfile(user.id, { song: songToSave });
+      setSelected(songToSave);
       setEditing(false);
       setResults([]);
       setQuery('');

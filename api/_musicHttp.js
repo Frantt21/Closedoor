@@ -8,6 +8,10 @@
  *   2. `scripts/music-api-server.mjs`      → host propio (rewrite de Vercel)
  *   3. el rewrite de Vercel (`/api/music/(.*)` → host propio) en produccion
  *
+ * Rutas: /api/music/health, /api/music/resolve, /api/music/stream,
+ *         /api/music/ytsearch (búsqueda innertube) y /api/music/search
+ *         (alias de metadatos Deezer/iTunes).
+ *
  * Los handlers de `api/music/*.js` son Web-standard ((Request) => Response), así
  * que aquí se convierten a los `(req, res)` de Node http / Connect. El audio se
  * pipea (no se bufferiza) para que el <audio> pueda hacer streaming y seek.
@@ -25,6 +29,7 @@ import { Readable } from 'node:stream';
 import healthHandler from './music/_health.js';
 import resolveHandler from './music/_resolve.js';
 import streamHandler from './music/_stream.js';
+import ytSearchHandler from './music/_ytsearch.js';
 import { searchMusicServer, resolveTrackPreview } from './_music.js';
 
 /** Rutas con handler Web-standard ((req) => Response). */
@@ -32,6 +37,7 @@ const WEB_HANDLERS = new Map([
   ['/api/music/health', healthHandler],
   ['/api/music/resolve', resolveHandler],
   ['/api/music/stream', streamHandler],
+  ['/api/music/ytsearch', ytSearchHandler],
 ]);
 
 /** Alias de búsqueda de metadatos (server.js expone las dos). */

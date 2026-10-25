@@ -73,9 +73,89 @@ const SEARCH_DATA = {
 
 const SEARCH_HTML = `<!doctype html><html><body><script>var ytInitialData = ${JSON.stringify(SEARCH_DATA)};</script></body></html>`;
 
+// ── Fixture de búsqueda de YouTube Music ──
+// La página real embebe el initialData como string JS escapado dentro de
+// initialData.push({ path: '/search', data: '...' }). El fixture reproduce esa
+// forma con: canción ATV, duplicado de la misma, vídeo oficial OMV, subida UGC,
+// álbum y podcast. Los tres últimos NO deben aparecer en el resultado.
+const musicFlexColumn = (text, runs) => ({
+  musicResponsiveListItemFlexColumnRenderer: { text: { runs: runs || [{ text }] } },
+});
+
+function musicItem({ videoId, title, artist, type, artwork = 'https://yt3.googleusercontent.com/cover=w120-h120-l90-rj' }) {
+  const isSong = type === 'MUSIC_VIDEO_TYPE_ATV';
+  const typeLabel = isSong ? 'Song' : 'Video';
+  return {
+    musicResponsiveListItemRenderer: {
+      thumbnail: {
+        musicThumbnailRenderer: { thumbnail: { thumbnails: [{ url: artwork, width: 120, height: 120 }] } },
+      },
+      overlay: videoId ? {
+        musicItemThumbnailOverlayRenderer: {
+          content: {
+            musicPlayButtonRenderer: {
+              playNavigationEndpoint: {
+                watchEndpoint: {
+                  videoId,
+                  watchEndpointMusicSupportedConfigs: { watchEndpointMusicConfig: { musicVideoType: type } },
+                },
+              },
+            },
+          },
+        },
+      } : undefined,
+      flexColumns: [
+        musicFlexColumn(title),
+        musicFlexColumn(`${typeLabel} • ${artist}`, [
+          { text: typeLabel },
+          { text: ' • ' },
+          {
+            text: artist,
+            navigationEndpoint: {
+              browseEndpoint: {
+                browseEndpointContextSupportedConfigs: {
+                  browseEndpointContextMusicConfig: { pageType: 'MUSIC_PAGE_TYPE_ARTIST' },
+                },
+              },
+            },
+          },
+        ]),
+      ],
+    },
+  };
+}
+
+const MUSIC_SEARCH_DATA = {
+  contents: {
+    tabbedSearchResultsRenderer: {
+      tabs: [{
+        tabRenderer: {
+          content: {
+            sectionListRenderer: {
+              contents: [
+                { itemSectionRenderer: { contents: [musicItem({ videoId: 'ATV_SONG', title: 'Never Gonna Give You Up', artist: 'Rick Astley', type: 'MUSIC_VIDEO_TYPE_ATV' })] } },
+                { itemSectionRenderer: { contents: [musicItem({ videoId: 'ATV_SONG', title: 'Never Gonna Give You Up', artist: 'Rick Astley', type: 'MUSIC_VIDEO_TYPE_ATV' })] } },
+                { itemSectionRenderer: { contents: [musicItem({ videoId: 'OMV_VIDEO', title: 'Never Gonna Give You Up (Official Video)', artist: 'Rick Astley', type: 'MUSIC_VIDEO_TYPE_OMV', artwork: 'https://i.ytimg.com/vi/OMV_VIDEO/hqdefault.jpg?sqp=firma' })] } },
+                { itemSectionRenderer: { contents: [musicItem({ videoId: 'UGC_UPLOAD', title: 'Never Gonna Give You Up (cover casero)', artist: 'Uploader Random', type: 'MUSIC_VIDEO_TYPE_UGC' })] } },
+                { itemSectionRenderer: { contents: [musicItem({ title: 'Whenever You Need Somebody', artist: 'Rick Astley' })] } },
+                { itemSectionRenderer: { contents: [musicItem({ videoId: 'PODCAST_EP', title: 'Radio Show', artist: 'Podcast', type: 'MUSIC_VIDEO_TYPE_PODCAST_EPISODE' })] } },
+              ],
+            },
+          },
+        },
+      }],
+    },
+  },
+};
+
+const MUSIC_SEARCH_HTML = `<!doctype html><html><head><script>try {const initialData = [];initialData.push({path: '\\/search', params: JSON.parse('\\x7b\\x7d'), data: '${JSON.stringify(MUSIC_SEARCH_DATA).replace(/'/g, "\\x27")}'});ytcfg.set({'YTMUSIC_INITIAL_DATA': initialData});} catch (e) {}</script></head><body></body></html>`;
+
 globalThis.fetch = async (url, options = {}) => {
   const target = String(url);
   calls.push({ target, headers: options.headers, body: options.body });
+  if (target.includes('music.youtube.com/search')) {
+    return { ok: true, status: 200, text: async () => MUSIC_SEARCH_HTML };
+  }
   if (target.includes('/results?')) {
     return { ok: true, status: 200, text: async () => SEARCH_HTML };
   }
@@ -427,7 +507,60 @@ check('health informa provider y clientes', info.provider === 'innertube' && inf
   check('prewarm: la resolución posterior es caché', cachedResolve.cached === true);
 }
 
-// ── 18. Marcador de build en health ──
+// ── 18. Búsqueda primaria: /api/music/ytsearch (YouTube Music) ──
+// La búsqueda de canciones va a YouTube Music antes que a iTunes/Deezer. Debe
+// devolver solo catálogo (ATV/OMV), descartando subidas de YouTube (UGC),
+// podcasts y colecciones, con título/artista limpios y SIN preview.
+{
+  clearInnertubeCaches();
+  // Se reemplaza el fetch del bloque anterior (prewarm): aquí solo la página de
+  // YouTube Music es válida.
+  globalThis.fetch = async (url, options = {}) => {
+    const target = String(url);
+    calls.push({ target, headers: options.headers, body: options.body });
+    if (target.includes('music.youtube.com/search')) {
+      return { ok: true, status: 200, text: async () => MUSIC_SEARCH_HTML };
+    }
+    throw new Error(`fetch inesperado en el test: ${target}`);
+  };
+
+  const { default: ytSearchHandler } = await import('../api/music/_ytsearch.js');
+
+  const res = await ytSearchHandler(
+    new Request('https://app.foranly.space/api/music/ytsearch?q=rick%20astley%20never%20gonna&limit=10')
+  );
+  const body = await res.json();
+  check('ytsearch: 200 y provider youtube', res.status === 200 && body.provider === 'youtube', `status=${res.status}`);
+  check(
+    'ytsearch: solo catálogo de YouTube Music (ATV/OMV, sin UGC ni podcast)',
+    body.results?.length === 2 && body.results.every((r) => !['UGC_UPLOAD', 'PODCAST_EP'].includes(r.trackId)),
+    `${body.results?.length} resultados: ${(body.results || []).map((r) => r.trackId).join(', ')}`
+  );
+
+  const song = body.results?.find((r) => r.trackId === 'ATV_SONG');
+  check(
+    'ytsearch: canción con título y artista limpios',
+    song?.title === 'Never Gonna Give You Up' && song?.artist === 'Rick Astley',
+    `${song?.title} — ${song?.artist}`
+  );
+  check(
+    'ytsearch: arte de YouTube Music a 400x400 y sin preview',
+    song?.artwork === 'https://yt3.googleusercontent.com/cover=w400-h400-l90-rj' && song?.previewUrl === '',
+    song?.artwork
+  );
+
+  const officialVideo = body.results?.find((r) => r.trackId === 'OMV_VIDEO');
+  check(
+    'ytsearch: vídeo oficial entra y su arte se normaliza',
+    officialVideo?.artwork === 'https://i.ytimg.com/vi/OMV_VIDEO/mqdefault.jpg',
+    officialVideo?.artwork
+  );
+
+  const missingQ = await ytSearchHandler(new Request('https://app.foranly.space/api/music/ytsearch'));
+  check('ytsearch: sin ?q responde 400', missingQ.status === 400, `status=${missingQ.status}`);
+}
+
+// ── 19. Marcador de build en health ──
 // Un solo request debe bastar para saber qué código corre en produccion.
 {
   const { default: healthHandler } = await import('../api/music/_health.js');
@@ -437,7 +570,7 @@ check('health informa provider y clientes', info.provider === 'innertube' && inf
   check('health: sigue informando el resolver', body.ok === true && body.stream === 'innertube' && Array.isArray(body.clients));
 }
 
-// ── 19. (eliminada) Sondas de despliegue ──
+// ── 20. (eliminada) Sondas de despliegue ──
 // api/diag-plain.js, api/diag-flat.js y api/music/diag-nested.js existían sólo
 // para aislar por qué api/music/* colgaba en produccion. Ya está diagnosticado
 // (las funciones serverless de Vercel tienen prioridad sobre los rewrites, y el

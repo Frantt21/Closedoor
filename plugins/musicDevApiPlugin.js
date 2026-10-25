@@ -16,6 +16,7 @@
  *   GET  /api/music/health          → api/music/_health.js
  *   GET  /api/music/resolve?…       → api/music/_resolve.js  (pre-warm)
  *   GET  /api/music/stream?…        → api/music/_stream.js   (audio, con Range)
+ *   GET  /api/music/ytsearch?q=…    → api/music/_ytsearch.js (innertube, búsqueda)
  *   GET  /api/music-search?q=…      → api/_music.js (Deezer / iTunes server-side)
  */
 

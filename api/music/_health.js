@@ -2,8 +2,8 @@
  * Vercel serverless function — estado del stream de música.
  *
  * Antes informaba el estado del music server externo (yt-dlp/ffmpeg/túnel).
- * Ahora el stream sale de innertube dentro de esta misma app, así que el health
- * reporta el cliente en uso y el estado de las cachés.
+ * Ahora el stream Y la búsqueda salen de innertube dentro de esta misma app, así
+ * que el health reporta el cliente en uso y el estado de las cachés.
  *
  * Uso: GET /api/music/health
  */
@@ -21,7 +21,7 @@ import { getInnertubeInfo } from '../_innertube.js';
 // está vivo en producción. Si /api/music/health no responde (o no trae `build`),
 // lo desplegado no es esta versión: en el último incidente el dominio servía un
 // cliente nuevo con funciones antiguas y costó distinguirlo.
-const BUILD = 'music-3';
+const BUILD = 'music-5';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -38,6 +38,7 @@ export default async function handler(req) {
       ok: true,
       build: BUILD,
       stream: 'innertube',
+      search: 'innertube',
       ...getInnertubeInfo(),
     }),
     {

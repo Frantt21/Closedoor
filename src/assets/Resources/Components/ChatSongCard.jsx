@@ -29,8 +29,11 @@ export default function ChatSongCard({ song }) {
   const isActive = songKey(track?.song) === songKey(song);
   const isPlaying = isActive && playerPlaying;
   const loading = isActive && loadingStream;
-  // toggleTrack exige previewUrl como último recurso de reproducción.
-  const canPlay = !!song.previewUrl && typeof toggleTrack === 'function' && (!isActive || sourceReady);
+  // Los resultados de YouTube pueden no tener preview: el player resuelve el
+  // stream por videoId. Con preview (iTunes) o con trackId se puede reproducir.
+  const canPlay = !!(song.previewUrl || song.trackId)
+    && typeof toggleTrack === 'function'
+    && (!isActive || sourceReady);
 
   const togglePlay = () => {
     if (!canPlay) return;

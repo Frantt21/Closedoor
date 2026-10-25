@@ -91,6 +91,10 @@ const CLIENTS = [
 
 const INNERTUBE_BASE = 'https://www.youtube.com/youtubei/v1';
 const SEARCH_RESULTS_URL = 'https://www.youtube.com/results';
+// Búsqueda de CATÁLOGO (YouTube Music). Se usa para el buscador de canciones:
+// descarta las subidas de YouTube (UGC) y devuelve solo el catálogo musical.
+// También es HTML (no youtubei/v1/search), así que no envenena el player.
+const MUSIC_SEARCH_URL = 'https://music.youtube.com/search';
 // UA de navegador para la página de resultados (el UA móvil de ANDROID_VR
 // devuelve un HTML recortado donde no siempre está ytInitialData).
 const BROWSER_UA =
@@ -136,6 +140,7 @@ const CACHE_MAX_ENTRIES = 300;
 // ── Cachés en memoria del proceso serverless ──
 const streamCache = new Map(); // key → { value, at }
 const searchCache = new Map(); // key → { value, at }
+const musicSearchCache = new Map(); // key → { value, at }
 
 function cacheGet(cache, key, ttl) {
   const hit = cache.get(key);
@@ -508,6 +513,150 @@ export async function searchTracks(query, { limit = 10, fresh = false, timeoutMs
   return results;
 }
 
+// ── Búsqueda en el catálogo de YouTube Music ──
+// La página de YouTube Music NO trae ytInitialData: embebe los datos como
+// strings JS escapados dentro de initialData.push({ path: '/search', data: '...' }).
+// Se decodifican y se parsean sin ejecutar JS.
+
+/** Decodifica escapes JS (\x7b, \u2022, …) de un string embebido en el HTML. */
+function decodeJsString(value) {
+  return value.replace(/\\(x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|.)/g, (match, escape) => {
+    if (escape[0] === 'x' || escape[0] === 'u') return String.fromCharCode(parseInt(escape.slice(1), 16));
+    if (escape === 'n') return '\n';
+    if (escape === 'r') return '\r';
+    if (escape === 't') return '\t';
+    return escape;
+  });
+}
+
+/** Extrae el initialData de la búsqueda de YouTube Music del HTML. */
+function musicSearchDataFromHtml(html) {
+  const re = /initialData\.push\(\{path:\s*'([^']+)',[\s\S]*?data:\s*'((?:[^'\\]|\\.)*)'\}\)/g;
+  for (const match of html.matchAll(re)) {
+    if (!match[1].includes('search')) continue;
+    try {
+      return JSON.parse(decodeJsString(match[2]));
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/** Recorre el árbol del initialData juntando los items de la lista. */
+function collectMusicItems(node, out) {
+  if (!node || typeof node !== 'object') return out;
+  if (Array.isArray(node)) {
+    for (const child of node) collectMusicItems(child, out);
+    return out;
+  }
+  if (node.musicResponsiveListItemRenderer) out.push(node.musicResponsiveListItemRenderer);
+  for (const value of Object.values(node)) {
+    if (value && typeof value === 'object') collectMusicItems(value, out);
+  }
+  return out;
+}
+
+const MUSIC_ARTIST_PAGE = 'MUSIC_PAGE_TYPE_ARTIST';
+// ATV = canción del catálogo (art track) · OMV = vídeo musical oficial.
+// Fuera: UGC (subidas de YouTube), podcasts, álbumes, playlists, artistas y
+// perfiles. Eso es lo que separa YouTube Music de un search normal de YouTube.
+const MUSIC_SONG_TYPES = new Set(['MUSIC_VIDEO_TYPE_ATV', 'MUSIC_VIDEO_TYPE_OMV']);
+
+/** Convierte un musicResponsiveListItemRenderer en un track de canción. */
+function musicItemToTrack(renderer) {
+  const raw = JSON.stringify(renderer);
+  const types = [...raw.matchAll(/"musicVideoType":"([^"]+)"/g)].map((m) => m[1]);
+  if (!types.some((type) => MUSIC_SONG_TYPES.has(type))) return null;
+
+  const columns = (renderer.flexColumns || [])
+    .map((column) => column.musicResponsiveListItemFlexColumnRenderer?.text)
+    .filter(Boolean);
+
+  const title = textOf(columns[0]).trim();
+  if (!title) return null;
+
+  const subtitleRuns = columns[1]?.runs || [];
+  // El artista es el run con página de artista; si no hubiera, el segundo
+  // bloque del subtítulo ("Song • Artista • …").
+  const artist = subtitleRuns
+    .filter((run) => run?.navigationEndpoint?.browseEndpoint?.browseEndpointContextSupportedConfigs?.browseEndpointContextMusicConfig?.pageType === MUSIC_ARTIST_PAGE)
+    .map((run) => run.text)
+    .filter(Boolean)
+    .join(', ')
+    || textOf(columns[1]).split('•')[1]?.trim()
+    || '';
+
+  const videoId =
+    renderer.overlay?.musicItemThumbnailOverlayRenderer?.content?.musicPlayButtonRenderer?.playNavigationEndpoint?.watchEndpoint?.videoId
+    || renderer.playlistItemData?.videoId
+    || columns[0]?.runs?.[0]?.navigationEndpoint?.watchEndpoint?.videoId;
+  if (!videoId) return null;
+
+  const thumbnails = renderer.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails || [];
+  const artwork = thumbnails.at(-1)?.url || '';
+
+  const durationText = subtitleRuns
+    .map((run) => run.text)
+    .find((text) => /^\d{1,3}(?::\d{2}){1,2}$/.test(text || ''));
+  const durationSec = durationText
+    ? durationText.split(':').map(Number).reduce((acc, part) => acc * 60 + part, 0)
+    : 0;
+
+  return { videoId, title, artist, artwork, durationSec };
+}
+
+/**
+ * Busca canciones SOLO en el catálogo de YouTube Music.
+ *
+ * Devuelve candidatos normalizados { videoId, title, artist, artwork, durationSec }.
+ * Filtra las subidas de YouTube (UGC), podcasts y colecciones: si no hay
+ * canciones del catálogo, el llamador debe caer a iTunes/Deezer.
+ *
+ * ⚠️ Igual que searchTracks, usa HTML y NO youtubei/v1/search: el search de
+ * innertube deja marcada la sesión y el player siguiente responde
+ * LOGIN_REQUIRED (ver cabecera del módulo).
+ */
+export async function searchYouTubeMusic(query, { limit = 10, fresh = false, timeoutMs = REQUEST_TIMEOUT_MS } = {}) {
+  const q = String(query || '').trim();
+  if (!q) return [];
+
+  const cacheKey = `${q.toLowerCase()}|${limit}`;
+  if (!fresh) {
+    const cached = cacheGet(musicSearchCache, cacheKey, SEARCH_CACHE_TTL_MS);
+    if (cached) return cached;
+  }
+
+  const url = `${MUSIC_SEARCH_URL}?q=${encodeURIComponent(q)}&hl=en&gl=US`;
+  const res = await serialize(() =>
+    fetch(url, {
+      headers: {
+        'User-Agent': BROWSER_UA,
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      signal: AbortSignal.timeout(timeoutMs),
+    })
+  );
+  if (!res.ok) throw new Error(`music search HTTP ${res.status}`);
+
+  const html = await res.text();
+  const data = musicSearchDataFromHtml(html);
+  if (!data) throw new Error('no se pudo leer la búsqueda de YouTube Music');
+
+  const tracks = [];
+  const seen = new Set();
+  for (const renderer of collectMusicItems(data, [])) {
+    const track = musicItemToTrack(renderer);
+    if (!track || seen.has(track.videoId)) continue;
+    seen.add(track.videoId);
+    tracks.push(track);
+    if (tracks.length >= limit) break;
+  }
+
+  if (tracks.length > 0) cacheSet(musicSearchCache, cacheKey, tracks);
+  return tracks;
+}
+
 /**
  * Resuelve un videoId a un stream de audio reproducible, probando los clientes
  * de la cadena hasta que uno responda con formatos utilizables.
@@ -770,6 +919,7 @@ export function getInnertubeInfo() {
     provider: 'innertube',
     clients: CLIENTS.map((c) => `${c.name} ${c.client.clientVersion}`),
     cachedSearches: searchCache.size,
+    cachedMusicSearches: musicSearchCache.size,
     cachedStreams: streamCache.size,
   };
 }
@@ -778,4 +928,5 @@ export function getInnertubeInfo() {
 export function clearInnertubeCaches() {
   streamCache.clear();
   searchCache.clear();
+  musicSearchCache.clear();
 }

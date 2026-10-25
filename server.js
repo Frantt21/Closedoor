@@ -21,8 +21,9 @@ import http from 'http';
 import { Readable } from 'stream';
 import { buildSitemapUrls, wrapSitemapXml } from './api/_sitemap.js';
 import { issueLiveKitToken } from './api/_livekit.js';
-import { searchMusicServer, resolveTrackPreview } from './api/_music.js';
+import { searchMusicServer, resolveTrackPreview, normalizeYouTubeTracks } from './api/_music.js';
 import {
+  searchYouTubeMusic,
   resolveTrackAudio,
   getInnertubeInfo,
   upstreamRangeHeader,
@@ -501,6 +502,29 @@ app.use('/api/music', (req, res, next) => {
 
 app.get('/api/music/health', async (req, res) => {
   res.status(200).json({ ok: true, stream: 'innertube', ...getInnertubeInfo() });
+});
+
+// Búsqueda de canciones con innertube acotada a YouTube Music — fuente primaria
+// del buscador. Igual que api/music/_ytsearch.js: descarta UGC de YouTube y
+// normaliza los títulos al shape de canción.
+app.get('/api/music/ytsearch', async (req, res) => {
+  const q = (req.query?.q || '').trim();
+  if (!q) {
+    res.status(400).json({ success: false, error: 'Missing ?q parameter' });
+    return;
+  }
+  const limit = Math.min(Math.max(parseInt(req.query?.limit, 10) || 10, 1), 20);
+  try {
+    const candidates = await searchYouTubeMusic(q, { limit });
+    res.status(200).json({
+      success: true,
+      provider: 'youtube',
+      results: normalizeYouTubeTracks(candidates),
+    });
+  } catch (err) {
+    console.warn('YouTube search error:', err.message);
+    res.status(502).json({ success: false, error: err.message });
+  }
 });
 
 // Alias de búsqueda de metadatos (misma respuesta que /api/music-search).

@@ -35,6 +35,7 @@ import Tooltip from '../Resources/Components/Tooltip';
 import GifPicker from '../Resources/Components/GifPicker';
 import SongPicker from '../Resources/Components/SongPicker';
 import ChatSongCard from '../Resources/Components/ChatSongCard';
+import { withPreviewFallback } from '../services/musicService';
 import { getTimeAgo, IMG_RE, detectMediaFromContent, getImageStyle, sanitizeUrl } from '../services/helpers';
 import { getClipboardImageFile } from '../services/clipboard';
 import NicknameModal from '../Resources/Components/NicknameModal';
@@ -2518,7 +2519,10 @@ export default function Chat() {
   const handleSongSelect = async (song) => {
     setShowSongPicker(false);
     if (!song?.title) return;
-    await sendContent('', { sharedSong: song });
+    // Los resultados de YouTube no traen preview: se pide uno a iTunes como
+    // respaldo del reproductor (best-effort, no bloquea el envío si falla).
+    const songToSend = await withPreviewFallback(song);
+    await sendContent('', { sharedSong: songToSend });
   };
 
   // ── Defensive dedup: some async races can introduce duplicate IDs ──

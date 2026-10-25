@@ -294,8 +294,10 @@ function normalizeSharedSong(song) {
   };
 
   const title = text(song.title, 200);
+  // El artista puede faltar (canales de YouTube sin nombre útil): el stream de
+  // esas canciones se resuelve por videoId, así que la tarjeta sigue siendo válida.
   const artist = text(song.artist, 200);
-  if (!title || !artist) return null; // sin esto no hay tarjeta ni stream posible
+  if (!title) return null;
 
   const duration = Number(song.duration);
   return {

@@ -1,7 +1,9 @@
 /**
- * Lógica compartida de búsqueda de música (Deezer / iTunes) usada por:
- *   - api/music-search.js   → función serverless de Vercel
- *   - server.js             → ruta local /api/music-search (dev/self-hosted)
+ * Lógica compartida de búsqueda de música (Deezer / iTunes) y normalización de
+ * los resultados de YouTube Music, usada por:
+ *   - api/music-search.js   → función serverless de Vercel (Deezer / iTunes)
+ *   - api/music/_ytsearch.js → búsqueda primaria (innertube / YouTube Music)
+ *   - server.js             → rutas locales /api/music-search y /api/music/ytsearch
  *
  * Todas las llamadas son server-side (sin CORS) y devuelven un arreglo de
  * tracks NORMALIZADOS con el mismo shape que usa el frontend (musicService):
@@ -9,6 +11,92 @@
  */
 
 const UA = 'Mozilla/5.0 (compatible; FastChangeBot/1.0)';
+
+// ── YouTube Music (innertube) ──
+// El search de innertube devuelve títulos de VÍDEO ("Artista - Tema (Official
+// Video)") y el canal, no metadatos de canción. Aquí se limpian para que el
+// shape sea el mismo que iTunes/Deezer: el título se queda con el tema y el
+// canal con el artista. Así la búsqueda puede ser la de YouTube (mucho más
+// precisa) sin ensuciar las cards ni el matcheo del stream.
+
+/** Quita acentos/puntuación para comparar "Artista - Topic" vs prefijo. */
+function compareKey(text) {
+  return String(text || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/vevo$/i, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+/** Sufijos de vídeo que no forman parte del nombre de la canción. */
+const VIDEO_NOISE_RE = /[([][^)\]]*\b(?:official|oficial|video|videoclip|audio|lyric|lyrics|letra|visualizer|hd|hq|4k|remaster(?:ed)?|music video)\b[^)\]]*[)\]]/gi;
+
+/**
+ * Miniatura para el frontend.
+ * - YouTube Music devuelve arte de álbum en yt3.googleusercontent.com; se sube
+ *   a 400×400 (la URL viene a 60/120 px).
+ * - Vídeos: se usa mqdefault por videoId (16:9 sin bandas y sin la firma
+ *   `sqp`/`rs` que caduca).
+ */
+function normalizeYouTubeArtwork(url, videoId) {
+  const value = String(url || '').trim();
+  if (value.includes('googleusercontent.com')) {
+    return value.replace(/=w\d+-h\d+.*$/i, '=w400-h400-l90-rj');
+  }
+  if (!videoId) return value;
+  return `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+}
+
+/**
+ * Convierte un candidato de innertube en el track normalizado del frontend.
+ * Acepta tanto el search de YouTube Music ({ artist, artwork }) como el de
+ * YouTube ({ channel }). YouTube no ofrece preview de 30 s → `previewUrl`
+ * vacío (el frontend pide uno a iTunes solo como respaldo del reproductor).
+ */
+function normalizeYouTubeTrack(candidate) {
+  if (!candidate?.videoId) return null;
+
+  const channel = String(candidate.artist || candidate.channel || '')
+    .replace(/\s*-\s*Topic$/i, '')
+    .replace(/\s*VEVO$/i, '')
+    .trim();
+  let title = String(candidate.title || '').trim();
+  let artist = channel;
+
+  // "Artista - Tema": el primer bloque suele repetir el canal.
+  const parts = title.split(/\s+[-–—]\s+/);
+  if (parts.length >= 2) {
+    const head = parts[0].trim();
+    const headKey = compareKey(head);
+    const artistKey = compareKey(artist);
+    if (!artistKey || headKey === artistKey || (headKey && artistKey.startsWith(headKey))) {
+      if (!artist) artist = head;
+      title = parts.slice(1).join(' - ');
+    }
+  }
+
+  title = title.replace(VIDEO_NOISE_RE, ' ').replace(/\s{2,}/g, ' ').trim();
+  if (!title) return null;
+
+  return {
+    provider: 'youtube',
+    trackId: candidate.videoId,
+    title,
+    artist,
+    album: '',
+    artwork: normalizeYouTubeArtwork(candidate.artwork, candidate.videoId),
+    previewUrl: '',
+    externalUrl: `https://www.youtube.com/watch?v=${candidate.videoId}`,
+    duration: Math.round(Number(candidate.durationSec) || 0),
+  };
+}
+
+/** Normaliza la lista de candidatos del search de innertube. */
+export function normalizeYouTubeTracks(candidates = []) {
+  return candidates.map(normalizeYouTubeTrack).filter(Boolean);
+}
 
 /** Escala la URL de arte de iTunes (ej. 100x100bb.jpg → 600x600bb.jpg). */
 function upscaleItunesArtwork(url, size = 600) {
