@@ -593,8 +593,21 @@ function musicItemToTrack(renderer) {
     || columns[0]?.runs?.[0]?.navigationEndpoint?.watchEndpoint?.videoId;
   if (!videoId) return null;
 
-  const thumbnails = renderer.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails || [];
-  const artwork = thumbnails.at(-1)?.url || '';
+  const getThumbs = (node) => {
+    if (!node || typeof node !== 'object') return [];
+    if (Array.isArray(node.thumbnails)) return node.thumbnails;
+    if (node.musicThumbnailRenderer?.thumbnail) {
+      const t = node.musicThumbnailRenderer.thumbnail;
+      if (Array.isArray(t.thumbnails)) return t.thumbnails;
+      if (Array.isArray(t)) return t;
+    }
+    if (node.thumbnail) return getThumbs(node.thumbnail);
+    if (node.musicThumbnailRenderer) return getThumbs(node.musicThumbnailRenderer);
+    return [];
+  };
+
+  const thumbnails = getThumbs(renderer.thumbnail) || getThumbs(renderer);
+  const artwork = (thumbnails[thumbnails.length - 1]?.url) || (thumbnails[0]?.url) || '';
 
   const durationText = subtitleRuns
     .map((run) => run.text)
