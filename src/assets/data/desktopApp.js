@@ -112,3 +112,26 @@ export const DESKTOP_FEATURES = [
   'desktop.feature_connection',
   'desktop.feature_same',
 ];
+
+/**
+ * Sistema operativo del visitante ('windows' | 'macos' | 'linux' | null).
+ * Se usa en /download para enseñar solo el instalador que le corresponde.
+ */
+export function detectDesktopOS() {
+  if (typeof navigator === 'undefined') return null;
+  const ua = navigator.userAgent || '';
+  const platform = (navigator.userAgentData?.platform || navigator.platform || '').toLowerCase();
+
+  if (platform.includes('win') || /windows nt/i.test(ua)) return 'windows';
+
+  if (platform.includes('mac') || /macintosh|mac os x/i.test(ua)) {
+    if (/iphone|ipad|ipod/i.test(ua)) return null;
+    return 'macos';
+  }
+
+  if (/android/i.test(ua)) return null;
+
+  if (platform.includes('linux') || /linux|x11/i.test(ua)) return 'linux';
+
+  return null;
+}
