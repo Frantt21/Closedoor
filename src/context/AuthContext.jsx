@@ -634,9 +634,37 @@ export function AuthProvider({ children }) {
     return { success: true, code: 'ok' };
   };
 
+  // Estado que guarda mientras se cierra la sesión. Se mantiene el usuario
+  // y el perfil hasta que se confirma la desconexión para no perder
+  // pantallas intermedias ni sincronizaciones en curso.
+  const currentSession = user?.id ? { user: user.id, profile: profile?.id, username: profile?.username, email: user.email } : null;
+
   const logout = async () => {
     try {
       setError(null);
+
+      const currentUserId = user?.id;
+      const currentUsername = profile?.username;
+
+      // ── Guardar estado antes de descargar la sesión ──
+      try {
+        await saveSessionStateOnLogout(currentUserId, currentUsername, user?.email);
+      } catch (saveError) {
+        console.warn('[AuthContext] No se pudo guardar el estado de cierre:', saveError);
+      }
+
+      // ── Solo destruir sesión si el usuario actual era el identificador de sesión ──
+      // Si hay varias sesiones abiertas, esta salida solo cierra la propia sesión
+      // y no invalida las demás.
+      if (currentSession) {
+        const shouldClose = await confirmSessionOwnership(currentSession);
+        if (!shouldClose) {
+          setUser(null);
+          setProfile(null);
+          return { success: false, error: 'solo_session_local' };
+        }
+      }
+
       const { error } = await supabase.auth.signOut();
 
       if (error) {
@@ -644,8 +672,13 @@ export function AuthProvider({ children }) {
         return { success: false, error: error.message };
       }
 
-      const currentUserId = user?.id;
-      const currentUsername = profile?.username;
+      if (currentSession) {
+        try {
+          await clearSessionState(clientSession);
+        } catch (clearError) {
+          console.warn('[AuthContext] No se pudo borrar el estado de cierre:', clearError);
+        }
+      }
 
       setUser(null);
       setProfile(null);
