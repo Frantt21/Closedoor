@@ -1,33 +1,33 @@
 import React, {
-  createContext,
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
+createContext,
+useState,
+useEffect,
+useCallback,
+useRef,
 } from "react";
 import { supabase } from "../assets/services/supabaseclient";
 import {
-  checkUsernameExists,
-  checkEmailExists,
-  createUserProfile,
-  ensureUserProfile,
-  loginEmailByUsername,
-  getUserProfile,
-  getCachedProfile,
-  setCachedProfile,
-  clearCachedProfile,
-  clearCachedProfileByUsername,
-  changeUsername as requestUsernameChange,
-  verifyCurrentPassword,
-  validateProfileFields,
+checkUsernameExists,
+checkEmailExists,
+createUserProfile,
+ensureUserProfile,
+loginEmailByUsername,
+getUserProfile,
+getCachedProfile,
+setCachedProfile,
+clearCachedProfile,
+clearCachedProfileByUsername,
+changeUsername as requestUsernameChange,
+verifyCurrentPassword,
+validateProfileFields,
 } from "../assets/services/userService";
 import { clearAllAppCaches } from "../assets/services/postService";
 import { clearDecryptedCache } from "../assets/services/alphabetEncryption";
 import { clearBlockedListsCache } from "../assets/services/blockService";
 import { clearCachedFollowCounts } from "../assets/services/followService";
 import {
-  initPresence,
-  disposePresence,
+initPresence,
+disposePresence,
 } from "../assets/services/presenceService";
 import { getItem, waitForKeyReady } from "../assets/services/secureStorage";
 import { PROFILE_PUBLIC_COLUMNS } from "../assets/services/userService";
@@ -36,68 +36,200 @@ import { validateEmail } from "../assets/services/userService";
 export const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
+const [user, setUser] = useState(null);
+const [profile, setProfile] = useState(null);
+const [profileLoading, setProfileLoading] = useState(true);
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState(null);
+
+// ── Anti-click / anticlick guard: confirmación del cierre de sesión ──────┐
+// │                                                                          │
+// │ El logout ahora es anticlickeable: el usuario tiene 60 s desde el último   │
+// │ click para cancelar el cierre (y, en particular, para confirmar con otro   │
+// │ click o pulsación en el botón) antes de que se ejecute el logout.          │
+// │ Cuando el estado vuelve a los Santos, se abre el vuelo de confirmación    │
+// │ de nuevo.                                                                  │
+// └──────────────────────────────────────────────────────────────────────────┘
 const MAX_CLOSE_CONFIRM_MS = 60000;
-  let closeConfirmTimer = null;
+const closeConfirmTimerRef = useRef(null);
+const [isLogoutConfirmed, setIsLogoutConfirmed] = useState(false);
 
-  const clearCloseConfirmTimer = () => {
-    if (closeConfirmTimer !== null) {
-      clearTimeout(closeConfirmTimer);
-      closeConfirmTimer = null;
-    }
-  };
+const clearCloseConfirmTimer = useCallback(() => {
+if (closeConfirmTimerRef.current !== null) {
+clearTimeout(closeConfirmTimerRef.current);
+closeConfirmTimerRef.current = null;
+}
+}, []);
 
-  const scheduleCloseConfirm = () => {
-    clearCloseConfirmTimer();
-    if (isLogoutConfirmed) return;
-    closeConfirmTimer = setTimeout(() => {
-      setIsLogoutConfirmed(true);
-    }, MAX_CLOSE_CONFIRM_MS);
-  };
+const scheduleCloseConfirm = useCallback(() => {
+clearCloseConfirmTimer();
+if (isLogoutConfirmed) return;
+closeConfirmTimerRef.current = setTimeout(() => {
+setIsLogoutConfirmed(true);
+}, MAX_CLOSE_CONFIRM_MS);
+}, [isLogoutConfirmed, clearCloseConfirmTimer]);
 
-  const cancelCloseConfirm = () => {
-    clearCloseConfirmTimer();
-    setIsLogoutConfirmed(false);
-  };
-  const [profile, setProfile] = useState(null);
-  const [profileLoading, setProfileLoading] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+const cancelCloseConfirm = useCallback(() => {
+clearCloseConfirmTimer();
+setIsLogoutConfirmed(false);
+}, [clearCloseConfirmTimer]);
 
-  const myStatusRef = useRef("online");
-  const sessionTokenRef = useRef(null);
-  const heartbeatRef = useRef(null);
+useEffect(() => {
+const maybeConfirmClose = () => {
+if (isLogoutConfirmed) return;
+scheduleCloseConfirm();
+};
 
-  // ── Persistir mi estado a la DB ──
-  const persistMyStatus = useCallback(async (status, userId) => {
-    if (!userId) return;
-    try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          user_status: status,
-          user_status_updated_at: new Date().toISOString(),
-        })
-        .eq("id", userId);
-      if (error) console.warn("[AuthStatus] DB update error:", error);
-    } catch (err) {
-      console.warn("[AuthStatus] Error updating status:", err);
-    }
-  }, []);
+const onFocus = () => maybeConfirmClose();
+const onMouseOver = () => maybeConfirmClose();
+const onMouseOut = () => cancelCloseConfirm();
+const onTouchStart = () => maybeConfirmClose();
 
-  // ── Inicializar estado del usuario (global, nunca se desmonta) ──
+window.addEventListener("focus", onFocus, true);
+window.addEventListener("mouseover", onMouseOver, true);
+window.addEventListener("mouseout", onMouseOut, true);
+window.addEventListener("touchstart", onTouchStart, true);
+
+return () => {
+window.removeEventListener("focus", onFocus, true);
+window.removeEventListener("mouseover", onMouseOver, true);
+window.removeEventListener("mouseout", onMouseOut, true);
+window.removeEventListener("touchstart", onTouchStart, true);
+};
+}, [scheduleCloseConfirm, cancelCloseConfirm]);
+
+// ── Persistir mi estado a la DB ──
+const persistMyStatus = useCallback(async (status, userId) => {
+if (!userId) return;
+try {
+const { error } = await supabase
+.from("profiles")
+.update({
+user_status: status,
+user_status_updated_at: new Date().toISOString(),
+})
+.eq("id", userId);
+if (error) console.warn("[AuthStatus] DB update error:", error);
+} catch (err) {
+console.warn("[AuthStatus] Error updating status:", err);
+}
+}, []);
+
+// ── Status tracker: init, heartbeat, beforeunload ──
+const myStatusRef = useRef("online");
+const sessionTokenRef = useRef(null);
+const heartbeatRef = useRef(null);
+
+const startMyStatusTracker = useCallback(
+(userId) => {
+if (!userId) return;
+
+(async () => {
+// Restaurar estado guardado
+let initialStatus = "online";
+try {
+const saved = getItem("fc_user_status");
+if (saved === "dnd" || saved === "idle") {
+initialStatus = saved;
+}
+} catch {}
+
+myStatusRef.current = initialStatus;
+
+// Sesión token para beforeunload fetch
+try {
+const { data } = await supabase.auth.getSession();
+sessionTokenRef.current = data?.session?.access_token || null;
+} catch {}
+
+// Heartbeat cada 30s — lee de secureStorage para sincronizar con
+// cambios de estado hechos desde useUserStatus.setMyStatus
+if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+heartbeatRef.current = setInterval(() => {
+let s = myStatusRef.current;
+try {
+const saved = getItem("fc_user_status");
+if (saved === "dnd" || saved === "idle" || saved === "online") {
+s = saved;
+myStatusRef.current = s;
+}
+} catch {}
+if (s === "online" || s === "idle" || s === "dnd") {
+persistMyStatus(s, userId);
+}
+}, 30000);
+
+// beforeunload/pagehide: poner disconnected
+const SB_URL = import.meta.env.VITE_SUPABASE_URL || "";
+const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
+const restOrigin = (() => {
+try {
+return new URL(SB_URL).origin;
+} catch {
+return "";
+}
+})();
+
+const handleDisconnect = () => {
+if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+const token = sessionTokenRef.current;
+if (SB_URL && SB_KEY && token) {
+try {
+fetch(`${restOrigin}/rest/v1/profiles?id=eq.${userId}`, {
+method: "PATCH",
+headers: {
+"Content-Type": "application/json",
+Authorization: `Bearer ${token}`,
+apikey: SB_KEY,
+},
+body: JSON.stringify({
+user_status: "disconnected",
+user_status_updated_at: new Date().toISOString(),
+}),
+keepalive: true,
+}).catch(() => {});
+} catch {}
+}
+persistMyStatus("disconnected", userId).catch(() => {});
+};
+window.addEventListener("beforeunload", handleDisconnect);
+window.addEventListener("pagehide", handleDisconnect);
+
+// Guardar cleanup
+window.__fc_statusCleanup = () => {
+window.removeEventListener("beforeunload", handleDisconnect);
+window.removeEventListener("pagehide", handleDisconnect);
+if (heartbeatRef.current) {
+clearInterval(heartbeatRef.current);
+heartbeatRef.current = null;
+}
+};
+
+// Sync inicial: restaurar estado en DB
+persistMyStatus(initialStatus, userId);
+})();
+},
+[persistMyStatus],
+);
+
+const stopMyStatusTracker = useCallback(() => {
+if (typeof window.__fc_statusCleanup === "function") {
+window.__fc_statusCleanup();
+window.__fc_statusCleanup = null;
+}
+}, []);
+
+// ── Inicializar estado del usuario (global, nunca se desmonta) ──
   useEffect(() => {
     const initializeAuth = async () => {
       try {
         // Esperar a que la clave maestra esté cargada (IndexedDB/memoria)
         // para poder descifrar la sesión de forma fiable.
         await waitForKeyReady();
-
         // Get current session
         const {
           data: { session },
-          error,
-        } = await supabase.auth.getSession();
-
+          error,        } = await supabase.auth.getSession();
         if (error) {
           console.error("Error getting session:", error);
           setUser(null);
@@ -123,10 +255,8 @@ const MAX_CLOSE_CONFIRM_MS = 60000;
             } finally {
               setProfileLoading(false);
             }
-
             // ── Inicializar Presence global ──
             initPresence(currentUser.id, "online");
-
             // ── Restaurar estado guardado + heartbeat global ──
             startMyStatusTracker(currentUser.id);
           } else {
@@ -143,9 +273,7 @@ const MAX_CLOSE_CONFIRM_MS = 60000;
         setLoading(false);
       }
     };
-
     initializeAuth();
-
     // Listen for auth changes
     const {
       data: { subscription },
@@ -159,13 +287,11 @@ const MAX_CLOSE_CONFIRM_MS = 60000;
         stopMyStatusTracker();
         return;
       }
-
       const cached = getCachedProfile(currentUser.id);
       if (cached) {
         setProfile(cached);
         setProfileLoading(false);
       }
-
       try {
         const freshProfile = await getUserProfile(currentUser.id);
         if (freshProfile) {
@@ -177,227 +303,125 @@ const MAX_CLOSE_CONFIRM_MS = 60000;
       } finally {
         setProfileLoading(false);
       }
-
       // Reiniciar tracker de estado al cambiar de usuario
       stopMyStatusTracker();
       startMyStatusTracker(currentUser.id);
     });
-
     return () => {
       subscription?.unsubscribe();
       stopMyStatusTracker();
     };
   }, []);
 
-  // ── Status tracker: init, heartbeat, beforeunload ──
-  const startMyStatusTracker = useCallback(
-    (userId) => {
-      if (!userId) return;
 
-      (async () => {
-        // Restaurar estado guardado
-        let initialStatus = "online";
-        try {
-          const saved = getItem("fc_user_status");
-          if (saved === "dnd" || saved === "idle") {
-            initialStatus = saved;
-          }
-        } catch {}
+// ── Realtime subscription para cambios en profiles ──
+useEffect(() => {
+if (!user?.id) return;
 
-        myStatusRef.current = initialStatus;
+const channel = supabase
+.channel(`profile-realtime-${user.id}`)
+.on(
+"postgres_changes",
+{
+event: "UPDATE",
+schema: "public",
+table: "profiles",
+filter: `id=eq.${user.id}`,
+},
+(payload) => {
+const fresh = payload.new;
+setProfile(fresh);
+setCachedProfile(fresh);
+},
+)
+.subscribe();
 
-        // Sesión token para beforeunload fetch
-        try {
-          const { data } = await supabase.auth.getSession();
-          sessionTokenRef.current = data?.session?.access_token || null;
-        } catch {}
+return () => {
+supabase.removeChannel(channel);
+};
+}, [user?.id]);
 
-        // Heartbeat cada 30s — lee de secureStorage para sincronizar con
-        // cambios de estado hechos desde useUserStatus.setMyStatus
-        if (heartbeatRef.current) clearInterval(heartbeatRef.current);
-        heartbeatRef.current = setInterval(() => {
-          let s = myStatusRef.current;
-          try {
-            const saved = getItem("fc_user_status");
-            if (saved === "dnd" || saved === "idle" || saved === "online") {
-              s = saved;
-              myStatusRef.current = s;
-            }
-          } catch {}
-          if (s === "online" || s === "idle" || s === "dnd") {
-            persistMyStatus(s, userId);
-          }
-        }, 30000);
+const refreshProfile = async (userId = user?.id) => {
+if (!userId) return null;
 
-        // beforeunload/pagehide: poner disconnected
-        const SB_URL = import.meta.env.VITE_SUPABASE_URL || "";
-        const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || "";
-        const restOrigin = (() => {
-          try {
-            return new URL(SB_URL).origin;
-          } catch {
-            return "";
-          }
-        })();
+try {
+// Bypass cache para obtener datos frescos siempre.
+// Columnas explícitas SIN email (columna revocada en migración 053).
+const { data, error } = await supabase
+.from("profiles")
+.select(PROFILE_PUBLIC_COLUMNS)
+.eq("id", userId)
+.maybeSingle();
 
-        const handleDisconnect = () => {
-          if (heartbeatRef.current) clearInterval(heartbeatRef.current);
-          const token = sessionTokenRef.current;
-          if (SB_URL && SB_KEY && token) {
-            try {
-              fetch(`${restOrigin}/rest/v1/profiles?id=eq.${userId}`, {
-                method: "PATCH",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                  apikey: SB_KEY,
-                },
-                body: JSON.stringify({
-                  user_status: "disconnected",
-                  user_status_updated_at: new Date().toISOString(),
-                }),
-                keepalive: true,
-              }).catch(() => {});
-            } catch {}
-          }
-          persistMyStatus("disconnected", userId).catch(() => {});
-        };
-        window.addEventListener("beforeunload", handleDisconnect);
-        window.addEventListener("pagehide", handleDisconnect);
+if (error) {
+console.error("Error refreshing profile:", error);
+return null;
+}
 
-        // Guardar cleanup
-        window.__fc_statusCleanup = () => {
-          window.removeEventListener("beforeunload", handleDisconnect);
-          window.removeEventListener("pagehide", handleDisconnect);
-          if (heartbeatRef.current) {
-            clearInterval(heartbeatRef.current);
-            heartbeatRef.current = null;
-          }
-        };
+if (data) {
+setProfile(data);
+setCachedProfile(data);
+}
+return data;
+} catch (err) {
+console.warn("Could not refresh profile:", err);
+return null;
+}
+};
 
-        // Sync inicial: restaurar estado en DB
-        persistMyStatus(initialStatus, userId);
-      })();
-    },
-    [persistMyStatus],
-  );
+const isDiscordLinked = !!user?.identities?.some(
+(i) => i.provider === "discord",
+);
 
-  const stopMyStatusTracker = useCallback(() => {
-    if (typeof window.__fc_statusCleanup === "function") {
-      window.__fc_statusCleanup();
-      window.__fc_statusCleanup = null;
-    }
-  }, []);
+const linkDiscord = async () => {
+try {
+setError(null);
+const { data, error } = await supabase.auth.linkIdentity({
+provider: "discord",
+options: {
+redirectTo: `${window.location.origin}/auth/callback`,
+},
+});
 
-  // ── Realtime subscription para cambios en profiles ──
-  useEffect(() => {
-    if (!user?.id) return;
+if (error) {
+setError(error.message);
+return { success: false, error: error.message };
+}
 
-    const channel = supabase
-      .channel(`profile-realtime-${user.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "profiles",
-          filter: `id=eq.${user.id}`,
-        },
-        (payload) => {
-          const fresh = payload.new;
-          setProfile(fresh);
-          setCachedProfile(fresh);
-        },
-      )
-      .subscribe();
+return { success: true };
+} catch (err) {
+setError(err.message);
+return { success: false, error: err.message };
+}
+};
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user?.id]);
+const loginWithDiscord = async () => {
+try {
+setError(null);
+const { data, error } = await supabase.auth.signInWithOAuth({
+provider: "discord",
+options: {
+redirectTo: `${window.location.origin}/auth/callback`,
+},
+});
 
-  const refreshProfile = async (userId = user?.id) => {
-    if (!userId) return null;
+if (error) {
+setError(error.message);
+return { success: false, error: error.message };
+}
 
-    try {
-      // Bypass cache para obtener datos frescos siempre.
-      // Columnas explícitas SIN email (columna revocada en migración 053).
-      const { data, error } = await supabase
-        .from("profiles")
-        .select(PROFILE_PUBLIC_COLUMNS)
-        .eq("id", userId)
-        .maybeSingle();
-
-      if (error) {
-        console.error("Error refreshing profile:", error);
-        return null;
-      }
-
-      if (data) {
-        setProfile(data);
-        setCachedProfile(data);
-      }
-      return data;
-    } catch (err) {
-      console.warn("Could not refresh profile:", err);
-      return null;
-    }
-  };
-
-  const isDiscordLinked = !!user?.identities?.some(
-    (i) => i.provider === "discord",
-  );
-
-  const linkDiscord = async () => {
-    try {
-      setError(null);
-      const { data, error } = await supabase.auth.linkIdentity({
-        provider: "discord",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      if (error) {
-        setError(error.message);
-        return { success: false, error: error.message };
-      }
-
-      return { success: true };
-    } catch (err) {
-      setError(err.message);
-      return { success: false, error: err.message };
-    }
-  };
-
-  const loginWithDiscord = async () => {
-    try {
-      setError(null);
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "discord",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      if (error) {
-        setError(error.message);
-        return { success: false, error: error.message };
-      }
-
-      // OAuth redirects away from the page, so we don't set user here
-      return { success: true };
-    } catch (err) {
-      setError(err.message);
-      return { success: false, error: err.message };
-    }
-  };
+// OAuth redirects away from the page, so we don't set user here
+return { success: true };
+} catch (err) {
+setError(err.message);
+return { success: false, error: err.message };
+}
+};
 
   const login = async (emailOrUsername, password, captchaToken) => {
     try {
       setError(null);
       let email = emailOrUsername;
-
       // Defensa en profundidad: si el input es un email, validar formato y dominio.
       if (emailOrUsername.includes("@")) {
         const emailErr = validateEmail(emailOrUsername);
@@ -413,7 +437,6 @@ const MAX_CLOSE_CONFIRM_MS = 60000;
           return { success: false, error: err };
         }
       }
-
       // Si el input no contiene @, es un username: resolver su email vía
       // RPC password-gated (migración 074). El RPC solo devuelve el email si
       // la contraseña es correcta, así que un username inexistente y una
@@ -430,7 +453,6 @@ const MAX_CLOSE_CONFIRM_MS = 60000;
         }
         email = foundEmail;
       }
-
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -439,12 +461,10 @@ const MAX_CLOSE_CONFIRM_MS = 60000;
           captchaToken: captchaToken || undefined,
         },
       });
-
       if (error) {
         setError(error.message);
         return { success: false, error: error.message };
       }
-
       const loggedUser = data?.user || null;
       if (loggedUser) {
         try {
@@ -456,11 +476,9 @@ const MAX_CLOSE_CONFIRM_MS = 60000;
         } catch (profileErr) {
           console.warn("Could not ensure profile on login:", profileErr);
         }
-
         // ── Inicializar Presence global en login ──
         initPresence(loggedUser.id, "online");
       }
-
       setUser(loggedUser);
       return { success: true, user: loggedUser };
     } catch (err) {
@@ -468,349 +486,312 @@ const MAX_CLOSE_CONFIRM_MS = 60000;
       return { success: false, error: err.message };
     }
   };
+const register = async (
+email,
+password,
+username,
+nickname,
+captchaToken,
+) => {
+try {
+setError(null);
 
-  const register = async (
-    email,
-    password,
-    username,
-    nickname,
-    captchaToken,
-  ) => {
-    try {
-      setError(null);
+// Validate inputs
+if (!email || !password || !username) {
+const err = "All fields are required";
+setError(err);
+return { success: false, error: err };
+}
 
-      // Validate inputs
-      if (!email || !password || !username) {
-        const err = "All fields are required";
-        setError(err);
-        return { success: false, error: err };
-      }
+if (password.length < 6) {
+const err = "Password must be at least 6 characters";
+setError(err);
+return { success: false, error: err };
+}
 
-      if (password.length < 6) {
-        const err = "Password must be at least 6 characters";
-        setError(err);
-        return { success: false, error: err };
-      }
+// Defensa en profundidad: validar formato y proveedor del email
+// (Gmail, Outlook, Yahoo, Proton, iCloud) antes de contactar a Supabase.
+const emailErr = validateEmail(email);
+if (emailErr === "invalid") {
+const err = "Enter a valid email address";
+setError(err);
+return { success: false, error: err };
+}
+if (emailErr === "domain") {
+const err =
+"Only emails from Gmail, Outlook, Yahoo, Proton and iCloud are allowed";
+setError(err);
+return { success: false, error: err };
+}
 
-      // Defensa en profundidad: validar formato y proveedor del email
-      // (Gmail, Outlook, Yahoo, Proton, iCloud) antes de contactar a Supabase.
-      const emailErr = validateEmail(email);
-      if (emailErr === "invalid") {
-        const err = "Enter a valid email address";
-        setError(err);
-        return { success: false, error: err };
-      }
-      if (emailErr === "domain") {
-        const err =
-          "Only emails from Gmail, Outlook, Yahoo, Proton and iCloud are allowed";
-        setError(err);
-        return { success: false, error: err };
-      }
+if (username.length < 3) {
+const err = "Username must be at least 3 characters";
+setError(err);
+return { success: false, error: err };
+}
 
-      if (username.length < 3) {
-        const err = "Username must be at least 3 characters";
-        setError(err);
-        return { success: false, error: err };
-      }
+// Username: solo letras, números y guiones bajos
+if (!/^[a-zA-Z0-9_]+$/.test(username.trim())) {
+const err =
+"Username can only contain letters, numbers and underscores";
+setError(err);
+return { success: false, error: err };
+}
 
-      // Username: solo letras, números y guiones bajos
-      if (!/^[a-zA-Z0-9_]+$/.test(username.trim())) {
-        const err =
-          "Username can only contain letters, numbers and underscores";
-        setError(err);
-        return { success: false, error: err };
-      }
+// Check if username already exists
+try {
+const usernameExists = await checkUsernameExists(username);
+if (usernameExists) {
+const err = "Username already taken";
+setError(err);
+return { success: false, error: err };
+}
+} catch (err) {
+console.warn("Could not check username (table may not exist):", err);
+}
 
-      // Check if username already exists
-      try {
-        const usernameExists = await checkUsernameExists(username);
-        if (usernameExists) {
-          const err = "Username already taken";
-          setError(err);
-          return { success: false, error: err };
-        }
-      } catch (err) {
-        console.warn("Could not check username (table may not exist):", err);
-      }
+// Check if email already exists
+try {
+const emailExists = await checkEmailExists(email);
+if (emailExists) {
+const err = "Email already registered";
+setError(err);
+return { success: false, error: err };
+}
+} catch (err) {
+console.warn("Could not check email:", err);
+}
 
-      // Check if email already exists
-      try {
-        const emailExists = await checkEmailExists(email);
-        if (emailExists) {
-          const err = "Email already registered";
-          setError(err);
-          return { success: false, error: err };
-        }
-      } catch (err) {
-        console.warn("Could not check email:", err);
-      }
+// Sign up with Supabase Auth
+const { data, error } = await supabase.auth.signUp({
+email,
+password,
+options: {
+// Token de Cloudflare Turnstile (verificado server-side por Supabase)
+captchaToken: captchaToken || undefined,
+data: {
+username,
+display_name: nickname || username,
+},
+},
+});
 
-      // Sign up with Supabase Auth
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          // Token de Cloudflare Turnstile (verificado server-side por Supabase)
-          captchaToken: captchaToken || undefined,
-          data: {
-            username,
-            display_name: nickname || username,
-          },
-        },
-      });
+if (error) {
+setError(error.message);
+return { success: false, error: error.message };
+}
 
-      if (error) {
-        setError(error.message);
-        return { success: false, error: error.message };
-      }
+// Create user profile in profiles table only when a valid authenticated session exists.
+try {
+if (data?.session?.user) {
+await createUserProfile(
+data.session.user.id,
+email,
+username,
+nickname,
+);
+setUser(data.session.user);
+try {
+const freshProfile = await getUserProfile(data.session.user.id);
+if (freshProfile) {
+setProfile(freshProfile);
+setCachedProfile(freshProfile);
+}
+} catch (profileErr) {
+console.warn(
+"Could not load profile after registration:",
+profileErr,
+);
+}
+} else {
+setUser(null);
+}
+} catch (profileErr) {
+console.warn(
+"Could not create profile (table may not exist or session not authenticated):",
+profileErr,
+);
+}
 
-      // Create user profile in profiles table only when a valid authenticated session exists.
-      try {
-        if (data?.session?.user) {
-          await createUserProfile(
-            data.session.user.id,
-            email,
-            username,
-            nickname,
-          );
-          setUser(data.session.user);
-          try {
-            const freshProfile = await getUserProfile(data.session.user.id);
-            if (freshProfile) {
-              setProfile(freshProfile);
-              setCachedProfile(freshProfile);
-            }
-          } catch (profileErr) {
-            console.warn(
-              "Could not load profile after registration:",
-              profileErr,
-            );
-          }
-        } else {
-          setUser(null);
-        }
-      } catch (profileErr) {
-        console.warn(
-          "Could not create profile (table may not exist or session not authenticated):",
-          profileErr,
-        );
-      }
+return {
+success: true,
+user: data?.session?.user || null,
+message: data?.session
+? "Registration successful! Your profile was created."
+: "Registration successful! Please check your email to confirm before logging in.",
+};
+} catch (err) {
+setError(err.message);
+return { success: false, error: err.message };
+}
+};
 
-      return {
-        success: true,
-        user: data?.session?.user || null,
-        message: data?.session
-          ? "Registration successful! Your profile was created."
-          : "Registration successful! Please check your email to confirm before logging in.",
-      };
-    } catch (err) {
-      setError(err.message);
-      return { success: false, error: err.message };
-    }
-  };
+// ── Cambio de credenciales desde Ajustes ──
+// Los tres exigen la CONTRASEÑA ACTUAL. verify_password (migración 075)
+// compara con bcrypt en el servidor y aplica throttle por uid, así que una
+// sesión robada no basta para apropiarse de la cuenta.
+// Devuelven códigos estables; la UI los traduce (Settings.jsx).
 
-  // ── Cambio de credenciales desde Ajustes ──
-  // Los tres exigen la CONTRASEÑA ACTUAL. verify_password (migración 075)
-  // compara con bcrypt en el servidor y aplica throttle por uid, así que una
-  // sesión robada no basta para apropiarse de la cuenta.
-  // Devuelven códigos estables; la UI los traduce (Settings.jsx).
+const changeUsername = async (newUsername, currentPassword) => {
+setError(null);
+if (!user?.id) return { success: false, code: "not_authenticated" };
 
-  const changeUsername = async (newUsername, currentPassword) => {
-    setError(null);
-    if (!user?.id) return { success: false, code: "not_authenticated" };
+const normalized = String(newUsername || "")
+.trim()
+.toLowerCase();
+const validationError = validateProfileFields({ username: normalized });
+if (validationError) {
+setError(validationError);
+return {
+success: false,
+code: "invalid_username",
+error: validationError,
+};
+}
+if (!currentPassword) return { success: false, code: "invalid_password" };
 
-    const normalized = String(newUsername || "")
-      .trim()
-      .toLowerCase();
-    const validationError = validateProfileFields({ username: normalized });
-    if (validationError) {
-      setError(validationError);
-      return {
-        success: false,
-        code: "invalid_username",
-        error: validationError,
-      };
-    }
-    if (!currentPassword) return { success: false, code: "invalid_password" };
+const previousUsername = profile?.username;
+const code = await requestUsernameChange(normalized, currentPassword);
+if (code !== "ok") return { success: false, code };
 
-    const previousUsername = profile?.username;
-    const code = await requestUsernameChange(normalized, currentPassword);
-    if (code !== "ok") return { success: false, code };
+// El perfil público se cachea por id y por username: invalidar el viejo.
+if (previousUsername) clearCachedProfileByUsername(previousUsername);
+clearCachedProfile(user.id);
 
-    // El perfil público se cachea por id y por username: invalidar el viejo.
-    if (previousUsername) clearCachedProfileByUsername(previousUsername);
-    clearCachedProfile(user.id);
+const fresh = await refreshProfile(user.id);
+if (!fresh) {
+// Sin red: al menos reflejar el cambio ya confirmado por el servidor.
+setProfile((prev) => (prev ? { ...prev, username: normalized } : prev));
+}
+return { success: true, code: "ok", profile: fresh };
+};
 
-    const fresh = await refreshProfile(user.id);
-    if (!fresh) {
-      // Sin red: al menos reflejar el cambio ya confirmado por el servidor.
-      setProfile((prev) => (prev ? { ...prev, username: normalized } : prev));
-    }
-    return { success: true, code: "ok", profile: fresh };
-  };
+const changeEmail = async (newEmail, currentPassword) => {
+setError(null);
+if (!user?.id) return { success: false, code: "not_authenticated" };
 
-  const changeEmail = async (newEmail, currentPassword) => {
-    setError(null);
-    if (!user?.id) return { success: false, code: "not_authenticated" };
+const email = String(newEmail || "")
+.trim()
+.toLowerCase();
+const emailErr = validateEmail(email);
+if (emailErr === "invalid")
+return { success: false, code: "invalid_email" };
+if (emailErr === "domain") return { success: false, code: "email_domain" };
+if (!currentPassword) return { success: false, code: "invalid_password" };
+if (String(user?.email || "").toLowerCase() === email) {
+return { success: false, code: "same_email" };
+}
+if (!(await verifyCurrentPassword(currentPassword))) {
+return { success: false, code: "invalid_password" };
+}
 
-    const email = String(newEmail || "")
-      .trim()
-      .toLowerCase();
-    const emailErr = validateEmail(email);
-    if (emailErr === "invalid")
-      return { success: false, code: "invalid_email" };
-    if (emailErr === "domain") return { success: false, code: "email_domain" };
-    if (!currentPassword) return { success: false, code: "invalid_password" };
-    if (String(user?.email || "").toLowerCase() === email) {
-      return { success: false, code: "same_email" };
-    }
-    if (!(await verifyCurrentPassword(currentPassword))) {
-      return { success: false, code: "invalid_password" };
-    }
+try {
+if (await checkEmailExists(email))
+return { success: false, code: "email_taken" };
+} catch (err) {
+console.warn("Could not check email availability:", err);
+}
 
-    try {
-      if (await checkEmailExists(email))
-        return { success: false, code: "email_taken" };
-    } catch (err) {
-      console.warn("Could not check email availability:", err);
-    }
+// Supabase envía el/los correos de confirmación según la config del
+// proyecto ("Secure email change" → confirma en la dirección antigua y en
+// la nueva). El email real solo cambia al confirmar.
+const { error } = await supabase.auth.updateUser({ email });
+if (error) {
+setError(error.message);
+return { success: false, code: "error", error: error.message };
+}
+return { success: true, code: "ok" };
+};
 
-    // Supabase envía el/los correos de confirmación según la config del
-    // proyecto ("Secure email change" → confirma en la dirección antigua y en
-    // la nueva). El email real solo cambia al confirmar.
-    const { error } = await supabase.auth.updateUser({ email });
-    if (error) {
-      setError(error.message);
-      return { success: false, code: "error", error: error.message };
-    }
-    return { success: true, code: "ok" };
-  };
+const changePassword = async (newPassword, currentPassword) => {
+setError(null);
+if (!user?.id) return { success: false, code: "not_authenticated" };
+if (typeof newPassword !== "string" || newPassword.length < 6) {
+return { success: false, code: "weak_password" };
+}
+// bcrypt solo usa los primeros 72 bytes: rechazar en vez de truncar.
+if (newPassword.length > 72)
+return { success: false, code: "password_too_long" };
+if (!currentPassword) return { success: false, code: "invalid_password" };
+if (newPassword === currentPassword)
+return { success: false, code: "same_password" };
+if (!(await verifyCurrentPassword(currentPassword))) {
+return { success: false, code: "invalid_password" };
+}
 
-  const changePassword = async (newPassword, currentPassword) => {
-    setError(null);
-    if (!user?.id) return { success: false, code: "not_authenticated" };
-    if (typeof newPassword !== "string" || newPassword.length < 6) {
-      return { success: false, code: "weak_password" };
-    }
-    // bcrypt solo usa los primeros 72 bytes: rechazar en vez de truncar.
-    if (newPassword.length > 72)
-      return { success: false, code: "password_too_long" };
-    if (!currentPassword) return { success: false, code: "invalid_password" };
-    if (newPassword === currentPassword)
-      return { success: false, code: "same_password" };
-    if (!(await verifyCurrentPassword(currentPassword))) {
-      return { success: false, code: "invalid_password" };
-    }
+const { error } = await supabase.auth.updateUser({ password: newPassword });
+if (error) {
+setError(error.message);
+return { success: false, code: "error", error: error.message };
+}
+return { success: true, code: "ok" };
+};
 
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    if (error) {
-      setError(error.message);
-      return { success: false, code: "error", error: error.message };
-    }
-    return { success: true, code: "ok" };
-  };
+// ── Cierre de sesión con guardado de estado antes de cerrar ──
+const currentSession = user?.id
+? {
+userId: user.id,
+username: profile?.username || null,
+email: user.email || null,
+}
+: null;
 
-  // ── Cierre de sesión con guardado y confirmación de propiedad ──
-  //
-  // El bug usado a ser que el logout destruía la sesión actual de forma
-  // destructiva, perdiendo lo que había en pantalla y sincronizando mal al
-  // desmontar. Para seguir con varias sesiones a la vez:
-  //  - guardar siempre el estado anterior a cerrar;
-  //  - solo borrar el estado y cerrar sesión si la sesión en curso
-  //    corresponde a este punto de la app;
-  //  - dejar intacta la sesión de los demás clientes que estén abiertos.
+const sessionStateKey = (sessionId) =>
+`foranly_client_session_state_${sessionId}`;
 
-  // ── Estado del cierre de sesión ──
-  const [isLogoutConfirmed, setIsLogoutConfirmed] = useState(false);
-  const [isLogoutConfirmed, setIsLogoutConfirmed] = useState(false);
-  const MAX_CLOSE_CONFIRM_MS = 60000;
-  let closeConfirmTimer = null;
+const saveSessionStateOnLogout = async (userId, username, email) => {
+if (!userId) return;
+const state = {
+userId,
+username,
+email,
+savedAt: new Date().toISOString(),
+};
+try {
+await localStorage.setItem(
+sessionStateKey(userId),
+JSON.stringify(state),
+);
+} catch (err) {
+console.warn(
+"[AuthContext] No se pudo guardar el estado de cierre:",
+err,
+);
+throw err;
+}
+};
 
-  const clearCloseConfirmTimer = () => {
-    if (closeConfirmTimer !== null) {
-      clearTimeout(closeConfirmTimer);
-      closeConfirmTimer = null;
-    }
-  };
+const clearSessionState = async (userId) => {
+if (!userId) return;
+try {
+await localStorage.removeItem(sessionStateKey(userId));
+} catch (err) {
+console.warn("[AuthContext] No se pudo borrar el estado de cierre:", err);
+throw err;
+}
+};
 
-  const scheduleCloseConfirm = () => {
-    clearCloseConfirmTimer();
-    if (isLogoutConfirmed) return;
-    closeConfirmTimer = setTimeout(() => {
-      setIsLogoutConfirmed(true);
-    }, MAX_CLOSE_CONFIRM_MS);
-  };
-
-  const cancelCloseConfirm = () => {
-    clearCloseConfirmTimer();
-    setIsLogoutConfirmed(false);
-  };
-  const currentSession = user?.id
-    ? {
-        userId: user.id,
-        username: profile?.username || null,
-        email: user.email || null,
-      }
-    : null;
-
-  const sessionStateKey = (sessionId) =>
-    `foranly_client_session_state_${sessionId}`;
-
-  const saveSessionStateOnLogout = async (userId, username, email) => {
-    if (!userId) return;
-    const state = {
-      userId,
-      username,
-      email,
-      savedAt: new Date().toISOString(),
-    };
-    try {
-      await localStorage.setItem(
-        sessionStateKey(userId),
-        JSON.stringify(state),
-      );
-    } catch (err) {
-      console.warn(
-        "[AuthContext] No se pudo guardar el estado de cierre:",
-        err,
-      );
-      throw err;
-    }
-  };
-
-  const clearSessionState = async (userId) => {
-    if (!userId) return;
-    try {
-      await localStorage.removeItem(sessionStateKey(userId));
-    } catch (err) {
-      console.warn("[AuthContext] No se pudo borrar el estado de cierre:", err);
-      throw err;
-    }
-  };
-
-  // Confirma que el cierre de sesión corresponde a la sesión actual.
-  // Devuelve falso cuando el usuario actual no es el mismo que el de la
-  // sesión que se estaba cerrando, dejando la sesión de los demás intacta.
-  const confirmSessionOwnership = async (session) => {
-    if (!session?.userId) return true;
-    try {
-      const { data } = await supabase.auth.getSession();
-      const currentUserId = data?.session?.user?.id;
-      return currentUserId === session.userId;
-    } catch {
-      // Sin red: como no sabemos bien quién es, cerrar la sesión local.
-      return true;
-    }
-  };
+// Confirma que el cierre de sesión corresponde a la sesión actual.
+// Devuelve falso cuando el usuario actual no es el mismo que el de la
+// sesión que se estaba cerrando, dejando la sesión de los demás intacta.
+const confirmSessionOwnership = async (session) => {
+if (!session?.userId) return true;
+try {
+const { data } = await supabase.auth.getSession();
+const currentUserId = data?.session?.user?.id;
+return currentUserId === session.userId;
+} catch {
+// Sin red: como no sabemos bien quién es, cerrar la sesión local.
+return true;
+}
+};
 
   const logout = async () => {
     try {
       setError(null);
-
       const currentUserId = user?.id;
       const currentUsername = profile?.username;
-
-      // ── Guardar estado antes de descargar la sesión ──
+      // ── Guardar estado antes de cerrar la sesión ──
       try {
         await saveSessionStateOnLogout(
           currentUserId,
@@ -823,7 +804,6 @@ const MAX_CLOSE_CONFIRM_MS = 60000;
           saveError,
         );
       }
-
       // ── Solo destruir sesión si el usuario actual era el identificador de sesión ──
       // Si hay varias sesiones abiertas, esta salida solo cierra la propia sesión
       // y no invalida las demás.
@@ -835,14 +815,11 @@ const MAX_CLOSE_CONFIRM_MS = 60000;
           return { success: false, error: "solo_session_local" };
         }
       }
-
       const { error } = await supabase.auth.signOut();
-
       if (error) {
         setError(error.message);
         return { success: false, error: error.message };
       }
-
       if (currentSession) {
         try {
           await clearSessionState(currentSession.userId);
@@ -853,13 +830,10 @@ const MAX_CLOSE_CONFIRM_MS = 60000;
           );
         }
       }
-
       setUser(null);
       setProfile(null);
-
       // ── Liberar Presence global ──
       disposePresence();
-
       // ── Limpiar todo el caché de la sesión ──
       clearAllAppCaches(); // Elimina todos los localStorage fc_*
       clearDecryptedCache(); // Limpia el caché en memoria de contenido descifrado
@@ -871,36 +845,9 @@ const MAX_CLOSE_CONFIRM_MS = 60000;
       if (currentUsername) {
         clearCachedProfileByUsername(currentUsername);
       }
-
       return { success: true };
     } catch (err) {
       setError(err.message);
       return { success: false, error: err.message };
     }
   };
-
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        profile,
-        profileLoading,
-        loading,
-        error,
-        login,
-        loginWithDiscord,
-        linkDiscord,
-        isDiscordLinked,
-        register,
-        logout,
-        refreshProfile,
-        changeUsername,
-        changeEmail,
-        changePassword,
-        isAuthenticated: !!user,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
-}
