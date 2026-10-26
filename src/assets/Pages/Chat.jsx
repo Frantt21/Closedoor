@@ -29,12 +29,13 @@ import { getFollowing } from '../services/followService';
 import { isBlocked, blockUser, unblockUser, unfollowBothWays, getCachedBlockStatus, cacheBlockStatus } from '../services/blockService';
 import FollowButton from '../Resources/Components/FollowButton';
 import ModalShell from '../Resources/Components/ModalShell';
-import { FaComment, FaSearch, FaArrowLeft, FaPlus, FaTimes, FaUserPlus, FaUsers, FaTrash, FaPalette, FaBan, FaThumbtack, FaCopy, FaEdit, FaCheck, FaSmile, FaReply, FaImage, FaMusic, FaUser, FaPhone, FaLock, FaUpload, FaSpinner, FaEllipsisH, FaArrowDown, FaPhoneSlash, FaMicrophone, FaMicrophoneSlash } from 'react-icons/fa';
+import { FaComment, FaSearch, FaArrowLeft, FaPlus, FaTimes, FaUserPlus, FaUsers, FaTrash, FaPalette, FaBan, FaThumbtack, FaCopy, FaEdit, FaCheck, FaSmile, FaReply, FaImage, FaMusic, FaUser, FaPhone, FaLock, FaSpinner, FaEllipsisH, FaArrowDown, FaPhoneSlash, FaMicrophone, FaMicrophoneSlash } from 'react-icons/fa';
 import Avatar from '../Resources/Components/Avatar';
 import Badge from '../Resources/Components/Badge';
 import Tooltip from '../Resources/Components/Tooltip';
 import GifPicker from '../Resources/Components/GifPicker';
 import SongPicker from '../Resources/Components/SongPicker';
+import MediaPicker from '../Resources/Components/MediaPicker';
 import ChatSongCard from '../Resources/Components/ChatSongCard';
 import { withPreviewFallback } from '../services/musicService';
 import { getTimeAgo, IMG_RE, detectMediaFromContent, getImageStyle, sanitizeUrl } from '../services/helpers';
@@ -1774,14 +1775,6 @@ export default function Chat() {
     }
   }, [user?.id, t]);
 
-  // ── Input file del chat → sube la imagen seleccionada ──
-  const handleChatMediaUpload = useCallback(async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    await uploadChatImageFile(file);
-    e.target.value = '';
-  }, [uploadChatImageFile]);
-
   // ── Pegar imagen (Ctrl+V) en el input → sube directo y muestra preview ──
   const handleChatPaste = useCallback((e) => {
     if (uploadingChatMedia) return; // evita uploads concurrentes (mismo guard que el input file)
@@ -3480,60 +3473,19 @@ export default function Chat() {
             </div>
           </div>
         )}
-        {/* Media (imagen) picker — misma shell embebida que GIF y canciones
-            (.gif-picker + .gif-picker-header), para que los cuatro selectores
-            del composer (emojis, GIF, imagen, canción) se vean iguales. */}
+        {/* Media (imagen) picker — mismo contenedor embebido que GIF, canciones
+            y emojis (ver MediaPicker / gifPicker.css). */}
         {showMediaInput && (
-          <div className="gif-picker chat-media-picker">
-            <div className="gif-picker-header">
-              <label
-                className="chat-media-picker-upload"
-                title={t('chat.media_gallery')}
-              >
-                {uploadingChatMedia ? <FaSpinner className="fc-spin" /> : <FaUpload size={12} />}
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/gif,image/webp"
-                  onChange={handleChatMediaUpload}
-                  disabled={uploadingChatMedia}
-                />
-              </label>
-              <div className="gif-picker-search-wrap">
-                <FaImage className="gif-picker-search-icon" size={12} />
-                <input
-                  className="gif-picker-search-input"
-                  type="url"
-                  value={mediaUrl}
-                  onChange={(e) => setMediaUrl(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      if (mediaUrl.trim()) handleMediaSend();
-                    }
-                  }}
-                  placeholder={t('chat.media_placeholder')}
-                  autoFocus
-                />
-              </div>
-              <button
-                type="button"
-                className="chat-song-picker-search-btn"
-                onClick={handleMediaSend}
-                disabled={!mediaUrl.trim()}
-              >
-                Add
-              </button>
-              <button
-                type="button"
-                className="gif-picker-close"
-                onClick={() => { setShowMediaInput(false); setMediaUrl(''); }}
-                aria-label={t('common.close')}
-              >
-                <FaTimes size={13} />
-              </button>
-            </div>
-          </div>
-        )}          <div className="chat-input-inner">
+          <MediaPicker
+            url={mediaUrl}
+            onUrlChange={setMediaUrl}
+            onFile={uploadChatImageFile}
+            uploading={uploadingChatMedia}
+            onSend={handleMediaSend}
+            onClose={() => { setShowMediaInput(false); setMediaUrl(''); }}
+          />
+        )}
+        <div className="chat-input-inner">
           <textarea
             ref={inputRef}
             className="chat-input"
@@ -3550,21 +3502,21 @@ export default function Chat() {
             <div className="chat-input-actions-desktop">
               <button
                 className={`chat-input-action-btn ${showInputEmojiPicker ? 'chat-input-action-btn--active' : ''}`}
-                onClick={() => { setShowInputEmojiPicker(s => !s); setShowGifPicker(false); setShowSongPicker(false); }}
+                onClick={() => { setShowInputEmojiPicker(s => !s); setShowGifPicker(false); setShowSongPicker(false); setShowMediaInput(false); }}
                 title="Emoji"
               >
                 <FaSmile />
               </button>
               <button
                 className={`chat-input-action-btn ${showGifPicker ? 'chat-input-action-btn--active' : ''}`}
-                onClick={() => { setShowGifPicker(s => !s); setShowInputEmojiPicker(false); setShowSongPicker(false); }}
+                onClick={() => { setShowGifPicker(s => !s); setShowInputEmojiPicker(false); setShowSongPicker(false); setShowMediaInput(false); }}
                 title="GIF"
               >
                 <span className="chat-input-action-btn-gif">GIF</span>
               </button>
               <button
                 className={`chat-input-action-btn ${showMediaInput ? 'chat-input-action-btn--active' : ''}`}
-                onClick={() => { setShowMediaInput(s => !s); setShowSongPicker(false); }}
+                onClick={() => { setShowMediaInput(s => !s); setShowGifPicker(false); setShowInputEmojiPicker(false); setShowSongPicker(false); }}
                 title="Media"
               >
                 <FaImage />

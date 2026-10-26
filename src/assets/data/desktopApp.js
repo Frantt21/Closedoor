@@ -4,22 +4,33 @@
  * ÚNICO sitio donde se cambian las URLs de los instaladores: los lee la página
  * /download (Pages/Download.jsx) y el aviso del reproductor
  * (Components/DesktopAppPrompt.jsx). Mantener el número de versión sincronizado
- * con desktop/package.json (los nombres de archivo los genera electron-builder:
- * `Foranly-Setup-<version>.exe`, `Foranly-<version>-<arch>.dmg`, etc.).
+ * con desktop/package.json.
+ *
+ * Los binarios se publican como assets del Release de GitHub:
+ *   https://github.com/Frantt21/Closedoor/releases/tag/v0.1.0
+ *
+ * Los nombres los genera electron-builder (ver `build.*.artifactName` en
+ * desktop/package.json):
+ *   Windows  → Closedoor-0.1.0.exe
+ *   macOS    → Closedoor-0.1.0-arm64.dmg · Closedoor-0.1.0-x64.dmg
+ *   Linux    → Closedoor-0.1.0-x86_64.AppImage · Closedoor-0.1.0-amd64.deb
  */
 
 export const DESKTOP_VERSION = '0.1.0';
 
+/** Tag del Release que contiene los instaladores. */
+export const DESKTOP_RELEASE_TAG = `v${DESKTOP_VERSION}`;
+
+/** Página del Release (fallback si un asset concreto no existe). */
+export const DESKTOP_RELEASE_URL =
+  `https://github.com/Frantt21/Closedoor/releases/tag/${DESKTOP_RELEASE_TAG}`;
+
+/** Base de descarga directa de los assets del Release. */
+export const DESKTOP_DOWNLOAD_BASE =
+  `https://github.com/Frantt21/Closedoor/releases/download/${DESKTOP_RELEASE_TAG}`;
+
 /** Ruta de la página de descargas (a la que apunta el aviso del reproductor). */
 export const DESKTOP_DOWNLOAD_PATH = '/download';
-
-/**
- * Base donde se publican los instaladores.
- * ⚠️ Mientras esté vacía, /download muestra los archivos como "Próximamente" en
- * vez de enlaces rotos. Al subir los binarios basta con rellenar esto:
- *   export const DESKTOP_DOWNLOAD_BASE = 'https://dl.foranly.space/desktop';
- */
-export const DESKTOP_DOWNLOAD_BASE = '';
 
 /**
  * Instaladores ofrecidos, en el orden en que se muestran.
@@ -30,37 +41,68 @@ export const DESKTOP_DOWNLOADS = [
     id: 'windows-x64',
     os: 'windows',
     arch: 'x64',
-    file: `Foranly-Setup-${DESKTOP_VERSION}.exe`,
+    file: `Closedoor-${DESKTOP_VERSION}.exe`,
   },
   {
     id: 'macos-arm64',
     os: 'macos',
     arch: 'Apple Silicon',
-    file: `Foranly-${DESKTOP_VERSION}-arm64.dmg`,
+    file: `Closedoor-${DESKTOP_VERSION}-arm64.dmg`,
   },
   {
     id: 'macos-x64',
     os: 'macos',
     arch: 'Intel',
-    file: `Foranly-${DESKTOP_VERSION}-x64.dmg`,
+    file: `Closedoor-${DESKTOP_VERSION}-x64.dmg`,
   },
   {
     id: 'linux-appimage',
     os: 'linux',
-    arch: 'x86_64',
-    file: `Foranly-${DESKTOP_VERSION}-x86_64.AppImage`,
+    arch: 'AppImage · x86_64',
+    file: `Closedoor-${DESKTOP_VERSION}-x86_64.AppImage`,
   },
   {
     id: 'linux-deb',
     os: 'linux',
-    arch: 'amd64 · Debian/Ubuntu',
-    file: `Foranly-${DESKTOP_VERSION}-amd64.deb`,
+    arch: '.deb · amd64 · Debian/Ubuntu',
+    file: `Closedoor-${DESKTOP_VERSION}-amd64.deb`,
+  },
+];
+
+/**
+ * Agrupación por plataforma para el aviso del reproductor: macOS y Linux
+ * ofrecen sus dos variantes (cada una con su enlace).
+ */
+export const DESKTOP_PLATFORM_GROUPS = [
+  {
+    os: 'windows',
+    labelKey: 'download.os_windows',
+    options: [
+      { id: 'windows-x64', arch: 'x64', file: `Closedoor-${DESKTOP_VERSION}.exe` },
+    ],
+  },
+  {
+    os: 'macos',
+    labelKey: 'download.os_macos',
+    options: [
+      { id: 'macos-arm64', arch: 'Apple Silicon', file: `Closedoor-${DESKTOP_VERSION}-arm64.dmg` },
+      { id: 'macos-x64', arch: 'Intel', file: `Closedoor-${DESKTOP_VERSION}-x64.dmg` },
+    ],
+  },
+  {
+    os: 'linux',
+    labelKey: 'download.os_linux',
+    options: [
+      { id: 'linux-appimage', arch: 'AppImage', file: `Closedoor-${DESKTOP_VERSION}-x86_64.AppImage` },
+      { id: 'linux-deb', arch: '.deb', file: `Closedoor-${DESKTOP_VERSION}-amd64.deb` },
+    ],
   },
 ];
 
 /** URL final del instalador ('' si todavía no está publicado). */
 export function getDownloadUrl(entry) {
-  if (!DESKTOP_DOWNLOAD_BASE || !entry?.file) return '';
+  if (!entry?.file) return '';
+  if (!DESKTOP_DOWNLOAD_BASE) return '';
   return `${DESKTOP_DOWNLOAD_BASE.replace(/\/+$/, '')}/${entry.file}`;
 }
 

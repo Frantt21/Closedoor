@@ -1,13 +1,14 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useState, useContext, useEffect, useRef } from 'react';
 import './css/header.css';
-import { IconHome, IconUser, IconBars, IconBell, IconCompass, IconCog, IconComment, IconUsers } from './ShellIcons';
+import { IconHome, IconUser, IconBars, IconBell, IconCompass, IconCog, IconComment, IconUsers, IconDownload } from './ShellIcons';
 import { useAuth } from '../../../hooks/useAuth';
 import { NotificationContext } from '../../../context/NotificationContext';
 import { useI18n } from '../../../assets/services/i18n/useI18n';
 import Tooltip from './Tooltip';
 import React from 'react';
 import { getItem, setItem } from '../../services/secureStorage';
+import { isDesktopApp } from '../../services/desktopApp';
 
 const SIDEBAR_STORAGE_KEY = 'fc_sidebar_collapsed'; // clave antigua (booleano) — para migración y rollback
 const SIDEBAR_MODE_KEY = 'fc_sidebar_mode';
@@ -212,6 +213,17 @@ function Header() {
       </nav>
 
       <div className="sidebar-footer">
+        {!isDesktopApp() && (
+          <Tooltip text={tooltipText('desktop.prompt_download')} placement="right">
+            <Link
+              to="/download"
+              className={`sidebar-link${location.pathname.toLowerCase() === '/download' ? ' active' : ''}`}
+            >
+              <span className="sidebar-icon"><IconDownload /></span>
+              <span className="sidebar-footer-label">{t('desktop.prompt_download')}</span>
+            </Link>
+          </Tooltip>
+        )}
         <div className="sidebar-mode-wrap">
           <Tooltip text={collapsed && mode !== 'hover' ? t('nav.sidebar_cycle') : ''} placement="right">
             <button

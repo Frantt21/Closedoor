@@ -1,0 +1,90 @@
+/* ── Media (imagen) picker ──
+   Comparte la shell de GifPicker/SongPicker (.gif-picker, .gif-picker-header,
+   .gif-picker-search-wrap/-input, .gif-picker-close). Aquí solo vive el cuerpo
+   propio: la zona de subida, con la misma altura y disposición que el panel de
+   resultados de los demás selectores. */
+
+.chat-media-picker .gif-picker-header {
+    padding: 8px 10px;
+}
+
+.chat-media-picker-upload {
+    position: relative;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: var(--radius-sm, 6px);
+    background: transparent;
+    color: var(--color-text-muted, #6b7280);
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.chat-media-picker-upload:hover:not(:disabled) {
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+}
+
+.chat-media-picker-upload:disabled {
+    cursor: default;
+    opacity: 0.7;
+}
+
+.chat-media-picker-results {
+    padding: 10px;
+}
+
+.chat-media-picker-drop {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    min-height: 140px;
+    padding: 18px 16px;
+    border: 1px dashed var(--color-border, #2a2a2a);
+    border-radius: var(--radius-sm, 6px);
+    background: var(--overlay-bg-subtle, rgba(255, 255, 255, 0.04));
+    color: var(--color-text-muted, #6b7280);
+    font-family: inherit;
+    font-size: 0.82rem;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.chat-media-picker-drop:hover:not(:disabled) {
+    border-color: var(--color-text-muted, #6b7280);
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+}
+
+.chat-media-picker-drop:disabled {
+    cursor: default;
+    opacity: 0.7;
+}
+
+.chat-media-picker-drop svg {
+    font-size: 1.1rem;
+}
+
+.chat-media-picker-drop small {
+    font-size: 0.68rem;
+    opacity: 0.7;
+}
+
+/* El <input type="file"> queda oculto: el botón hace de disparador. */
+.chat-media-picker-file-input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}

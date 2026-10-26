@@ -12,6 +12,7 @@
   "author": "Foranly",
   "license": "UNLICENSED",
   "main": "main.js",
+  "desktopName": "closedoor.desktop",
   "scripts": {
     "start": "node scripts/start.js",
     "dev": "node scripts/start.js",
@@ -28,6 +29,7 @@
     "appId": "space.foranly.desktop",
     "productName": "Closedoor",
     "executableName": "Closedoor",
+    "publish": null,
     "directories": {
       "output": "dist"
     },
@@ -64,7 +66,7 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "shortcutName": "Closedoor",
-      "artifactName": "Foranly-Setup-${version}.${ext}"
+      "artifactName": "Closedoor-${version}.${ext}"
     },
     "mac": {
       "target": [
@@ -72,7 +74,7 @@
       ],
       "category": "public.app-category.social-networking",
       "icon": "assets/icon.png",
-      "artifactName": "Foranly-${version}-${arch}.${ext}"
+      "artifactName": "Closedoor-${version}-${arch}.${ext}"
     },
     "linux": {
       "target": [
@@ -82,7 +84,8 @@
       "category": "Network",
       "maintainer": "Foranly <dev@foranly.space>",
       "icon": "assets/icon.png",
-      "artifactName": "Foranly-${version}-${arch}.${ext}"
+      "syncDesktopName": true,
+      "artifactName": "Closedoor-${version}-${arch}.${ext}"
     }
   }
 }

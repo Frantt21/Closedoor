@@ -38,7 +38,6 @@ jobs:
       - name: Build Windows (NSIS + portable)
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx electron-builder --win --x64 --publish never
 
       - name: Upload Windows artifacts
@@ -73,7 +72,6 @@ jobs:
       - name: Build macOS (DMG + ZIP)
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx electron-builder --mac --x64 --arm64 --publish never
 
       - name: Upload macOS artifacts
@@ -107,8 +105,6 @@ jobs:
         run: npm ci
 
       - name: Build Linux (AppImage + deb)
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx electron-builder --linux AppImage deb --publish never
 
       - name: Upload Linux artifacts

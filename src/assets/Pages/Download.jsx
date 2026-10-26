@@ -98,7 +98,12 @@ export default function Download() {
                   <span className="download-card-file">{entry.file}</span>
                 </div>
                 {url ? (
-                  <a className="download-card-btn" href={url} download rel="noopener noreferrer">
+                  <a
+                    className="download-card-btn"
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     <FaDownload />
                     {t('download.get')}
                   </a>

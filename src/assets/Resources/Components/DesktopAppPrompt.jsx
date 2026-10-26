@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FaDownload, FaDesktop } from 'react-icons/fa';
+import { FaDownload, FaDesktop, FaWindows, FaApple, FaLinux } from 'react-icons/fa';
 import ModalShell from './ModalShell';
 import { useI18n } from '../../services/i18n/useI18n';
 import {
@@ -9,8 +9,20 @@ import {
   isDesktopApp,
   isDesktopPromptDismissed,
 } from '../../services/desktopApp';
-import { DESKTOP_DOWNLOAD_PATH, DESKTOP_FEATURES } from '../../data/desktopApp';
+import {
+  DESKTOP_DOWNLOAD_PATH,
+  DESKTOP_FEATURES,
+  DESKTOP_PLATFORM_GROUPS,
+  DESKTOP_RELEASE_URL,
+  getDownloadUrl,
+} from '../../data/desktopApp';
 import './css/desktopAppPrompt.css';
+
+const PLATFORM_ICONS = {
+  windows: FaWindows,
+  macos: FaApple,
+  linux: FaLinux,
+};
 
 /**
  * DesktopAppPrompt — aviso "oye la canción completa en la app de escritorio".
@@ -95,6 +107,38 @@ export default function DesktopAppPrompt() {
             </li>
           ))}
         </ul>
+
+        <div className="desktop-prompt-platforms">
+          {DESKTOP_PLATFORM_GROUPS.map((group) => {
+            const OsIcon = PLATFORM_ICONS[group.os] || FaDesktop;
+            return (
+              <div key={group.os} className="desktop-prompt-platform-group">
+                <span className="desktop-prompt-platform-group-title">
+                  <OsIcon aria-hidden="true" />
+                  {t(group.labelKey)}
+                </span>
+                <div className="desktop-prompt-platform-options">
+                  {group.options.map((option) => {
+                    const url = getDownloadUrl(option);
+                    return (
+                      <a
+                        key={option.id}
+                        href={url || DESKTOP_RELEASE_URL}
+                        className="desktop-prompt-platform-option"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={handleClose}
+                      >
+                        <span className="desktop-prompt-platform-arch">{option.arch}</span>
+                        <FaDownload className="desktop-prompt-platform-download" aria-hidden="true" />
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
 
         <div className="desktop-prompt-actions">
           <Link to={DESKTOP_DOWNLOAD_PATH} className="desktop-prompt-download" onClick={handleClose}>

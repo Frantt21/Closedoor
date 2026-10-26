@@ -35,18 +35,32 @@ const VIDEO_NOISE_RE = /[([][^)\]]*\b(?:official|oficial|video|videoclip|audio|l
 
 /**
  * Miniatura para el frontend.
- * - YouTube Music devuelve arte de álbum en yt3.googleusercontent.com; se sube
- *   a 400×400 (la URL viene a 60/120 px).
+ * - `lh3.googleusercontent.com` es el arte de álbum real; se sube a 400×400
+ *   (la URL viene a 60/120 px).
+ * - `yt3.googleusercontent.com` es el avatar del canal/artista, NO la portada
+ *   de la canción. Cuando conocemos el videoId se prefiere la miniatura del
+ *   vídeo (`i.ytimg.com`), que es la portada que ve el usuario en YouTube.
+ * - Sin videoId se devuelve la URL tal cual (upscaled si es de googleusercontent).
  * - Vídeos: se usa mqdefault por videoId (16:9 sin bandas y sin la firma
  *   `sqp`/`rs` que caduca).
  */
 function normalizeYouTubeArtwork(url, videoId) {
   const value = String(url || '').trim();
+  const videoThumb = videoId
+    ? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`
+    : '';
+
+  if (value.includes('yt3.googleusercontent.com')) {
+    // Avatar del canal: no es la portada de la canción.
+    if (videoThumb) return videoThumb;
+    return value.replace(/=w\d+-h\d+.*$/i, '=w400-h400-l90-rj');
+  }
+
   if (value.includes('googleusercontent.com')) {
     return value.replace(/=w\d+-h\d+.*$/i, '=w400-h400-l90-rj');
   }
-  if (!videoId) return value;
-  return `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+
+  return value || videoThumb;
 }
 
 /**
