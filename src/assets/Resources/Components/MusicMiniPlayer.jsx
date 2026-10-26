@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { FaPlay, FaPause, FaTimes, FaExpand, FaMusic, FaSpinner } from 'react-icons/fa';
+import { FaPlay, FaPause, FaTimes, FaExpand, FaSpinner } from 'react-icons/fa';
 import { useI18n } from '../../services/i18n/useI18n';
 import { useAuth } from '../../../hooks/useAuth';
+import SongArtwork from './SongArtwork';
 import './css/musicMiniPlayer.css';
 
 function formatTime(s) {
@@ -157,17 +158,12 @@ export default function MusicMiniPlayer({
           disabled={!canExpand}
           title={canExpand ? (t('music.view_profile') || 'View profile') : undefined}
         >
-          {song.artwork ? (
-            <img
-              className="music-mini-art-img"
-              src={song.artwork}
-              alt=""
-              draggable={false}
-              onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }}
-            />
-          ) : (
-            <span className="music-mini-art-img music-mini-art-img--empty"><FaMusic /></span>
-          )}
+          <SongArtwork
+            song={song}
+            className="music-mini-art-img"
+            emptyClassName="music-mini-art-img--empty"
+            draggable={false}
+          />
           <span className={`music-mini-art-disc${playing ? ' music-mini-art-disc--playing' : ''}`}>
             {loading ? <FaSpinner className="fc-spin" /> : (playing ? <FaPause /> : <FaPlay />)}
           </span>

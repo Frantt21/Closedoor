@@ -22,6 +22,7 @@ import {
   subscribeToTyping,
   getNicknames, getCachedNicknames, cacheNicknames,
   getBubbleColors, getCachedBubbleColors, cacheBubbleColors,
+  getChatBackgrounds,
   getPinnedMessages, getDecryptedMessages,
 } from '../services/chatService';
 import { getFollowing } from '../services/followService';
@@ -40,6 +41,7 @@ import { getTimeAgo, IMG_RE, detectMediaFromContent, getImageStyle, sanitizeUrl 
 import { getClipboardImageFile } from '../services/clipboard';
 import NicknameModal from '../Resources/Components/NicknameModal';
 import BubbleColorModal from '../Resources/Components/BubbleColorModal';
+import ChatBackgroundModal from '../Resources/Components/ChatBackgroundModal';
 import { getPost } from '../services/postService';
 import { getContrastFromHex } from '../services/colorExtractor';
 import RichText from '../Resources/Components/RichText';
@@ -179,6 +181,10 @@ export default function Chat() {
   });
   // Bubble color modal state
   const [bubbleColorModal, setBubbleColorModal] = useState({ open: false, convId: null });
+  // Fondo del chat: map conversation_id → url (solo del usuario actual, DB privada)
+  const [chatBackgrounds, setChatBackgrounds] = useState({});
+  // Chat background modal state
+  const [chatBackgroundModal, setChatBackgroundModal] = useState({ open: false, convId: null });
   // ── Chat header dropdown (desktop): más opciones ──
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false);
   const headerMenuRef = useRef(null);
@@ -752,6 +758,21 @@ export default function Chat() {
       supabase.removeChannel(bubbleColorsChannelRef.current);
       bubbleColorsChannelRef.current = null;
     };
+  }, [user?.id]);
+
+  // ── Fondos de chat del usuario (uno por conversación, privados) ──
+  // Se cargan una vez por sesión: la tabla es pequeña (una fila por conversación
+  // con fondo) y el RLS ya limita el resultado a las filas de auth.uid().
+  useEffect(() => {
+    let cancelled = false;
+    if (!user?.id) {
+      setChatBackgrounds({});
+      return () => { cancelled = true; };
+    }
+    getChatBackgrounds(user.id).then((map) => {
+      if (!cancelled) setChatBackgrounds(map || {});
+    });
+    return () => { cancelled = true; };
   }, [user?.id]);
 
   // ── Load messages when active conversation changes ──
@@ -1417,6 +1438,12 @@ export default function Chat() {
   const openBubbleColorModal = useCallback((convId) => {
     if (!convId) return;
     setBubbleColorModal({ open: true, convId });
+  }, []);
+
+  // ── Open chat background modal (header/dropdown) ──
+  const openChatBackgroundModal = useCallback((convId) => {
+    if (!convId) return;
+    setChatBackgroundModal({ open: true, convId });
   }, []);
 
   // ── Pin/unpin conversation ──
@@ -2757,6 +2784,9 @@ export default function Chat() {
     </>
   );
 
+  // Fondo de la conversación abierta ('' si no tiene): privado del usuario.
+  const activeChatBackground = (activeConvId && chatBackgrounds[activeConvId]) || '';
+
   // ── Render message area content ──
   // NOTA: FRAGMENT — el <div className="chat-messages"> lo pone el caller
   // (mismo patrón que renderConversationListContent / la card flotante).
@@ -2847,6 +2877,10 @@ export default function Chat() {
                     <FaPalette />
                     <span>{t('chat.bubble_colors') || 'Bubble colors'}</span>
                   </button>
+                  <button className="chat-context-menu-btn" onClick={() => { setHeaderMenuOpen(false); openChatBackgroundModal(activeConvId); }}>
+                    <FaImage />
+                    <span>{t('chat.background') || 'Chat background'}</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -2901,6 +2935,12 @@ export default function Chat() {
           </button>
           <button
             className="chat-mobile-header-menu-item"
+            onClick={() => { setShowMobileMenu(false); openChatBackgroundModal(activeConvId); }}
+          >
+            <FaImage /> {t('chat.background') || 'Chat background'}
+          </button>
+          <button
+            className="chat-mobile-header-menu-item"
             onClick={() => { setShowMobileMenu(false); setConfirmBlock(true); }}
           >
             <FaBan /> {getCachedBlockStatus(user?.id, otherUser?.id) === true ? t('block.unblock') : t('block.block')}
@@ -2915,11 +2955,22 @@ export default function Chat() {
       )}
 
       {/* Messages — key=activeConvId fuerza remount completo al cambiar de chat */}
-      <div className="chat-messages-body" ref={messagesContainerRef} style={{
+      <div className={`chat-messages-body${activeChatBackground ? ' chat-messages-body--custom-bg' : ''}`} ref={messagesContainerRef} style={{
         '--chat-bubble-own': bubbleColors[activeConvId]?.own || '#111111',
         '--chat-bubble-own-text': getContrastFromHex(bubbleColors[activeConvId]?.own),
         '--chat-bubble-other': bubbleColors[activeConvId]?.other || 'var(--color-surface-hover, #252525)',
         '--chat-bubble-other-text': getContrastFromHex(bubbleColors[activeConvId]?.other),
+        // Fondo propio de ESTA conversación (tabla privada chat_background_settings):
+        // el velo oscuro va en el mismo background para que las burbujas y el
+        // texto sigan legibles sobre cualquier imagen, sin capas extra.
+        ...(activeChatBackground
+          ? {
+              backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.55)), url("${activeChatBackground.replace(/"/g, '%22')}")`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+            }
+          : null),
       }}>
         {msgsLoading ? (
           <div className="chat-messages-loading">
@@ -3406,40 +3457,58 @@ export default function Chat() {
             </div>
           </div>
         )}
-        {/* Media URL input */}
+        {/* Media (imagen) picker — misma shell embebida que GIF y canciones
+            (.gif-picker + .gif-picker-header), para que los cuatro selectores
+            del composer (emojis, GIF, imagen, canción) se vean iguales. */}
         {showMediaInput && (
-          <div className="chat-media-input-bar">
-            <label className="chat-media-upload-btn">
-              {uploadingChatMedia ? <FaSpinner className="fc-spin" /> : <FaUpload />}
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/gif,image/webp"
-                onChange={handleChatMediaUpload}
-                disabled={uploadingChatMedia}
-                style={{ position: 'absolute', opacity: 0, width: 0, height: 0 }}
-              />
-            </label>
-            <input
-              className="chat-media-input"
-              type="url"
-              value={mediaUrl}
-              onChange={(e) => setMediaUrl(e.target.value)}
-              placeholder={t('chat.media_placeholder')}
-              autoFocus
-            />
-            <button
-              className="chat-media-input-btn"
-              onClick={handleMediaSend}
-              disabled={!mediaUrl.trim()}
-            >
-              Add
-            </button>
-            <button
-              className="chat-media-input-close"
-              onClick={() => { setShowMediaInput(false); setMediaUrl(''); }}
-            >
-              <FaTimes />
-            </button>
+          <div className="gif-picker chat-media-picker">
+            <div className="gif-picker-header">
+              <label
+                className="chat-media-picker-upload"
+                title={t('chat.media_gallery')}
+              >
+                {uploadingChatMedia ? <FaSpinner className="fc-spin" /> : <FaUpload size={12} />}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/gif,image/webp"
+                  onChange={handleChatMediaUpload}
+                  disabled={uploadingChatMedia}
+                />
+              </label>
+              <div className="gif-picker-search-wrap">
+                <FaImage className="gif-picker-search-icon" size={12} />
+                <input
+                  className="gif-picker-search-input"
+                  type="url"
+                  value={mediaUrl}
+                  onChange={(e) => setMediaUrl(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (mediaUrl.trim()) handleMediaSend();
+                    }
+                  }}
+                  placeholder={t('chat.media_placeholder')}
+                  autoFocus
+                />
+              </div>
+              <button
+                type="button"
+                className="chat-song-picker-search-btn"
+                onClick={handleMediaSend}
+                disabled={!mediaUrl.trim()}
+              >
+                Add
+              </button>
+              <button
+                type="button"
+                className="gif-picker-close"
+                onClick={() => { setShowMediaInput(false); setMediaUrl(''); }}
+                aria-label={t('common.close')}
+              >
+                <FaTimes size={13} />
+              </button>
+            </div>
           </div>
         )}          <div className="chat-input-inner">
           <textarea
@@ -4129,6 +4198,23 @@ export default function Chat() {
           />
         );
       })()}
+
+      {/* Fondo del chat: modal ligado a la conversación abierta (privado) */}
+      {chatBackgroundModal.open && chatBackgroundModal.convId && (
+        <ChatBackgroundModal
+          conversationId={chatBackgroundModal.convId}
+          currentUrl={chatBackgrounds[chatBackgroundModal.convId] || ''}
+          onClose={() => setChatBackgroundModal({ open: false, convId: null })}
+          onSaved={(url) => {
+            setChatBackgrounds((prev) => {
+              const next = { ...prev };
+              if (url) next[chatBackgroundModal.convId] = url;
+              else delete next[chatBackgroundModal.convId];
+              return next;
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

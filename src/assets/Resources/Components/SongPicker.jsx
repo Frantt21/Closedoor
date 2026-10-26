@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { FaMusic, FaPaperPlane, FaSearch, FaSpinner, FaTimes } from 'react-icons/fa';
 import { useI18n } from '../../services/i18n/useI18n';
 import { searchMusic } from '../../services/musicService';
+import SongArtwork from './SongArtwork';
 // Shell compartida con el picker de GIF: así el contenedor de búsqueda de
 // canciones tiene exactamente la misma estética que el resto de contenedores
 // embebidos del chat (borde, radios, superficie, header y buscador).
@@ -126,19 +127,12 @@ export default function SongPicker({ onSelect, onClose }) {
                 onClick={() => onSelect(song)}
                 title={t('chat.share_song')}
               >
-                {song.artwork ? (
-                  <img
-                    className="chat-song-picker-art"
-                    src={song.artwork}
-                    alt=""
-                    loading="lazy"
-                    onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }}
-                  />
-                ) : (
-                  <span className="chat-song-picker-art chat-song-picker-art--empty">
-                    <FaMusic />
-                  </span>
-                )}
+                <SongArtwork
+                  song={song}
+                  className="chat-song-picker-art"
+                  emptyClassName="chat-song-picker-art--empty"
+                  loading="lazy"
+                />
                 <span className="chat-song-picker-info">
                   <span className="chat-song-picker-title">{song.title}</span>
                   <span className="chat-song-picker-artist">{song.artist}</span>

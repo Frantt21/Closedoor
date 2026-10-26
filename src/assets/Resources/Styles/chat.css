@@ -1698,99 +1698,44 @@
     letter-spacing: 0.02em;
 }
 
-/* ── Media URL input bar ── */
-.chat-media-input-bar {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 12px;
-    border: 1px solid var(--color-border, #2a2a2a);
-    border-radius: var(--radius, 10px);
-    background: var(--color-surface, #1a1a1a);
+/* ── Media (imagen) container ──
+   Misma shell embebida que el picker de GIF y el buscador de canciones
+   (.gif-picker / .gif-picker-header / .gif-picker-search-wrap + -input /
+   .gif-picker-close, todos en gifPicker.css): el contenedor para subir una
+   imagen queda idéntico al de GIF, música y emojis del composer. Aquí solo
+   vive el botón de subida, que es propio de este picker. */
+.chat-media-picker .gif-picker-header {
+    padding: 8px 10px;
 }
 
-.chat-media-input {
-    flex: 1;
-    padding: 6px 10px;
-    border: none;
-    border-radius: var(--radius, 10px);
-    font-size: 0.82rem;
-    font-family: inherit;
-    color: var(--color-text, #ffffff);
-    background: var(--overlay-bg-subtle);
-    outline: none;
-}
-
-.chat-media-input::placeholder {
-    color: var(--color-text-muted, #6b7280);
-}
-
-.chat-media-input-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 5px 12px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    font-family: inherit;
-    border: none;
-    border-radius: var(--radius-sm, 6px);
-    background: var(--color-text, #ffffff);
-    color: var(--color-bg, #000000);
-    cursor: pointer;
-    transition: opacity 0.12s ease;
+.chat-media-picker-upload {
+    position: relative;
     flex-shrink: 0;
-}
-
-.chat-media-input-btn:hover:not(:disabled) {
-    opacity: 0.85;
-}
-
-.chat-media-input-btn:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-}
-
-.chat-media-upload-btn {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     justify-content: center;
     width: 28px;
     height: 28px;
-    border: none;
     border-radius: var(--radius-sm, 6px);
     background: transparent;
     color: var(--color-text-muted, #6b7280);
     cursor: pointer;
     font-size: 0.75rem;
-    flex-shrink: 0;
-    transition: background 0.12s ease, color 0.12s ease;
+    transition: background 0.15s ease, color 0.15s ease;
 }
 
-.chat-media-upload-btn:hover {
+.chat-media-picker-upload:hover {
     background: var(--color-surface-hover, #252525);
     color: var(--color-text, #ffffff);
 }
 
-.chat-media-input-close {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    border: none;
-    border-radius: 50%;
-    background: transparent;
-    color: var(--color-text-muted, #6b7280);
-    cursor: pointer;
-    font-size: 0.75rem;
-    flex-shrink: 0;
-    transition: background 0.12s ease, color 0.12s ease;
-}
-
-.chat-media-input-close:hover {
-    background: var(--overlay-bg);
-    color: var(--color-text, #ffffff);
+/* El <input type="file"> no se pinta: el <label> hace de botón. */
+.chat-media-picker-upload input[type='file'] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
 }
 
 /* ── Message pin badge ── */
@@ -3784,4 +3729,112 @@ dialog.fc-modal.chat-followers-modal {
     border-radius: 16px;
     font-size: 0.82rem;
     max-width: 75%;
+}
+
+/* ── Chat background (imagen de fondo por conversación, solo del usuario) ──
+   La imagen y el velo oscuro los pone el inline style de .chat-messages-body
+   (ver Chat.jsx); aquí solo se asegura un color base detrás por si la imagen
+   tarda en cargar o trae zonas transparentes. */
+.chat-messages-body--custom-bg {
+    background-color: #0b0b0f;
+}
+
+.chat-bg-preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 140px;
+    padding: 12px;
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius, 10px);
+    background-color: var(--color-surface, #1a1a1a);
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    overflow: hidden;
+}
+
+.chat-bg-preview--empty {
+    color: var(--color-text-muted, #6b7280);
+    font-size: 0.78rem;
+}
+
+.chat-bg-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.chat-bg-upload,
+.chat-bg-remove {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 12px;
+    border: none;
+    border-radius: var(--radius-sm, 6px);
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.chat-bg-upload:hover,
+.chat-bg-remove:hover {
+    background: var(--overlay-bg, rgba(255, 255, 255, 0.1));
+}
+
+.chat-bg-upload--busy,
+.chat-bg-upload:has(input:disabled),
+.chat-bg-remove:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* El <input type="file"> no se pinta: el <label> hace de botón. */
+.chat-bg-upload input[type='file'] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.chat-bg-remove {
+    color: #f87171;
+}
+
+.chat-bg-url {
+    width: 100%;
+    margin-top: 12px;
+    padding: 8px 10px;
+    box-sizing: border-box;
+    font-family: inherit;
+    font-size: 0.78rem;
+    color: var(--color-text, #ffffff);
+    background: var(--overlay-bg-subtle, rgba(255, 255, 255, 0.04));
+    border: 1px solid var(--color-border, #2a2a2a);
+    border-radius: var(--radius-sm, 6px);
+    outline: none;
+}
+
+.chat-bg-url:focus {
+    border-color: var(--color-text-muted, #6b7280);
+}
+
+.chat-bg-url::placeholder {
+    color: var(--color-text-muted, #6b7280);
+}
+
+.chat-bg-hint {
+    margin: 8px 0 0;
+    font-size: 0.72rem;
+    color: var(--color-text-muted, #6b7280);
 }

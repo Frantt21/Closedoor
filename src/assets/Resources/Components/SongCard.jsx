@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { FaMusic, FaPlay, FaPause, FaPencilAlt, FaTrash, FaSearch, FaSpinner } from 'react-icons/fa';
 import { useI18n } from '../../services/i18n/useI18n';
 import { useAuth } from '../../../hooks/useAuth';
-import { searchMusic, songKey, withPreviewFallback } from '../../services/musicService';
+import { searchMusic, songArtworkUrl, songKey, withPreviewFallback } from '../../services/musicService';
+import SongArtwork from './SongArtwork';
 import { useMusicPlayer } from '../../../hooks/useMusicPlayer';
 import { updateUserProfile } from '../../services/userService';
 import { toast } from 'react-toastify';
@@ -229,19 +230,12 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle, owner }) {
                     onClick={() => saveSong(r)}
                     disabled={saving}
                   >
-                    {r.artwork ? (
-                      <img
-                        className="song-card-result-art"
-                        src={r.artwork}
-                        alt=""
-                        loading="lazy"
-                        onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }}
-                      />
-                    ) : (
-                      <span className="song-card-result-art song-card-result-art--empty">
-                        <FaMusic />
-                      </span>
-                    )}
+                    <SongArtwork
+                      song={r}
+                      className="song-card-result-art"
+                      emptyClassName="song-card-result-art--empty"
+                      loading="lazy"
+                    />
                     <span className="song-card-result-info">
                       <span className="song-card-result-title">{r.title}</span>
                       <span className="song-card-result-artist">{r.artist}</span>
@@ -289,19 +283,13 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle, owner }) {
                 disabled={!canPlay}
                 title={loadingHere ? t('profile.song_loading') || 'Loading…' : (playing ? t('profile.song_pause') : t('profile.song_play'))}
               >
-                {selected.artwork ? (
-                  <img
-                    className="song-card-cover-img"
-                    src={selected.artwork}
-                    alt={selected.title || ''}
-                    loading="lazy"
-                    onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }}
-                  />
-                ) : (
-                  <span className="song-card-cover-img song-card-cover-img--empty">
-                    <FaMusic />
-                  </span>
-                )}
+                <SongArtwork
+                  song={selected}
+                  className="song-card-cover-img"
+                  emptyClassName="song-card-cover-img--empty"
+                  alt={selected.title || ''}
+                  loading="lazy"
+                />
                 <span className="song-card-cover-time">
                   {formatTime(currentTime)} / {formatTime(duration)}
                 </span>
@@ -343,7 +331,10 @@ export default function SongCard({ song, isOwnProfile, surfaceStyle, owner }) {
               disabled={!canPlay}
               title={playing ? t('profile.song_pause') : t('profile.song_play')}
             >
-              <span className="song-card-vinyl-art" style={{ backgroundImage: `url(${selected.artwork})` }} />
+              <span
+                className="song-card-vinyl-art"
+                style={songArtworkUrl(selected) ? { backgroundImage: `url(${songArtworkUrl(selected)})` } : undefined}
+              />
             </button>
           </div>
 

@@ -1011,3 +1011,77 @@ export function getCachedBubbleColors(userId) {
   } catch { return null; }
 }
 
+// ── Fondo del chat (per-conversation, per-user) ──
+// Tabla chat_background_settings (migración 078). Es PRIVADO: las políticas RLS
+// solo dejan leer/escribir las filas de auth.uid(), así que el otro
+// participante nunca ve ni recibe el fondo del chat.
+
+/** Normaliza una URL de fondo: solo http(s), o null si no es válida. */
+function normalizeBackgroundUrl(value) {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fondos de chat del usuario, listos para pintar.
+ * @returns {Promise<Record<string, string>>} `{ [conversation_id]: url }`
+ */
+export async function getChatBackgrounds(userId) {
+  if (!userId) return {};
+  const { data, error } = await supabase
+    .from('chat_background_settings')
+    .select('conversation_id, image_url')
+    .eq('user_id', userId);
+  if (error) {
+    console.warn('[Chat] Error fetching chat backgrounds:', error);
+    return {};
+  }
+  const map = {};
+  (data || []).forEach((row) => {
+    if (row?.conversation_id && row?.image_url) map[row.conversation_id] = row.image_url;
+  });
+  return map;
+}
+
+/**
+ * Guarda el fondo de una conversación (upsert).
+ *
+ * `imageUrl` vacío / null QUITA el fondo: se borra la fila en lugar de guardar
+ * NULL, así no queda una fila muerta por cada conversación y la preferencia se
+ * puede revertir al estado por defecto.
+ *
+ * @param {string} imageUrl - URL http(s) de la imagen, o '' / null para quitarlo
+ */
+export async function setChatBackground(userId, conversationId, imageUrl) {
+  if (!userId || !conversationId) return;
+
+  const url = normalizeBackgroundUrl(imageUrl);
+  if (!url) {
+    const { error } = await supabase
+      .from('chat_background_settings')
+      .delete()
+      .eq('user_id', userId)
+      .eq('conversation_id', conversationId);
+    if (error) throw error;
+    return;
+  }
+
+  const { error } = await supabase
+    .from('chat_background_settings')
+    .upsert(
+      {
+        user_id: userId,
+        conversation_id: conversationId,
+        image_url: url,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id,conversation_id' }
+    );
+  if (error) throw error;
+}
+

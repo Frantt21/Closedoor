@@ -1,7 +1,8 @@
-import { FaMusic, FaPause, FaPlay, FaSpinner } from 'react-icons/fa';
+import { FaPause, FaPlay, FaSpinner } from 'react-icons/fa';
 import { useI18n } from '../../services/i18n/useI18n';
 import { useMusicPlayer } from '../../../hooks/useMusicPlayer';
 import { songKey } from '../../services/musicService';
+import SongArtwork from './SongArtwork';
 
 /**
  * ChatSongCard — canción compartida en un mensaje del chat.
@@ -57,19 +58,12 @@ export default function ChatSongCard({ song }) {
         aria-label={label}
         title={label}
       >
-        {song.artwork ? (
-          <img
-            className="chat-song-art-img"
-            src={song.artwork}
-            alt=""
-            loading="lazy"
-            onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }}
-          />
-        ) : (
-          <span className="chat-song-art-img chat-song-art-img--empty">
-            <FaMusic />
-          </span>
-        )}
+        <SongArtwork
+          song={song}
+          className="chat-song-art-img"
+          emptyClassName="chat-song-art-img--empty"
+          loading="lazy"
+        />
         <span className="chat-song-art-overlay">
           {loading ? <FaSpinner className="fc-spin" /> : (isPlaying ? <FaPause /> : <FaPlay />)}
         </span>

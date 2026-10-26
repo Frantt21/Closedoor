@@ -3,6 +3,10 @@
   "productName": "Closedoor",
   "version": "0.1.0",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Frantt21/Closedoor.git"
+  },
   "description": "App de escritorio de Closedoor: la misma web, con las canciones completas del perfil (servidor de música local en 127.0.0.1)",
   "homepage": "https://app.foranly.space",
   "author": "Foranly",

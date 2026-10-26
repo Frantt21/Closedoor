@@ -117,6 +117,34 @@ export function songKey(song) {
 }
 
 /**
+ * URL de la miniatura de una canción, lista para pintar.
+ *
+ * `artwork` es un campo que se GUARDA (jsonb `messages.shared_song`, canción
+ * del perfil), así que los registros antiguos o escritos por el cliente pueden
+ * venir sin él. Para una canción de YouTube el videoId siempre existe, así que
+ * se deriva la miniatura de ahí en vez de dejar el hueco vacío para siempre.
+ * Devuelve '' si no hay forma de conocerla (el que pinta muestra el icono).
+ */
+export function songArtworkUrl(song) {
+  const art = typeof song?.artwork === 'string' ? song.artwork.trim() : '';
+  if (art) return art;
+  if (song?.provider === 'youtube' && song.trackId) {
+    return `https://i.ytimg.com/vi/${encodeURIComponent(song.trackId)}/mqdefault.jpg`;
+  }
+  return '';
+}
+
+/**
+ * La misma miniatura servida same-origin: el backend la descarga y la devuelve
+ * con CORS. Es el respaldo cuando el navegador no puede pedir el CDN original
+ * (red/DNS que bloquea el host, hotlink o una CSP antigua que no autoriza
+ * `https:` en img-src). Misma ruta que usa colorExtractor para lo mismo.
+ */
+export function proxiedArtworkUrl(url) {
+  return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+}
+
+/**
  * URL de stream completo de una canción. Same-origin, servida por el backend
  * con innertube. La URL de googlevideo no se expone al navegador.
  * Retorna null si la canción no tiene título. Para resultados de YouTube se
