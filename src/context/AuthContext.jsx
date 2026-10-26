@@ -36,7 +36,28 @@ import { validateEmail } from "../assets/services/userService";
 export const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+const MAX_CLOSE_CONFIRM_MS = 60000;
+  let closeConfirmTimer = null;
+
+  const clearCloseConfirmTimer = () => {
+    if (closeConfirmTimer !== null) {
+      clearTimeout(closeConfirmTimer);
+      closeConfirmTimer = null;
+    }
+  };
+
+  const scheduleCloseConfirm = () => {
+    clearCloseConfirmTimer();
+    if (isLogoutConfirmed) return;
+    closeConfirmTimer = setTimeout(() => {
+      setIsLogoutConfirmed(true);
+    }, MAX_CLOSE_CONFIRM_MS);
+  };
+
+  const cancelCloseConfirm = () => {
+    clearCloseConfirmTimer();
+    setIsLogoutConfirmed(false);
+  };
   const [profile, setProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -700,6 +721,29 @@ export function AuthProvider({ children }) {
   //  - dejar intacta la sesión de los demás clientes que estén abiertos.
 
   // ── Estado del cierre de sesión ──
+  const [isLogoutConfirmed, setIsLogoutConfirmed] = useState(false);
+  const MAX_CLOSE_CONFIRM_MS = 60000;
+  let closeConfirmTimer = null;
+
+  const clearCloseConfirmTimer = () => {
+    if (closeConfirmTimer !== null) {
+      clearTimeout(closeConfirmTimer);
+      closeConfirmTimer = null;
+    }
+  };
+
+  const scheduleCloseConfirm = () => {
+    clearCloseConfirmTimer();
+    if (isLogoutConfirmed) return;
+    closeConfirmTimer = setTimeout(() => {
+      setIsLogoutConfirmed(true);
+    }, MAX_CLOSE_CONFIRM_MS);
+  };
+
+  const cancelCloseConfirm = () => {
+    clearCloseConfirmTimer();
+    setIsLogoutConfirmed(false);
+  };
   const currentSession = user?.id
     ? {
         userId: user.id,
