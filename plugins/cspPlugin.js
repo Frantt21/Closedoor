@@ -54,6 +54,11 @@ function buildCSP() {
     // Búsqueda de música: iTunes directo desde el navegador (los previews de
     // Deezer van por el proxy same-origin /api/music-search).
     'https://itunes.apple.com',
+    // Extracción de colores (services/colorExtractor): último recurso cuando la
+    // imagen no se puede leer directamente por CORS. Sin esto, la CSP bloquea
+    // la petición y el acento del fondo del chat (y los colores de banners
+    // externos) cae siempre a la paleta por defecto.
+    'https://wsrv.nl',
     'https://api.klipy.com',
     'https://challenges.cloudflare.com',
     // LiveKit Cloud (el server devuelve la URL real en /api/livekit-token)

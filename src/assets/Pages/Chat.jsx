@@ -43,7 +43,7 @@ import NicknameModal from '../Resources/Components/NicknameModal';
 import BubbleColorModal from '../Resources/Components/BubbleColorModal';
 import ChatBackgroundModal from '../Resources/Components/ChatBackgroundModal';
 import { getPost } from '../services/postService';
-import { darkenHex, extractColors, getContrastFromHex, hexToRgba } from '../services/colorExtractor';
+import { ensureDarkSurface, extractColors, getContrastFromHex, hexToRgba, mixHex } from '../services/colorExtractor';
 import RichText from '../Resources/Components/RichText';
 import SafeImage from '../Resources/Components/SafeImage';
 import ConfirmModal from '../Resources/Components/ConfirmModal';
@@ -766,9 +766,9 @@ export default function Chat() {
   // ── Acento del fondo (color dominante) ──
   // Se extrae de la propia imagen con colorExtractor (cachea por URL en
   // localStorage) y tiñe cabecera + caja de entrada (ver chat.css
-  // `.chat-messages--accent`). Si la imagen no se puede leer (CORS/red),
-  // extractColors devuelve su paleta por defecto y el resultado sigue siendo
-  // superficies oscuras legibles.
+  // `.chat-messages--accent`). Si la imagen no se puede leer (CORS/red) NO se
+  // pinta nada: se queda el estilo por defecto en vez de un gris que parecía
+  // un fallo del acento.
   const [chatAccent, setChatAccent] = useState('');
 
   useEffect(() => {
@@ -780,8 +780,14 @@ export default function Chat() {
     extractColors(activeChatBackground)
       .then((colors) => {
         if (cancelled) return;
-        const accent = Array.isArray(colors) ? colors[0] : '';
-        setChatAccent(typeof accent === 'string' && /^#[0-9a-f]{6}$/i.test(accent) ? accent : '');
+        const accent = Array.isArray(colors) ? String(colors[0] || '') : '';
+        // '#ffffff' como color dominante NO es un acento real: el algoritmo
+        // descarta los píxeles casi blancos, así que ese valor es la paleta de
+        // RESPALDO que devuelve extractColors cuando no pudo leer la imagen
+        // (CORS/red/timeout). Pintar con ella dejaba cabecera e input grises y
+        // parecía que el acento no se había aplicado. Sin acento, no se pinta.
+        const usable = /^#[0-9a-f]{6}$/i.test(accent) && accent.toLowerCase() !== '#ffffff';
+        setChatAccent(usable ? accent : '');
       })
       .catch(() => {
         if (!cancelled) setChatAccent('');
@@ -2981,22 +2987,13 @@ export default function Chat() {
       )}
 
       {/* Messages — key=activeConvId fuerza remount completo al cambiar de chat */}
-      <div className={`chat-messages-body${activeChatBackground ? ' chat-messages-body--custom-bg' : ''}`} ref={messagesContainerRef} style={{
+      <div className="chat-messages-body" ref={messagesContainerRef} style={{
         '--chat-bubble-own': bubbleColors[activeConvId]?.own || '#111111',
         '--chat-bubble-own-text': getContrastFromHex(bubbleColors[activeConvId]?.own),
         '--chat-bubble-other': bubbleColors[activeConvId]?.other || 'var(--color-surface-hover, #252525)',
         '--chat-bubble-other-text': getContrastFromHex(bubbleColors[activeConvId]?.other),
-        // Fondo propio de ESTA conversación (tabla privada chat_background_settings):
-        // el velo oscuro va en el mismo background para que las burbujas y el
-        // texto sigan legibles sobre cualquier imagen, sin capas extra.
-        ...(activeChatBackground
-          ? {
-              backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.55)), url("${activeChatBackground.replace(/"/g, '%22')}")`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-            }
-          : null),
+        // El fondo de la conversación NO va aquí: vive en la card
+        // (.chat-messages), y el body queda transparente para dejarlo ver.
       }}>
         {msgsLoading ? (
           <div className="chat-messages-loading">
@@ -3597,14 +3594,28 @@ export default function Chat() {
       </div>
       <div
         className={`chat-messages${showList ? ' chat-messages--hide-mobile' : ''}${chatAccent ? ' chat-messages--accent' : ''}`}
-        style={chatAccent ? {
-          // Acento del fondo del chat: el color dominante de la imagen tiñe la
-          // cabecera y la caja de entrada. Las superficies van oscurecidas para
-          // que el texto/iconos blancos sigan legibles con cualquier acento.
-          '--chat-accent': chatAccent,
-          '--chat-accent-header': darkenHex(chatAccent, 0.72) || 'transparent',
-          '--chat-accent-input': darkenHex(chatAccent, 0.62) || 'transparent',
-          '--chat-accent-border': hexToRgba(chatAccent, 0.5) || 'transparent',
+        style={activeChatBackground ? {
+          // Fondo personalizado de ESTA conversación (tabla privada
+          // chat_background_settings), en la CARD y no en el body: así cubre
+          // todo el chat (mensajes, franja del composer y pill del input) y las
+          // zonas que no pintan fondo dejan verlo en vez de taparlo.
+          // El velo oscuro va en el mismo background para que burbujas y texto
+          // sigan legibles sobre cualquier imagen, sin capas extra.
+          backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.55)), url("${activeChatBackground.replace(/"/g, '%22')}")`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          ...(chatAccent ? {
+            // Acento del fondo del chat: el color dominante de la imagen tiñe la
+            // cabecera y la caja de entrada. Se mezcla con la superficie del
+            // tema (no se oscurece hacia negro, que apagaba el tono y dejaba un
+            // gris) y luego se limita el brillo lo justo para que el texto
+            // blanco siga legible, también con acentos claros (amarillo, cian…).
+            '--chat-accent': chatAccent,
+            '--chat-accent-header': ensureDarkSurface(mixHex(chatAccent, '#1a1a1a', 0.5), 0.14) || 'transparent',
+            '--chat-accent-input': ensureDarkSurface(mixHex(chatAccent, '#1a1a1a', 0.62), 0.16) || 'transparent',
+            '--chat-accent-border': hexToRgba(chatAccent, 0.7) || 'transparent',
+          } : null),
         } : undefined}
       >
         {activeConvId ? renderMessageAreaContent() : (

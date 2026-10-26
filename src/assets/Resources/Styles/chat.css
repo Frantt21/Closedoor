@@ -395,7 +395,12 @@
     position: relative;
     margin: 12px 0 12px 6px;
     border-radius: var(--radius, 10px);
-    background: var(--color-surface, #1a1a1a);
+    /* FONDOS SEPARADOS. La card es la DUEÑA del fondo del chat: la superficie
+       del tema por defecto y la imagen personalizada cuando la hay (inline
+       style en Chat.jsx). Las zonas de dentro deciden si lo dejan ver
+       (cabecera = acento, mensajes y composer = transparentes) o lo tapan
+       (--chat-header-bg / --chat-composer-bg si se quisiera). */
+    background: var(--chat-card-bg, var(--color-surface, #1a1a1a));
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 
@@ -424,8 +429,9 @@
     justify-content: space-between;
     padding: 16px 16px 12px;
     border-bottom: 1px solid var(--color-border, #2a2a2a);
-    /* transparente → hereda la superficie de la card flotante */
-    background: transparent;
+    /* Fondo propio (antes transparente, dependía de la card): con fondo de
+       chat lo tiñe el acento desde Chat.jsx. */
+    background: var(--chat-header-bg, var(--color-surface, #1a1a1a));
 }
 
 .chat-messages-header-left {
@@ -557,8 +563,10 @@
     display: flex;
     flex-direction: column-reverse;
     gap: 4px;
-    /* transparente → hereda la superficie de la card flotante */
-    background: transparent;
+    /* Transparente a propósito: el fondo del chat (imagen o superficie de la
+       card) vive en .chat-messages y aquí debe verse. Si alguna vez se necesita
+       una capa propia (p. ej. velo), se pone --chat-body-bg. */
+    background-color: var(--chat-body-bg, transparent);
     /* No scrollbar-gutter: stable — overlay scrollbar, no real space */
     scrollbar-width: thin;
     scrollbar-color: var(--color-border, #2a2a2a) transparent;
@@ -1571,7 +1579,10 @@
     flex-direction: column;
     gap: 8px;
     margin: 12px 16px 12px 16px;
-    background: transparent;
+    /* La franja del composer NO pinta nada: el input flota con su propio fondo
+       (--chat-accent-input) sobre el fondo del chat, que vive en la card. Si se
+       quisiera una capa propia (velo), se pone --chat-composer-bg. */
+    background: var(--chat-composer-bg, transparent);
     position: relative;
 }
 
@@ -1626,12 +1637,16 @@
     position: relative;
     padding: 4px 6px 4px 14px;
     border-radius: 22px;
-    background: var(--color-surface-hover, #252525);
-    transition: border-color 0.2s ease;
+    /* Fondo propio del input: el acento del fondo del chat cuando lo hay
+       (--chat-accent-input), si no la superficie de siempre. */
+    background: var(--chat-accent-input, var(--color-surface-hover, #252525));
+    transition: box-shadow 0.2s ease;
 }
 
 .chat-input-inner:has(.chat-input:focus) {
-    border-color: var(--color-text-muted, #6b7280);
+    /* Sin relleno la única señal de foco es el anillo (dibujado fuera del box,
+       no tapa ni tine el fondo del chat). */
+    box-shadow: 0 0 0 1px var(--color-text-muted, #6b7280);
 }
 
 .chat-input {
@@ -3731,30 +3746,20 @@ dialog.fc-modal.chat-followers-modal {
     max-width: 75%;
 }
 
-/* ── Chat background (imagen de fondo por conversación, solo del usuario) ──
-   La imagen y el velo oscuro los pone el inline style de .chat-messages-body
-   (ver Chat.jsx); aquí solo se asegura un color base detrás por si la imagen
-   tarda en cargar o trae zonas transparentes. */
-.chat-messages-body--custom-bg {
-    background-color: #0b0b0f;
-}
 
 /* ── Acento extraído del fondo del chat ──
    El color dominante de la imagen tiñe la cabecera y la caja de entrada para
-   que el chat se integre con su fondo. Las superficies llegan YA oscurecidas
-   desde Chat.jsx (darkenHex 0.72 / 0.62), así que el texto blanco y los iconos
-   siguen legibles con cualquier acento (incluidos los claros). */
+   que el chat se integre con su fondo. Las superficies las calcula Chat.jsx
+   (mixHex con la superficie del tema + ensureDarkSurface), así que llegan con
+   el TONO del acento pero con brillo limitado: el texto y los iconos blancos
+   siguen legibles incluso con acentos claros (amarillo, cian…). */
 .chat-messages--accent .chat-messages-header {
-    background: var(--chat-accent-header, transparent);
+    background: var(--chat-accent-header, var(--chat-header-bg, var(--color-surface, #1a1a1a)));
     border-bottom-color: var(--chat-accent-border, var(--color-border, #2a2a2a));
 }
 
-.chat-messages--accent .chat-input-inner {
-    background: var(--chat-accent-input, var(--color-surface-hover, #252525));
-    box-shadow: 0 0 0 1px var(--chat-accent-border, transparent);
-}
-
-/* Foco: el acento puro marca el input activo (más visible que el gris). */
+/* Foco: el acento puro marca el input activo (más visible que el gris).
+   Es solo un anillo: el composer no tiene fondo propio ni con acento. */
 .chat-messages--accent .chat-input-inner:has(.chat-input:focus) {
     box-shadow: 0 0 0 1px var(--chat-accent, var(--color-text-muted, #6b7280));
 }

@@ -149,12 +149,37 @@ function loadBlobAndExtract(blob) {
  * Extract 4 dominant colors from an image URL.
  * Uses browser cache + localStorage cache to avoid repeated downloads.
  */
-export async function extractColors(imageUrl) {
-  if (!imageUrl) return ['#ffffff', '#555555', '#222222', '#000000'];
+const FALLBACK_COLORS = ['#ffffff', '#555555', '#222222', '#000000'];
 
-  // Check localStorage cache first
+/**
+ * `true` si la paleta es el RESPALDO de un fallo de lectura, no colores reales.
+ *
+ * El algoritmo descarta los píxeles casi blancos (r,g,b > 245), así que
+ * '#ffffff' como PRIMER color no puede salir de una imagen: solo está en
+ * FALLBACK_COLORS. Sirve para no pintar con gris un acento inexistente y para
+ * invalidar entradas de caché envenenadas por un fallo anterior.
+ */
+function isFallbackPalette(colors) {
+  return !Array.isArray(colors) || colors.length === 0 || colors[0] === FALLBACK_COLORS[0];
+}
+
+// URLs que fallaron hace poco: evita repetir los 3 intentos (directo → proxy
+// propio → wsrv) cada vez que se abre un chat con un fondo ilegible. Es solo un
+// cooldown en memoria, así que un arreglo de red entra en vigor al minuto.
+const recentFailures = new Map(); // url → timestamp
+const FAILURE_COOLDOWN = 60 * 1000;
+
+export async function extractColors(imageUrl) {
+  if (!imageUrl) return [...FALLBACK_COLORS];
+
+  // Check localStorage cache first. Una entrada con la paleta de respaldo es un
+  // fallo cacheado (versiones anteriores sí la guardaban) → se ignora y se
+  // reintenta, en vez de arrastrar "sin acento" para siempre en esa imagen.
   const cached = getCachedColors(imageUrl);
-  if (cached) return cached;
+  if (cached && !isFallbackPalette(cached)) return cached;
+
+  const failedAt = recentFailures.get(imageUrl);
+  if (failedAt && Date.now() - failedAt < FAILURE_COOLDOWN) return [...FALLBACK_COLORS];
 
   let colors;
 
@@ -173,11 +198,15 @@ export async function extractColors(imageUrl) {
       || await attemptExtraction(proxyViaWsrv(imageUrl));
   }
 
-  // Final fallback
+  // Sin lectura posible (CORS, red, timeout, CSP): se devuelve el respaldo pero
+  // NO se cachea, para que un reintento posterior (proxy disponible, red
+  // arreglada…) pueda dar colores reales en lugar de quedar fijado el fallo.
   if (!colors) {
-    colors = ['#ffffff', '#555555', '#222222', '#000000'];
+    recentFailures.set(imageUrl, Date.now());
+    return [...FALLBACK_COLORS];
   }
 
+  recentFailures.delete(imageUrl);
   setCachedColors(imageUrl, colors);
   return colors;
 }
@@ -263,6 +292,51 @@ export function darkenHex(hex, amount = 0.6) {
   const k = Math.min(Math.max(Number(amount) || 0, 0), 1);
   const channel = (c) => Math.round(c * (1 - k)).toString(16).padStart(2, '0');
   return `#${channel(rgb.r)}${channel(rgb.g)}${channel(rgb.b)}`;
+}
+
+/**
+ * Mezcla dos colores hex: devuelve `a` con peso `weightA` sobre `b`.
+ * weightA = 0 → b, weightA = 1 → a. Devuelve '' si algún hex no es válido.
+ *
+ * Se usa para teñir una superficie oscura con el acento sin perderlo: oscurecer
+ * el acento hacia negro (darkenHex) apaga el tono y la superficie acaba viéndose
+ * gris; mezclarlo con el fondo del tema mantiene el color reconocible.
+ */
+export function mixHex(hexA, hexB, weightA = 0.5) {
+  const a = parseHex(hexA);
+  const b = parseHex(hexB);
+  if (!a || !b) return '';
+  const k = Math.min(Math.max(Number(weightA) || 0, 0), 1);
+  const channel = (ca, cb) => Math.round(ca * k + cb * (1 - k)).toString(16).padStart(2, '0');
+  return `#${channel(a.r, b.r)}${channel(a.g, b.g)}${channel(a.b, b.b)}`;
+}
+
+/** Luminancia relativa (WCAG) de un color hex, 0 = negro, 1 = blanco. */
+function relativeLuminance(rgb) {
+  const srgb = (c) => {
+    c /= 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * srgb(rgb.r) + 0.7152 * srgb(rgb.g) + 0.0722 * srgb(rgb.b);
+}
+
+/**
+ * Oscurece un hex lo justo para que el texto BLANCO encima siga teniendo
+ * contraste suficiente (luminancia relativa <= maxLuminance, 0.16 ≈ contraste
+ * 4.7:1 sobre blanco). Con acentos claros (amarillo, cian) el tinte directo
+ * dejaría el texto ilegible; aquí se mantiene el TONO y se baja el brillo por
+ * pasos del 6 %. Devuelve '' si el hex no es válido.
+ */
+export function ensureDarkSurface(hex, maxLuminance = 0.16) {
+  const rgb = parseHex(hex);
+  if (!rgb) return '';
+  let current = rgb;
+  const limit = Math.min(Math.max(Number(maxLuminance) || 0, 0), 1);
+  for (let i = 0; i < 24 && relativeLuminance(current) > limit; i++) {
+    current = { r: current.r * 0.94, g: current.g * 0.94, b: current.b * 0.94 };
+  }
+  const channel = (c) => Math.round(c).toString(16).padStart(2, '0');
+  return `#${channel(current.r)}${channel(current.g)}${channel(current.b)}`;
 }
 
 /**
