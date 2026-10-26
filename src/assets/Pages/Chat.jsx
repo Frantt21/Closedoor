@@ -43,7 +43,7 @@ import NicknameModal from '../Resources/Components/NicknameModal';
 import BubbleColorModal from '../Resources/Components/BubbleColorModal';
 import ChatBackgroundModal from '../Resources/Components/ChatBackgroundModal';
 import { getPost } from '../services/postService';
-import { getContrastFromHex } from '../services/colorExtractor';
+import { darkenHex, extractColors, getContrastFromHex, hexToRgba } from '../services/colorExtractor';
 import RichText from '../Resources/Components/RichText';
 import SafeImage from '../Resources/Components/SafeImage';
 import ConfirmModal from '../Resources/Components/ConfirmModal';
@@ -759,6 +759,35 @@ export default function Chat() {
       bubbleColorsChannelRef.current = null;
     };
   }, [user?.id]);
+
+  // Fondo de la conversación abierta ('' si no tiene): privado del usuario.
+  const activeChatBackground = (activeConvId && chatBackgrounds[activeConvId]) || '';
+
+  // ── Acento del fondo (color dominante) ──
+  // Se extrae de la propia imagen con colorExtractor (cachea por URL en
+  // localStorage) y tiñe cabecera + caja de entrada (ver chat.css
+  // `.chat-messages--accent`). Si la imagen no se puede leer (CORS/red),
+  // extractColors devuelve su paleta por defecto y el resultado sigue siendo
+  // superficies oscuras legibles.
+  const [chatAccent, setChatAccent] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeChatBackground) {
+      setChatAccent('');
+      return () => { cancelled = true; };
+    }
+    extractColors(activeChatBackground)
+      .then((colors) => {
+        if (cancelled) return;
+        const accent = Array.isArray(colors) ? colors[0] : '';
+        setChatAccent(typeof accent === 'string' && /^#[0-9a-f]{6}$/i.test(accent) ? accent : '');
+      })
+      .catch(() => {
+        if (!cancelled) setChatAccent('');
+      });
+    return () => { cancelled = true; };
+  }, [activeChatBackground]);
 
   // ── Fondos de chat del usuario (uno por conversación, privados) ──
   // Se cargan una vez por sesión: la tabla es pequeña (una fila por conversación
@@ -2784,9 +2813,6 @@ export default function Chat() {
     </>
   );
 
-  // Fondo de la conversación abierta ('' si no tiene): privado del usuario.
-  const activeChatBackground = (activeConvId && chatBackgrounds[activeConvId]) || '';
-
   // ── Render message area content ──
   // NOTA: FRAGMENT — el <div className="chat-messages"> lo pone el caller
   // (mismo patrón que renderConversationListContent / la card flotante).
@@ -3569,7 +3595,18 @@ export default function Chat() {
       <div className={`chat-list${!showList ? ' chat-list--hide-mobile' : ''}`}>
         {renderConversationListContent()}
       </div>
-      <div className={`chat-messages${showList ? ' chat-messages--hide-mobile' : ''}`}>
+      <div
+        className={`chat-messages${showList ? ' chat-messages--hide-mobile' : ''}${chatAccent ? ' chat-messages--accent' : ''}`}
+        style={chatAccent ? {
+          // Acento del fondo del chat: el color dominante de la imagen tiñe la
+          // cabecera y la caja de entrada. Las superficies van oscurecidas para
+          // que el texto/iconos blancos sigan legibles con cualquier acento.
+          '--chat-accent': chatAccent,
+          '--chat-accent-header': darkenHex(chatAccent, 0.72) || 'transparent',
+          '--chat-accent-input': darkenHex(chatAccent, 0.62) || 'transparent',
+          '--chat-accent-border': hexToRgba(chatAccent, 0.5) || 'transparent',
+        } : undefined}
+      >
         {activeConvId ? renderMessageAreaContent() : (
           <div className="chat-messages-welcome">
             <FaComment className="chat-messages-welcome-icon" />

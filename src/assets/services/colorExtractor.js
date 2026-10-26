@@ -230,6 +230,53 @@ export function getContrastFromHex(hex) {
 }
 
 /**
+ * Parsea '#rgb' / '#rrggbb' a { r, g, b }. Devuelve null si no es un hex
+ * válido (p. ej. un 'var(--x)' o una cadena vacía).
+ */
+function parseHex(hex) {
+  if (typeof hex !== 'string') return null;
+  const h = hex.trim().replace('#', '');
+  const expand = (value) => (value.length === 3
+    ? value[0] + value[0] + value[1] + value[1] + value[2] + value[2]
+    : value);
+  const full = expand(h);
+  if (!/^[0-9a-f]{6}$/i.test(full)) return null;
+  return {
+    r: parseInt(full.slice(0, 2), 16),
+    g: parseInt(full.slice(2, 4), 16),
+    b: parseInt(full.slice(4, 6), 16),
+  };
+}
+
+/**
+ * Oscurece un color hex mezclándolo con negro.
+ * amount = 0 → el mismo color, amount = 1 → negro.
+ *
+ * Se usa para teñir superficies (cabecera/input del chat) con el acento
+ * extraído de una imagen sin perder legibilidad del texto blanco. Devuelve ''
+ * si el color de entrada no es un hex válido (el CSS cae a su valor por
+ * defecto con `var(--x, fallback)`).
+ */
+export function darkenHex(hex, amount = 0.6) {
+  const rgb = parseHex(hex);
+  if (!rgb) return '';
+  const k = Math.min(Math.max(Number(amount) || 0, 0), 1);
+  const channel = (c) => Math.round(c * (1 - k)).toString(16).padStart(2, '0');
+  return `#${channel(rgb.r)}${channel(rgb.g)}${channel(rgb.b)}`;
+}
+
+/**
+ * hex → 'rgba(r, g, b, a)', para bordes/velos translúcidos del mismo acento.
+ * Devuelve '' si el hex no es válido.
+ */
+export function hexToRgba(hex, alpha = 1) {
+  const rgb = parseHex(hex);
+  if (!rgb) return '';
+  const a = Math.min(Math.max(Number(alpha) || 0, 0), 1);
+  return `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${a})`;
+}
+
+/**
  * Try to fetch and extract colors from a URL. Returns null on failure.
  */
 async function attemptExtraction(url) {

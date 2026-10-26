@@ -1016,11 +1016,23 @@ export function getCachedBubbleColors(userId) {
 // solo dejan leer/escribir las filas de auth.uid(), así que el otro
 // participante nunca ve ni recibe el fondo del chat.
 
-/** Normaliza una URL de fondo: solo http(s), o null si no es válida. */
+/**
+ * Normaliza la URL de fondo. Acepta:
+ *  - http(s) absoluta (imagen externa pegada por el usuario)
+ *  - ruta del CDN propio (`/cdn/files/xxx`), que es lo que devuelve
+ *    cdnService.uploadImage: mismo origen, sin esquema. ⚠️ Sin esta rama,
+ *    `new URL('/cdn/files/x')` lanza y el fondo recién subido se BORRARÍA en
+ *    vez de guardarse.
+ * Rechaza `//host` (protocol-relative, se saltaría el https del sitio) y
+ * cualquier otro esquema (javascript:, data:…). Devuelve null si no vale.
+ */
 function normalizeBackgroundUrl(value) {
-  if (typeof value !== 'string' || !value.trim()) return null;
+  if (typeof value !== 'string') return null;
+  const raw = value.trim().slice(0, 2048);
+  if (!raw) return null;
+  if (raw.startsWith('/') && !raw.startsWith('//')) return raw;
   try {
-    const url = new URL(value.trim());
+    const url = new URL(raw);
     return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : null;
   } catch {
     return null;

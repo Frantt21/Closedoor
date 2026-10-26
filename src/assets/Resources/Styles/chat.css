@@ -3739,6 +3739,26 @@ dialog.fc-modal.chat-followers-modal {
     background-color: #0b0b0f;
 }
 
+/* ── Acento extraído del fondo del chat ──
+   El color dominante de la imagen tiñe la cabecera y la caja de entrada para
+   que el chat se integre con su fondo. Las superficies llegan YA oscurecidas
+   desde Chat.jsx (darkenHex 0.72 / 0.62), así que el texto blanco y los iconos
+   siguen legibles con cualquier acento (incluidos los claros). */
+.chat-messages--accent .chat-messages-header {
+    background: var(--chat-accent-header, transparent);
+    border-bottom-color: var(--chat-accent-border, var(--color-border, #2a2a2a));
+}
+
+.chat-messages--accent .chat-input-inner {
+    background: var(--chat-accent-input, var(--color-surface-hover, #252525));
+    box-shadow: 0 0 0 1px var(--chat-accent-border, transparent);
+}
+
+/* Foco: el acento puro marca el input activo (más visible que el gris). */
+.chat-messages--accent .chat-input-inner:has(.chat-input:focus) {
+    box-shadow: 0 0 0 1px var(--chat-accent, var(--color-text-muted, #6b7280));
+}
+
 .chat-bg-preview {
     display: flex;
     flex-direction: column;
