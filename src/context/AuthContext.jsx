@@ -722,6 +722,7 @@ const MAX_CLOSE_CONFIRM_MS = 60000;
 
   // ── Estado del cierre de sesión ──
   const [isLogoutConfirmed, setIsLogoutConfirmed] = useState(false);
+  const [isLogoutConfirmed, setIsLogoutConfirmed] = useState(false);
   const MAX_CLOSE_CONFIRM_MS = 60000;
   let closeConfirmTimer = null;
 
