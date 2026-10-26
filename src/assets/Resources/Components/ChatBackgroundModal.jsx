@@ -5,6 +5,7 @@ import { toast } from 'react-toastify';
 import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../services/i18n/useI18n';
 import { setChatBackground } from '../../services/chatService';
+import { clearColorsCache } from '../../services/colorExtractor';
 import { uploadImage } from '../../services/cdnService';
 import '../Styles/chat.css';
 import './css/modal.css';
@@ -82,8 +83,12 @@ export default function ChatBackgroundModal({ conversationId, currentUrl = '', o
     if (!user?.id || !conversationId) return;
     setSaving(true);
     try {
-      await setChatBackground(user.id, conversationId, image);
-      onSaved?.(image);
+      const savedUrl = await setChatBackground(user.id, conversationId, image);
+      // El acento se cachea por URL y NO caduca (las imágenes no cambian): la
+      // única invalidación es cambiar el fondo, así que aquí —y solo aquí— se
+      // borra la paleta de la nueva imagen para que se extraiga de cero.
+      if (savedUrl && savedUrl !== (currentUrl || '')) clearColorsCache(savedUrl);
+      onSaved?.(savedUrl || '');
       toast.success(t('chat.background_saved') || 'Chat background saved');
       onClose?.();
     } catch (err) {
@@ -92,7 +97,7 @@ export default function ChatBackgroundModal({ conversationId, currentUrl = '', o
     } finally {
       setSaving(false);
     }
-  }, [user?.id, conversationId, image, onSaved, onClose, t]);
+  }, [user?.id, conversationId, image, currentUrl, onSaved, onClose, t]);
 
   if (!conversationId) return null;
 

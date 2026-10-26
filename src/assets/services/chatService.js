@@ -1068,9 +1068,11 @@ export async function getChatBackgrounds(userId) {
  * puede revertir al estado por defecto.
  *
  * @param {string} imageUrl - URL http(s) de la imagen, o '' / null para quitarlo
+ * @returns {Promise<string|null>} la URL YA normalizada que quedó guardada (la
+ *   que se usa luego como clave de caché del acento), o null si se quitó.
  */
 export async function setChatBackground(userId, conversationId, imageUrl) {
-  if (!userId || !conversationId) return;
+  if (!userId || !conversationId) return null;
 
   const url = normalizeBackgroundUrl(imageUrl);
   if (!url) {
@@ -1080,7 +1082,7 @@ export async function setChatBackground(userId, conversationId, imageUrl) {
       .eq('user_id', userId)
       .eq('conversation_id', conversationId);
     if (error) throw error;
-    return;
+    return null;
   }
 
   const { error } = await supabase
@@ -1095,5 +1097,6 @@ export async function setChatBackground(userId, conversationId, imageUrl) {
       { onConflict: 'user_id,conversation_id' }
     );
   if (error) throw error;
+  return url;
 }
 

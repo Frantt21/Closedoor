@@ -36,18 +36,27 @@ const CORS_BLOCKED_DOMAINS = [
 const IMAGE_PROXY = 'https://wsrv.nl/?';
 
 const CACHE_KEY_PREFIX = 'fc_colors_';
-const CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours (but the user suggested 5 min, let's do 1 week since we don't need to delete anything)
-// Actually, cache is fine for a long time since colors don't change per URL
 
-import { getItem, setItem } from './secureStorage';
+import { getItem, removeItem, setItem } from './secureStorage';
 
 // ── Cache ──
+//
+// La paleta se guarda POR URL y NO caduca: el color dominante de una imagen no
+// cambia, así que repetir la descarga + el canvas al abrir cada card era puro
+// desperdicio. La única invalidación legítima es que el usuario cambie la
+// imagen: `clearColorsCache(url)` (lo llama el modal de fondo del chat al
+// guardar). Antes se invalidaban también los fallos para reintentar, lo que
+// repetía 3 peticiones cada vez que se abría un chat con el fondo ilegible.
+const CACHE_VERSION = 2;
 
 function getCachedColors(imageUrl) {
   try {
     const entry = getItem(CACHE_KEY_PREFIX + imageUrl);
-    if (!entry || !entry.colors || !entry.ts) return null;
-    // No TTL check — if cached, it's valid. User can clear cache manually.
+    if (!entry || !Array.isArray(entry.colors) || !entry.ts) return null;
+    // Entradas v1 (sin versión): podían guardar la paleta de respaldo de un
+    // fallo como si fueran colores reales. Se descartan UNA vez y se reescriben
+    // como v2; a partir de ahí no se vuelven a invalidar solas.
+    if (entry.v !== CACHE_VERSION) return null;
     return entry.colors;
   } catch {
     return null;
@@ -59,10 +68,21 @@ function setCachedColors(imageUrl, colors) {
     setItem(CACHE_KEY_PREFIX + imageUrl, {
       colors,
       ts: Date.now(),
+      v: CACHE_VERSION,
     });
   } catch {
     // localStorage might be full, ignore
   }
+}
+
+/**
+ * Borra la paleta cacheada de una imagen. Es la ÚNICA invalidación: usarla al
+ * cambiar la imagen (p. ej. el fondo del chat) para que se vuelva a extraer el
+ * acento de la nueva. Para cualquier otra imagen la caché es permanente.
+ */
+export function clearColorsCache(imageUrl) {
+  if (!imageUrl) return;
+  try { removeItem(CACHE_KEY_PREFIX + imageUrl); } catch {}
 }
 
 // ── Domain matching ──
@@ -151,35 +171,15 @@ function loadBlobAndExtract(blob) {
  */
 const FALLBACK_COLORS = ['#ffffff', '#555555', '#222222', '#000000'];
 
-/**
- * `true` si la paleta es el RESPALDO de un fallo de lectura, no colores reales.
- *
- * El algoritmo descarta los píxeles casi blancos (r,g,b > 245), así que
- * '#ffffff' como PRIMER color no puede salir de una imagen: solo está en
- * FALLBACK_COLORS. Sirve para no pintar con gris un acento inexistente y para
- * invalidar entradas de caché envenenadas por un fallo anterior.
- */
-function isFallbackPalette(colors) {
-  return !Array.isArray(colors) || colors.length === 0 || colors[0] === FALLBACK_COLORS[0];
-}
-
-// URLs que fallaron hace poco: evita repetir los 3 intentos (directo → proxy
-// propio → wsrv) cada vez que se abre un chat con un fondo ilegible. Es solo un
-// cooldown en memoria, así que un arreglo de red entra en vigor al minuto.
-const recentFailures = new Map(); // url → timestamp
-const FAILURE_COOLDOWN = 60 * 1000;
-
 export async function extractColors(imageUrl) {
   if (!imageUrl) return [...FALLBACK_COLORS];
 
-  // Check localStorage cache first. Una entrada con la paleta de respaldo es un
-  // fallo cacheado (versiones anteriores sí la guardaban) → se ignora y se
-  // reintenta, en vez de arrastrar "sin acento" para siempre en esa imagen.
+  // Caché permanente por URL: incluye los fallos. Repetir la extracción de una
+  // imagen que no se puede leer (CORS/red) en cada apertura era justo lo que
+  // multiplicaba las peticiones; si hay que reintentar, se llama a
+  // clearColorsCache(url) al cambiar la imagen.
   const cached = getCachedColors(imageUrl);
-  if (cached && !isFallbackPalette(cached)) return cached;
-
-  const failedAt = recentFailures.get(imageUrl);
-  if (failedAt && Date.now() - failedAt < FAILURE_COOLDOWN) return [...FALLBACK_COLORS];
+  if (cached) return cached;
 
   let colors;
 
@@ -198,15 +198,13 @@ export async function extractColors(imageUrl) {
       || await attemptExtraction(proxyViaWsrv(imageUrl));
   }
 
-  // Sin lectura posible (CORS, red, timeout, CSP): se devuelve el respaldo pero
-  // NO se cachea, para que un reintento posterior (proxy disponible, red
-  // arreglada…) pueda dar colores reales en lugar de quedar fijado el fallo.
+  // Sin lectura posible (CORS, red, timeout, CSP): se cachea igualmente el
+  // respaldo para no repetir los 3 intentos en cada render. Se limpia con
+  // clearColorsCache(url) cuando el usuario cambia la imagen.
   if (!colors) {
-    recentFailures.set(imageUrl, Date.now());
-    return [...FALLBACK_COLORS];
+    colors = [...FALLBACK_COLORS];
   }
 
-  recentFailures.delete(imageUrl);
   setCachedColors(imageUrl, colors);
   return colors;
 }
