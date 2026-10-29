@@ -7,14 +7,25 @@ const pkg = require(path.join(root, 'package.json'));
 const execName = pkg.build?.executableName || pkg.name || 'electron';
 const productName = pkg.build?.productName || pkg.productName || execName;
 
+const isWin = process.platform === 'win32';
+const unpackedDir = `dist/${isWin ? 'win' : 'linux'}-unpacked`;
+
 const candidates = [
-  path.join(root, 'node_modules/electron/dist/electron'),
-  path.join(root, 'node_modules/.bin/electron'),
-  path.join(root, 'dist/linux-unpacked', execName),
-  path.join(root, 'dist/linux-unpacked', productName),
-  path.join(root, 'dist/linux-unpacked/foranly-desktop'),
-  path.join(root, 'dist/linux-unpacked/closedoor'),
+  path.join(root, 'node_modules/electron/dist/electron' + (isWin ? '.exe' : '')),
 ];
+
+// En Windows npm solo expone shims de shell (.cmd/.ps1) en .bin: no son
+// ejecutables para spawn, así que ese candidato se omite.
+if (!isWin) {
+  candidates.push(path.join(root, 'node_modules/.bin/electron'));
+}
+
+candidates.push(
+  path.join(root, unpackedDir, execName + (isWin ? '.exe' : '')),
+  path.join(root, unpackedDir, productName + (isWin ? '.exe' : '')),
+  path.join(root, unpackedDir, 'foranly-desktop' + (isWin ? '.exe' : '')),
+  path.join(root, unpackedDir, 'closedoor' + (isWin ? '.exe' : '')),
+);
 
 let bin = candidates.find((p) => {
   try {
@@ -35,13 +46,15 @@ if (!bin) {
 
 if (!bin) {
   console.error('No Electron binary found. Tried:\n  ' + candidates.join('\n  '));
-  console.error('Run "npx electron-builder --linux dir" once, or reinstall electron with its postinstall script enabled.');
+  console.error(
+    `Run "npx electron-builder --${isWin ? 'win' : 'linux'} dir" once, or reinstall electron with its postinstall script enabled.`,
+  );
   process.exit(1);
 }
 
 const env = { ...process.env };
 const binDir = path.dirname(bin);
-if (binDir.includes('linux-unpacked') || binDir.includes('win-unpacked')) {
+if (!isWin && (binDir.includes('linux-unpacked') || binDir.includes('win-unpacked'))) {
   env.LD_LIBRARY_PATH = binDir + (env.LD_LIBRARY_PATH ? ':' + env.LD_LIBRARY_PATH : '');
 }
 

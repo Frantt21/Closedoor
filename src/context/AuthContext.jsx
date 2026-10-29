@@ -851,3 +851,30 @@ return true;
       return { success: false, error: err.message };
     }
   };
+  // ── Valor del contexto ──
+  const value = {
+    user,
+    profile,
+    profileLoading,
+    loading,
+    error,
+    isAuthenticated: !!user,
+    isDiscordLinked,
+    isLogoutConfirmed,
+    refreshProfile,
+    login,
+    register,
+    loginWithDiscord,
+    linkDiscord,
+    logout,
+    changeUsername,
+    changeEmail,
+    changePassword,
+  };
+
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
