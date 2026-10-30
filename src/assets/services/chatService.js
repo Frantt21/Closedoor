@@ -488,76 +488,110 @@ export async function getDecryptedMessages(conversationId, currentUserId, limit 
   })));
 }
 
+// ── Canales realtime de mensajes: UNO por conversación, compartido ──
+//
+// `supabase.channel(topic)` devuelve el MISMO canal si el topic ya existe. Al
+// haber ahora dos consumidores (la ventana flotante y Chat.jsx), el segundo
+// hacía `.on(...)` sobre un canal que ya estaba `subscribe()`-ado y Supabase
+// lanzaba: "cannot add `postgres_changes` callbacks after `subscribe()`".
+//
+// Aquí se registra un canal por conversación con una lista de suscriptores:
+// cada evento se reparte a todos, y el canal se cierra (unsubscribe +
+// removeChannel) cuando se va el último.
+const messageChannels = new Map();
+
+/** Trae el mensaje ya con el perfil del emisor (mismo shape que antes). */
+async function fetchMessageWithProfile(messageId) {
+  const { data: msg } = await supabase
+    .from('messages')
+    .select()
+    .eq('id', messageId)
+    .single();
+  if (!msg) return null;
+
+  const { data: profile } = await dbPublic
+    .from('profiles')
+    .select('id, username, displayname, avatar_url, avatar_position, user_status, user_status_updated_at')
+    .eq('id', msg.sender_id)
+    .maybeSingle();
+
+  return { ...msg, profiles: profile };
+}
+
 /**
- * Subscribe to new messages in a conversation (realtime)
+ * Subscribe to new messages in a conversation (realtime).
+ * Devuelve `{ unsubscribe }`; se puede llamar varias veces por conversación.
  */
 export function subscribeToMessages(conversationId, onMessage, onDelete) {
-  return supabase
-    .channel(`chat-${conversationId}`)
-    .on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-        filter: `conversation_id=eq.${conversationId}`,
-      },
-      async (payload) => {
-        const { data: msg } = await supabase
-          .from('messages')
-          .select()
-          .eq('id', payload.new.id)
-          .single();
-        if (!msg) return;
+  if (!conversationId) return { unsubscribe() {} };
 
-        const { data: profile } = await dbPublic
-          .from('profiles')
-          .select('id, username, displayname, avatar_url, avatar_position, user_status, user_status_updated_at')
-          .eq('id', msg.sender_id)
-          .maybeSingle();
+  let entry = messageChannels.get(conversationId);
+  if (!entry) {
+    const listeners = new Set();
 
-        onMessage({ ...msg, profiles: profile }, 'INSERT');
-      }
-    )
-    .on(
-      'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'messages',
-        filter: `conversation_id=eq.${conversationId}`,
-      },
-      async (payload) => {
-        const { data: msg } = await supabase
-          .from('messages')
-          .select()
-          .eq('id', payload.new.id)
-          .single();
-        if (!msg) return;
+    const channel = supabase
+      .channel(`chat-${conversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        async (payload) => {
+          const msg = await fetchMessageWithProfile(payload.new.id);
+          if (!msg) return;
+          listeners.forEach((listener) => listener.onMessage?.(msg, 'INSERT'));
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        async (payload) => {
+          const msg = await fetchMessageWithProfile(payload.new.id);
+          if (!msg) return;
+          listeners.forEach((listener) => listener.onMessage?.(msg, 'UPDATE'));
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${conversationId}`,
+        },
+        (payload) => {
+          const deletedId = payload.old?.id;
+          if (!deletedId) return;
+          listeners.forEach((listener) => listener.onDelete?.(deletedId));
+        }
+      )
+      .subscribe();
 
-        const { data: profile } = await dbPublic
-          .from('profiles')
-          .select('id, username, displayname, avatar_url, avatar_position, user_status, user_status_updated_at')
-          .eq('id', msg.sender_id)
-          .maybeSingle();
+    entry = { channel, listeners };
+    messageChannels.set(conversationId, entry);
+  }
 
-        onMessage({ ...msg, profiles: profile }, 'UPDATE');
-      }
-    )
-    .on(
-      'postgres_changes',
-      {
-        event: 'DELETE',
-        schema: 'public',
-        table: 'messages',
-        filter: `conversation_id=eq.${conversationId}`,
-      },
-      (payload) => {
-        const deletedId = payload.old.id;
-        if (onDelete) onDelete(deletedId);
-      }
-    )
-    .subscribe();
+  const listener = { onMessage, onDelete };
+  entry.listeners.add(listener);
+
+  return {
+    unsubscribe() {
+      entry.listeners.delete(listener);
+      if (entry.listeners.size > 0) return;
+
+      messageChannels.delete(conversationId);
+      try { entry.channel.unsubscribe(); } catch { /* ya cerrado */ }
+      try { supabase.removeChannel(entry.channel); } catch { /* ya quitado */ }
+    },
+  };
 }
 
 /**

@@ -1,7 +1,7 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FaCommentDots, FaTimes, FaChevronLeft, FaPaperPlane, FaExpand, FaSpinner, FaComments } from 'react-icons/fa';
+import { FaCommentDots, FaTimes, FaChevronLeft, FaPaperPlane, FaExpand, FaSpinner, FaComments, FaReply } from 'react-icons/fa';
 import { useAuth } from '../../../hooks/useAuth';
 import { useI18n } from '../../services/i18n/useI18n';
 import { NotificationContext } from '../../../context/NotificationContext';
@@ -15,7 +15,12 @@ import {
   markAsRead,
 } from '../../services/chatService';
 import { detectMediaFromContent, getTimeAgo } from '../../services/helpers';
+import { supabase } from '../../services/supabaseclient';
+import { getPost } from '../../services/postService';
 import Avatar from './Avatar';
+import ChatSongCard from './ChatSongCard';
+import ChatCommunityCard from './ChatCommunityCard';
+import ChatSharedPostCard from './ChatSharedPostCard';
 import './css/floatingChat.css';
 
 const HIDDEN_ROUTES = ['/chat', '/login', '/register', '/auth/callback'];
@@ -68,6 +73,10 @@ export default function FloatingChat() {
   const [loadingThread, setLoadingThread] = useState(false);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  // Comunidades de las invitaciones compartidas (se piden una vez por id).
+  const [sharedCommunities, setSharedCommunities] = useState({});
+  // Posts compartidos, igual: se piden una vez por id y se cachean.
+  const [sharedPosts, setSharedPosts] = useState({});
   const listRef = useRef(null);
   const threadRef = useRef(null);
   const activeIdRef = useRef(null);
@@ -194,6 +203,53 @@ export default function FloatingChat() {
     };
   }, [open, view, activeId, userId]);
 
+  // ── Comunidades de las invitaciones del hilo abierto ──
+  useEffect(() => {
+    const missing = [...new Set(messages.map((m) => m.shared_community_id).filter(Boolean))]
+      .filter((id) => !sharedCommunities[id]);
+    if (!missing.length) return undefined;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase.from('communities').select('*').in('id', missing);
+        if (cancelled || !data?.length) return;
+        setSharedCommunities((prev) => {
+          const next = { ...prev };
+          for (const community of data) next[community.id] = community;
+          return next;
+        });
+      } catch (err) {
+        console.warn('[FloatingChat] load shared communities failed:', err);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [messages, sharedCommunities]);
+
+  // ── Posts compartidos del hilo abierto ──
+  useEffect(() => {
+    const missing = [...new Set(messages.map((m) => m.shared_post_id).filter(Boolean))]
+      .filter((id) => !sharedPosts[id]);
+    if (!missing.length) return undefined;
+
+    let cancelled = false;
+    (async () => {
+      const loaded = {};
+      await Promise.all(missing.map(async (id) => {
+        try {
+          loaded[id] = await getPost(id);
+        } catch {
+          // Post borrado o inaccesible: la card se queda en su esqueleto.
+        }
+      }));
+      if (cancelled || !Object.keys(loaded).length) return;
+      setSharedPosts((prev) => ({ ...prev, ...loaded }));
+    })();
+
+    return () => { cancelled = true; };
+  }, [messages, sharedPosts]);
+
   // ── Scroll al final al llegar/abrir mensajes ──
   useEffect(() => {
     if (!open || view !== 'thread') return;
@@ -239,24 +295,69 @@ export default function FloatingChat() {
 
   if (hidden) return null;
 
+  // «Abrir en Chat» aterriza en la conversación que está abierta (?c=<id>).
   const goFullChat = () => {
+    const convId = activeId;
     setOpen(false);
-    navigate('/Chat');
+    navigate(convId ? `/Chat?c=${encodeURIComponent(convId)}` : '/Chat');
   };
 
-  const renderBubbleContent = (content) => {
-    if (!content) return null;
-    const { imageUrl } = detectMediaFromContent(content) || {};
-    if (imageUrl) {
-      const rest = content.replace(imageUrl, '').trim();
-      return (
-        <>
-          <img className="fc-msg-img" src={imageUrl} alt="" loading="lazy" />
-          {rest ? <span>{rest}</span> : null}
-        </>
-      );
-    }
-    return <span>{content}</span>;
+  // Texto corto para el preview de una respuesta citada (misma idea que
+  // Chat.jsx: canción → título, imagen → "Image", resto → recorte).
+  const previewOf = (msg) => {
+    if (msg.shared_song?.title) return `🎵 ${msg.shared_song.title}`;
+    const txt = (msg.decryptedContent || '').trim();
+    if (!txt) return t('chat.encrypted') || 'Encrypted';
+    const { imageUrl } = detectMediaFromContent(txt) || {};
+    if (imageUrl) return 'Image';
+    return txt.length > 60 ? `${txt.slice(0, 60)}...` : txt;
+  };
+
+  // Una burbuja puede traer varias cosas: respuesta citada, canción,
+  // invitación a comunidad, imagen y/o texto. Antes solo se pintaba
+  // decryptedContent, así que todo lo demás salía como globo vacío.
+  const renderMessageBody = (msg) => {
+    const content = (msg.decryptedContent || '').trim();
+    const { imageUrl } = content ? (detectMediaFromContent(content) || {}) : {};
+    const replyTarget = msg.reply_to ? messages.find((m) => m.id === msg.reply_to) : null;
+    const community = msg.shared_community_id ? sharedCommunities[msg.shared_community_id] : null;
+    const text = imageUrl ? content.replace(imageUrl, '').trim() : content;
+
+    return (
+      <>
+        {replyTarget && (
+          <div className="fc-msg-reply">
+            <FaReply className="fc-msg-reply-icon" />
+            <div className="fc-msg-reply-body">
+              <span className="fc-msg-reply-author">
+                {replyTarget.sender_id === userId ? (t('chat.replying_self') || 'You') : peerName(activeConv)}
+              </span>
+              <span className="fc-msg-reply-text">{previewOf(replyTarget)}</span>
+            </div>
+          </div>
+        )}
+
+        {msg.shared_community_id && (
+          <ChatCommunityCard
+            community={community}
+            inviteToken={msg.shared_invite_token}
+            isOwn={msg.sender_id === userId}
+          />
+        )}
+
+        {msg.shared_post_id && (
+          <ChatSharedPostCard
+            post={sharedPosts[msg.shared_post_id]}
+            postId={msg.shared_post_id}
+          />
+        )}
+
+        {msg.shared_song && <ChatSongCard song={msg.shared_song} />}
+
+        {imageUrl && <img className="fc-msg-img" src={imageUrl} alt="" loading="lazy" />}
+        {text ? <span>{text}</span> : null}
+      </>
+    );
   };
 
   return createPortal(
@@ -369,12 +470,16 @@ export default function FloatingChat() {
                 ) : (
                   messages.map((msg) => {
                     const own = msg.sender_id === userId;
+                    // Sin texto y con tarjeta (canción / invitación) el globo no
+                    // se pinta: la card va sola, igual que en el chat completo.
+                    const isBare = !(msg.decryptedContent || '').trim()
+                      && !!(msg.shared_song || msg.shared_community_id || msg.shared_post_id);
                     return (
                       <div
                         key={msg.id}
                         className={`fc-msg${own ? ' fc-msg--own' : ''}${msg._optimistic ? ' fc-msg--pending' : ''}`}
                       >
-                        <div className="fc-msg-bubble">{renderBubbleContent(msg.decryptedContent)}</div>
+                        <div className={`fc-msg-bubble${isBare ? ' fc-msg-bubble--bare' : ''}`}>{renderMessageBody(msg)}</div>
                         <span className="fc-msg-time">{getTimeAgo(t, locale, msg.created_at)}</span>
                       </div>
                     );

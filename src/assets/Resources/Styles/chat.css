@@ -1056,6 +1056,16 @@
     overflow: visible;
     flex-shrink: 0;
     position: relative;
+    /* Cliqueable: abre el perfil del usuario directamente. */
+    cursor: pointer;
+}
+
+.chat-message-avatar .avatar-img {
+    transition: filter 0.15s ease;
+}
+
+.chat-message-avatar:hover .avatar-img {
+    filter: brightness(1.15);
 }
 
 .chat-message-row--own .chat-message-avatar {

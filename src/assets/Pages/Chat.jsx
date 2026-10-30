@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useLayoutEffect, useContext } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useI18n } from '../services/i18n/useI18n';
 import {
@@ -37,6 +37,8 @@ import GifPicker from '../Resources/Components/GifPicker';
 import SongPicker from '../Resources/Components/SongPicker';
 import MediaPicker from '../Resources/Components/MediaPicker';
 import ChatSongCard from '../Resources/Components/ChatSongCard';
+import ChatCommunityCard from '../Resources/Components/ChatCommunityCard';
+import ChatSharedPostCard from '../Resources/Components/ChatSharedPostCard';
 import ChatAccountCard from '../Resources/Components/ChatAccountCard';
 import { withPreviewFallback } from '../services/musicService';
 import { getTimeAgo, IMG_RE, detectMediaFromContent, getImageStyle, sanitizeUrl } from '../services/helpers';
@@ -80,6 +82,8 @@ export default function Chat() {
   const { t, locale } = useI18n();
   const { user, profile, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  // «Abrir en Chat» de la ventana flotante llega como /Chat?c=<convId>.
+  const [searchParams, setSearchParams] = useSearchParams();
   usePageTitle(t('chat.title'));
 
   // ── Redirect if not authenticated (wait for auth to finish loading) ──
@@ -1206,6 +1210,22 @@ export default function Chat() {
     }, 100);
   };
 
+  // ── Abrir la conversación pedida por URL (?c=<convId>) ──
+  // Lo usa el botón «abrir en Chat» de la ventana flotante para aterrizar en
+  // la misma conversación. Se espera a que la lista esté cargada y se limpia
+  // el parámetro para que un refresh no la reabra.
+  const openedFromUrlRef = useRef(false);
+  const wantedConvId = searchParams.get('c');
+
+  useEffect(() => {
+    if (!wantedConvId || openedFromUrlRef.current) return;
+    if (!conversations.some((c) => c.id === wantedConvId)) return;
+    openedFromUrlRef.current = true;
+    selectConversation(wantedConvId);
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantedConvId, conversations, setSearchParams]);
+
   const goBackToList = () => {
     // Guardar borrador antes de ir a la lista
     if (activeConvId) {
@@ -1446,6 +1466,16 @@ export default function Chat() {
     const currentNick = nicknames[targetUserId] || '';
     setNicknameModal({ open: true, targetUserId, currentName: currentNick, userData: userData || null });
   }, [nicknames]);
+
+  // ── Click en el avatar de una burbuja ──
+  // Abre el perfil del usuario directamente; con tu propio avatar, el tuyo.
+  const handleMessageAvatarClick = useCallback((targetUser) => {
+    const isOwnAvatar = !targetUser?.id || targetUser.id === user?.id;
+    const targetUsername = isOwnAvatar
+      ? (profile?.username || user?.username)
+      : targetUser?.username;
+    if (targetUsername) navigate(`/profile/${targetUsername}`);
+  }, [user?.id, user?.username, profile?.username, navigate]);
 
   // ── Block/unblock the chat partner (header dropdown) ──
   const handleBlockFromChat = useCallback(async (targetUser) => {
@@ -3052,6 +3082,7 @@ export default function Chat() {
                       src={otherUser?.avatar_url}
                       alt={otherUser?.username || '?'}
                       className="chat-message-avatar"
+                      onClick={(e) => { e.stopPropagation(); handleMessageAvatarClick(otherUser); }}
                     />
                   )}
                   {!isOwn && !showAvatar && <div className="chat-message-avatar-spacer" />}
@@ -3103,127 +3134,20 @@ export default function Chat() {
                       );
                     })()}
                     {/* ── Shared post card (mini PostCard style) ── */}
-                    {msg.shared_post_id && (() => {
-                      const sharedPost = sharedPosts[msg.shared_post_id];
-                      if (!sharedPost) {
-                        return (
-                          <div className="chat-message-shared-post chat-message-shared-post--loading" onClick={() => openSharedPost(msg.shared_post_id)}>
-                            <div className="chat-message-shared-post-spinner" />
-                            <span>{t('common.loading')}</span>
-                          </div>
-                        );
-                      }
-                      const postProfile = sharedPost.profiles || {};
-                      const hasMedia = !!(sharedPost.image_urls?.length || sharedPost.image_url);
-                      return (
-                        <div className="chat-message-shared-post" onClick={() => openSharedPost(sharedPost.id)}>
-                          {/* Header: avatar + username + badge */}
-                          <div className="chat-message-shared-post-header">
-                            <Avatar
-                              src={postProfile.avatar_url}
-                              alt={postProfile.username || '?'}
-                              className="chat-message-shared-post-avatar"
-                            />
-                            <div className="chat-message-shared-post-author">
-                              <span className="chat-message-shared-post-username">
-                                {postProfile.username || 'unknown'}
-                              </span>
-                              {Array.isArray(postProfile.roles) && postProfile.roles.some(r => r !== 'user') && (
-                                <Badge roles={postProfile.roles} />
-                              )}
-                            </div>
-                          </div>
-                          {/* Content with RichText */}
-                          {sharedPost.content && (
-                            <div className="chat-message-shared-post-text">
-                              <RichText
-                                text={sharedPost.content.length > 150
-                                  ? sharedPost.content.slice(0, 150) + '...'
-                                  : sharedPost.content}
-                                skipUrls={(() => {
-                                  const urls = sharedPost.content.match(/(https?:\/\/[^\s<]+)/gi) || [];
-                                  return urls.filter(u => IMG_RE.test(u));
-                                })()}
-                                mentions={sharedPost.mentions}
-                              />
-                            </div>
-                          )}
-                          {/* Media preview */}
-                          {hasMedia && (
-                            <div className="chat-message-shared-post-media">
-                              <SafeImage
-                                src={sharedPost.image_urls?.[0] || sharedPost.image_url}
-                                alt="Post media"
-                                className="chat-message-shared-post-img"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()}
-                    {msg.shared_community_id && (() => {
-                      const community = sharedCommunities[msg.shared_community_id];
-                      if (!community) {
-                        return (
-                          <div className="chat-message-shared-community chat-message-shared-community--loading">
-                            <div className="chat-message-shared-post-spinner" />
-                            <span>{t('common.loading')}</span>
-                          </div>
-                        );
-                      }
-                      // El token viaja en el mensaje → el receptor canjea al unirse
-                      const inviteQs = msg.shared_invite_token ? `?invite=${msg.shared_invite_token}` : '';
-                      return (
-                        <div className="chat-message-shared-community">
-                          {/* Banner: imagen real o gradiente con el acento de la comunidad (igual que CommunityPage) */}
-                          <div className="chat-community-card-banner">
-                            {community.banner_url ? (
-                              <img src={community.banner_url} alt="" />
-                            ) : (
-                              <div
-                                className="chat-community-card-banner-fallback"
-                                style={community.accent_color ? { background: `linear-gradient(135deg, ${community.accent_color}, ${community.accent_color_secondary || community.accent_color})` } : undefined}
-                              />
-                            )}
-                            <div className="chat-community-card-banner-overlay" />
-                          </div>
-                          <div className="chat-community-card-body">
-                            <div className="chat-community-card-header">
-                              {community.avatar_url ? (
-                                <img className="chat-community-card-avatar" src={community.avatar_url} alt={community.name} />
-                              ) : (
-                                <div className="chat-community-card-avatar chat-community-card-avatar--letter">
-                                  {community.name?.charAt(0).toUpperCase()}
-                                </div>
-                              )}
-                              <div className="chat-community-card-info">
-                                <span className="chat-community-card-name">{community.name}</span>
-                                <span className="chat-community-card-slug">c/{community.slug}</span>
-                              </div>
-                            </div>
-                            {/* Bloque de 2 líneas fijo (clamp en CSS) para que todas las tarjetas midan igual */}
-                            <p className="chat-community-card-desc">{community.description || ''}</p>
-                            <div className="chat-community-card-stats">
-                              <span>{community.member_count || 0} {t('comunidades.members')}</span>
-                              <span>{community.post_count || 0} {t('comunidades.posts')}</span>
-                            </div>
-                            {isOwn ? (
-                              <span className="chat-community-card-btn chat-community-card-btn--disabled" aria-disabled="true">
-                                {t('comunidades.join_btn')}
-                              </span>
-                            ) : (
-                              <a
-                                href={`/c/${community.slug}${inviteQs}`}
-                                className="chat-community-card-btn"
-                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.location.href = `/c/${community.slug}${inviteQs}`; }}
-                              >
-                                {t('comunidades.join_btn')}
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })()}
+                    {msg.shared_post_id && (
+                      <ChatSharedPostCard
+                        post={sharedPosts[msg.shared_post_id]}
+                        postId={msg.shared_post_id}
+                        onOpen={openSharedPost}
+                      />
+                    )}
+                    {msg.shared_community_id && (
+                      <ChatCommunityCard
+                        community={sharedCommunities[msg.shared_community_id]}
+                        inviteToken={msg.shared_invite_token}
+                        isOwn={isOwn}
+                      />
+                    )}
                     {/* ── Canción compartida (card fuera de la burbuja) ── */}
                     {msg.shared_song && (
                       <ChatSongCard song={msg.shared_song} />
@@ -3306,6 +3230,7 @@ export default function Chat() {
                       src={profile?.avatar_url || user?.user_metadata?.avatar_url || user?.avatar_url}
                       alt={profile?.username || user?.username || '?'}
                       className="chat-message-avatar chat-message-avatar--own"
+                      onClick={(e) => { e.stopPropagation(); handleMessageAvatarClick(); }}
                     />
                   )}
                   {isOwn && !showAvatar && <div className="chat-message-avatar-spacer" />}

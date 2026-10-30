@@ -366,6 +366,72 @@
     color: #ffffff;
 }
 
+/* Burbuja sin globo: el mensaje es solo una tarjeta (canción compartida o
+   invitación a comunidad), así que se pinta sobre la superficie del panel. */
+.fc-msg-bubble--bare,
+.fc-msg--own .fc-msg-bubble--bare {
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+}
+
+/* Respuesta citada dentro de la burbuja */
+.fc-msg-reply {
+    display: flex;
+    gap: 6px;
+    padding: 4px 8px;
+    margin-bottom: 4px;
+    border-left: 2px solid var(--overlay-border-strong, rgba(255, 255, 255, 0.4));
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.22);
+    max-width: 100%;
+}
+
+.fc-msg-reply-icon {
+    flex-shrink: 0;
+    margin-top: 3px;
+    font-size: 0.6rem;
+    opacity: 0.6;
+}
+
+.fc-msg-reply-body {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.fc-msg-reply-author {
+    font-size: 0.68rem;
+    font-weight: 600;
+    opacity: 0.85;
+}
+
+.fc-msg-reply-text {
+    font-size: 0.7rem;
+    opacity: 0.7;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Las tarjetas compartidas (canción, invitación a comunidad, post) NO se
+   reestilan aquí: conservan el ancho fijo de 280px y los mismos paddings que
+   en el chat completo, para que midan igual en las dos ventanas. Solo se
+   quita el margen inferior, que en el globo separaba la card del texto. */
+.fc-msg-bubble .chat-message-shared-song,
+.fc-msg-bubble .chat-message-shared-community,
+.fc-msg-bubble .chat-message-shared-post {
+    margin-bottom: 0;
+}
+
+/* Un mensaje con tarjeta no cabe en el 82% del hilo: las cards miden 280px y
+   quedaban recortadas/desbordadas. Lo dejamos ocupar el ancho completo. */
+.fc-msg:has(.chat-message-shared-song),
+.fc-msg:has(.chat-message-shared-community),
+.fc-msg:has(.chat-message-shared-post) {
+    max-width: 100%;
+}
+
 .fc-msg-img {
     display: block;
     max-width: 100%;
