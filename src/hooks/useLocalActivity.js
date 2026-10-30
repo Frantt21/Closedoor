@@ -18,20 +18,44 @@ export function isLocalActivityAvailable() {
 }
 
 /**
+ * ¿El preload instalado ya expone el listado de programas?
+ *
+ * Importa para distinguir "no hay nada abierto" de " esta app de escritorio es
+ * anterior a la función": sin esto el selector aparece vacío y parece roto hasta
+ * reiniciar la app para cargar el preload nuevo.
+ */
+export function isOpenAppsAvailable() {
+  try {
+    const api = typeof window !== 'undefined' ? window.electron?.activity : null;
+    return !!api && typeof api.listApps === 'function';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Programas abiertos en el equipo (Ajustes → Actividad).
  *
  * Bajo demanda y no con un hook: la lista se pide al abrir la categoría y al
  * pulsar "actualizar", no cada 10 s como la actividad. En el navegador devuelve
  * [] porque no hay puente.
  *
- * @returns {Promise<string[]>}
+ * @returns {Promise<Array<{name: string, exe: string}>>}
  */
 export async function listOpenApps() {
   try {
     const api = typeof window !== 'undefined' ? window.electron?.activity : null;
     if (!api || typeof api.listApps !== 'function') return [];
     const apps = await api.listApps();
-    return Array.isArray(apps) ? apps.filter((name) => typeof name === 'string' && name) : [];
+    if (!Array.isArray(apps)) return [];
+    return apps
+      .map((item) => {
+        if (typeof item === 'string') return { name: item, exe: item };
+        const name = typeof item?.name === 'string' ? item.name : '';
+        if (!name) return null;
+        return { name, exe: typeof item.exe === 'string' && item.exe ? item.exe : name };
+      })
+      .filter(Boolean);
   } catch {
     return [];
   }

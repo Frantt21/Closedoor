@@ -719,6 +719,7 @@
   "settings.activity_program_empty": "Nenhum programa aberto encontrado.",
   "settings.activity_program_loading": "Procurando programas abertos…",
   "settings.activity_program_desktop_only": "O seletor de programas só está disponível no app de desktop.",
+  "settings.activity_program_restart": "Reinicie o app de desktop para carregar a lista de programas.",
   "settings.activity_history": "Histórico de atividade",
   "settings.activity_history_desc": "Fica só neste dispositivo e desaparece ao limpar o histórico.",
   "settings.activity_history_empty": "Ainda não há atividade registrada.",

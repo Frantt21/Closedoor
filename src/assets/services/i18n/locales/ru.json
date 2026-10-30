@@ -719,6 +719,7 @@
   "settings.activity_program_empty": "Открытых программ не найдено.",
   "settings.activity_program_loading": "Поиск открытых программ…",
   "settings.activity_program_desktop_only": "Выбор программы доступен только в приложении для компьютера.",
+  "settings.activity_program_restart": "Перезапустите приложение для компьютера, чтобы загрузить список программ.",
   "settings.activity_history": "История активности",
   "settings.activity_history_desc": "Хранится только на этом устройстве и удаляется вместе с историей.",
   "settings.activity_history_empty": "Активность пока не записана.",

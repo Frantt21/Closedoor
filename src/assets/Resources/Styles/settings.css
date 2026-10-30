@@ -1007,6 +1007,9 @@ dialog.fc-modal.settings-blocked-modal {
 }
 
 .settings-activity-app {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
   max-width: 100%;
   padding: 5px 10px;
   border: 1px solid var(--border-color, rgba(255, 255, 255, 0.14));
@@ -1030,6 +1033,12 @@ dialog.fc-modal.settings-blocked-modal {
   border-color: var(--color-accent, #ffffff);
   color: var(--accent-surface-text-color, #000000);
   font-weight: 600;
+}
+
+.settings-activity-app-exe {
+  font-size: 0.65rem;
+  font-weight: 400;
+  opacity: 0.65;
 }
 
 .settings-activity-app:disabled {

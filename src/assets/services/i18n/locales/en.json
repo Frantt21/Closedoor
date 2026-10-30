@@ -721,6 +721,7 @@
   "settings.activity_program_empty": "No open programs found.",
   "settings.activity_program_loading": "Looking for open programs…",
   "settings.activity_program_desktop_only": "The program picker is only available in the desktop app.",
+  "settings.activity_program_restart": "Restart the desktop app to load the program list.",
   "settings.activity_history": "Activity history",
   "settings.activity_history_desc": "Stored on this device only, and removed when you clear the history.",
   "settings.activity_history_empty": "No activity recorded yet.",

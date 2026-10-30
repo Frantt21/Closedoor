@@ -8,7 +8,7 @@ import { getBlockedUsers, getCachedBlockedUsers, unblockUser, cacheBlockStatus, 
 import { useNavigate } from 'react-router-dom';
 import { getItem } from '../services/secureStorage';
 import { isWindowZoomAvailable, controlWindowZoom, isDesktopApp } from '../services/desktopApp';
-import { listOpenApps } from '../../hooks/useLocalActivity';
+import { listOpenApps, isOpenAppsAvailable } from '../../hooks/useLocalActivity';
 import { getActivitySettings, readActivityHistory, clearActivityHistory, persistActivity, persistProgramActivity, programFromProfile } from '../services/activityService';
 import { supabase } from '../services/supabaseclient';
 import { getNicknames, getCachedNicknames, cacheNicknames, setNickname, removeNickname } from '../services/chatService';
@@ -439,6 +439,9 @@ export default function Settings() {
   // Con la actividad apagada o en "nadie" no se escribe: el programa se publica
   // en la fila del perfil igual que la canción, así que comparte su privacidad.
   const programSelectable = activitySettings.enabled && activitySettings.visibility !== 'nobody';
+  // Si el preload es anterior al listado de programas, la lista llega vacía sin
+  // ser un fallo de detección: hay que reiniciar la app de escritorio.
+  const appsApiReady = isOpenAppsAvailable();
 
   // Programas abiertos en el equipo: se piden al entrar en la categoría (y al
   // pulsar "actualizar", que suma a openAppsRevision), no en cada render: es una
@@ -1535,6 +1538,8 @@ export default function Settings() {
 
                 {!isDesktop ? (
                   <p className="settings-activity-empty">{t('settings.activity_program_desktop_only')}</p>
+                ) : !appsApiReady ? (
+                  <p className="settings-activity-empty">{t('settings.activity_program_restart')}</p>
                 ) : openApps === null ? (
                   <p className="settings-activity-empty">{t('settings.activity_program_loading')}</p>
                 ) : openApps.length === 0 ? (
@@ -1552,7 +1557,7 @@ export default function Settings() {
 
                     {/* El elegido se mantiene aunque ahora esté cerrado: sin esto
                         desaparecería de la lista y parecería que no hay nada. */}
-                    {selectedProgram && !openApps.includes(selectedProgram) && (
+                    {selectedProgram && !openApps.some((app) => app.name === selectedProgram) && (
                       <button
                         type="button"
                         className="settings-activity-app settings-activity-app--active"
@@ -1564,16 +1569,19 @@ export default function Settings() {
                       </button>
                     )}
 
-                    {openApps.map((appName) => (
+                    {openApps.map((app) => (
                       <button
-                        key={appName}
+                        key={app.exe}
                         type="button"
-                        className={`settings-activity-app ${selectedProgram === appName ? 'settings-activity-app--active' : ''}`}
-                        onClick={() => handleProgramChange(appName)}
+                        className={`settings-activity-app ${selectedProgram === app.name ? 'settings-activity-app--active' : ''}`}
+                        onClick={() => handleProgramChange(app.name)}
                         disabled={activityUpdating || !programSelectable}
-                        title={appName}
+                        title={`${app.name} · ${app.exe}`}
                       >
-                        {appName}
+                        {app.name}
+                        {app.exe && app.exe.toLowerCase() !== `${app.name.toLowerCase()}.exe` && (
+                          <span className="settings-activity-app-exe">{app.exe}</span>
+                        )}
                       </button>
                     ))}
                   </div>

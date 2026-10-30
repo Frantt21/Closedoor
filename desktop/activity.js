@@ -106,8 +106,26 @@ function prettyAppName(raw) {
     itunes: 'Apple Music',
     'Microsoft.ZuneMusic': 'Media Player',
     'Microsoft.ZuneVideo': 'Films & TV',
+    // Nombres de proceso comunes en Windows (el .exe real lo añade la lista).
+    code: 'VS Code',
+    discord: 'Discord',
+    steam: 'Steam',
+    windowsterminal: 'Windows Terminal',
+    githubdesktop: 'GitHub Desktop',
+    robloxplayerbeta: 'Roblox',
+    obs64: 'OBS Studio',
+    telegram: 'Telegram',
+    whatsapp: 'WhatsApp',
+    zoom: 'Zoom',
+    notepad: 'Notepad',
+    explorer: 'File Explorer',
+    epicgameslauncher: 'Epic Games Launcher',
+    radeonsoftware: 'AMD Radeon Software',
   };
-  return known[base.toLowerCase()] || known[base] || base;
+  const mapped = known[base.toLowerCase()] || known[base];
+  if (mapped) return mapped;
+  // Sin nombre bonito, al menos no gritar en minúsculas ("hydra" → "Hydra").
+  return base === base.toLowerCase() ? base.charAt(0).toUpperCase() + base.slice(1) : base;
 }
 
 // ── Windows: SMTC ──
@@ -383,39 +401,104 @@ const APP_NOISE = new Set([
   'mutter',
   'xdg-desktop-portal-gnome',
   'gnome-shell-extension',
+  // Ayudantes de Windows que aparecen en la sesión pero no son programas que el
+  // usuario abra: drivers de GPU/audio, tareas del shell y helpers de otras apps.
+  'ctfmon',
+  'dllhost',
+  'fontdrvhost',
+  'runtimebroker',
+  'sihost',
+  'taskhostw',
+  'msmpeng',
+  'securityhealthsystray',
+  'securityhealthservice',
+  'smartscreen',
+  'backgroundtaskhost',
+  'openconsole',
+  'amdrsserv',
+  'amdrssrcext',
+  'atieclxx',
+  'atiedxx',
+  'cpumetricsserver',
+  'defendersessionhelper',
+  'discordsystemhelper',
+  'killerintelligencecenter',
+  'winlogon',
+  'rundll32',
+  'useroobebroker',
+  'searchapp',
+  'steamwebhelper',
+  'robloxcrashhandler',
+  'rtkauduservice64',
+  'cncmd',
 ]);
 
 /**
- * Lista ordenada y sin duplicados a partir de los nombres crudos que devuelve
- * cada plataforma. Filtra ruido del sistema y limita el tamaño: la lista se
- * pinta en Ajustes, no es un monitor de procesos.
+ * Lista ordenada y sin duplicados a partir de los nombres crudos de proceso que
+ * devuelve cada plataforma. Filtra ruido del sistema y limita el tamaño: la
+ * lista se pinta en Ajustes, no es un monitor de procesos.
+ *
+ * Los que tienen ventana van primero: son los que el usuario reconoce de un
+ * vistazo, y con el tope de la lista los procesos de fondo no los desplazan.
+ *
+ * @param {Array<string | {name: string, hasWindow?: boolean}>} entries
+ * @returns {Array<{name: string, exe: string}>} nombre visible + ejecutable
  */
-function normalizeAppList(names) {
+function normalizeAppList(entries) {
   const seen = new Map();
-  for (const raw of names || []) {
-    const pretty = prettyAppName(raw);
-    if (!pretty) continue;
-    const key = pretty.toLowerCase();
-    if (APP_NOISE.has(key) || APP_NOISE.has(String(raw || '').toLowerCase())) continue;
+  for (const entry of entries || []) {
+    const raw = typeof entry === 'string' ? entry : entry?.name;
+    const hasWindow = typeof entry === 'string' ? true : entry?.hasWindow === true;
+    const base = String(raw || '').trim().replace(/^.*[/\\]/, '');
+    if (!base) continue;
+    const key = base.toLowerCase().replace(/\.exe$/, '');
+    const pretty = prettyAppName(base);
+    if (!pretty || !key) continue;
+    if (APP_NOISE.has(key)) continue;
     if (pretty.length > 60) continue;
-    if (!seen.has(key)) seen.set(key, pretty);
+    // En Windows se muestra el ejecutable; en Linux/macOS el proceso tal cual.
+    const exe = /\.exe$/i.test(base)
+      ? base
+      : process.platform === 'win32'
+        ? `${base}.exe`
+        : base;
+    if (!seen.has(key)) seen.set(key, { name: pretty, exe, hasWindow });
   }
-  return [...seen.values()].sort((a, b) => a.localeCompare(b)).slice(0, 40);
+  return [...seen.values()]
+    .sort((a, b) => (Number(b.hasWindow) - Number(a.hasWindow)) || a.name.localeCompare(b.name))
+    .slice(0, 80)
+    .map(({ name, exe }) => ({ name, exe }));
 }
 
-/** Programas con ventana abierta en Windows (Procesos con MainWindowTitle). */
+/**
+ * Procesos de la sesión del usuario en Windows, con o sin ventana.
+ *
+ * Antes solo se listaban los que tenían `MainWindowTitle`, y eso dejaba fuera a
+ * media máquina (apps minimizadas a la bandeja, Electron, juegos con ventana
+ * propia, etc.). Ahora se listan todos los de la sesión: se descartan los de
+ * `SessionId 0`, que son servicios del sistema.
+ */
 async function listWindowsApps() {
   const script = `
 $ErrorActionPreference = 'SilentlyContinue'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-Get-Process | Where-Object { $_.MainWindowTitle -and $_.MainWindowTitle.Length -gt 0 } |
-  Select-Object -ExpandProperty ProcessName | Sort-Object -Unique
+Get-Process | Where-Object { $_.SessionId -ne 0 } | ForEach-Object {
+  $win = if ($_.MainWindowHandle -ne 0) { '1' } else { '0' }
+  "$($_.ProcessName)" + [char]9 + $win
+} | Sort-Object -Unique
 `;
   const encoded = Buffer.from(script, 'utf16le').toString('base64');
   const output = clean(
     await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded]),
   );
-  return output.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  return output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const [name, win] = line.split('\t');
+      return { name, hasWindow: win === '1' };
+    });
 }
 
 /** Ventanas visibles en Linux vía wmctrl; si no está instalado, cae a `ps`. */
@@ -456,7 +539,7 @@ async function listMacApps() {
  * Nunca lanza: si la plataforma falla devuelve [] y Ajustes muestra el estado
  * vacío en vez de romperse.
  *
- * @returns {Promise<string[]>} nombres "bonitos", ordenados y sin duplicados
+ * @returns {Promise<Array<{name: string, exe: string}>>} ordenados y sin duplicados
  */
 async function listRunningApps() {
   try {

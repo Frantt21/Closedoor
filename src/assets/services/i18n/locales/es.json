@@ -721,6 +721,7 @@
   "settings.activity_program_empty": "No se encontraron programas abiertos.",
   "settings.activity_program_loading": "Buscando programas abiertos…",
   "settings.activity_program_desktop_only": "El selector de programas solo está disponible en la app de escritorio.",
+  "settings.activity_program_restart": "Reinicia la app de escritorio para cargar el listado de programas.",
   "settings.activity_history": "Historial de actividad",
   "settings.activity_history_desc": "Se guarda solo en este equipo y desaparece al borrar el historial.",
   "settings.activity_history_empty": "Todavía no hay actividad registrada.",
