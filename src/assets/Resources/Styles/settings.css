@@ -941,6 +941,8 @@ dialog.fc-modal.settings-blocked-modal {
   animation: settings-fadeIn 0.2s ease;
 }
 
+/* Cada entrada apila título, subtítulo y hora en columna: el icono queda como
+   viñeta a la izquierda y la hora ya no compite por el ancho con el título. */
 .settings-activity-item {
   display: flex;
   align-items: flex-start;
@@ -987,11 +989,10 @@ dialog.fc-modal.settings-blocked-modal {
 }
 
 .settings-activity-item-time {
-  flex: 0 0 auto;
   font-size: 0.7rem;
   color: var(--color-text-muted, #6b7280);
   white-space: nowrap;
-  padding-top: 2px;
+  margin-top: 2px;
 }
 
 /* Programas abiertos: chips seleccionables, no un <select>, para que se vean de

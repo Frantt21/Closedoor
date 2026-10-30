@@ -1623,8 +1623,8 @@ export default function Settings() {
                             <span className="settings-activity-item-meta">
                               <span className="settings-activity-item-title" title={entry.title}>{entry.title}</span>
                               {sub && <span className="settings-activity-item-sub" title={sub}>{sub}</span>}
+                              <span className="settings-activity-item-time">{when}</span>
                             </span>
-                            <span className="settings-activity-item-time">{when}</span>
                           </li>
                         );
                       })}
