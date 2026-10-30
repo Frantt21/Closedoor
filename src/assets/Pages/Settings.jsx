@@ -18,6 +18,9 @@ import ConfirmModal from '../Resources/Components/ConfirmModal';
 import ModalShell from '../Resources/Components/ModalShell';
 import '../Resources/Styles/settings.css';
 
+/* Entradas visibles del historial de actividad antes de desplegar el resto. */
+const ACTIVITY_HISTORY_PREVIEW = 3;
+
 /* ── SVG Flag Icons ── */
 
 const FlagEs = () => (
@@ -417,6 +420,7 @@ export default function Settings() {
   const [activityUpdating, setActivityUpdating] = useState(false);
   const [showClearHistoryModal, setShowClearHistoryModal] = useState(false);
   const [historyRevision, setHistoryRevision] = useState(0);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
   const activitySettings = getActivitySettings(profile);
   // El historial vive en el localStorage del renderer, es decir, solo existe en
   // la app de escritorio (la web nunca detecta actividad).
@@ -1489,12 +1493,9 @@ export default function Settings() {
                 ) : (
                   <>
                     <ul className="settings-activity-history">
-                      {activityHistory.map((entry, index) => {
+                      {(historyExpanded ? activityHistory : activityHistory.slice(0, ACTIVITY_HISTORY_PREVIEW)).map((entry, index) => {
                         const EntryIcon = entry.kind === 'game' ? FaGamepad : entry.kind === 'video' ? FaTv : FaMusic;
                         const when = formatActivityWhen(entry.startedAt);
-                        const end = entry.endedAt
-                          ? formatActivityWhen(entry.endedAt)
-                          : t('settings.activity_history_ongoing');
                         const sub = [entry.subtitle, entry.app].filter(Boolean).join(' · ');
                         return (
                           <li className="settings-activity-item" key={`${entry.startedAt || 'x'}-${index}`}>
@@ -1503,13 +1504,24 @@ export default function Settings() {
                               <span className="settings-activity-item-title" title={entry.title}>{entry.title}</span>
                               {sub && <span className="settings-activity-item-sub" title={sub}>{sub}</span>}
                             </span>
-                            <span className="settings-activity-item-time">
-                              {when}{end ? ` – ${end}` : ''}
-                            </span>
+                            <span className="settings-activity-item-time">{when}</span>
                           </li>
                         );
                       })}
                     </ul>
+
+                    {activityHistory.length > ACTIVITY_HISTORY_PREVIEW && (
+                      <button
+                        type="button"
+                        className="settings-activity-toggle"
+                        onClick={() => setHistoryExpanded((prev) => !prev)}
+                        aria-expanded={historyExpanded}
+                      >
+                        {historyExpanded
+                          ? t('profile.show_less')
+                          : t('profile.show_more', { count: activityHistory.length - ACTIVITY_HISTORY_PREVIEW })}
+                      </button>
+                    )}
 
                     <button
                       type="button"
