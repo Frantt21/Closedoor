@@ -133,6 +133,9 @@ CREATE TABLE IF NOT EXISTS profiles (
   activity_enabled BOOLEAN NOT NULL DEFAULT true,
   activity_visibility TEXT NOT NULL DEFAULT 'followers'
     CHECK (activity_visibility IN ('followers', 'nobody')),
+  -- Programa abierto que el usuario elige compartir (migración 081):
+  -- {kind:'app', title, app}. Convive con `activity` (canción/juego).
+  program_activity JSONB DEFAULT NULL,
   -- Color de acento
   accent_color VARCHAR(7) DEFAULT NULL,
   accent_color_secondary TEXT DEFAULT NULL,

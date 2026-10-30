@@ -18,6 +18,26 @@ export function isLocalActivityAvailable() {
 }
 
 /**
+ * Programas abiertos en el equipo (Ajustes → Actividad).
+ *
+ * Bajo demanda y no con un hook: la lista se pide al abrir la categoría y al
+ * pulsar "actualizar", no cada 10 s como la actividad. En el navegador devuelve
+ * [] porque no hay puente.
+ *
+ * @returns {Promise<string[]>}
+ */
+export async function listOpenApps() {
+  try {
+    const api = typeof window !== 'undefined' ? window.electron?.activity : null;
+    if (!api || typeof api.listApps !== 'function') return [];
+    const apps = await api.listApps();
+    return Array.isArray(apps) ? apps.filter((name) => typeof name === 'string' && name) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
  * useLocalActivityState — actividad local del equipo (música, vídeo o juego) según
  * la detecta la app de escritorio (desktop/activity.js) y publica preload.js.
  *

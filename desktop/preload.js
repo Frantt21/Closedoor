@@ -63,6 +63,8 @@ contextBridge.exposeInMainWorld('electron', {
   // devuelve una función para desuscribirse. En la web esto no existe.
   activity: {
     get: () => ipcRenderer.invoke('foranly:activity-get'),
+    // Programas abiertos en el equipo (Ajustes → Actividad). Devuelve string[].
+    listApps: () => ipcRenderer.invoke('foranly:apps-list'),
     subscribe: (callback) => {
       if (typeof callback !== 'function') return () => {};
       const listener = (_event, value) => callback(value);

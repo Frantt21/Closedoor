@@ -342,6 +342,133 @@ async function detectLinuxSteamGame() {
   return null;
 }
 
+// ── Programas abiertos (selector de Ajustes → Actividad) ──
+
+/** Ruido del sistema: procesos que no son "programas que el usuario abrió". */
+const APP_NOISE = new Set([
+  'electron',
+  'node',
+  'conhost',
+  'cmd',
+  'powershell',
+  'pwsh',
+  'bash',
+  'sh',
+  'zsh',
+  'systemsettings',
+  'textinputhost',
+  'applicationframehost',
+  'shellexperiencehost',
+  'searchhost',
+  'startmenuexperiencehost',
+  'lockapp',
+  'dwm',
+  'wininit',
+  'csrss',
+  'svchost',
+  'explorer',
+  'gnome-shell',
+  'kwin_x11',
+  'kwin_wayland',
+  'plasmashell',
+  'systemd',
+  'dbus-daemon',
+  'dbus-broker',
+  'gvfsd',
+  'xdg-desktop-portal',
+  'pipewire',
+  'wireplumber',
+  'pulseaudio',
+  'xfwm4',
+  'mutter',
+  'xdg-desktop-portal-gnome',
+  'gnome-shell-extension',
+]);
+
+/**
+ * Lista ordenada y sin duplicados a partir de los nombres crudos que devuelve
+ * cada plataforma. Filtra ruido del sistema y limita el tamaño: la lista se
+ * pinta en Ajustes, no es un monitor de procesos.
+ */
+function normalizeAppList(names) {
+  const seen = new Map();
+  for (const raw of names || []) {
+    const pretty = prettyAppName(raw);
+    if (!pretty) continue;
+    const key = pretty.toLowerCase();
+    if (APP_NOISE.has(key) || APP_NOISE.has(String(raw || '').toLowerCase())) continue;
+    if (pretty.length > 60) continue;
+    if (!seen.has(key)) seen.set(key, pretty);
+  }
+  return [...seen.values()].sort((a, b) => a.localeCompare(b)).slice(0, 40);
+}
+
+/** Programas con ventana abierta en Windows (Procesos con MainWindowTitle). */
+async function listWindowsApps() {
+  const script = `
+$ErrorActionPreference = 'SilentlyContinue'
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+Get-Process | Where-Object { $_.MainWindowTitle -and $_.MainWindowTitle.Length -gt 0 } |
+  Select-Object -ExpandProperty ProcessName | Sort-Object -Unique
+`;
+  const encoded = Buffer.from(script, 'utf16le').toString('base64');
+  const output = clean(
+    await run('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded]),
+  );
+  return output.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+}
+
+/** Ventanas visibles en Linux vía wmctrl; si no está instalado, cae a `ps`. */
+async function listLinuxApps() {
+  try {
+    const output = clean(await run('wmctrl', ['-lx']));
+    if (output) {
+      // Formato: <id> <escritorio> <clase> <host> <título>
+      const names = output
+        .split(/\r?\n/)
+        .map((line) => line.trim().split(/\s+/)[2] || '')
+        .map((cls) => cls.split('.').pop())
+        .filter(Boolean);
+      if (names.length) return names;
+    }
+  } catch {
+    // sin wmctrl (X11 ausente o Wayland): probamos con los procesos
+  }
+
+  const output = clean(await run('ps', ['-u', String(os.userInfo().uid), '-o', 'comm=']));
+  return output.split(/\r?\n/).map((line) => line.trim().split('/').pop()).filter(Boolean);
+}
+
+/** Procesos visibles en macOS (System Events). */
+async function listMacApps() {
+  const output = clean(
+    await run('osascript', [
+      '-e',
+      'tell application "System Events" to get name of every process whose visible is true',
+    ]),
+  );
+  return output.split(',').map((name) => name.trim()).filter(Boolean);
+}
+
+/**
+ * Programas abiertos que el usuario podría compartir como actividad.
+ *
+ * Nunca lanza: si la plataforma falla devuelve [] y Ajustes muestra el estado
+ * vacío en vez de romperse.
+ *
+ * @returns {Promise<string[]>} nombres "bonitos", ordenados y sin duplicados
+ */
+async function listRunningApps() {
+  try {
+    if (process.platform === 'win32') return normalizeAppList(await listWindowsApps());
+    if (process.platform === 'linux') return normalizeAppList(await listLinuxApps());
+    if (process.platform === 'darwin') return normalizeAppList(await listMacApps());
+    return [];
+  } catch {
+    return [];
+  }
+}
+
 // ── Detección por plataforma ──
 
 /**
@@ -433,6 +560,7 @@ function stopActivityWatcher() {
 module.exports = {
   detectActivity,
   getActivity,
+  listRunningApps,
   startActivityWatcher,
   stopActivityWatcher,
   POLL_INTERVAL_MS,

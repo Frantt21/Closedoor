@@ -994,6 +994,48 @@ dialog.fc-modal.settings-blocked-modal {
   padding-top: 2px;
 }
 
+/* Programas abiertos: chips seleccionables, no un <select>, para que se vean de
+   un vistazo y funcionen igual con teclado. */
+.settings-activity-apps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 0 4px 24px;
+  max-height: 190px;
+  overflow-y: auto;
+}
+
+.settings-activity-app {
+  max-width: 100%;
+  padding: 5px 10px;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.14));
+  border-radius: 999px;
+  background: transparent;
+  font-size: 0.75rem;
+  color: var(--color-text, #ffffff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.settings-activity-app:hover:not(:disabled) {
+  background: var(--overlay-bg, rgba(255, 255, 255, 0.06));
+}
+
+.settings-activity-app--active {
+  background: var(--color-accent, #ffffff);
+  border-color: var(--color-accent, #ffffff);
+  color: var(--accent-surface-text-color, #000000);
+  font-weight: 600;
+}
+
+.settings-activity-app:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .settings-activity-toggle {
   margin: 2px 0 0 24px;
   padding: 4px 0;

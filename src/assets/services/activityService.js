@@ -36,7 +36,12 @@ const MAX_ALBUM = 160;
 const MAX_APP = 60;
 const MAX_URL = 500;
 
-const KINDS = new Set(['music', 'video', 'game']);
+/**
+ * `app` no lo detecta el watcher: es el programa que el usuario elige a mano en
+ * Ajustes → Actividad. Se guarda en su propia columna (`program_activity`) para
+ * que conviva con la canción, y se normaliza aquí para reutilizar el mismo shape.
+ */
+const KINDS = new Set(['music', 'video', 'game', 'app']);
 
 function clip(value, max) {
   const text = typeof value === 'string' ? value.trim() : '';
@@ -80,6 +85,45 @@ export function isActivityFresh(activity, updatedAt, now = Date.now()) {
   if (!Number.isFinite(ts)) return false;
   // Tolerancia de 1 min hacia el futuro por desajustes de reloj del cliente.
   return now - ts < ACTIVITY_TTL_MS && ts - now < 60 * 1000;
+}
+
+/**
+ * Programa elegido a mano por el dueño del perfil (columna `program_activity`).
+ *
+ * No caduca como la actividad detectada: es una elección explícita del usuario y
+ * sigue vigente hasta que la cambie o la quite.
+ *
+ * @returns {null | {kind: 'app', title: string, subtitle: null, album: null, app: string, url: null}}
+ */
+export function programFromProfile(profile) {
+  if (!profile) return null;
+  return normalizeActivity(profile.program_activity);
+}
+
+/**
+ * Guarda (o quita con `null`) el programa que el usuario quiere mostrar.
+ *
+ * Va aparte de `persistActivity` porque esa columna la sobreescribe el watcher
+ * cada vez que cambia la canción; si compartieran columna, elegir un programa
+ * borraría la música y viceversa.
+ *
+ * @param {string} userId
+ * @param {string|null} appName
+ * @returns {Promise<object|null>} el valor normalizado que se escribió
+ */
+export async function persistProgramActivity(userId, appName) {
+  if (!userId) return null;
+
+  const name = typeof appName === 'string' ? appName.trim().slice(0, MAX_APP) : '';
+  const program = name ? normalizeActivity({ kind: 'app', title: name, app: name }) : null;
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ program_activity: program })
+    .eq('id', userId);
+
+  if (error) throw error;
+  return program;
 }
 
 /**

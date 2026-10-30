@@ -8,10 +8,11 @@ import { getBlockedUsers, getCachedBlockedUsers, unblockUser, cacheBlockStatus, 
 import { useNavigate } from 'react-router-dom';
 import { getItem } from '../services/secureStorage';
 import { isWindowZoomAvailable, controlWindowZoom, isDesktopApp } from '../services/desktopApp';
-import { getActivitySettings, readActivityHistory, clearActivityHistory, persistActivity } from '../services/activityService';
+import { listOpenApps } from '../../hooks/useLocalActivity';
+import { getActivitySettings, readActivityHistory, clearActivityHistory, persistActivity, persistProgramActivity, programFromProfile } from '../services/activityService';
 import { supabase } from '../services/supabaseclient';
 import { getNicknames, getCachedNicknames, cacheNicknames, setNickname, removeNickname } from '../services/chatService';
-import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaHeartBroken, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaChartBar, FaBell, FaBrush, FaBan, FaClock, FaAt, FaTrashAlt, FaTimes, FaDiscord, FaEdit, FaImage, FaCompress, FaUndo, FaGamepad, FaHistory, FaMusic, FaTv } from 'react-icons/fa';
+import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaHeartBroken, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaChartBar, FaBell, FaBrush, FaBan, FaClock, FaAt, FaTrashAlt, FaTimes, FaDiscord, FaEdit, FaImage, FaCompress, FaUndo, FaGamepad, FaHistory, FaMusic, FaTv, FaDesktop } from 'react-icons/fa';
 import { MdLogout } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import ConfirmModal from '../Resources/Components/ConfirmModal';
@@ -421,6 +422,10 @@ export default function Settings() {
   const [showClearHistoryModal, setShowClearHistoryModal] = useState(false);
   const [historyRevision, setHistoryRevision] = useState(0);
   const [historyExpanded, setHistoryExpanded] = useState(false);
+  // Programa compartido (migración 081) y la lista de programas abiertos que
+  // detecta la app de escritorio para elegirlo.
+  const [openApps, setOpenApps] = useState(null); // null = todavía cargando
+  const [openAppsRevision, setOpenAppsRevision] = useState(0);
   const activitySettings = getActivitySettings(profile);
   // El historial vive en el localStorage del renderer, es decir, solo existe en
   // la app de escritorio (la web nunca detecta actividad).
@@ -429,6 +434,26 @@ export default function Settings() {
     () => (activeCategory === 'activity' && isDesktop ? readActivityHistory(user?.id) : []),
     [activeCategory, isDesktop, user?.id, historyRevision]
   );
+  // Programa que el usuario comparte ahora mismo (columna de la migración 081).
+  const selectedProgram = programFromProfile(profile)?.title || null;
+  // Con la actividad apagada o en "nadie" no se escribe: el programa se publica
+  // en la fila del perfil igual que la canción, así que comparte su privacidad.
+  const programSelectable = activitySettings.enabled && activitySettings.visibility !== 'nobody';
+
+  // Programas abiertos en el equipo: se piden al entrar en la categoría (y al
+  // pulsar "actualizar", que suma a openAppsRevision), no en cada render: es una
+  // consulta al sistema. El estado se escribe tras el await para no encadenar
+  // renders síncronos desde el efecto.
+  useEffect(() => {
+    if (activeCategory !== 'activity' || !isDesktop) return undefined;
+    let alive = true;
+    listOpenApps().then((apps) => {
+      if (alive) setOpenApps(apps);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [activeCategory, isDesktop, openAppsRevision]);
 
   // ── Calculate cache size ──
   const cacheSize = useMemo(() => {
@@ -743,7 +768,10 @@ export default function Settings() {
     setActivityUpdating(true);
     try {
       await updateUserProfile(user.id, { activity_enabled: next });
-      if (!next) await persistActivity(user.id, null).catch(() => {});
+      if (!next) {
+        await persistActivity(user.id, null).catch(() => {});
+        await persistProgramActivity(user.id, null).catch(() => {});
+      }
       await refreshProfile(user.id);
     } catch (err) {
       console.error('Error updating activity settings:', err);
@@ -758,10 +786,29 @@ export default function Settings() {
     setActivityUpdating(true);
     try {
       await updateUserProfile(user.id, { activity_visibility: value });
-      if (value === 'nobody') await persistActivity(user.id, null).catch(() => {});
+      if (value === 'nobody') {
+        await persistActivity(user.id, null).catch(() => {});
+        await persistProgramActivity(user.id, null).catch(() => {});
+      }
       await refreshProfile(user.id);
     } catch (err) {
       console.error('Error updating activity visibility:', err);
+      toast.error(t('settings.activity_save_error'));
+    } finally {
+      setActivityUpdating(false);
+    }
+  };
+
+  // Programa compartido: se escribe en su propia columna para no pisar la
+  // canción/juego que publica ActivitySync.
+  const handleProgramChange = async (appName) => {
+    if (!user?.id || activityUpdating || !programSelectable) return;
+    setActivityUpdating(true);
+    try {
+      await persistProgramActivity(user.id, appName === selectedProgram ? null : appName);
+      await refreshProfile(user.id);
+    } catch (err) {
+      console.error('Error updating shared program:', err);
       toast.error(t('settings.activity_save_error'));
     } finally {
       setActivityUpdating(false);
@@ -1472,6 +1519,79 @@ export default function Settings() {
                     {t('settings.activity_visibility_nobody')}
                   </button>
                 </div>
+              </div>
+
+              <div className="settings-row-divider" />
+
+              {/* ── Programa compartido (segunda actividad) ── */}
+              <div className="settings-row" style={programSelectable ? undefined : { opacity: 0.55 }}>
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaDesktop /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.activity_program')}</h2>
+                    <p className="settings-section-desc">{t('settings.activity_program_desc')}</p>
+                  </div>
+                </div>
+
+                {!isDesktop ? (
+                  <p className="settings-activity-empty">{t('settings.activity_program_desktop_only')}</p>
+                ) : openApps === null ? (
+                  <p className="settings-activity-empty">{t('settings.activity_program_loading')}</p>
+                ) : openApps.length === 0 ? (
+                  <p className="settings-activity-empty">{t('settings.activity_program_empty')}</p>
+                ) : (
+                  <div className="settings-activity-apps">
+                    <button
+                      type="button"
+                      className={`settings-activity-app ${selectedProgram ? '' : 'settings-activity-app--active'}`}
+                      onClick={() => handleProgramChange(null)}
+                      disabled={activityUpdating || !programSelectable}
+                    >
+                      {t('settings.activity_program_none')}
+                    </button>
+
+                    {/* El elegido se mantiene aunque ahora esté cerrado: sin esto
+                        desaparecería de la lista y parecería que no hay nada. */}
+                    {selectedProgram && !openApps.includes(selectedProgram) && (
+                      <button
+                        type="button"
+                        className="settings-activity-app settings-activity-app--active"
+                        onClick={() => handleProgramChange(selectedProgram)}
+                        disabled={activityUpdating || !programSelectable}
+                        title={selectedProgram}
+                      >
+                        {selectedProgram}
+                      </button>
+                    )}
+
+                    {openApps.map((appName) => (
+                      <button
+                        key={appName}
+                        type="button"
+                        className={`settings-activity-app ${selectedProgram === appName ? 'settings-activity-app--active' : ''}`}
+                        onClick={() => handleProgramChange(appName)}
+                        disabled={activityUpdating || !programSelectable}
+                        title={appName}
+                      >
+                        {appName}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {isDesktop && (
+                  <button
+                    type="button"
+                    className="settings-activity-toggle"
+                    onClick={() => {
+                      setOpenApps(null);
+                      setOpenAppsRevision((v) => v + 1);
+                    }}
+                  >
+                    <FaUndo style={{ marginRight: 6 }} />
+                    {t('settings.activity_program_refresh')}
+                  </button>
+                )}
               </div>
 
               <div className="settings-row-divider" />

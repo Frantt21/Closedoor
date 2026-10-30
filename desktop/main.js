@@ -516,6 +516,10 @@ ipcMain.handle('window-zoom', (_event, action = 'get') => {
 // cambios por el evento 'foranly:activity'. Devuelve null si no hay nada activo.
 ipcMain.handle('foranly:activity-get', () => activity.getActivity());
 
+// Programas abiertos para Ajustes → Actividad. Se consulta bajo demanda (no en
+// cada sondeo): solo hace falta cuando el usuario abre esa categoría.
+ipcMain.handle('foranly:apps-list', () => activity.listRunningApps());
+
 // ── Window controls handlers ──
 ipcMain.on('window-minimize', () => {
   if (mainWindow) mainWindow.minimize();
