@@ -2682,7 +2682,7 @@ export default function Chat() {
           <p>{t('following.empty')}</p>
         </div>
       ) : (
-        <div className="chat-followers-modal-grid">
+        <div className="chat-followers-modal-list">
           {followers.map((u) => (
             <button key={u.id} className="chat-followers-modal-card" onClick={() => { setShowFollowersModal(false); startConversation(u); }}>
               <Avatar src={u.avatar_url} alt={u.username} className="chat-followers-modal-card-avatar" />
