@@ -1,42 +1,4 @@
 {
-  "2026-10-10+2:4x09xw": {
-    "es": {
-      "title": "La canción de tu perfil, ahora transmitida de verdad",
-      "items": [
-        "La canción que fijes en tu perfil ahora reproduce la pista en sí, no solo la vista previa de 30 segundos.",
-        "Puedes buscar dentro de la pista mientras se transmite.",
-        "El audio se resuelve dentro de la propia aplicación, por lo que funciona igual en producción y localmente.",
-        "Si una canción no se puede reproducir en su totalidad, la tarjeta vuelve automáticamente a la vista previa."
-      ]
-    },
-    "pt": {
-      "title": "Sua música de perfil, agora transmitida de verdade",
-      "items": [
-        "A música que você fixa em seu perfil agora reproduz a faixa em si, não apenas a prévia de 30 segundos.",
-        "Você pode pesquisar na faixa enquanto ela é transmitida.",
-        "O áudio é resolvido dentro do próprio aplicativo, por isso funciona da mesma forma em produção e localmente.",
-        "Se uma música não puder ser reproduzida por completo, o cartão volta automaticamente para a visualização."
-      ]
-    },
-    "ru": {
-      "title": "Песня из вашего профиля теперь звучит по-настоящему",
-      "items": [
-        "Песня, которую вы прикрепляете в своем профиле, теперь воспроизводит саму дорожку, а не только 30-секундный предварительный просмотр.",
-        "Вы можете искать трек во время его трансляции.",
-        "Звук обрабатывается внутри самого приложения, поэтому он работает одинаково как в рабочей среде, так и локально.",
-        "Если песню невозможно воспроизвести полностью, карта автоматически возвращается к предварительному просмотру."
-      ]
-    },
-    "ja": {
-      "title": "あなたのプロフィールソングが本格的にストリーミング配信中",
-      "items": [
-        "プロフィールにピン留めした曲は、30 秒のプレビューだけでなく、トラック自体も再生されるようになりました。",
-        "ストリーミング中にトラック内をシークできます。",
-        "オーディオはアプリ自体の内部で解決されるため、本番環境でもローカルでも同様に動作します。",
-        "曲を完全に再生できない場合、カードは自動的にプレビューに戻ります。"
-      ]
-    }
-  },
   "2026-10-16:twf9o0": {
     "es": {
       "title": "Canciones completas en la aplicación de escritorio.",
@@ -126,6 +88,52 @@
         "[設定] には新しい [アカウント] セクションがあり、ユーザー名、電子メール、パスワードを変更します。変更するたびに、最初に現在のパスワードが要求されます。",
         "チャット内のメディアと固定メッセージは、会話を開いた瞬間に利用できるようになりました。",
         "投稿の「固定」バッジが明るい背景でも読めるようになりました。"
+      ]
+    }
+  },
+  "2026-10-29:k5acpu": {
+    "es": {
+      "title": "Actividad en tu perfil y tu cuenta en la lista de chat",
+      "items": [
+        "Tu perfil ahora muestra lo que estás escuchando, viendo o reproduciendo: la aplicación de escritorio lo detecta localmente y la portada proviene de la misma búsqueda que la canción de tu perfil.",
+        "Nueva sección Actividad en Configuración: desactívala por completo, elige si solo tus seguidores pueden verla o nadie y revisa un historial local de lo que has estado jugando.",
+        "Con la actividad desactivada o configurada como Nadie, no se publica nada: su perfil no almacena ninguna actividad.",
+        "La lista de chat ahora termina con tu propia tarjeta de cuenta: avatar, nombre y lo que estás haciendo en este momento.",
+        "Haga clic en esa tarjeta para abrir su tarjeta Explore sin salir del chat, o use el ícono de información para los detalles de su cuenta.",
+        "Los contadores de seguidores y seguidores en esa tarjeta se actualizan en el momento en que cambian."
+      ]
+    },
+    "pt": {
+      "title": "Atividade em seu perfil e sua conta na lista de bate-papo",
+      "items": [
+        "Seu perfil agora mostra o que você está ouvindo, assistindo ou tocando: o aplicativo de desktop detecta isso localmente e a capa vem da mesma pesquisa da música do seu perfil.",
+        "Nova seção de atividades em Configurações: desative-a totalmente, escolha se apenas seus seguidores podem vê-la ou ninguém e revise um histórico local do que você está jogando.",
+        "Com a atividade desativada ou definida como ninguém, nada é publicado – seu perfil não armazena nenhuma atividade.",
+        "A lista de bate-papo agora termina com seu próprio cartão de conta: avatar, nome e o que você está fazendo no momento.",
+        "Clique nesse cartão para abrir seu cartão Explorar sem sair do bate-papo ou use o ícone de informações para obter os detalhes da sua conta.",
+        "Os contadores de seguidores e seguidores nesse cartão são atualizados no momento em que mudam."
+      ]
+    },
+    "ru": {
+      "title": "Активность в вашем профиле и вашей учетной записи в списке чата",
+      "items": [
+        "В вашем профиле теперь отображается то, что вы слушаете, смотрите или играете: настольное приложение определяет это локально, а обложка берется из того же поиска, что и песня вашего профиля.",
+        "Новый раздел «Активность» в настройках: полностью отключите его, выберите, смогут ли его видеть только ваши подписчики или вообще никто, а также просмотрите локальную историю того, во что вы играли.",
+        "Если активность отключена или установлено значение «Никто», ничего не публикуется — в вашем профиле вообще не сохраняется никакой активности.",
+        "Список чата теперь заканчивается вашей собственной карточкой аккаунта: аватаром, именем и тем, что вы делаете в данный момент.",
+        "Нажмите на эту карточку, чтобы открыть карточку «Обзор», не выходя из чата, или используйте значок информации для просмотра данных своей учетной записи.",
+        "Счетчики последователей и подписок на этой карточке обновляются в момент их изменения."
+      ]
+    },
+    "ja": {
+      "title": "プロフィール上のアクティビティとチャット リスト内のアカウント",
+      "items": [
+        "あなたのプロフィールには、あなたが聴いている、見ている、または再生しているものが表示されます。デスクトップ アプリはそれをローカルで検出し、カバー アートはプロフィールの曲と同じ検索から取得されます。",
+        "[設定] の [新しいアクティビティ] セクション: 完全にオフにし、フォロワーのみに表示するか誰にも表示できないかを選択し、プレイした内容のローカル履歴を確認します。",
+        "アクティビティをオフにするか、誰もに設定しない場合、何も公開されません。プロファイルにはアクティビティがまったく保存されません。",
+        "チャット リストの最後には、アバター、名前、現在行っていることなど、自分のアカウント カードが表示されます。",
+        "そのカードをクリックして、チャットを終了せずに Explore カードを開くか、情報アイコンを使用してアカウントの詳細を確認します。",
+        "そのカード内のフォロワーとフォローしているカウンターは、変更されるとすぐに更新されます。"
       ]
     }
   }

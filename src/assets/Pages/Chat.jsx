@@ -37,6 +37,7 @@ import GifPicker from '../Resources/Components/GifPicker';
 import SongPicker from '../Resources/Components/SongPicker';
 import MediaPicker from '../Resources/Components/MediaPicker';
 import ChatSongCard from '../Resources/Components/ChatSongCard';
+import ChatAccountCard from '../Resources/Components/ChatAccountCard';
 import { withPreviewFallback } from '../services/musicService';
 import { getTimeAgo, IMG_RE, detectMediaFromContent, getImageStyle, sanitizeUrl } from '../services/helpers';
 import { getClipboardImageFile } from '../services/clipboard';
@@ -2809,6 +2810,9 @@ export default function Chat() {
           ))
         )}
       </div>
+
+      {/* Tu cuenta, fija al pie del listado (fuera del scroller de chats). */}
+      <ChatAccountCard />
     </>
   );
 

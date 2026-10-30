@@ -22,6 +22,20 @@ export const CHANGELOG_SEEN_KEY = 'fc_changelog_seen';
 
 export const RELEASES = [
   {
+    id: '2026-10-29',
+    date: '2026-10-29',
+    title: 'Activity on your profile, and your account in the chat list',
+    items: [
+      'Your profile now shows what you are listening to, watching or playing: the desktop app detects it locally and the cover art comes from the same search as your profile song.',
+      'New Activity section in Settings: turn it off entirely, choose whether only your followers can see it or nobody at all, and review a local history of what you have been playing.',
+      'With activity off, or set to nobody, nothing is published — your profile stores no activity at all.',
+      'The chat list now ends with your own account card: avatar, name and what you are doing right now.',
+      'Click that card to open your Explore card without leaving the chat, or use the info icon for your account details — both open right above the card.',
+      'The same card has a three-dot menu to copy your profile link or switch your status between online, idle and do not disturb.',
+      'Follower and following counters in that card update the moment they change.',
+    ],
+  },
+  {
     id: '2026-10-20',
     date: '2026-10-20',
     title: 'Floating player, chat dock and account settings',

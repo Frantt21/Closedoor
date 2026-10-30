@@ -187,6 +187,294 @@
 }
 
 /* ── Conversation list items ── */
+/* ── Account card ──
+   Tu cuenta al pie del listado: avatar, nombre, actividad en curso y el icono
+   de información. Queda FUERA de .chat-list-items (el scroller), así que no se
+   desplaza con las conversaciones. */
+.chat-account-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    padding: 10px 12px;
+    border-top: 1px solid var(--color-border, #2a2a2a);
+    background: transparent;
+}
+
+.chat-account-card-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+/* Toda la card (avatar + nombre + actividad) abre la tarjeta de Explore. El
+   icono de información queda FUERA del botón: botones anidados no son válidos. */
+.chat-account-card-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 2px;
+    margin: -2px;
+    border: none;
+    border-radius: var(--radius-sm, 6px);
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+
+.chat-account-card-main:hover {
+    background: var(--overlay-bg, rgba(255, 255, 255, 0.05));
+}
+
+.chat-account-card-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.chat-account-card-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--color-text, #ffffff);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chat-account-card-activity {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    font-size: 0.76rem;
+    color: var(--color-text-secondary, #9ca3af);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chat-account-card-activity--idle {
+    color: var(--color-text-muted, #6b7280);
+}
+
+.chat-account-card-activity-icon {
+    flex-shrink: 0;
+    font-size: 0.7rem;
+    opacity: 0.85;
+}
+
+.chat-account-card-info-btn {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    border: none;
+    border-radius: var(--radius-sm, 6px);
+    background: transparent;
+    color: var(--color-text-secondary, #9ca3af);
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.chat-account-card-info-btn:hover {
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+}
+
+/* ── Panel flotante (NO es un modal) ──
+   Un div normal en un portal a <body>, position: fixed, así que flota sobre la
+   interfaz sin backdrop ni bloquear el resto de la app, y el overflow del
+   sidebar no lo recorta. Se pega al borde superior de .chat-account-card y
+   crece hacia arriba; --anchor-left / --anchor-bottom / --anchor-width los pone
+   el componente con la posición real de la card al abrirlo. */
+.chat-account-float {
+    position: fixed;
+    left: var(--anchor-left, 16px);
+    bottom: var(--anchor-bottom, 76px);
+    z-index: 1200;
+    padding: 0;
+    border-radius: var(--radius, 10px);
+    background: var(--color-surface, #1a1a1a);
+    border: 1px solid var(--color-border, #2a2a2a);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+    /* El panel nunca debe salirse por arriba ni tapar la propia card. */
+    max-height: calc(100vh - var(--anchor-bottom, 76px) - 12px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    transform-origin: bottom left;
+    animation: chatAccountFloatIn 0.16s ease-out;
+}
+
+@keyframes chatAccountFloatIn {
+    from { opacity: 0; transform: translateY(10px) scale(0.98); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* Tu tarjeta de Explore: el chrome lo pone la propia card, no el panel.
+   Mismo ancho que el sidebar del chat (340px) y que los paneles flotantes de
+   esta pantalla: la card mide igual que las demás. Con otro ancho se estiraba
+   el banner (aspect-ratio 40/11) y el texto envolvía distinto, así que la
+   tarjeta salía más ancha y más baja que el resto. */
+.chat-account-float--card {
+    width: min(340px, calc(100vw - var(--anchor-left, 16px) - 12px));
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    overflow: visible;
+}
+
+/* Detalles de la cuenta. */
+.chat-account-float--details {
+    width: min(340px, calc(100vw - var(--anchor-left, 16px) - 12px));
+}
+
+/* Móvil: la card ocupa todo el ancho, así que el panel también. */
+@media (max-width: 560px) {
+    .chat-account-float {
+        left: 8px;
+        right: 8px;
+        width: auto;
+    }
+}
+
+.chat-account-explore-wrap {
+    position: relative;
+}
+
+.chat-account-explore-wrap .explore-card {
+    border-radius: var(--radius, 10px);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+}
+
+.chat-account-explore-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 3;
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.55);
+    color: #ffffff;
+    font-size: 0.85rem;
+    cursor: pointer;
+    backdrop-filter: blur(4px);
+    transition: background 0.15s ease;
+}
+
+.chat-account-explore-close:hover {
+    background: rgba(0, 0, 0, 0.75);
+}
+
+.chat-account-modal-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 20px 20px 14px;
+    border-bottom: 1px solid var(--color-border, #2a2a2a);
+}
+
+.chat-account-modal-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.chat-account-modal-identity {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.chat-account-modal-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--color-text, #ffffff);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chat-account-modal-username {
+    font-size: 0.8rem;
+    color: var(--color-text-muted, #6b7280);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chat-account-modal-close {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    border-radius: var(--radius-sm, 6px);
+    background: none;
+    color: var(--color-text-secondary, #9ca3af);
+    font-size: 1.05rem;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.chat-account-modal-close:hover {
+    background: var(--color-surface-hover, #252525);
+    color: var(--color-text, #ffffff);
+}
+
+.chat-account-modal-body {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 20px 18px;
+}
+
+.chat-account-modal-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--color-border, #2a2a2a);
+}
+
+.chat-account-modal-row:last-child {
+    border-bottom: none;
+}
+
+.chat-account-modal-label {
+    font-size: 0.8rem;
+    color: var(--color-text-muted, #6b7280);
+}
+
+.chat-account-modal-value {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--color-text, #ffffff);
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .chat-list-items {
     flex: 1;
     overflow-y: auto;
