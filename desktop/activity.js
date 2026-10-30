@@ -441,14 +441,15 @@ const APP_NOISE = new Set([
  * Los que tienen ventana van primero: son los que el usuario reconoce de un
  * vistazo, y con el tope de la lista los procesos de fondo no los desplazan.
  *
- * @param {Array<string | {name: string, hasWindow?: boolean}>} entries
- * @returns {Array<{name: string, exe: string}>} nombre visible + ejecutable
+ * @param {Array<string | {name: string, hasWindow?: boolean, path?: string}>} entries
+ * @returns {Array<{name: string, exe: string, path: string|null}>} nombre, ejecutable y ruta
  */
 function normalizeAppList(entries) {
   const seen = new Map();
   for (const entry of entries || []) {
     const raw = typeof entry === 'string' ? entry : entry?.name;
     const hasWindow = typeof entry === 'string' ? true : entry?.hasWindow === true;
+    const filePath = typeof entry === 'object' && entry?.path ? entry.path : null;
     const base = String(raw || '').trim().replace(/^.*[/\\]/, '');
     if (!base) continue;
     const key = base.toLowerCase().replace(/\.exe$/, '');
@@ -462,12 +463,20 @@ function normalizeAppList(entries) {
       : process.platform === 'win32'
         ? `${base}.exe`
         : base;
-    if (!seen.has(key)) seen.set(key, { name: pretty, exe, hasWindow });
+    const existing = seen.get(key);
+    if (!existing) {
+      seen.set(key, { name: pretty, exe, hasWindow, path: filePath });
+    } else {
+      // Un mismo proceso puede aparecer varias veces; nos quedamos con la
+      // primera ruta legible (es la que luego se usa para sacar el icono).
+      if (!existing.path && filePath) existing.path = filePath;
+      existing.hasWindow = existing.hasWindow || hasWindow;
+    }
   }
   return [...seen.values()]
     .sort((a, b) => (Number(b.hasWindow) - Number(a.hasWindow)) || a.name.localeCompare(b.name))
     .slice(0, 80)
-    .map(({ name, exe }) => ({ name, exe }));
+    .map(({ name, exe, path }) => ({ name, exe, path }));
 }
 
 /**
@@ -484,7 +493,8 @@ $ErrorActionPreference = 'SilentlyContinue'
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 Get-Process | Where-Object { $_.SessionId -ne 0 } | ForEach-Object {
   $win = if ($_.MainWindowHandle -ne 0) { '1' } else { '0' }
-  "$($_.ProcessName)" + [char]9 + $win
+  $exePath = if ($_.Path) { $_.Path } else { '' }
+  "$($_.ProcessName)" + [char]9 + $win + [char]9 + $exePath
 } | Sort-Object -Unique
 `;
   const encoded = Buffer.from(script, 'utf16le').toString('base64');
@@ -496,8 +506,8 @@ Get-Process | Where-Object { $_.SessionId -ne 0 } | ForEach-Object {
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => {
-      const [name, win] = line.split('\t');
-      return { name, hasWindow: win === '1' };
+      const [name, win, exePath] = line.split('\t');
+      return { name, hasWindow: win === '1', path: exePath || null };
     });
 }
 

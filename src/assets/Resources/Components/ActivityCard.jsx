@@ -1,5 +1,20 @@
 import { useEffect, useState } from 'react';
-import { FaMusic, FaTv, FaGamepad, FaSpotify, FaDesktop } from 'react-icons/fa6';
+import {
+  FaMusic,
+  FaTv,
+  FaGamepad,
+  FaSpotify,
+  FaDesktop,
+  FaDiscord,
+  FaSteam,
+  FaChrome,
+  FaFirefox,
+  FaEdge,
+  FaCode,
+  FaTerminal,
+  FaTelegram,
+  FaWhatsapp,
+} from 'react-icons/fa6';
 import { useI18n } from '../../services/i18n/useI18n';
 import { useAuth } from '../../../hooks/useAuth';
 import { useLocalActivityState, isLocalActivityAvailable } from '../../../hooks/useLocalActivity';
@@ -13,6 +28,37 @@ import {
   canViewActivity,
 } from '../../services/activityService';
 import './css/activityCard.css';
+
+/**
+ * Iconos por programa para la card del perfil.
+ *
+ * El icono real del .exe solo existe dentro de la app de escritorio; en el perfil
+ * se ve desde web y desde otros equipos, así que aquí se usa la marca conocida y
+ * un monitor genérico para el resto. Se busca en minúsculas por el título guardado.
+ */
+const PROGRAM_ICONS = {
+  spotify: FaSpotify,
+  discord: FaDiscord,
+  steam: FaSteam,
+  chrome: FaChrome,
+  'google chrome': FaChrome,
+  'brave': FaChrome,
+  firefox: FaFirefox,
+  edge: FaEdge,
+  'microsoft edge': FaEdge,
+  'vs code': FaCode,
+  'visual studio code': FaCode,
+  'windows terminal': FaTerminal,
+  terminal: FaTerminal,
+  telegram: FaTelegram,
+  whatsapp: FaWhatsapp,
+};
+
+/** Icono del programa como componente estático (la marca conocida o un monitor). */
+function ProgramGlyph({ title, className }) {
+  const Icon = PROGRAM_ICONS[String(title || '').trim().toLowerCase()] || FaDesktop;
+  return <Icon className={className} />;
+}
 
 /** ¿El visitante sigue al dueño del perfil? */
 
@@ -109,6 +155,7 @@ export default function ActivityCard({ profile, isOwnProfile, surfaceStyle }) {
       ? t('profile.activity_watching')
       : t('profile.activity_listening');
 
+
   return (
     <div className="profile-sidebar-card profile-activity-card" style={surfaceStyle}>
       {activity && (
@@ -158,13 +205,13 @@ export default function ActivityCard({ profile, isOwnProfile, surfaceStyle }) {
       {program && (
         <div className={`profile-activity-program ${activity ? '' : 'profile-activity-program--alone'}`}>
           <h3 className="profile-sidebar-title">
-            <FaDesktop className="profile-sidebar-title-icon" />
+            <ProgramGlyph title={program.title} className="profile-sidebar-title-icon" />
             {t('profile.activity_using_app')}
           </h3>
 
           <div className="profile-activity-row">
             <span className="profile-activity-art" aria-hidden="true">
-              <FaDesktop />
+              <ProgramGlyph title={program.title} />
             </span>
 
             <div className="profile-activity-meta">

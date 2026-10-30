@@ -40,7 +40,7 @@ export function isOpenAppsAvailable() {
  * pulsar "actualizar", no cada 10 s como la actividad. En el navegador devuelve
  * [] porque no hay puente.
  *
- * @returns {Promise<Array<{name: string, exe: string}>>}
+ * @returns {Promise<Array<{name: string, exe: string, icon: string|null}>>}
  */
 export async function listOpenApps() {
   try {
@@ -50,10 +50,13 @@ export async function listOpenApps() {
     if (!Array.isArray(apps)) return [];
     return apps
       .map((item) => {
-        if (typeof item === 'string') return { name: item, exe: item };
+        if (typeof item === 'string') return { name: item, exe: item, icon: null };
         const name = typeof item?.name === 'string' ? item.name : '';
         if (!name) return null;
-        return { name, exe: typeof item.exe === 'string' && item.exe ? item.exe : name };
+        // El icono llega como data URL del ejecutable (main.js → getFileIcon).
+        // Se valida el prefijo para no pintar cualquier cosa que mande el puente.
+        const icon = typeof item.icon === 'string' && item.icon.startsWith('data:image/') ? item.icon : null;
+        return { name, exe: typeof item.exe === 'string' && item.exe ? item.exe : name, icon };
       })
       .filter(Boolean);
   } catch {

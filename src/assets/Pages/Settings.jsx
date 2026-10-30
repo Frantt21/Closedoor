@@ -444,6 +444,10 @@ export default function Settings() {
   // Si el preload es anterior al listado de programas, la lista llega vacía sin
   // ser un fallo de detección: hay que reiniciar la app de escritorio.
   const appsApiReady = isOpenAppsAvailable();
+  // Icono real del programa elegido (si sigue en la lista de abiertos).
+  const selectedProgramEntry = selectedProgram
+    ? (openApps || []).find((app) => app.name === selectedProgram)
+    : null;
 
   // Programas abiertos en el equipo: se piden al entrar en la categoría (y al
   // pulsar "actualizar", que suma a openAppsRevision), no en cada render: es una
@@ -1578,6 +1582,14 @@ export default function Settings() {
                       aria-expanded={programMenuOpen}
                       disabled={activityUpdating || !programSelectable}
                     >
+                      {selectedProgramEntry?.icon && (
+                        <img
+                          src={selectedProgramEntry.icon}
+                          alt=""
+                          className="settings-activity-program-option-icon"
+                          draggable={false}
+                        />
+                      )}
                       <span className="settings-activity-program-btn-label">
                         {selectedProgram || t('settings.activity_program_none')}
                       </span>
@@ -1634,6 +1646,17 @@ export default function Settings() {
                                     setProgramMenuOpen(false);
                                   }}
                                 >
+                                  {app.icon ? (
+                                    <img
+                                      src={app.icon}
+                                      alt=""
+                                      className="settings-activity-program-option-icon"
+                                      loading="lazy"
+                                      draggable={false}
+                                    />
+                                  ) : (
+                                    <FaDesktop className="settings-activity-program-option-icon settings-activity-program-option-icon--fallback" />
+                                  )}
                                   <span className="settings-activity-program-option-name">{app.name}</span>
                                   <span className="settings-activity-program-option-exe">{app.exe}</span>
                                 </button>

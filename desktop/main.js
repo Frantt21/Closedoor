@@ -518,7 +518,44 @@ ipcMain.handle('foranly:activity-get', () => activity.getActivity());
 
 // Programas abiertos para Ajustes → Actividad. Se consulta bajo demanda (no en
 // cada sondeo): solo hace falta cuando el usuario abre esa categoría.
-ipcMain.handle('foranly:apps-list', () => activity.listRunningApps());
+//
+// Cada programa lleva además su icono real, sacado del ejecutable con
+// app.getFileIcon y serializado a data URL (la web no puede leer el .exe). Se
+// cachea por ruta: abrir Ajustes varias veces no vuelve a consultar el shell.
+const appIconCache = new Map();
+
+async function attachAppIcons(apps) {
+  return Promise.all(
+    (apps || []).map(async (item) => {
+      const clean = { name: item?.name, exe: item?.exe };
+      const filePath = item?.path;
+      if (!filePath) return clean;
+
+      let icon = appIconCache.get(filePath);
+      if (icon === undefined) {
+        try {
+          const image = await app.getFileIcon(filePath, { size: 'small' });
+          icon = image && !image.isEmpty() ? image.toDataURL() : null;
+        } catch {
+          icon = null; // ruta protegida o archivo ya cerrado
+        }
+        appIconCache.set(filePath, icon);
+      }
+
+      return icon ? { ...clean, icon } : clean;
+    }),
+  );
+}
+
+ipcMain.handle('foranly:apps-list', async () => {
+  const apps = await activity.listRunningApps();
+  try {
+    return await attachAppIcons(apps);
+  } catch {
+    // Sin iconos la lista sigue siendo válida: el renderer pone uno genérico.
+    return apps.map(({ name, exe }) => ({ name, exe }));
+  }
+});
 
 // ── Window controls handlers ──
 ipcMain.on('window-minimize', () => {

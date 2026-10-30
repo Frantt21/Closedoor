@@ -1075,6 +1075,20 @@ dialog.fc-modal.settings-blocked-modal {
   overflow-y: auto;
 }
 
+/* Icono real del ejecutable (data URL de Electron); el fallback es un monitor. */
+.settings-activity-program-option-icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  border-radius: 3px;
+}
+
+.settings-activity-program-option-icon--fallback {
+  font-size: 0.78rem;
+  opacity: 0.6;
+}
+
 .settings-activity-program-option-name {
   flex: 1;
   min-width: 0;
