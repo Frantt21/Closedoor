@@ -36,6 +36,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "activity.js",
       "package.json",
       "assets/**"
     ],

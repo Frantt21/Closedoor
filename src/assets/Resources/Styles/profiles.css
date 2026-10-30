@@ -206,6 +206,38 @@
     color: #ffffff;
 }
 
+/* ---- Actividad local (app de escritorio) ---- */
+/* Chip con lo que está sonando o el juego en curso. Solo se renderiza en el
+   perfil propio y solo dentro de la app de escritorio. */
+.profile-activity {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(6px);
+    max-width: 100%;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: #ffffff;
+}
+
+.profile-activity-icon {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.85rem;
+    opacity: 0.9;
+    flex: 0 0 auto;
+}
+
+.profile-activity-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 /* ---- Stats (followers / following) ---- */
 
 .profile-stats {

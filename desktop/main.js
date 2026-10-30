@@ -29,6 +29,9 @@
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { app, BrowserWindow, Menu, Tray, ipcMain, nativeImage, session, shell } = require('electron');
+// Detección de actividad local (Spotify, vídeo, juegos): vive en el proceso
+// principal porque solo ahí se puede leer el sistema (ver desktop/activity.js).
+const activity = require('./activity');
 
 // ── Configuración (todo por env, con valores por defecto de producción) ──
 const WEB_URL = process.env.FORANLY_WEB_URL || 'https://app.foranly.space';
@@ -429,6 +432,18 @@ if (!app.requestSingleInstanceLock()) {
     createWindow();
     createTray();
 
+    // Actividad local: sondeo cada 10 s y aviso a la ventana SOLO cuando cambia.
+    // Si el usuario cierra la ventana a la bandeja, el watcher sigue vivo (el
+    // envío simplemente no tiene destinatario) para que al reabrir la actividad
+    // ya esté al día.
+    activity.startActivityWatcher({
+      onChange: (current) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('foranly:activity', current);
+        }
+      },
+    });
+
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
       else showMainWindow();
@@ -439,6 +454,7 @@ if (!app.requestSingleInstanceLock()) {
   // handler de 'close' deja pasar el cierre en vez de ocultar.
   app.on('before-quit', () => {
     isQuitting = true;
+    activity.stopActivityWatcher();
     if (tray) {
       tray.destroy();
       tray = null;
@@ -494,6 +510,11 @@ ipcMain.handle('window-zoom', (_event, action = 'get') => {
 
   return zoomState();
 });
+
+// ── Actividad local (música / vídeo / juegos) ──
+// La web pide el estado actual al montar (invoke) y a partir de ahí recibe los
+// cambios por el evento 'foranly:activity'. Devuelve null si no hay nada activo.
+ipcMain.handle('foranly:activity-get', () => activity.getActivity());
 
 // ── Window controls handlers ──
 ipcMain.on('window-minimize', () => {
