@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useI18n } from '../services/i18n/useI18n';
 import usePageTitle from '../../hooks/usePageTitle';
 import { useAuth } from '../../hooks/useAuth';
@@ -21,6 +22,10 @@ import '../Resources/Styles/settings.css';
 
 /* Entradas visibles del historial de actividad antes de desplegar el resto. */
 const ACTIVITY_HISTORY_PREVIEW = 3;
+
+/* Menú de programas: medidas con las que se decide abrir hacia arriba o abajo. */
+const PROGRAM_MENU_WIDTH = 300;
+const PROGRAM_MENU_MAX_HEIGHT = 380;
 
 /* ── SVG Flag Icons ── */
 
@@ -427,7 +432,11 @@ export default function Settings() {
   const [openApps, setOpenApps] = useState(null); // null = todavía cargando
   const [openAppsRevision, setOpenAppsRevision] = useState(0);
   const [programMenuOpen, setProgramMenuOpen] = useState(false);
+  // Posición fija del menú calculada al abrirlo: así escapa del contenedor que
+  // hace scroll y elige abrirse hacia arriba o hacia abajo según el hueco.
+  const [programMenuPos, setProgramMenuPos] = useState(null);
   const programMenuRef = useRef(null);
+  const programMenuListRef = useRef(null);
   const activitySettings = getActivitySettings(profile);
   // El historial vive en el localStorage del renderer, es decir, solo existe en
   // la app de escritorio (la web nunca detecta actividad).
@@ -468,25 +477,42 @@ export default function Settings() {
   // Actividad aparecería abierto sin que el usuario lo pidiera.
   useEffect(() => () => setProgramMenuOpen(false), [activeCategory]);
 
-  // Cierre del menú de programas al hacer clic fuera o con Escape (mismo patrón
-  // que el resto de menús fc-dropdown de la app).
+  // Cierre del menú de programas al hacer clic fuera, con Escape, o si la página
+  // se desplaza/redimensiona (su posición es fija y quedaría descolocado).
   useEffect(() => {
     if (!programMenuOpen) return undefined;
 
+    const isInside = (node) => {
+      const trigger = programMenuRef.current;
+      const menu = programMenuListRef.current;
+      return (
+        (trigger && trigger.contains(node)) ||
+        (menu && menu.contains(node))
+      );
+    };
+
     const handlePointer = (event) => {
-      if (programMenuRef.current && !programMenuRef.current.contains(event.target)) {
-        setProgramMenuOpen(false);
-      }
+      if (!isInside(event.target)) setProgramMenuOpen(false);
     };
     const handleKey = (event) => {
       if (event.key === 'Escape') setProgramMenuOpen(false);
     };
+    const handleScroll = (event) => {
+      // Desplazarse dentro de la propia lista no debe cerrar el menú.
+      if (isInside(event.target)) return;
+      setProgramMenuOpen(false);
+    };
+    const handleResize = () => setProgramMenuOpen(false);
 
     document.addEventListener('mousedown', handlePointer);
     document.addEventListener('keydown', handleKey);
+    document.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleResize);
     return () => {
       document.removeEventListener('mousedown', handlePointer);
       document.removeEventListener('keydown', handleKey);
+      document.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleResize);
     };
   }, [programMenuOpen]);
 
@@ -832,6 +858,35 @@ export default function Settings() {
     } finally {
       setActivityUpdating(false);
     }
+  };
+
+  // Abre el menú calculando el hueco real alrededor del disparador: dentro del
+  // panel con scroll un menú absoluto se cortaba contra el borde del contenedor.
+  const toggleProgramMenu = () => {
+    if (programMenuOpen) {
+      setProgramMenuOpen(false);
+      return;
+    }
+
+    const trigger = programMenuRef.current;
+    if (!trigger) return;
+
+    const gap = 6;
+    const edge = 8;
+    const rect = trigger.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - rect.bottom - gap - edge;
+    const spaceAbove = rect.top - gap - edge;
+    const openAbove = spaceBelow < Math.min(PROGRAM_MENU_MAX_HEIGHT, spaceAbove);
+    const maxHeight = Math.max(160, Math.min(PROGRAM_MENU_MAX_HEIGHT, openAbove ? spaceAbove : spaceBelow));
+    // Nunca se sale por la derecha: se pega al borde con 8px de margen.
+    const left = Math.max(edge, Math.min(rect.left, window.innerWidth - PROGRAM_MENU_WIDTH - edge));
+
+    setProgramMenuPos(
+      openAbove
+        ? { bottom: window.innerHeight - rect.top + gap, left, width: PROGRAM_MENU_WIDTH, maxHeight }
+        : { top: rect.bottom + gap, left, width: PROGRAM_MENU_WIDTH, maxHeight },
+    );
+    setProgramMenuOpen(true);
   };
 
   // Programa compartido: se escribe en su propia columna para no pisar la
@@ -1577,7 +1632,7 @@ export default function Settings() {
                     <button
                       type="button"
                       className="settings-activity-program-btn"
-                      onClick={() => setProgramMenuOpen((open) => !open)}
+                      onClick={toggleProgramMenu}
                       aria-haspopup="menu"
                       aria-expanded={programMenuOpen}
                       disabled={activityUpdating || !programSelectable}
@@ -1596,8 +1651,13 @@ export default function Settings() {
                       <FaChevronDown className="settings-activity-program-btn-chevron" />
                     </button>
 
-                    {programMenuOpen && (
-                      <div className="settings-activity-program-menu fc-dropdown" role="menu">
+                    {programMenuOpen && programMenuPos && createPortal(
+                      <div
+                        className="settings-activity-program-menu fc-dropdown"
+                        role="menu"
+                        ref={programMenuListRef}
+                        style={programMenuPos}
+                      >
                         <button
                           type="button"
                           role="menuitem"
@@ -1679,7 +1739,8 @@ export default function Settings() {
                           <FaUndo />
                           {t('settings.activity_program_refresh')}
                         </button>
-                      </div>
+                      </div>,
+                      document.body,
                     )}
                   </div>
                 )}
