@@ -1,15 +1,55 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { FaMusic, FaTv, FaGamepad, FaSpotify } from 'react-icons/fa6';
 import { useI18n } from '../../services/i18n/useI18n';
 import { useAuth } from '../../../hooks/useAuth';
-import { useLocalActivity, isLocalActivityAvailable } from '../../../hooks/useLocalActivity';
+import { useLocalActivityState, isLocalActivityAvailable } from '../../../hooks/useLocalActivity';
+import { isFollowing, getCachedFollowStatus } from '../../services/followService';
 import {
   normalizeActivity,
   activityFromProfile,
-  activitySignature,
-  persistActivity,
+  getActivitySettings,
+  canViewActivity,
 } from '../../services/activityService';
 import './css/activityCard.css';
+
+/**
+ * ¿El visitante sigue al dueño del perfil?
+ *
+ * Solo se consulta cuando el dueño limitó la actividad a sus seguidores. Primero
+ * el cache (`fc_fs_*`, 1 h) para pintar sin esperar, y si no hay, una consulta a
+ * `follows`. `skip` deja el estado en false sin tocar la red.
+ */
+function useViewerIsFollower(viewerId, ownerId, skip) {
+  const [isFollower, setIsFollower] = useState(() => {
+    if (skip || !viewerId || !ownerId) return false;
+    return getCachedFollowStatus(viewerId, ownerId) === true;
+  });
+
+  useEffect(() => {
+    if (skip || !viewerId || !ownerId) {
+      setIsFollower(false);
+      return undefined;
+    }
+    const cached = getCachedFollowStatus(viewerId, ownerId);
+    if (cached !== null && cached !== undefined) {
+      setIsFollower(cached === true);
+      return undefined;
+    }
+    let alive = true;
+    isFollowing(viewerId, ownerId)
+      .then((value) => {
+        if (alive) setIsFollower(value === true);
+      })
+      .catch(() => {
+        if (alive) setIsFollower(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [skip, viewerId, ownerId]);
+
+  return isFollower;
+}
 
 /**
  * ActivityCard — qué está haciendo el usuario ahora mismo (música, vídeo o un
@@ -22,40 +62,39 @@ import './css/activityCard.css';
  *   · Cualquier otro caso (perfil ajeno, o el propio desde el navegador) →
  *     `profiles.activity`, lo último que guardó su dueño desde el escritorio.
  *
+ * Los ajustes de la categoría "Actividad" de Ajustes (migración 080) mandan:
+ *   · `activity_enabled = false` → no se muestra en ningún sitio.
+ *   · `activity_visibility = 'followers'` → solo lo ven quienes le siguen.
+ *   · `activity_visibility = 'nobody'` → solo lo ve el dueño; y como no se
+ *     publica, su fila queda con `activity` a NULL.
+ *
  * La card NO se pinta si no hay actividad: un hueco vacío "sin actividad" solo
  * ocuparía sitio en el panel. Tampoco se pinta si el registro guardado tiene más
  * de ACTIVITY_TTL_MS (el equipo se apagó o la app se cerró sin limpiar).
  *
- * Además, en el perfil propio guarda los cambios en la fila del usuario para que
- * el resto los vea. Se hace aquí, junto a la lectura, para tener una sola fuente
- * de verdad y no duplicar el sondeo.
+ * La card SOLO pinta. Publicar la actividad en la fila y escribir el historial lo
+ * hace ActivitySync, montado a nivel de App, para que funcione sin depender de que
+ * el usuario esté mirando su propio perfil.
  */
 export default function ActivityCard({ profile, isOwnProfile, surfaceStyle }) {
   const { t } = useI18n();
   const { user } = useAuth();
-  const localActivity = useLocalActivity();
+  const { activity: liveActivity } = useLocalActivityState();
 
-  // Detección en vivo solo en tu propio perfil y solo si el puente del escritorio
-  // está disponible (en el navegador no existe).
-  const isLive = isOwnProfile && isLocalActivityAvailable();
+  const { enabled, visibility } = getActivitySettings(profile);
 
-  const activity = isLive ? normalizeActivity(localActivity) : activityFromProfile(profile);
-  const signature = activitySignature(activity);
+  // Detección en vivo solo en tu propio perfil, solo con el puente del escritorio
+  // y solo si no apagaste la actividad. Si está apagada no se muestra nada.
+  const isLive = isOwnProfile && enabled && isLocalActivityAvailable();
+  const needsFollowerCheck = enabled && !isOwnProfile && visibility === 'followers';
+  const viewerIsFollower = useViewerIsFollower(user?.id, profile?.id, !needsFollowerCheck);
 
-  // ~2,5 s de espera: deja que la primera lectura del bridge resuelva antes de
-  // escribir nada (si no, el `null` inicial borraría la actividad que había) y
-  // agrupa los cambios que llegan casi seguidos al cambiar de canción.
-  useEffect(() => {
-    if (!isLive || !user?.id) return undefined;
-    const timer = setTimeout(() => {
-      persistActivity(user.id, activity).catch((err) => {
-        console.warn('[ActivityCard] No se pudo guardar la actividad:', err?.message || err);
-      });
-    }, 2500);
-    return () => clearTimeout(timer);
-  }, [isLive, user?.id, signature]);
+  const visible = canViewActivity({ profile, isOwnProfile, viewerIsFollower });
+  const storedActivity = activityFromProfile(profile);
 
-  if (!activity) return null;
+  const activity = isLive ? normalizeActivity(liveActivity) : enabled ? storedActivity : null;
+
+  if (!visible || !activity) return null;
 
   const isGame = activity.kind === 'game';
   const isVideo = activity.kind === 'video';

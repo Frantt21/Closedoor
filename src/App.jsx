@@ -3,6 +3,7 @@ import { Routes, Route, useParams, useLocation } from 'react-router-dom';
 import Header from './assets/Resources/Components/Header.jsx';
 import FollowCountsWatcher from './assets/Resources/Components/FollowCountsWatcher.jsx';
 import BlockRealtimeWatcher from './assets/Resources/Components/BlockRealtimeWatcher.jsx';
+import ActivitySync from './assets/Resources/Components/ActivitySync.jsx';
 import { I18nProvider } from './assets/services/i18n/I18nContext';
 import { CallProvider } from './context/CallContext';
 import { MusicPlayerProvider } from './context/MusicPlayerContext';
@@ -213,6 +214,9 @@ function App() {
           <Header />
           {!isChatRoute && <FollowCountsWatcher />}
           {!isChatRoute && <BlockRealtimeWatcher />}
+          {/* Publica la actividad local (música/vídeo/juegos) en el perfil y
+              escribe el historial. Sin UI; no hace nada en el navegador. */}
+          <ActivitySync />
 
           {/* Pages (lazy-loaded) */}
           <main className={isFullWidthRoute ? "app-content app-content--full" : "app-content"}>

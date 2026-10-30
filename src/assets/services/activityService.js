@@ -140,3 +140,126 @@ export async function persistActivity(userId, rawActivity) {
   lastWrittenKey = key;
   return true;
 }
+
+// ── Ajustes de privacidad (migración 080) ──
+
+/**
+ * Ajustes de actividad del perfil con los valores por defecto de la 080
+ * aplicados a filas antiguas o incompletas.
+ *
+ * @returns {{enabled: boolean, visibility: 'followers'|'nobody'}}
+ */
+export function getActivitySettings(profile) {
+  return {
+    enabled: profile?.activity_enabled !== false,
+    visibility: profile?.activity_visibility === 'nobody' ? 'nobody' : 'followers',
+  };
+}
+
+/**
+ * ¿Debe escribirse en la fila? Con `nobody` no: si nadie la va a ver, lo correcto
+ * es no guardarla (y limpiar la que hubiera), no guardarla y esconderla.
+ */
+export function shouldPublishActivity(profile) {
+  const { enabled, visibility } = getActivitySettings(profile);
+  return enabled && visibility !== 'nobody';
+}
+
+/**
+ * ¿Puede este visitante ver la card de actividad del dueño?
+ *
+ * Es el mismo criterio que aplica ActivityCard, extraído aquí para que la regla
+ * viva en un solo sitio.
+ *
+ * @param {object} params
+ * @param {object} params.profile - Fila del dueño (activity_enabled / visibility).
+ * @param {boolean} params.isOwnProfile
+ * @param {boolean|null} params.viewerIsFollower - null = todavía no se sabe.
+ */
+export function canViewActivity({ profile, isOwnProfile, viewerIsFollower }) {
+  const { enabled, visibility } = getActivitySettings(profile);
+  if (!enabled) return false;
+  if (isOwnProfile) return true;
+  if (visibility === 'nobody') return false;
+  return viewerIsFollower === true;
+}
+
+// ── Historial local (solo app de escritorio) ──
+//
+// Vive en localStorage del renderer de Electron, como pidió el producto. Prefijo
+// `fca_` (no `fc_`) a propósito: clearAllAppCaches() borra todo `fc_*` y `_s*` al
+// cerrar sesión o al limpiar caché, y el historial es DATO del usuario, no caché.
+// La clave incluye el id de usuario para que dos cuentas en el mismo equipo no
+// mezclen historiales.
+const HISTORY_PREFIX = 'fca_activity_history_';
+const HISTORY_LIMIT = 40;
+
+const historyKey = (userId) => `${HISTORY_PREFIX}${userId}`;
+
+/**
+ * Historial del usuario, de más reciente a más antiguo.
+ *
+ * Cada entrada: { kind, title, subtitle, album, app, url, startedAt, endedAt }.
+ * `endedAt` es null mientras sigue en curso.
+ *
+ * @returns {Array<object>}
+ */
+export function readActivityHistory(userId) {
+  if (!userId) return [];
+  try {
+    const raw = localStorage.getItem(historyKey(userId));
+    if (!raw) return [];
+    const list = JSON.parse(raw);
+    if (!Array.isArray(list)) return [];
+    return list.filter((entry) => entry && typeof entry.title === 'string' && entry.title).slice(0, HISTORY_LIMIT);
+  } catch {
+    return [];
+  }
+}
+
+function writeActivityHistory(userId, list) {
+  try {
+    localStorage.setItem(historyKey(userId), JSON.stringify(list.slice(0, HISTORY_LIMIT)));
+    return true;
+  } catch {
+    return false; // storage lleno o bloqueado: el historial es best-effort
+  }
+}
+
+/**
+ * Registra un cambio de actividad: cierra la entrada abierta y abre la nueva.
+ *
+ * Si llega `null` (dejó de sonar) solo cierra la entrada abierta. Si la
+ * actividad es la misma que la abierta, no hace nada — el detector ya deduplica,
+ * pero el efecto que llama aquí puede reejecutarse al remontar el componente.
+ *
+ * @returns {boolean} true si el historial cambió
+ */
+export function recordActivity(userId, rawActivity) {
+  if (!userId) return false;
+
+  const activity = normalizeActivity(rawActivity);
+  const list = readActivityHistory(userId);
+  const openEntry = list[0] && !list[0].endedAt ? list[0] : null;
+  const signature = activitySignature(activity);
+
+  if (openEntry && activitySignature(openEntry) === signature) return false;
+
+  const now = new Date().toISOString();
+  let next = list;
+
+  if (openEntry) next = [{ ...openEntry, endedAt: now }, ...list.slice(1)];
+  if (activity) next = [{ ...activity, startedAt: now, endedAt: null }, ...next];
+
+  return writeActivityHistory(userId, next);
+}
+
+/** Borra el historial del usuario en este equipo. */
+export function clearActivityHistory(userId) {
+  if (!userId) return;
+  try {
+    localStorage.removeItem(historyKey(userId));
+  } catch {
+    /* storage bloqueado */
+  }
+}

@@ -7,10 +7,11 @@ import { clearAllAppCaches } from '../services/postService';
 import { getBlockedUsers, getCachedBlockedUsers, unblockUser, cacheBlockStatus, subscribeBlockChanges, clearBlockedListsCache } from '../services/blockService';
 import { useNavigate } from 'react-router-dom';
 import { getItem } from '../services/secureStorage';
-import { isWindowZoomAvailable, controlWindowZoom } from '../services/desktopApp';
+import { isWindowZoomAvailable, controlWindowZoom, isDesktopApp } from '../services/desktopApp';
+import { getActivitySettings, readActivityHistory, clearActivityHistory, persistActivity } from '../services/activityService';
 import { supabase } from '../services/supabaseclient';
 import { getNicknames, getCachedNicknames, cacheNicknames, setNickname, removeNickname } from '../services/chatService';
-import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaHeartBroken, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaChartBar, FaBell, FaBrush, FaBan, FaClock, FaAt, FaTrashAlt, FaTimes, FaDiscord, FaEdit, FaImage, FaCompress, FaUndo } from 'react-icons/fa';
+import { FaGlobe, FaPalette, FaLock, FaChevronDown, FaChevronRight, FaCheck, FaSun, FaMoon, FaEyeSlash, FaCog, FaFeather, FaHeart, FaHeartBroken, FaComment, FaRetweet, FaEye, FaUser, FaBookmark, FaTags, FaChartBar, FaBell, FaBrush, FaBan, FaClock, FaAt, FaTrashAlt, FaTimes, FaDiscord, FaEdit, FaImage, FaCompress, FaUndo, FaGamepad, FaHistory, FaMusic, FaTv } from 'react-icons/fa';
 import { MdLogout } from 'react-icons/md';
 import { toast } from 'react-toastify';
 import ConfirmModal from '../Resources/Components/ConfirmModal';
@@ -76,6 +77,7 @@ const CATEGORIES = [
   { id: 'system', icon: FaCog, titleKey: 'settings.category_system', descKey: 'settings.category_system_desc' },
   { id: 'profile', icon: FaUser, titleKey: 'settings.category_profile', descKey: 'settings.category_profile_desc' },
   { id: 'privacy', icon: FaEyeSlash, titleKey: 'settings.category_privacy', descKey: 'settings.category_privacy_desc' },
+  { id: 'activity', icon: FaGamepad, titleKey: 'settings.category_activity', descKey: 'settings.category_activity_desc' },
   { id: 'notifications', icon: FaBell, titleKey: 'settings.category_notifications', descKey: 'settings.category_notifications_desc' },
 ];
 
@@ -411,6 +413,18 @@ export default function Settings() {
   const [unblockingId, setUnblockingId] = useState(null);
   const [showClearCacheModal, setShowClearCacheModal] = useState(false);
   const [cacheRevision, setCacheRevision] = useState(0);
+  // ── Actividad (migración 080) ──
+  const [activityUpdating, setActivityUpdating] = useState(false);
+  const [showClearHistoryModal, setShowClearHistoryModal] = useState(false);
+  const [historyRevision, setHistoryRevision] = useState(0);
+  const activitySettings = getActivitySettings(profile);
+  // El historial vive en el localStorage del renderer, es decir, solo existe en
+  // la app de escritorio (la web nunca detecta actividad).
+  const isDesktop = isDesktopApp();
+  const activityHistory = useMemo(
+    () => (activeCategory === 'activity' && isDesktop ? readActivityHistory(user?.id) : []),
+    [activeCategory, isDesktop, user?.id, historyRevision]
+  );
 
   // ── Calculate cache size ──
   const cacheSize = useMemo(() => {
@@ -712,6 +726,64 @@ export default function Settings() {
       console.error('Error updating stats privacy:', err);
     } finally {
       setStatsPrivacyUpdating(false);
+    }
+  };
+
+  // ── Actividad: master switch y visibilidad ──
+  // Se guardan en profiles (no en localStorage) para que el ajuste valga en
+  // cualquier dispositivo. Al apagarla, o al ponerla en "nadie", se limpia
+  // también la actividad publicada: si nadie debe verla, no tiene sentido
+  // conservarla en la fila.
+  const handleActivityEnabledChange = async (next) => {
+    if (!user?.id || activityUpdating) return;
+    setActivityUpdating(true);
+    try {
+      await updateUserProfile(user.id, { activity_enabled: next });
+      if (!next) await persistActivity(user.id, null).catch(() => {});
+      await refreshProfile(user.id);
+    } catch (err) {
+      console.error('Error updating activity settings:', err);
+      toast.error(t('settings.activity_save_error'));
+    } finally {
+      setActivityUpdating(false);
+    }
+  };
+
+  const handleActivityVisibilityChange = async (value) => {
+    if (!user?.id || activityUpdating || value === activitySettings.visibility) return;
+    setActivityUpdating(true);
+    try {
+      await updateUserProfile(user.id, { activity_visibility: value });
+      if (value === 'nobody') await persistActivity(user.id, null).catch(() => {});
+      await refreshProfile(user.id);
+    } catch (err) {
+      console.error('Error updating activity visibility:', err);
+      toast.error(t('settings.activity_save_error'));
+    } finally {
+      setActivityUpdating(false);
+    }
+  };
+
+  const handleClearActivityHistory = () => {
+    clearActivityHistory(user?.id);
+    setHistoryRevision((v) => v + 1);
+    setShowClearHistoryModal(false);
+  };
+
+  // Hora del historial con el idioma de la interfaz. Si la fecha guardada está
+  // corrupta devuelve '' en vez de "Invalid Date".
+  const formatActivityWhen = (iso) => {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return '';
+    try {
+      return date.toLocaleString(locale || 'en', {
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return date.toLocaleString();
     }
   };
 
@@ -1342,6 +1414,117 @@ export default function Settings() {
             </>
           )}
 
+          {activeCategory === 'activity' && (
+            <>
+              {/* ── Compartir actividad (master switch) ── */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaGamepad /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.activity_enabled')}</h2>
+                    <p className="settings-section-desc">{t('settings.activity_enabled_desc')}</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className={`settings-toggle ${activitySettings.enabled ? 'settings-toggle--active' : ''}`}
+                  onClick={() => handleActivityEnabledChange(!activitySettings.enabled)}
+                  aria-pressed={activitySettings.enabled}
+                  disabled={activityUpdating || profileLoading}
+                >
+                  <span className="settings-toggle-track">
+                    <span className="settings-toggle-thumb" />
+                  </span>
+                </button>
+              </div>
+
+              <div className="settings-row-divider" />
+
+              {/* ── Quién puede verla ── */}
+              <div className="settings-row" style={activitySettings.enabled ? undefined : { opacity: 0.55 }}>
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaEyeSlash /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.activity_privacy')}</h2>
+                    <p className="settings-section-desc">{t('settings.activity_privacy_desc')}</p>
+                  </div>
+                </div>
+
+                <div className="settings-segmented">
+                  <button
+                    type="button"
+                    className={`settings-segmented-btn ${activitySettings.visibility === 'followers' ? 'settings-segmented-btn--active' : ''}`}
+                    onClick={() => handleActivityVisibilityChange('followers')}
+                    disabled={activityUpdating || profileLoading || !activitySettings.enabled}
+                  >
+                    {t('settings.activity_visibility_followers')}
+                  </button>
+                  <button
+                    type="button"
+                    className={`settings-segmented-btn ${activitySettings.visibility === 'nobody' ? 'settings-segmented-btn--active' : ''}`}
+                    onClick={() => handleActivityVisibilityChange('nobody')}
+                    disabled={activityUpdating || profileLoading || !activitySettings.enabled}
+                  >
+                    {t('settings.activity_visibility_nobody')}
+                  </button>
+                </div>
+              </div>
+
+              <div className="settings-row-divider" />
+
+              {/* ── Historial local (solo app de escritorio) ── */}
+              <div className="settings-row">
+                <div className="settings-row-header">
+                  <span className="settings-section-icon"><FaHistory /></span>
+                  <div>
+                    <h2 className="settings-section-title">{t('settings.activity_history')}</h2>
+                    <p className="settings-section-desc">{t('settings.activity_history_desc')}</p>
+                  </div>
+                </div>
+
+                {!isDesktop ? (
+                  <p className="settings-activity-empty">{t('settings.activity_history_desktop_only')}</p>
+                ) : activityHistory.length === 0 ? (
+                  <p className="settings-activity-empty">{t('settings.activity_history_empty')}</p>
+                ) : (
+                  <>
+                    <ul className="settings-activity-history">
+                      {activityHistory.map((entry, index) => {
+                        const EntryIcon = entry.kind === 'game' ? FaGamepad : entry.kind === 'video' ? FaTv : FaMusic;
+                        const when = formatActivityWhen(entry.startedAt);
+                        const end = entry.endedAt
+                          ? formatActivityWhen(entry.endedAt)
+                          : t('settings.activity_history_ongoing');
+                        const sub = [entry.subtitle, entry.app].filter(Boolean).join(' · ');
+                        return (
+                          <li className="settings-activity-item" key={`${entry.startedAt || 'x'}-${index}`}>
+                            <span className="settings-activity-item-icon"><EntryIcon /></span>
+                            <span className="settings-activity-item-meta">
+                              <span className="settings-activity-item-title" title={entry.title}>{entry.title}</span>
+                              {sub && <span className="settings-activity-item-sub" title={sub}>{sub}</span>}
+                            </span>
+                            <span className="settings-activity-item-time">
+                              {when}{end ? ` – ${end}` : ''}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+
+                    <button
+                      type="button"
+                      className="settings-danger-btn settings-activity-clear"
+                      onClick={() => setShowClearHistoryModal(true)}
+                    >
+                      <FaTrashAlt style={{ marginRight: 6 }} />
+                      {t('settings.activity_history_clear')}
+                    </button>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+
           {activeCategory === 'notifications' && (
             <>
               {/* ── Notificaciones ── */}
@@ -1679,6 +1862,15 @@ export default function Settings() {
           message={t('settings.cache_clear_confirm')}
           onConfirm={handleClearCache}
           onCancel={() => setShowClearCacheModal(false)}
+        />
+      )}
+
+      {/* ── Clear Activity History Confirmation ── */}
+      {showClearHistoryModal && (
+        <ConfirmModal
+          message={t('settings.activity_history_clear_confirm')}
+          onConfirm={handleClearActivityHistory}
+          onCancel={() => setShowClearHistoryModal(false)}
         />
       )}
 

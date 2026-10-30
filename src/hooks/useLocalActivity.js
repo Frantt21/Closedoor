@@ -18,37 +18,44 @@ export function isLocalActivityAvailable() {
 }
 
 /**
- * useLocalActivity — actividad local del equipo (música, vídeo o juego) según la
- * detecta la app de escritorio (desktop/activity.js) y publica preload.js.
+ * useLocalActivityState — actividad local del equipo (música, vídeo o juego) según
+ * la detecta la app de escritorio (desktop/activity.js) y publica preload.js.
  *
- * En el navegador `window.electron.activity` no existe, así que el hook devuelve
- * siempre `null` y no registra nada: el mismo componente sirve en web y en
- * escritorio sin ramas extra.
+ * Devuelve `{ activity, ready }`:
+ *   · `activity` — objeto normalizado o null si no hay nada activo.
+ *   · `ready`    — se puso true cuando llegó la PRIMERA lectura. Importante para
+ *                  quien reaccione a los cambios: el `null` inicial es "todavía
+ *                  no lo sé", no "dejó de sonar".
  *
- * @returns {null | {kind: 'music'|'video'|'game', title: string, subtitle: string|null, album: string|null, app: string|null, url: string|null, detectedAt: string}}
+ * En el navegador no hay puente, así que se queda en `{ activity: null, ready:
+ * false }` y no registra nada: el mismo componente sirve en web y escritorio.
+ *
+ * @returns {{activity: null | {kind: 'music'|'video'|'game', title: string, subtitle: string|null, album: string|null, app: string|null, url: string|null, detectedAt: string}, ready: boolean}}
  */
-export function useLocalActivity() {
-  const [activity, setActivity] = useState(null);
+export function useLocalActivityState() {
+  const [state, setState] = useState({ activity: null, ready: false });
 
   useEffect(() => {
-    // El API solo existe dentro de la app de escritorio (preload.js).
     const api = typeof window !== 'undefined' ? window.electron?.activity : null;
     if (!api || typeof api.subscribe !== 'function') return undefined;
 
     let alive = true;
 
-    // Estado inicial por invoke; si falla, se queda en null (sin actividad).
+    // Estado inicial por invoke; si falla, queda en null pero marcado como listo
+    // (si no, el consumidor esperaría para siempre).
     Promise.resolve()
       .then(() => api.get())
       .then((value) => {
-        if (alive) setActivity(value || null);
+        if (alive) setState({ activity: value || null, ready: true });
       })
       .catch(() => {
-        if (alive) setActivity(null);
+        if (alive) setState({ activity: null, ready: true });
       });
 
     // La app avisa solo cuando la actividad cambia de verdad.
-    const unsubscribe = api.subscribe((value) => setActivity(value || null));
+    const unsubscribe = api.subscribe((value) => {
+      if (alive) setState({ activity: value || null, ready: true });
+    });
 
     return () => {
       alive = false;
@@ -56,5 +63,13 @@ export function useLocalActivity() {
     };
   }, []);
 
-  return activity;
+  return state;
+}
+
+/**
+ * Atajo cuando solo interesa el valor y no si ya llegó la primera lectura.
+ * En el navegador devuelve siempre null.
+ */
+export function useLocalActivity() {
+  return useLocalActivityState().activity;
 }

@@ -129,6 +129,10 @@ CREATE TABLE IF NOT EXISTS profiles (
   -- {kind, title, subtitle, album, app, url}. Ver ActivityCard.
   activity JSONB DEFAULT NULL,
   activity_updated_at TIMESTAMPTZ DEFAULT NULL,
+  -- Ajustes de la categoría "Actividad" de Ajustes (migración 080)
+  activity_enabled BOOLEAN NOT NULL DEFAULT true,
+  activity_visibility TEXT NOT NULL DEFAULT 'followers'
+    CHECK (activity_visibility IN ('followers', 'nobody')),
   -- Color de acento
   accent_color VARCHAR(7) DEFAULT NULL,
   accent_color_secondary TEXT DEFAULT NULL,

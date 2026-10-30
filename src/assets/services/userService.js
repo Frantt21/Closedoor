@@ -87,9 +87,12 @@ export const PROFILE_PUBLIC_COLUMNS = [
   'show_cards_glass',
   'song',
   // Actividad local (migración 079): la escribe la app de escritorio y se muestra
-  // debajo de "Mi canción" (Components/ActivityCard).
+  // debajo de "Mi canción" (Components/ActivityCard). Los dos ajustes de
+  // privacidad vienen de la 080.
   'activity',
   'activity_updated_at',
+  'activity_enabled',
+  'activity_visibility',
 ].join(', ');
 
 // ── Límites coherentes de caracteres (una sola fuente de verdad) ──

@@ -919,3 +919,82 @@ dialog.fc-modal.settings-blocked-modal {
   color: var(--color-danger, #ef4444);
 }
 
+/* ── Actividad (categoría Ajustes) ── */
+
+.settings-activity-empty {
+  margin: 0;
+  padding-left: 24px;
+  font-size: 0.8rem;
+  color: var(--color-text-muted, #6b7280);
+  line-height: 1.5;
+}
+
+.settings-activity-history {
+  list-style: none;
+  margin: 0;
+  padding: 8px 0 4px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 280px;
+  overflow-y: auto;
+  animation: settings-fadeIn 0.2s ease;
+}
+
+.settings-activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm, 6px);
+}
+
+.settings-activity-item:hover {
+  background: var(--overlay-bg, rgba(255, 255, 255, 0.04));
+}
+
+.settings-activity-item-icon {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--color-text-muted, #6b7280);
+  padding-top: 2px;
+}
+
+.settings-activity-item-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.settings-activity-item-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-text, #ffffff);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-activity-item-sub {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #6b7280);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-activity-item-time {
+  flex: 0 0 auto;
+  font-size: 0.7rem;
+  color: var(--color-text-muted, #6b7280);
+  white-space: nowrap;
+  padding-top: 2px;
+}
+
+.settings-activity-clear {
+  margin: 6px 0 0 24px;
+}
+
