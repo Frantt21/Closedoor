@@ -426,6 +426,8 @@ export default function Settings() {
   // detecta la app de escritorio para elegirlo.
   const [openApps, setOpenApps] = useState(null); // null = todavía cargando
   const [openAppsRevision, setOpenAppsRevision] = useState(0);
+  const [programMenuOpen, setProgramMenuOpen] = useState(false);
+  const programMenuRef = useRef(null);
   const activitySettings = getActivitySettings(profile);
   // El historial vive en el localStorage del renderer, es decir, solo existe en
   // la app de escritorio (la web nunca detecta actividad).
@@ -457,6 +459,32 @@ export default function Settings() {
       alive = false;
     };
   }, [activeCategory, isDesktop, openAppsRevision]);
+
+  // Al cambiar de categoría el menú se cierra solo: si no, al volver a
+  // Actividad aparecería abierto sin que el usuario lo pidiera.
+  useEffect(() => () => setProgramMenuOpen(false), [activeCategory]);
+
+  // Cierre del menú de programas al hacer clic fuera o con Escape (mismo patrón
+  // que el resto de menús fc-dropdown de la app).
+  useEffect(() => {
+    if (!programMenuOpen) return undefined;
+
+    const handlePointer = (event) => {
+      if (programMenuRef.current && !programMenuRef.current.contains(event.target)) {
+        setProgramMenuOpen(false);
+      }
+    };
+    const handleKey = (event) => {
+      if (event.key === 'Escape') setProgramMenuOpen(false);
+    };
+
+    document.addEventListener('mousedown', handlePointer);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handlePointer);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [programMenuOpen]);
 
   // ── Calculate cache size ──
   const cacheSize = useMemo(() => {
@@ -1540,65 +1568,97 @@ export default function Settings() {
                   <p className="settings-activity-empty">{t('settings.activity_program_desktop_only')}</p>
                 ) : !appsApiReady ? (
                   <p className="settings-activity-empty">{t('settings.activity_program_restart')}</p>
-                ) : openApps === null ? (
-                  <p className="settings-activity-empty">{t('settings.activity_program_loading')}</p>
-                ) : openApps.length === 0 ? (
-                  <p className="settings-activity-empty">{t('settings.activity_program_empty')}</p>
                 ) : (
-                  <div className="settings-activity-apps">
+                  <div className="settings-activity-program-select" ref={programMenuRef}>
                     <button
                       type="button"
-                      className={`settings-activity-app ${selectedProgram ? '' : 'settings-activity-app--active'}`}
-                      onClick={() => handleProgramChange(null)}
+                      className="settings-activity-program-btn"
+                      onClick={() => setProgramMenuOpen((open) => !open)}
+                      aria-haspopup="menu"
+                      aria-expanded={programMenuOpen}
                       disabled={activityUpdating || !programSelectable}
                     >
-                      {t('settings.activity_program_none')}
+                      <span className="settings-activity-program-btn-label">
+                        {selectedProgram || t('settings.activity_program_none')}
+                      </span>
+                      <FaChevronDown className="settings-activity-program-btn-chevron" />
                     </button>
 
-                    {/* El elegido se mantiene aunque ahora esté cerrado: sin esto
-                        desaparecería de la lista y parecería que no hay nada. */}
-                    {selectedProgram && !openApps.some((app) => app.name === selectedProgram) && (
-                      <button
-                        type="button"
-                        className="settings-activity-app settings-activity-app--active"
-                        onClick={() => handleProgramChange(selectedProgram)}
-                        disabled={activityUpdating || !programSelectable}
-                        title={selectedProgram}
-                      >
-                        {selectedProgram}
-                      </button>
+                    {programMenuOpen && (
+                      <div className="settings-activity-program-menu fc-dropdown" role="menu">
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className={`fc-dropdown-btn${selectedProgram ? '' : ' fc-dropdown-btn--active'}`}
+                          onClick={() => {
+                            handleProgramChange(null);
+                            setProgramMenuOpen(false);
+                          }}
+                        >
+                          {t('settings.activity_program_none')}
+                        </button>
+
+                        <div className="fc-dropdown-divider" />
+
+                        <div className="settings-activity-program-list">
+                          {openApps === null ? (
+                            <p className="settings-activity-empty">{t('settings.activity_program_loading')}</p>
+                          ) : openApps.length === 0 ? (
+                            <p className="settings-activity-empty">{t('settings.activity_program_empty')}</p>
+                          ) : (
+                            <>
+                              {/* El elegido se mantiene aunque ahora esté cerrado:
+                                  sin esto parecería que no hay nada compartido. */}
+                              {selectedProgram && !openApps.some((app) => app.name === selectedProgram) && (
+                                <button
+                                  type="button"
+                                  role="menuitem"
+                                  className="fc-dropdown-btn fc-dropdown-btn--active"
+                                  onClick={() => {
+                                    handleProgramChange(selectedProgram);
+                                    setProgramMenuOpen(false);
+                                  }}
+                                >
+                                  {selectedProgram}
+                                </button>
+                              )}
+
+                              {openApps.map((app) => (
+                                <button
+                                  key={app.exe}
+                                  type="button"
+                                  role="menuitem"
+                                  className={`fc-dropdown-btn${selectedProgram === app.name ? ' fc-dropdown-btn--active' : ''}`}
+                                  onClick={() => {
+                                    handleProgramChange(app.name);
+                                    setProgramMenuOpen(false);
+                                  }}
+                                >
+                                  <span className="settings-activity-program-option-name">{app.name}</span>
+                                  <span className="settings-activity-program-option-exe">{app.exe}</span>
+                                </button>
+                              ))}
+                            </>
+                          )}
+                        </div>
+
+                        <div className="fc-dropdown-divider" />
+
+                        <button
+                          type="button"
+                          role="menuitem"
+                          className="fc-dropdown-btn"
+                          onClick={() => {
+                            setOpenApps(null);
+                            setOpenAppsRevision((v) => v + 1);
+                          }}
+                        >
+                          <FaUndo />
+                          {t('settings.activity_program_refresh')}
+                        </button>
+                      </div>
                     )}
-
-                    {openApps.map((app) => (
-                      <button
-                        key={app.exe}
-                        type="button"
-                        className={`settings-activity-app ${selectedProgram === app.name ? 'settings-activity-app--active' : ''}`}
-                        onClick={() => handleProgramChange(app.name)}
-                        disabled={activityUpdating || !programSelectable}
-                        title={`${app.name} · ${app.exe}`}
-                      >
-                        {app.name}
-                        {app.exe && app.exe.toLowerCase() !== `${app.name.toLowerCase()}.exe` && (
-                          <span className="settings-activity-app-exe">{app.exe}</span>
-                        )}
-                      </button>
-                    ))}
                   </div>
-                )}
-
-                {isDesktop && (
-                  <button
-                    type="button"
-                    className="settings-activity-toggle"
-                    onClick={() => {
-                      setOpenApps(null);
-                      setOpenAppsRevision((v) => v + 1);
-                    }}
-                  >
-                    <FaUndo style={{ marginRight: 6 }} />
-                    {t('settings.activity_program_refresh')}
-                  </button>
                 )}
               </div>
 

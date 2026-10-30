@@ -1009,55 +1009,88 @@ dialog.fc-modal.settings-blocked-modal {
   margin-top: 2px;
 }
 
-/* Programas abiertos: chips seleccionables, no un <select>, para que se vean de
-   un vistazo y funcionen igual con teclado. */
-.settings-activity-apps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 8px 0 4px 24px;
-  max-height: 190px;
+/* Programa compartido: disparador + menú contextual (la estética del menú la
+   aporta .fc-dropdown, el mismo de los 3 puntos y los menús de post). */
+.settings-activity-program-select {
+  position: relative;
+  align-self: flex-start;
+  padding-left: 24px;
+}
+
+.settings-activity-program-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 320px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: var(--radius-sm, 6px);
+  background: var(--overlay-bg, rgba(255, 255, 255, 0.06));
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-text, #ffffff);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.settings-activity-program-btn:hover:not(:disabled),
+.settings-activity-program-btn[aria-expanded="true"] {
+  background: var(--overlay-bg-hover, rgba(255, 255, 255, 0.1));
+}
+
+.settings-activity-program-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.settings-activity-program-btn-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-activity-program-btn-chevron {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  opacity: 0.7;
+  transition: transform 0.15s ease;
+}
+
+.settings-activity-program-btn[aria-expanded="true"] .settings-activity-program-btn-chevron {
+  transform: rotate(180deg);
+}
+
+.settings-activity-program-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 24px;
+  z-index: 100;
+  min-width: 250px;
+  max-width: 340px;
+}
+
+.settings-activity-program-list {
+  max-height: 260px;
   overflow-y: auto;
 }
 
-.settings-activity-app {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  max-width: 100%;
-  padding: 5px 10px;
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.14));
-  border-radius: 999px;
-  background: transparent;
-  font-size: 0.75rem;
-  color: var(--color-text, #ffffff);
-  white-space: nowrap;
+.settings-activity-program-option-name {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
 }
 
-.settings-activity-app:hover:not(:disabled) {
-  background: var(--overlay-bg, rgba(255, 255, 255, 0.06));
+.settings-activity-program-option-exe {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  color: var(--color-text-muted, #6b7280);
 }
 
-.settings-activity-app--active {
-  background: var(--color-accent, #ffffff);
-  border-color: var(--color-accent, #ffffff);
-  color: var(--accent-surface-text-color, #000000);
-  font-weight: 600;
-}
-
-.settings-activity-app-exe {
-  font-size: 0.65rem;
-  font-weight: 400;
-  opacity: 0.65;
-}
-
-.settings-activity-app:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.settings-activity-program-list .settings-activity-empty {
+  padding: 6px 12px 8px;
 }
 
 .settings-activity-toggle {
