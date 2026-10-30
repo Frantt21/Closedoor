@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef, useMemo, useCallback, useContext } 
 import { createPortal } from "react-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
-import { useLocalActivity } from "../../hooks/useLocalActivity";
 import { supabase } from "../services/supabaseclient";
 import {
     updateUserProfile,
@@ -57,7 +56,6 @@ import Avatar from "../Resources/Components/Avatar";
 import Tooltip from "../Resources/Components/Tooltip";
 import { getPlatformIcon, getPlatformName } from "../services/socialPlatforms";
 import { FaFeather, FaBookmark, FaLock, FaEllipsisH, FaBan, FaClock, FaHeart, FaRetweet, FaChevronDown, FaShareAlt, FaComment, FaTag } from 'react-icons/fa';
-import { FaSpotify, FaGamepad, FaMusic } from 'react-icons/fa6';
 import FollowButton from "../Resources/Components/FollowButton";
 import { blockUser, unblockUser, isBlocked, cacheBlockStatus, getCachedBlockStatus, unfollowBothWays } from "../services/blockService";
 import { useI18n } from "../services/i18n/useI18n";
@@ -162,9 +160,6 @@ function Profile() {
 
   // ── User status ──
   const { myStatus, setMyStatus } = useUserStatus(isOwnProfile ? user?.id : null);
-  // Actividad local (Spotify / vídeo / juego) del equipo. Solo existe en la app
-  // de escritorio; en la web el hook devuelve siempre null.
-  const localActivity = useLocalActivity();
   // ── Observar estado del perfil visitado en el contexto global (persiste entre rutas) ──
   useRegisterUserStatus(!isOwnProfile ? activeProfile?.id : null);
   // Estado del perfil visitado — del contexto global (polling 3s batch) + Realtime
@@ -1634,27 +1629,6 @@ function Profile() {
                             <span>{profileDisplayName} <span style={{ fontSize: '0.78rem', fontWeight: 400, opacity: 0.55, verticalAlign: 'middle' }}>· @{activeProfile?.username || user?.user_metadata?.username || ''}</span></span>
                             {showBadges && <Badge roles={visibleRoles} />}
                         </div>
-
-                        {/* Actividad local detectada por la app de escritorio
-                            (Spotify / vídeo / Steam). Solo en el perfil propio:
-                            todavía no se comparte con otros usuarios. */}
-                        {isOwnProfile && localActivity && (
-                            <div className="profile-activity" title={localActivity.app || undefined}>
-                                <span className="profile-activity-icon">
-                                    {localActivity.kind === 'game' ? (
-                                        <FaGamepad />
-                                    ) : localActivity.app === 'Spotify' ? (
-                                        <FaSpotify />
-                                    ) : (
-                                        <FaMusic />
-                                    )}
-                                </span>
-                                <span className="profile-activity-text">
-                                    {localActivity.title}
-                                    {localActivity.subtitle ? ` · ${localActivity.subtitle}` : ''}
-                                </span>
-                            </div>
-                        )}
 
                         {!isOwnProfile && isBlockedByMe ? (
                           <div className="profile-stats">

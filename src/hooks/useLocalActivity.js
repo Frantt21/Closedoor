@@ -1,6 +1,23 @@
 import { useEffect, useState } from 'react';
 
 /**
+ * ¿Está disponible la detección local? Solo dentro de la app de escritorio
+ * (desktop/preload.js publica `window.electron.activity`).
+ *
+ * Sirve para distinguir "no hay nada activo" de "aquí no se puede detectar":
+ * en el navegador el hook devuelve null siempre, y quien lo consuma debe caer al
+ * dato guardado en la base de datos en vez de asumir que el usuario está parado.
+ */
+export function isLocalActivityAvailable() {
+  try {
+    const api = typeof window !== 'undefined' ? window.electron?.activity : null;
+    return !!api && typeof api.subscribe === 'function';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * useLocalActivity — actividad local del equipo (música, vídeo o juego) según la
  * detecta la app de escritorio (desktop/activity.js) y publica preload.js.
  *

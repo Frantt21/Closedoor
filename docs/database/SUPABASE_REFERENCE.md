@@ -125,6 +125,10 @@ CREATE TABLE IF NOT EXISTS profiles (
   -- Canción del perfil (card con disco animado; metadatos vía YouTube/innertube
   -- —preview de respaldo de iTunes— y audio completo resuelto con innertube)
   song JSONB DEFAULT NULL,
+  -- Actividad local que comparte la app de escritorio (migración 079):
+  -- {kind, title, subtitle, album, app, url}. Ver ActivityCard.
+  activity JSONB DEFAULT NULL,
+  activity_updated_at TIMESTAMPTZ DEFAULT NULL,
   -- Color de acento
   accent_color VARCHAR(7) DEFAULT NULL,
   accent_color_secondary TEXT DEFAULT NULL,

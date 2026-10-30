@@ -6,6 +6,7 @@ import { useAuth } from '../../../hooks/useAuth';
 import { getCachedBlockStatus, subscribeBlockChanges } from '../../services/blockService';
 import { getItem, setItem, removeItem } from '../../services/secureStorage';
 import SongCard from './SongCard';
+import ActivityCard from './ActivityCard';
 import './css/profileSidebar.css';
 
 // ── Stats cache ──
@@ -203,6 +204,18 @@ export default function ProfileSidebar({ profile, isPrivate, canViewContent, sta
           isOwnProfile={isOwnProfile}
           surfaceStyle={surfaceStyle}
           owner={profile || null}
+        />
+      )}
+
+      {/* ── Actividad ahora (debajo de Mi canción) ──
+          Música / vídeo / juego en curso. Los mismos gates que la canción y las
+          stats: no se muestra a quien está bloqueado ni en un perfil privado que
+          no se puede ver. La card no pinta nada si no hay actividad. */}
+      {!isBlocked && (isOwnProfile || canViewContent) && (
+        <ActivityCard
+          profile={profile}
+          isOwnProfile={isOwnProfile}
+          surfaceStyle={surfaceStyle}
         />
       )}
 

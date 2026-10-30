@@ -1,0 +1,115 @@
+/* ==========================================
+   Activity card — actividad local del perfil
+   (música / vídeo / juego en curso)
+   ========================================== */
+
+.profile-activity-card {
+  overflow: hidden;
+}
+
+.profile-activity-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* Carátula simbólica: no hay artwork del sistema, así que usamos un cuadrado
+   con el icono de la fuente y, en música/vídeo, un ecualizador animado. */
+.profile-activity-art {
+  position: relative;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  color: var(--accent-surface-text-color, var(--color-text, #ffffff));
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.profile-activity-bars {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  display: flex;
+  align-items: flex-end;
+  gap: 1.5px;
+  height: 8px;
+}
+
+.profile-activity-bars i {
+  width: 2px;
+  height: 100%;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0.75;
+  transform-origin: bottom;
+  animation: profileActivityBar 900ms ease-in-out infinite;
+}
+
+.profile-activity-bars i:nth-child(2) {
+  animation-delay: 180ms;
+}
+
+.profile-activity-bars i:nth-child(3) {
+  animation-delay: 360ms;
+}
+
+@keyframes profileActivityBar {
+  0%, 100% { transform: scaleY(0.35); }
+  50% { transform: scaleY(1); }
+}
+
+/* Respeta a quien pidió menos movimiento en el sistema. */
+@media (prefers-reduced-motion: reduce) {
+  .profile-activity-bars i {
+    animation: none;
+  }
+}
+
+.profile-activity-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.profile-activity-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--accent-surface-text-color, var(--color-text, #ffffff));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-activity-subtitle {
+  font-size: 0.78rem;
+  line-height: 1.25;
+  opacity: 0.7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-activity-app {
+  margin-top: 2px;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  opacity: 0.65;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
