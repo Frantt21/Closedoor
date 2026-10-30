@@ -1605,7 +1605,7 @@ export default function Settings() {
               <div className="settings-row-divider" />
 
               {/* ── Historial local (solo app de escritorio) ── */}
-              <div className="settings-row">
+              <div className="settings-row settings-row--stacked">
                 <div className="settings-row-header">
                   <span className="settings-section-icon"><FaHistory /></span>
                   <div>
