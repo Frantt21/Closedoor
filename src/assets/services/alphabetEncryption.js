@@ -203,6 +203,39 @@ async function deriveKey(seed) {
   );
 }
 
+// ── Caché de claves derivadas ──
+//
+// deriveKey() es PBKDF2 con 100.000 iteraciones: caro. La semilla solo depende
+// del autor y del CONJUNTO de participantes, así que en una conversación de dos
+// personas solo existen DOS claves posibles. Sin caché, cada mensaje derivaba
+// la suya otra vez: abrir un chat con 40 mensajes hacía 40 derivaciones
+// (≈330 ms medidos, y solo para descifrar). Aquí se cachea la promesa, así que
+// las peticiones concurrentes comparten la misma derivación y las siguientes
+// son instantáneas.
+const KEY_CACHE_MAX = 200;
+const keyCache = new Map();
+
+function getCachedKey(seed) {
+  const cached = keyCache.get(seed);
+  if (cached) {
+    // Reinsertar para que el desalojo sea del menos usado recientemente.
+    keyCache.delete(seed);
+    keyCache.set(seed, cached);
+    return cached;
+  }
+
+  const pending = deriveKey(seed).catch((err) => {
+    keyCache.delete(seed);
+    throw err;
+  });
+
+  keyCache.set(seed, pending);
+  while (keyCache.size > KEY_CACHE_MAX) {
+    keyCache.delete(keyCache.keys().next().value);
+  }
+  return pending;
+}
+
 /**
  * Encripta contenido para un conjunto de usuarios
  * La clave se deriva del userId del autor + los IDs ordenados de usuarios,
@@ -215,7 +248,7 @@ async function deriveKey(seed) {
 export async function encryptForUsers(content, authorUserId, userIds) {
   const sortedIds = [...userIds].sort();
   const seed = (authorUserId || 'anon') + '|' + sortedIds.join(',');
-  const key = await deriveKey(seed);
+  const key = await getCachedKey(seed);
 
   const encoder = new TextEncoder();
   const data = encoder.encode(content);
@@ -247,7 +280,7 @@ export async function decryptForUser(ciphertext, ivStr, authorUserId, allowedUse
 
   const sortedIds = [...allowedUserIds].sort();
   const seed = (authorUserId || 'anon') + '|' + sortedIds.join(',');
-  const key = await deriveKey(seed);
+  const key = await getCachedKey(seed);
 
   try {
     const encrypted = Uint8Array.from(atob(ciphertext), c => c.charCodeAt(0));
