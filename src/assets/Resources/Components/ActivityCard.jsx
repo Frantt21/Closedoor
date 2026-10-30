@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FaMusic, FaTv, FaGamepad, FaSpotify, FaChevronDown } from 'react-icons/fa6';
+import { FaMusic, FaTv, FaGamepad, FaSpotify } from 'react-icons/fa6';
 import { useI18n } from '../../services/i18n/useI18n';
 import { useAuth } from '../../../hooks/useAuth';
 import { useLocalActivityState, isLocalActivityAvailable } from '../../../hooks/useLocalActivity';
@@ -14,13 +14,8 @@ import {
 import { readActivityHistory } from '../../services/activityService';
 import './css/activityCard.css';
 
-/**
- * ¿El visitante sigue al dueño del perfil?
- *
- * Solo se consulta cuando el dueño limitó la actividad a sus seguidores. Primero
- * el cache (`fc_fs_*`, 1 h) para pintar sin esperar, y si no hay, una consulta a
- * `follows`. `skip` deja el estado en false sin tocar la red.
- */
+/** ¿El visitante sigue al dueño del perfil? */
+
 function useViewerIsFollower(viewerId, ownerId, skip) {
   const [isFollower, setIsFollower] = useState(() => {
     if (skip || !viewerId || !ownerId) return false;
@@ -55,31 +50,9 @@ function useViewerIsFollower(viewerId, ownerId, skip) {
   return isFollower;
 }
 
-/**
- * ActivityCard — qué está haciendo el usuario ahora mismo (música, vídeo o un
- * juego), debajo de la card "Mi canción" del sidebar del perfil.
- *
- * De dónde sale el dato:
- *   · Perfil propio EN LA APP DE ESCRITORIO → detección en vivo
- *     (window.electron.activity, ver desktop/activity.js). Es la única fuente
- *     fiable: si no suena nada, `null` y la card no se pinta.
- *   · Cualquier otro caso (perfil ajeno, o el propio desde el navegador) →
- *     `profiles.activity`, lo último que guardó su dueño desde el escritorio.
- *
- * Los ajustes de la categoría "Actividad" de Ajustes (migración 080) mandan:
- *   · `activity_enabled = false` → no se muestra en ningún sitio.
- *   · `activity_visibility = 'followers'` → solo lo ven quienes le siguen.
- *   · `activity_visibility = 'nobody'` → solo lo ve el dueño; y como no se
- *     publica, su fila queda con `activity` a NULL.
- *
- * La card NO se pinta si no hay actividad: un hueco vacío "sin actividad" solo
- * ocuparía sitio en el panel. Tampoco se pinta si el registro guardado tiene más
- * de ACTIVITY_TTL_MS (el equipo se apagó o la app se cerró sin limpiar).
- *
- * La card SOLO pinta lo actual. El historial (últimas actividades detectadas,
- * con 3 visibles + desplegar todo) lo renderiza ActivityHistory, montado junto a
- * esta card en ProfileSidebar para el perfil propio en la app de escritorio.
- */
+/** ActivityCard — qué está haciendo el usuario ahora mismo (música, vídeo o un juego),
+ *  debajo de la card "Mi canción" del sidebar del perfil. */
+
 export default function ActivityCard({ profile, isOwnProfile, surfaceStyle }) {
   const { t } = useI18n();
   const { user } = useAuth();
@@ -88,8 +61,6 @@ export default function ActivityCard({ profile, isOwnProfile, surfaceStyle }) {
 
   const { enabled, visibility } = getActivitySettings(profile);
 
-  // Detección en vivo solo en tu propio perfil, solo con el puente del escritorio
-  // y solo si no apagaste la actividad. Si está apagada no se muestra nada.
   const isLive = isOwnProfile && enabled && isLocalActivityAvailable();
   const needsFollowerCheck = enabled && !isOwnProfile && visibility === 'followers';
   const viewerIsFollower = useViewerIsFollower(user?.id, profile?.id, !needsFollowerCheck);
@@ -99,11 +70,6 @@ export default function ActivityCard({ profile, isOwnProfile, surfaceStyle }) {
 
   const activity = isLive ? normalizeActivity(liveActivity) : enabled ? storedActivity : null;
 
-  // ── Portada ──
-  // El detector solo sabe título y artista, así que la carátula se busca con la
-  // misma búsqueda que "Mi canción" (musicService.resolveActivityArtwork, que
-  // cachea por consulta). Solo para música: en un juego o un vídeo no hay nada
-  // que buscar y la tarjeta se queda con su icono.
   const [artwork, setArtwork] = useState('');
   const artworkKey = activity && activity.kind === 'music'
     ? `${activity.title}\u0001${activity.subtitle || ''}`
@@ -182,9 +148,6 @@ export default function ActivityCard({ profile, isOwnProfile, surfaceStyle }) {
         </div>
       </div>
 
-      {/* Historial de actividades detectadas (solo el propio usuario, solo en el
-          escritorio, solo si la actividad está pública). Tres entradas visibles y
-          un botón para desplegar todo el historial local. */}
       {isOwnProfile && isDesktop && enabled && (
         <ActivityHistory userId={user?.id} limit={3} />
       )}
@@ -192,15 +155,9 @@ export default function ActivityCard({ profile, isOwnProfile, surfaceStyle }) {
   );
 }
 
-/**
- * ActivityHistory — mini historial de lo que el usuario detectó en su equipo,
- * con 3 elementos visibles y un botón para expandir todo el historial local.
- *
- * El historial vive solo en el localStorage del escritorio (el servicio
- * readActivityHistory devuelve [] en la web), y está desordenado por detectadoAt
- * descendente; este componente muestra el estado almacenado tal cual, por
- * actividad ya intentando dejar una sola entrada por canción / juego / vídeo.
- */
+/** ActivityHistory — mini historial de lo que el usuario detectó en su equipo,
+ *  con 3 elementos visibles y un botón para expandir todo el historial local. */
+
 function ActivityHistory({ userId, limit = 3 }) {
   const { t } = useI18n();
   const [hist, setHist] = useState([]);
