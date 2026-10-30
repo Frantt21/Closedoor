@@ -4,6 +4,7 @@ import { useI18n } from '../../services/i18n/useI18n';
 import { useAuth } from '../../../hooks/useAuth';
 import { useLocalActivityState, isLocalActivityAvailable } from '../../../hooks/useLocalActivity';
 import { isFollowing, getCachedFollowStatus } from '../../services/followService';
+import { resolveActivityArtwork } from '../../services/musicService';
 import {
   normalizeActivity,
   activityFromProfile,
@@ -94,6 +95,30 @@ export default function ActivityCard({ profile, isOwnProfile, surfaceStyle }) {
 
   const activity = isLive ? normalizeActivity(liveActivity) : enabled ? storedActivity : null;
 
+  // ── Portada ──
+  // El detector solo sabe título y artista, así que la carátula se busca con la
+  // misma búsqueda que "Mi canción" (musicService.resolveActivityArtwork, que
+  // cachea por consulta). Solo para música: en un juego o un vídeo no hay nada
+  // que buscar y la tarjeta se queda con su icono.
+  const [artwork, setArtwork] = useState('');
+  const artworkKey = activity && activity.kind === 'music'
+    ? `${activity.title}\u0001${activity.subtitle || ''}`
+    : '';
+
+  useEffect(() => {
+    setArtwork('');
+    if (!artworkKey) return undefined;
+    let alive = true;
+    resolveActivityArtwork({ title: activity.title, artist: activity.subtitle })
+      .then((url) => {
+        if (alive) setArtwork(url || '');
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [artworkKey]);
+
   if (!visible || !activity) return null;
 
   const isGame = activity.kind === 'game';
@@ -114,8 +139,19 @@ export default function ActivityCard({ profile, isOwnProfile, surfaceStyle }) {
       </h3>
 
       <div className="profile-activity-row">
-        <span className="profile-activity-art" aria-hidden="true">
-          <Icon />
+        <span className={`profile-activity-art ${artwork ? 'profile-activity-art--image' : ''}`} aria-hidden="true">
+          {artwork ? (
+            <img
+              src={artwork}
+              alt=""
+              className="profile-activity-artwork"
+              loading="lazy"
+              draggable={false}
+              onError={() => setArtwork('')}
+            />
+          ) : (
+            <Icon />
+          )}
           {!isGame && (
             <span className="profile-activity-bars">
               <i />
@@ -132,11 +168,6 @@ export default function ActivityCard({ profile, isOwnProfile, surfaceStyle }) {
           {activity.subtitle && (
             <span className="profile-activity-subtitle" title={activity.subtitle}>
               {activity.subtitle}
-            </span>
-          )}
-          {activity.app && (
-            <span className="profile-activity-app" title={activity.app}>
-              {activity.app}
             </span>
           )}
         </div>

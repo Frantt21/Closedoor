@@ -31,6 +31,20 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+/* Con carátula la caja es la imagen: los iconos de respaldo y el fondo sobran. */
+.profile-activity-art--image {
+  padding: 0;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.profile-activity-artwork {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 .profile-activity-bars {
   position: absolute;
   right: 5px;
@@ -57,6 +71,13 @@
 
 .profile-activity-bars i:nth-child(3) {
   animation-delay: 360ms;
+}
+
+/* Sobre una portada clara el ecualizador desaparecería: blanco + sombra. */
+.profile-activity-art--image .profile-activity-bars i {
+  background: #ffffff;
+  opacity: 0.95;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.75));
 }
 
 @keyframes profileActivityBar {
@@ -97,19 +118,3 @@
   white-space: nowrap;
 }
 
-.profile-activity-app {
-  margin-top: 2px;
-  align-self: flex-start;
-  max-width: 100%;
-  padding: 1px 6px;
-  border-radius: 999px;
-  font-size: 0.66rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  opacity: 0.65;
-  background: rgba(255, 255, 255, 0.08);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}

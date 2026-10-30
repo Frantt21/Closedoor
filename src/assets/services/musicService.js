@@ -333,6 +333,68 @@ export async function searchMusic(query, { limit = 10 } = {}) {
   throw new Error('Music search failed');
 }
 
+// ── Portada de la actividad detectada en el sistema ──
+//
+// El reproductor del sistema solo da título y artista (desktop/activity.js), así
+// que la portada se resuelve con la MISMA búsqueda que la card "Mi canción"
+// (searchMusic: YouTube Music → iTunes → Deezer). Se usa solo la imagen: el
+// audio de la actividad no se reproduce.
+//
+// Caché en memoria por consulta (6 h) y dedupe de peticiones simultáneas: la card
+// se pinta en cada visita al perfil, y sin caché cada visita dispararía una
+// búsqueda. Se cachea la PROMESA, así dos cards montándose a la vez comparten la
+// misma petición.
+const activityArtworkCache = new Map(); // key → { at, promise }
+const ACTIVITY_ARTWORK_TTL = 6 * 60 * 60 * 1000;
+
+/** Normaliza título/artista para comparar resultados con lo que dio el sistema. */
+function normalizeTrackText(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/\((?:feat|ft|with)[^)]*\)|\[[^\]]*\]/g, ' ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
+/**
+ * Portada de lo que está sonando en el equipo, a partir del título y el artista
+ * que publica el detector.
+ *
+ * @param {{title?: string, artist?: string}} params
+ * @returns {Promise<string>} URL de la miniatura, o '' si no hay forma de saberla.
+ */
+export function resolveActivityArtwork({ title, artist } = {}) {
+  const query = [title, artist].filter(Boolean).join(' ').trim();
+  if (!query) return Promise.resolve('');
+
+  const key = query.toLowerCase();
+  const cached = activityArtworkCache.get(key);
+  if (cached && Date.now() - cached.at < ACTIVITY_ARTWORK_TTL) return cached.promise;
+
+  const promise = searchMusic(query, { limit: 5 })
+    .then(({ results }) => {
+      if (!Array.isArray(results) || results.length === 0) return '';
+      // Preferir el resultado que coincide con el título detectado: el primer hit
+      // de una búsqueda por "título artista" suele serlo, pero si el sistema
+      // añadió coletillas ("(Remastered 2011)") conviene comprobarlo.
+      const wanted = normalizeTrackText(title);
+      const best = wanted
+        ? results.find((r) => {
+            const candidate = normalizeTrackText(r?.title);
+            return candidate && (candidate === wanted || candidate.includes(wanted) || wanted.includes(candidate));
+          })
+        : null;
+      return songArtworkUrl(best || results[0]) || '';
+    })
+    .catch((err) => {
+      console.warn('[music] Activity artwork lookup failed:', err?.message || err);
+      return '';
+    });
+
+  activityArtworkCache.set(key, { at: Date.now(), promise });
+  return promise;
+}
+
 // ── Preview fresco (los de Deezer expiran ≈ 15 min) ──
 // Caché con TTL ~10 min (menor que la expiración real): una URL cacheada
 // nunca se sirve ya muerta en la misma sesión.
