@@ -148,9 +148,9 @@ export default function ActivityCard({ profile, isOwnProfile, surfaceStyle }) {
         </div>
       </div>
 
-      {isOwnProfile && isDesktop && enabled && (
+      {/* {isOwnProfile && isDesktop && enabled && (
         <ActivityHistory userId={user?.id} limit={3} />
-      )}
+      )} */}
     </div>
   );
 }
