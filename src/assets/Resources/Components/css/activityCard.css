@@ -1,13 +1,8 @@
-/* ==========================================
-   Activity card — actividad local del perfil
-   (música / vídeo / juego en curso) + mini historial
-   ========================================== */
+/* ========================================== Activity card — actividad local del perfil (música / vídeo / juego en curso) ========================================== */
 
 .profile-activity-card {
   overflow: visible;
 }
-
-/* ── Actividad actual ── */
 
 .profile-activity-row {
   display: flex;
@@ -16,8 +11,6 @@
   min-width: 0;
 }
 
-/* Carátula simbólica: no hay artwork del sistema, así que usamos un cuadrado
-   con el icono de la fuente y, en música/vídeo, un ecualizador animado. */
 .profile-activity-art {
   position: relative;
   flex: 0 0 auto;
@@ -33,7 +26,6 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-/* Con carátula la caja es la imagen: los iconos de respaldo y el fondo sobran. */
 .profile-activity-art--image {
   padding: 0;
   overflow: hidden;
@@ -75,7 +67,6 @@
   animation-delay: 360ms;
 }
 
-/* Sobre una portada clara el ecualizador desaparecería: blanco + sombra. */
 .profile-activity-art--image .profile-activity-bars i {
   background: #ffffff;
   opacity: 0.95;
@@ -87,7 +78,6 @@
   50% { transform: scaleY(1); }
 }
 
-/* Respeta a quien pidió menos movimiento en el sistema. */
 @media (prefers-reduced-motion: reduce) {
   .profile-activity-bars i {
     animation: none;
@@ -120,98 +110,98 @@
   white-space: nowrap;
 }
 
-/* ── Historial de actividades ── */
+/* ── Historial de actividades (solo estilos) ── */
 
 .profile-activity-history {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--overlay-border-subtle, rgba(255, 255, 255, 0.08));
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
 }
 
 .profile-activity-history-title {
-  margin: 0 0 8px 0;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--color-text-muted, #6b7280);
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
+  margin: 0;
+  padding: 0;
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
 }
 
 .profile-activity-history-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: inherit;
+  flex-direction: inherit;
+  gap: inherit;
 }
 
 .profile-activity-history-item {
   list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
 .profile-activity-history-entry {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.8rem;
-  color: var(--color-text-secondary, #9ca3af);
-  line-height: 1.4;
-  min-width: 0;
+  display: inherit;
+  align-items: inherit;
+  gap: inherit;
+  font-size: inherit;
+  color: inherit;
+  line-height: inherit;
+  min-width: inherit;
 }
 
 .profile-activity-history-icon {
-  flex: 0 0 auto;
-  width: 14px;
-  height: 14px;
-  font-size: 0.7rem;
-  opacity: 0.6;
+  width: inherit;
+  height: inherit;
+  font-size: inherit;
+  opacity: inherit;
 }
 
 .profile-activity-history-label {
-  flex: 0 0 auto;
-  color: var(--color-text-muted, #6b7280);
-  text-transform: capitalize;
+  color: inherit;
+  text-transform: inherit;
 }
 
 .profile-activity-history-title {
-  flex: 1 1 auto;
-  min-width: 0;
-  color: var(--color-text, #ffffff);
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: inherit;
+  font-weight: inherit;
+  overflow: inherit;
+  text-overflow: inherit;
+  white-space: inherit;
 }
 
 .profile-activity-history-subtitle {
-  flex: 0 0 auto;
-  color: var(--color-text-muted, #6b7280);
-  opacity: 0.7;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: inherit;
+  opacity: inherit;
+  overflow: inherit;
+  text-overflow: inherit;
+  white-space: inherit;
 }
 
 .profile-activity-history-when {
-  flex: 0 0 auto;
-  font-size: 0.7rem;
-  color: var(--color-text-muted, #6b7280);
-  white-space: nowrap;
+  font-size: inherit;
+  color: inherit;
+  white-space: inherit;
 }
 
 .profile-activity-history-toggle {
-  margin-top: 10px;
+  margin: 0;
   all: unset;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.78rem;
-  color: var(--color-text-muted, #6b7280);
-  cursor: pointer;
-  transition: color 0.2s ease;
+  display: inherit;
+  align-items: inherit;
+  gap: inherit;
+  font-size: inherit;
+  color: inherit;
+  cursor: inherit;
 }
 
-.profile-activity-history-toggle:hover {
-  color: var(--color-text-secondary, #9ca3af);
+.profile-activity-history-toggle-icon {
+  width: auto;
+  height: auto;
+  font-size: inherit;
+  opacity: inherit;
 }
