@@ -10,6 +10,8 @@ import { useNavigate } from 'react-router-dom';
 import { getItem } from '../services/secureStorage';
 import { isWindowZoomAvailable, controlWindowZoom, isDesktopApp } from '../services/desktopApp';
 import { listOpenApps, isOpenAppsAvailable } from '../../hooks/useLocalActivity';
+import { APP_LOGO_CREDIT_URL } from '../services/appLogos';
+import ProgramLogo from '../Resources/Components/ProgramLogo';
 import { getActivitySettings, readActivityHistory, clearActivityHistory, persistActivity, persistProgramActivity, programFromProfile } from '../services/activityService';
 import { supabase } from '../services/supabaseclient';
 import { getNicknames, getCachedNicknames, cacheNicknames, setNickname, removeNickname } from '../services/chatService';
@@ -1637,14 +1639,20 @@ export default function Settings() {
                       aria-expanded={programMenuOpen}
                       disabled={activityUpdating || !programSelectable}
                     >
-                      {selectedProgramEntry?.icon && (
-                        <img
-                          src={selectedProgramEntry.icon}
-                          alt=""
-                          className="settings-activity-program-option-icon"
-                          draggable={false}
-                        />
-                      )}
+                      <ProgramLogo
+                        title={selectedProgram || ''}
+                        imgClassName="settings-activity-program-option-icon"
+                        fallback={
+                          selectedProgramEntry?.icon ? (
+                            <img
+                              src={selectedProgramEntry.icon}
+                              alt=""
+                              className="settings-activity-program-option-icon"
+                              draggable={false}
+                            />
+                          ) : null
+                        }
+                      />
                       <span className="settings-activity-program-btn-label">
                         {selectedProgram || t('settings.activity_program_none')}
                       </span>
@@ -1706,17 +1714,23 @@ export default function Settings() {
                                     setProgramMenuOpen(false);
                                   }}
                                 >
-                                  {app.icon ? (
-                                    <img
-                                      src={app.icon}
-                                      alt=""
-                                      className="settings-activity-program-option-icon"
-                                      loading="lazy"
-                                      draggable={false}
-                                    />
-                                  ) : (
-                                    <FaDesktop className="settings-activity-program-option-icon settings-activity-program-option-icon--fallback" />
-                                  )}
+                                  <ProgramLogo
+                                    title={app.name}
+                                    imgClassName="settings-activity-program-option-icon"
+                                    fallback={
+                                      app.icon ? (
+                                        <img
+                                          src={app.icon}
+                                          alt=""
+                                          className="settings-activity-program-option-icon"
+                                          loading="lazy"
+                                          draggable={false}
+                                        />
+                                      ) : (
+                                        <FaDesktop className="settings-activity-program-option-icon settings-activity-program-option-icon--fallback" />
+                                      )
+                                    }
+                                  />
                                   <span className="settings-activity-program-option-name">{app.name}</span>
                                   <span className="settings-activity-program-option-exe">{app.exe}</span>
                                 </button>
@@ -1739,6 +1753,18 @@ export default function Settings() {
                           <FaUndo />
                           {t('settings.activity_program_refresh')}
                         </button>
+
+                        <div className="fc-dropdown-divider" />
+
+                        {/* Atribución exigida por el uso gratuito de apistemic logos. */}
+                        <a
+                          className="settings-activity-program-credit"
+                          href={APP_LOGO_CREDIT_URL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Logos by apistemic logos
+                        </a>
                       </div>,
                       document.body,
                     )}

@@ -1092,6 +1092,19 @@ dialog.fc-modal.settings-blocked-modal {
   opacity: 0.6;
 }
 
+.settings-activity-program-credit {
+  display: block;
+  padding: 6px 12px 8px;
+  font-size: 0.68rem;
+  color: var(--color-text-muted, #6b7280);
+  text-decoration: none;
+}
+
+.settings-activity-program-credit:hover {
+  color: var(--color-text, #ffffff);
+  text-decoration: underline;
+}
+
 .settings-activity-program-option-name {
   flex: 1;
   min-width: 0;

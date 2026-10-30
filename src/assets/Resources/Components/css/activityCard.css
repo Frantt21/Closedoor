@@ -98,6 +98,22 @@
   border-top: none;
 }
 
+/* Atribución del proveedor de logos (uso gratuito de apistemic logos). */
+.profile-activity-logo-credit {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 0.62rem;
+  line-height: 1.2;
+  color: var(--accent-surface-text-color, var(--color-text, #ffffff));
+  opacity: 0.45;
+  text-decoration: none;
+}
+
+.profile-activity-logo-credit:hover {
+  opacity: 0.75;
+  text-decoration: underline;
+}
+
 .profile-activity-meta {
   display: flex;
   flex-direction: column;

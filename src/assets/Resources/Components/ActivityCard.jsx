@@ -20,6 +20,8 @@ import { useAuth } from '../../../hooks/useAuth';
 import { useLocalActivityState, isLocalActivityAvailable } from '../../../hooks/useLocalActivity';
 import { isFollowing, getCachedFollowStatus } from '../../services/followService';
 import { resolveActivityArtwork } from '../../services/musicService';
+import { appLogoUrl, APP_LOGO_CREDIT_URL } from '../../services/appLogos';
+import ProgramLogo from './ProgramLogo';
 import {
   normalizeActivity,
   activityFromProfile,
@@ -154,6 +156,7 @@ export default function ActivityCard({ profile, isOwnProfile, surfaceStyle }) {
     : isVideo
       ? t('profile.activity_watching')
       : t('profile.activity_listening');
+  const programLogo = program ? appLogoUrl(program.title) : null;
 
 
   return (
@@ -210,8 +213,15 @@ export default function ActivityCard({ profile, isOwnProfile, surfaceStyle }) {
           </h3>
 
           <div className="profile-activity-row">
-            <span className="profile-activity-art" aria-hidden="true">
-              <ProgramGlyph title={program.title} />
+            <span
+              className={`profile-activity-art ${programLogo ? 'profile-activity-art--image' : ''}`}
+              aria-hidden="true"
+            >
+              <ProgramLogo
+                title={program.title}
+                imgClassName="profile-activity-artwork"
+                fallback={<ProgramGlyph title={program.title} />}
+              />
             </span>
 
             <div className="profile-activity-meta">
@@ -220,6 +230,18 @@ export default function ActivityCard({ profile, isOwnProfile, surfaceStyle }) {
               </span>
             </div>
           </div>
+
+          {/* Atribución exigida por el uso gratuito de apistemic logos. */}
+          {programLogo && (
+            <a
+              className="profile-activity-logo-credit"
+              href={APP_LOGO_CREDIT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Logos by apistemic logos
+            </a>
+          )}
         </div>
       )}
     </div>
