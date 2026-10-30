@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FaMusic, FaTv, FaGamepad, FaSpotify, FaChevronDown } from 'react-icons/fa6';
+import { FaMusic, FaTv, FaGamepad, FaSpotify } from 'react-icons/fa6';
 import { useI18n } from '../../services/i18n/useI18n';
 import { useAuth } from '../../../hooks/useAuth';
 import { useLocalActivityState, isLocalActivityAvailable } from '../../../hooks/useLocalActivity';
@@ -11,7 +11,6 @@ import {
   getActivitySettings,
   canViewActivity,
 } from '../../services/activityService';
-import { readActivityHistory } from '../../services/activityService';
 import './css/activityCard.css';
 
 /** ¿El visitante sigue al dueño del perfil? */
@@ -57,7 +56,6 @@ export default function ActivityCard({ profile, isOwnProfile, surfaceStyle }) {
   const { t } = useI18n();
   const { user } = useAuth();
   const { activity: liveActivity } = useLocalActivityState();
-  const isDesktop = isLocalActivityAvailable();
 
   const { enabled, visibility } = getActivitySettings(profile);
 
@@ -148,97 +146,6 @@ export default function ActivityCard({ profile, isOwnProfile, surfaceStyle }) {
         </div>
       </div>
 
-      {isOwnProfile && isDesktop && enabled && (
-        <ActivityHistory userId={user?.id} limit={3} />
-      )}
     </div>
   );
-}
-
-/** ActivityHistory — mini historial de lo que el usuario detectó en su equipo,
- *  con 3 elementos visibles y un botón para expandir todo el historial local. */
-
-function ActivityHistory({ userId, limit = 3 }) {
-  const { t } = useI18n();
-  const [hist, setHist] = useState([]);
-  const [expanded, setExpanded] = useState(false);
-
-  useEffect(() => {
-    if (!userId) return;
-    let alive = true;
-    readActivityHistory(userId).then((rows) => {
-      if (alive) setHist(Array.isArray(rows) ? rows : []);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [userId]);
-
-  const visible = expanded ? hist : hist.slice(0, limit);
-  const hasMore = hist.length > limit;
-  const byWhen = (a, b) => new Date(b?.detectedAt || 0) - new Date(a?.detectedAt || 0);
-
-  if (!hist.length) return null;
-
-  return (
-    <div className="profile-activity-history">
-      <h4 className="profile-activity-history-title">{t('profile.activity_history')}</h4>
-
-      <ul className="profile-activity-history-list">
-        {visible
-          .slice()
-          .sort(byWhen)
-          .map((item) => (
-            <li key={item.detectedAt + (item.title || '') + (item.subtitle || '')} className="profile-activity-history-item">
-              <ActivityHistoryItem activity={item} />
-            </li>
-          ))}
-      </ul>
-
-      {hasMore && (
-        <button
-          type="button"
-          className="profile-activity-history-toggle"
-          onClick={() => setExpanded((prev) => !prev)}
-        >
-          <FaChevronDown className="profile-activity-history-toggle-icon" />
-          <span>{expanded ? t('profile.show_less') : t('profile.show_history_all', { count: hist.length - limit })}</span>
-        </button>
-      )}
-    </div>
-  );
-}
-
-function ActivityHistoryItem({ activity }) {
-  const { t } = useI18n();
-  const kind = activity?.kind || 'music';
-  const Icon = kind === 'game' ? FaGamepad : kind === 'video' ? FaTv : activity?.app === 'Spotify' ? FaSpotify : FaMusic;
-  const when = formatActivityWhen(activity?.detectedAt);
-  const label = kind === 'game' ? t('profile.activity_playing_game') : kind === 'video' ? t('profile.activity_watching') : t('profile.activity_listening');
-
-  return (
-    <div className="profile-activity-history-entry" title={when}>
-      <Icon className="profile-activity-history-icon" />
-      <span className="profile-activity-history-label">{label}</span>
-      <span className="profile-activity-history-title" title={activity?.title}>{activity?.title}</span>
-      {activity?.subtitle && (
-        <span className="profile-activity-history-subtitle" title={activity.subtitle}>{activity.subtitle}</span>
-      )}
-      <span className="profile-activity-history-when">{when}</span>
-    </div>
-  );
-}
-
-function formatActivityWhen(iso) {
-  if (!iso) return '';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  try {
-    return date.toLocaleString(undefined, {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return date.toLocaleString();
-  }
 }
