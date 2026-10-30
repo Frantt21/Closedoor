@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { FaMusic, FaTv, FaGamepad, FaSpotify } from 'react-icons/fa6';
+import { FaMusic, FaTv, FaGamepad, FaSpotify, FaChevronDown } from 'react-icons/fa6';
 import { useI18n } from '../../services/i18n/useI18n';
 import { useAuth } from '../../../hooks/useAuth';
 import { useLocalActivityState, isLocalActivityAvailable } from '../../../hooks/useLocalActivity';
@@ -148,9 +148,9 @@ export default function ActivityCard({ profile, isOwnProfile, surfaceStyle }) {
         </div>
       </div>
 
-      {/* {isOwnProfile && isDesktop && enabled && (
+      {isOwnProfile && isDesktop && enabled && (
         <ActivityHistory userId={user?.id} limit={3} />
-      )} */}
+      )}
     </div>
   );
 }
@@ -235,8 +235,6 @@ function formatActivityWhen(iso) {
   if (Number.isNaN(date.getTime())) return '';
   try {
     return date.toLocaleString(undefined, {
-      day: '2-digit',
-      month: 'short',
       hour: '2-digit',
       minute: '2-digit',
     });
