@@ -197,8 +197,10 @@
     gap: 10px;
     flex-shrink: 0;
     padding: 10px 12px;
-    border-top: 1px solid var(--color-border, #2a2a2a);
+    border: 1px solid var(--color-border, #2a2a2a);
     background: transparent;
+    margin: 6px;
+    border-radius: var(--radius, 10px);
 }
 
 .chat-account-card-avatar {
