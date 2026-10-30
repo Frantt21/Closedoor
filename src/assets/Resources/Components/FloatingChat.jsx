@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FaCommentDots, FaTimes, FaChevronLeft, FaPaperPlane, FaExpand, FaSpinner, FaComments, FaReply } from 'react-icons/fa';
@@ -80,6 +80,7 @@ export default function FloatingChat() {
   const listRef = useRef(null);
   const threadRef = useRef(null);
   const activeIdRef = useRef(null);
+  const pendingAppStylesRef = useRef(false);
 
   useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
 
@@ -177,6 +178,40 @@ export default function FloatingChat() {
     setOpen(true);
     notif.refreshChatUnread?.();
   }, [open, notif]);
+
+  // ── UseLayoutEffect para inyectar los estilos de respaldo de las cards de
+  // chat, de forma que estén disponibles antes de que la app inyecte las de
+  // .chat-message-shared-*. Esto evita que al abrir primero la flotante, las
+  // tarjetas de canciones, invitaciones y posts queden invisibles.
+  useLayoutEffect(() => {
+    if (!userId) return;
+
+    if (document.getElementById('app-styles')) {
+      pendingAppStylesRef.current = false;
+      return;
+    }
+
+    const sheet = document.createElement('style');
+    sheet.id = 'pending-app-styles-float-backup';
+    sheet.textContent = `
+      .chat-message-shared-song,
+      .chat-message-shared-community,
+      .chat-message-shared-post {
+        margin-bottom: 0;
+        width: 280px;
+        flex-shrink: 0;
+        box-sizing: border-box;
+      }
+    `;
+    document.head.appendChild(sheet);
+    pendingAppStylesRef.current = true;
+
+    return () => {
+      const el = document.getElementById('pending-app-styles-float-backup');
+      if (el) el.remove();
+      pendingAppStylesRef.current = false;
+    };
+  }, [userId]);
 
   // ── Realtime de la conversación abierta ──
   useEffect(() => {

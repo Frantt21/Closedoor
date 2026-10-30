@@ -414,21 +414,29 @@
     white-space: nowrap;
 }
 
-/* Las tarjetas compartidas (canción, invitación a comunidad, post) NO se
-   reestilan aquí: conservan el ancho fijo de 280px y los mismos paddings que
-   en el chat completo, para que midan igual en las dos ventanas. Solo se
-   quita el margen inferior, que en el globo separaba la card del texto. */
-.fc-msg-bubble .chat-message-shared-song,
-.fc-msg-bubble .chat-message-shared-community,
-.fc-msg-bubble .chat-message-shared-post {
+/* Las tarjetas compartidas (canción, invitación a comunidad, post) usan las
+   mismas clases que el chat completo. Cuando la app arranca con las dos famílias
+   todavía sin cargar (<style> no inyectado), #menu-root hace que las cards
+   desaparezcan; esto fuerza que esa regla de restyle llegue ANTES de cualquier
+   selector de app, para que las tarjetas siempre se queden visibles.
+   Solo se quita el margen inferior (el globo ya no se pinta junto a ellas).
+   Los valores idénticos a chat.css para que midan igual en ambas ventanas. */
+#menu-root .chat-message-shared-song,
+#menu-root .chat-message-shared-community,
+#menu-root .chat-message-shared-post {
     margin-bottom: 0;
+    width: 280px;
+    flex-shrink: 0;
 }
 
 /* Un mensaje con tarjeta no cabe en el 82% del hilo: las cards miden 280px y
    quedaban recortadas/desbordadas. Lo dejamos ocupar el ancho completo. */
 .fc-msg:has(.chat-message-shared-song),
 .fc-msg:has(.chat-message-shared-community),
-.fc-msg:has(.chat-message-shared-post) {
+.fc-msg:has(.chat-message-shared-post),
+#menu-root .fc-msg:has(.chat-message-shared-song),
+#menu-root .fc-msg:has(.chat-message-shared-community),
+#menu-root .fc-msg:has(.chat-message-shared-post) {
     max-width: 100%;
 }
 
