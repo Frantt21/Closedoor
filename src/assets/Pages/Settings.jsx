@@ -1616,7 +1616,7 @@ export default function Settings() {
               <div className="settings-row-divider" />
 
               {/* ── Programa compartido (segunda actividad) ── */}
-              <div className="settings-row" style={programSelectable ? undefined : { opacity: 0.55 }}>
+              <div className="settings-row settings-row--stacked" style={programSelectable ? undefined : { opacity: 0.55 }}>
                 <div className="settings-row-header">
                   <span className="settings-section-icon"><FaDesktop /></span>
                   <div>
