@@ -22,7 +22,7 @@
     justify-content: center;
     width: 54px;
     height: 54px;
-    border: 1px solid var(--color-border, #2a2a2a);
+    border: none;
     border-radius: 50%;
     background: var(--color-surface, #1a1a1a);
     color: var(--color-text, #ffffff);
@@ -112,7 +112,6 @@
     width: 344px;
     height: min(540px, 72vh);
     background: var(--color-surface, #1a1a1a);
-    border: 1px solid var(--color-border, #2a2a2a);
     border-radius: var(--radius-lg, 14px);
     box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
     overflow: hidden;
