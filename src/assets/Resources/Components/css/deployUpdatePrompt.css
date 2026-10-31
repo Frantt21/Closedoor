@@ -16,7 +16,6 @@
     border-radius: var(--radius, 10px);
     background: var(--color-surface, #1a1a1a);
     color: var(--color-text, #ffffff);
-    border: 1px solid color-mix(in srgb, var(--color-text, #fff) 12%, transparent);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
     animation: deploy-update-in 0.25s ease;
 }
