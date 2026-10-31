@@ -652,6 +652,7 @@
   "profile.stats_title": "Статистика",
   "profile.stats_views": "Просмотры",
   "profile.title": "Профиль",
+  "profile.login.error": "Ошибка входа в профиль. Попробуйте снова.",
   "profile.updated": "Профиль успешно обновлён.",
   "profile.username_auth_error": "Имя пользователя обновлено в профиле, но не в auth. Попробуйте снова.",
   "profile.username_short": "Имя пользователя должно содержать минимум 3 символа.",

@@ -1443,7 +1443,7 @@ function Profile() {
 
     // ── Render ──
     if (!isAuthenticated && !profileUsername) {
-        return <p>{t('profile.title')}</p>;
+        return <p>{t('profile.login.error')}</p>;
     }
 
     if (profileError) {

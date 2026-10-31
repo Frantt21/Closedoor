@@ -652,6 +652,7 @@
   "profile.stats_title": "Estatísticas",
   "profile.stats_views": "Visualizações",
   "profile.title": "Perfil",
+  "profile.login.error": "Erro ao carregar perfil. Tente novamente.",
   "profile.updated": "Perfil atualizado com sucesso.",
   "profile.username_auth_error": "O nome foi atualizado no perfil, mas não na autenticação. Tente novamente.",
   "profile.username_short": "O nome de usuário deve ter pelo menos 3 caracteres.",

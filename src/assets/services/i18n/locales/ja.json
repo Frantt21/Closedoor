@@ -652,6 +652,7 @@
   "profile.stats_title": "統計",
   "profile.stats_views": "閲覧数",
   "profile.title": "プロフィール",
+  "profile.login.error": "プロフィールの読み込み中にエラーが発生しました。もう一度お試しください。",
   "profile.updated": "プロフィールを更新しました。",
   "profile.username_auth_error": "プロフィールのユーザー名は更新されましたが、認証情報は更新されませんでした。もう一度お試しください。",
   "profile.username_short": "ユーザー名は3文字以上必要です。",
