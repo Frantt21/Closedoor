@@ -43,7 +43,7 @@
 }
 
 .download-subtitle {
-  margin: 0 0 20px 48px;
+  margin: 0 0 20px 0px;
   font-size: 0.9rem;
   line-height: 1.5;
   color: var(--color-text-secondary, #9ca3af);
@@ -94,10 +94,7 @@
   gap: 16px;
   padding: 20px;
   border-radius: var(--radius-lg, 14px);
-  border: 1px solid var(--color-border, #2a2a2a);
-  background:
-    radial-gradient(120% 160% at 100% 0%, var(--overlay-bg, rgba(255, 255, 255, 0.08)) 0%, transparent 60%),
-    var(--color-surface, #1a1a1a);
+  background: var(--color-surface, #1a1a1a);
 }
 
 .download-primary-icon {

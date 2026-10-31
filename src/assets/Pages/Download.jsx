@@ -137,9 +137,6 @@ export default function Download() {
   return (
     <div className="download-page">
       <div className="download-header">
-        <button type="button" className="download-back" onClick={goBack} aria-label={t('common.back')}>
-          <FaArrowLeft />
-        </button>
         <h1 className="download-title">{t('download.title')}</h1>
       </div>
 
@@ -253,7 +250,6 @@ export default function Download() {
       {/* ── Web vs. app de escritorio ── */}
       <section className="download-section">
         <h2 className="download-section-title">{t('download.compare_title')}</h2>
-        <p className="download-section-subtitle">{t('download.compare_subtitle')}</p>
 
         <div className="download-compare">
           <article className="download-compare-card">
@@ -293,10 +289,6 @@ export default function Download() {
           </article>
         </div>
       </section>
-
-      <p className="download-meta">
-        {t('download.version')} {DESKTOP_VERSION}
-      </p>
     </div>
   );
 }

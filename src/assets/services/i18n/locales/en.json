@@ -846,7 +846,7 @@
   "desktop.feature_full": "Full songs, not just the 30-second preview.",
   "desktop.feature_connection": "Resolved from your own connection, so YouTube doesn't ask for verification.",
   "desktop.feature_same": "Same account and same profiles: it's this app, with the full audio.",
-  "download.title": "Foranly for desktop",
+  "download.title": "Closedoor for desktop",
   "download.subtitle": "The same app, with profile songs playing in full.",
   "download.why_title": "Why the desktop app?",
   "download.why_body": "YouTube only gives the full track to connections it trusts. From a server, the browser gets a verification check instead. On your computer, the audio is served from your own connection, so the song plays through.",

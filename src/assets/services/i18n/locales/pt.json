@@ -844,7 +844,7 @@
   "desktop.feature_full": "A música completa, não só os 30 segundos.",
   "desktop.feature_connection": "É resolvida pela sua própria conexão, então o YouTube não pede verificação.",
   "desktop.feature_same": "Mesma conta e mesmos perfis: é este mesmo app, com o áudio completo.",
-  "download.title": "Foranly para desktop",
+  "download.title": "Closedoor para desktop",
   "download.subtitle": "O mesmo app, com as músicas do perfil tocando inteiras.",
   "download.why_title": "Por que um app de desktop?",
   "download.why_body": "O YouTube só entrega a faixa completa a conexões em que confia; de um servidor (o que o navegador faz hoje) a resposta é uma verificação. No seu computador o áudio sai da sua própria conexão, então a música toca inteira.",
