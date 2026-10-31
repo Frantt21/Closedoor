@@ -224,7 +224,6 @@ export default function ChatAccountCard() {
   })();
 
   const rows = [
-    { label: t('chat.account_email'), value: user?.email || '—' },
     { label: t('chat.account_joined'), value: joined || '—' },
     { label: t('chat.account_followers'), value: counts?.followers ?? profile?.followers ?? 0 },
     { label: t('chat.account_following'), value: counts?.following ?? profile?.followings ?? 0 },
